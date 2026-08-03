@@ -692,7 +692,13 @@ describe('mascota.svg — estructura', () => {
   })
 
   it('no hay grupos de más', () => {
-    const declarados = JERARQUIA.map((g) => g.id)
+    // `JERARQUIA` es `as const`, así que `.map` devuelve una unión de tipos
+    // literales y `.includes(string)` no compila. Ensanchar una sola vez con
+    // la anotación es la salida honesta. Castear el argumento a `never`
+    // también compila, pero desactiva el chequeo para siempre: `includes`
+    // pasaría a aceptar cualquier cosa, incluso si el tipo se estrecha de
+    // nuevo más adelante.
+    const declarados: readonly string[] = JERARQUIA.map((g) => g.id)
     const sobrantes = idsDeGrupos(doc).filter(
       (id) => !declarados.includes(id) && !id.startsWith('piv-') && !id.startsWith('grano-'),
     )
