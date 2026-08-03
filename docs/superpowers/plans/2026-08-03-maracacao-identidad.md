@@ -976,8 +976,8 @@ git commit -m "feat: rasterizado de SVG para verificación visual"
 | Clase de trazo de detalles internos | `.t-interior` (8) |
 | Relleno del cráneo y orejas | `#5B744B` |
 | Relleno del rostro | `#F8B465` |
-| Relleno de cachetes | `#8B4D3F` a `opacity="0.35"` |
-| Relleno de boca | `#8B4D3F`; lengua `#F4E8C6` |
+| Relleno de cachetes | `rosa-300` `#E0A9A4`, sólido (decidido en el fix round: el bordó al 35% los dejaba marrones) |
+| Relleno de boca | `#8B4D3F`; lengua `rosa-300` `#E0A9A4` — a tamaño chico `rosa-400` se empasta contra el bordó (contraste 2.36 vs 3.21) y el `rosa-500` del original directamente se pierde (1.71) |
 | Ojos | arcos cerrados de sonrisa, sin relleno, `.t-interior` |
 
 **No copiar del render:** textura de pincel, moteado tonal, ancho de cabeza aumentado. La foto manda en proporciones.
