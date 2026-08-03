@@ -11,7 +11,8 @@
     "astro": "astro",
     "render": "node scripts/render-svg.mjs",
     "test": "vitest run",
-    "typecheck": "astro check"
+    "typecheck": "astro check",
+    "tokens": "node scripts/emit-tokens.mjs"
   },
   "dependencies": {
     "@astrojs/mdx": "^7.0.5",

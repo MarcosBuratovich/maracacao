@@ -1,2 +1,11 @@
 /* src/styles/global.css */
 @import "tailwindcss";
+@import "./tokens.generated.css";
+
+@media (prefers-reduced-motion: reduce) {
+  /* El spec dice apagar, no atenuar. */
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
