@@ -86,6 +86,7 @@ Más grave que el cambio en sí: **el packaging original tenía un contraste tip
 | Base cromática | **C — bandas alternadas** | Crema y verde por secciones |
 | Pairing tipográfico | **Fraunces + Work Sans** | |
 | Header del sitio | **Cabeza + logotipo + descriptor** | |
+| Idioma | **Español de México (`es-MX`)** | Más idiomas se evalúan después; ver §10.6 |
 
 ## 6. Sistema cromático
 
@@ -283,6 +284,18 @@ maracacao/
 4. **Fuentes self-hosteadas.** Sin `<link>` a Google en producción: privacidad, velocidad, y que la identidad no dependa de un CDN ajeno.
 5. **Dos capas de animación** con regla clara de cuál usar: **CSS keyframes y transiciones** para lo ambiental y para la UI, **Rive** para el personaje. `prefers-reduced-motion` las apaga desde un solo lugar. No se instala ninguna librería de animación de entrada — si más adelante aparece una interacción que necesite física de springs de verdad, se evalúa Motion entonces y se justifica el peso.
 
+### 10.6 Idioma y preparación para i18n
+
+El sitio es **español de México**: `<html lang="es-MX">`, y `Intl` con locale `es-MX` para fechas, números y pesos.
+
+**No se implementa i18n ahora.** Pero se van a sumar idiomas, y hay tres reglas que no cuestan nada hoy y evitan una reescritura después:
+
+1. **Ningún string visible se escribe dentro de un componente.** Todo el texto de cara al usuario vive en `src/content/` (MDX) o en un módulo de copy. Un componente recibe texto, no lo contiene.
+2. **Las rutas nacen bajo un segmento de idioma implícito.** La estructura de `src/pages/` se arma de modo que agregar `[lang]/` después sea mover archivos, no reescribir enlaces. Los enlaces internos pasan por un helper, nunca son strings crudos.
+3. **Nada de texto dentro de los SVG de marca.** El lettering de `MARACACAO` y `CHOCOLATE MEXICANO` son paths, no `<text>` — lo cual ya era la regla por otro motivo, pero acá suma: el logotipo no se traduce nunca.
+
+**Vocabulario:** el español de México no es intercambiable con el rioplatense ni con el peninsular, y el packaging ya lo demuestra — dice **"pistaches"**, no "pistachos". Ese registro manda sobre cualquier corrección de estilo genérica.
+
 ## 11. Rig de Rive e integración
 
 ### 11.1 Restricción reconocida
@@ -357,7 +370,7 @@ El fallback CSS no es un plan B: es lo que ve quien tiene reduced-motion o conex
 | Las proporciones salen de una foto borrosa | El redibujo es interpretativo | La foto manda sobre Gemini; se revisa contra ambas |
 | No se identificó la fuente original del wordmark | El lettering es una aproximación | Se dibuja a mano calcando; no depende de identificarla |
 | El `.riv` depende de una persona externa al código | La landing podría quedar bloqueada esperándolo | El fallback CSS shippea igual y la integración está preparada para swappear |
-| Se asume mercado hispanohablante y sitio en español | Si hay mercado en inglés, cambia el copy y quizá la escala tipográfica | **Verificar antes de implementar.** No afecta la estructura |
+| Se van a sumar idiomas más adelante | Retrofitear i18n sobre strings incrustados en componentes es caro | Las tres reglas de §10.6 se aplican desde el primer commit. No se construye i18n, solo se evita bloquearla |
 
 ## 15. Próximo paso
 
