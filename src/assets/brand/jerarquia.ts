@@ -10,12 +10,10 @@ export const JERARQUIA = [
   { id: 'cola', padre: 'mono' },
   { id: 'pierna-post', padre: 'mono' },
   { id: 'pie-post', padre: 'pierna-post' },
-  { id: 'brazo-post', padre: 'mono' },
   { id: 'cuerpo', padre: 'mono' },
   { id: 'pierna-apoyo', padre: 'mono' },
   { id: 'pie-apoyo', padre: 'pierna-apoyo' },
   { id: 'brazo-l', padre: 'mono' },
-  { id: 'mano-l', padre: 'brazo-l' },
   { id: 'bowl', padre: 'mono' },
   { id: 'bowl-cuenco', padre: 'bowl' },
   { id: 'bowl-contenido', padre: 'bowl' },
@@ -33,6 +31,11 @@ export const JERARQUIA = [
   { id: 'cachete-r', padre: 'cabeza' },
   { id: 'nariz', padre: 'cabeza' },
   { id: 'boca', padre: 'cabeza' },
+  // La mano izquierda cuelga de #mono, no de #brazo-l: va después de la cabeza
+  // porque en la referencia la mano y el pistache se pintan por delante de la
+  // cara. En Rive se emparenta al hueso del brazo izquierdo; acá el orden ES
+  // el orden de pintado y es lo único que decide quién tapa a quién.
+  { id: 'mano-l', padre: 'mono' },
   { id: 'chispas', padre: 'mono' },
   { id: 'pivotes', padre: null },
 ] as const
@@ -42,7 +45,6 @@ export const PIVOTES = {
   'cola': 'cadera',
   'pierna-post': 'cadera',
   'pie-post': 'tobillo',
-  'brazo-post': 'hombro',
   'pierna-apoyo': 'cadera',
   'pie-apoyo': 'tobillo',
   'brazo-l': 'hombro',

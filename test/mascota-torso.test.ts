@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cargarSvg, hexUsados } from './svg-utils'
+import { cargarSvg, hexUsados, padreDe, idsDeGrupos } from './svg-utils'
 import { todosLosColores } from '@/tokens/color'
 
 const doc = cargarSvg('src/assets/brand/mascota.svg')
@@ -8,12 +8,17 @@ const formas = (id: string) =>
   grupo(id).querySelectorAll('path, circle, ellipse, rect').length
 
 describe('torso y brazos — contenido', () => {
-  it.each(['cuerpo', 'brazo-l', 'mano-l', 'brazo-r', 'mano-r', 'brazo-post'])(
+  it.each(['cuerpo', 'brazo-l', 'mano-l', 'brazo-r', 'mano-r'])(
     '#%s tiene al menos una forma', (id) => expect(formas(id)).toBeGreaterThan(0),
   )
 
-  it('la mano izquierda vive dentro del brazo izquierdo', () => {
-    expect(grupo('mano-l').closest('g[id="brazo-l"]')).not.toBeNull()
+  it('la mano izquierda se pinta después de la cabeza — lleva el pistache a la boca', () => {
+    // Cerrado contra la referencia (§9.2 del spec): en el packaging la mano
+    // va por delante de la cara. En Rive se emparenta al hueso del brazo;
+    // acá vive después de #cabeza por orden de pintado.
+    expect(padreDe(doc, 'mano-l')).toBe('mono')
+    const orden = idsDeGrupos(doc)
+    expect(orden.indexOf('mano-l')).toBeGreaterThan(orden.indexOf('cabeza'))
   })
 
   it('la mano derecha vive dentro del brazo derecho', () => {
@@ -29,7 +34,7 @@ describe('torso y brazos — paleta', () => {
 })
 
 describe('torso y brazos — pivotes ubicados', () => {
-  it.each(['piv-brazo-l', 'piv-mano-l', 'piv-brazo-r', 'piv-mano-r', 'piv-brazo-post'])(
+  it.each(['piv-brazo-l', 'piv-mano-l', 'piv-brazo-r', 'piv-mano-r'])(
     '%s dejó de estar en el origen', (id) => {
       const el = doc.querySelector(`[id="${id}"]`)!
       expect(Number(el.getAttribute('cx'))).toBeGreaterThan(0)
@@ -59,7 +64,7 @@ describe('torso y brazos — técnica de relleno', () => {
   // Si una forma se queda sin `fill`, cae al negro inicial de SVG y se
   // dibuja como una mancha sólida; si vuelve un `style` inline, el color
   // deja de sobrevivir a una importación que ignore estilos.
-  const GRUPOS = ['cuerpo', 'brazo-l', 'brazo-r', 'brazo-post'] as const
+  const GRUPOS = ['cuerpo', 'brazo-l', 'mano-l', 'brazo-r'] as const
 
   it.each(GRUPOS)('toda forma de #%s con clase de trazo lleva fill explícito', (id) => {
     const conClase = [...grupo(id).querySelectorAll('[class]')]
@@ -93,7 +98,7 @@ describe('torso y brazos — geometría horneada', () => {
   // Las coordenadas son absolutas y los pivotes también. Un `transform`
   // sobreviviente (por ejemplo el de la prueba del brazo) mueve el dibujo
   // respecto de su pivote.
-  it.each(['cuerpo', 'brazo-l', 'mano-l', 'brazo-r', 'mano-r', 'brazo-post'])(
+  it.each(['cuerpo', 'brazo-l', 'mano-l', 'brazo-r', 'mano-r'])(
     'ni #%s ni sus formas usan transform', (id) => {
       expect(grupo(id).hasAttribute('transform')).toBe(false)
       for (const el of grupo(id).querySelectorAll('*')) {

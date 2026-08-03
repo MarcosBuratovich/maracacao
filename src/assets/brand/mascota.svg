@@ -21,14 +21,6 @@
     <g id="mono">
       <g id="cola"></g>
       <g id="pierna-post"><g id="pie-post"></g></g>
-      <g id="brazo-post">
-        <!-- Brazo del lado lejano, por detrás del torso. La referencia muestra dos
-             brazos y nada más, así que este va completo y completamente tapado: es
-             el miembro que el rig necesita si alguna pose lo saca de atrás del
-             cuerpo. Verificado: rotarlo ±20° no cambia un solo píxel del render. -->
-        <path id="brazo-post-forma" class="t-principal" fill="#5B744B"
-              d="M 499.57 291.46 C 498.81 294.4 496.44 303.31 495.01 309.1 C 493.58 314.88 492.28 320.23 490.98 326.18 C 489.69 332.12 488.24 338.7 487.24 344.78 C 486.24 350.86 485.53 356.6 485 362.68 C 484.48 368.76 484.3 374.99 484.09 381.25 C 483.89 387.52 483.75 394.07 483.75 400.25 C 483.75 406.43 483.85 412.55 484.1 418.36 C 484.36 424.17 484.83 429.49 485.29 435.12 C 485.74 440.74 486.38 447.54 486.82 452.12 C 487.26 456.69 487.74 460.82 487.93 462.56 A 14 14 0 0 1 460.07 465.44 C 459.89 463.69 459.42 459.61 458.97 454.96 C 458.52 450.3 457.86 443.4 457.39 437.51 C 456.92 431.62 456.4 425.29 456.13 419.63 C 455.86 413.98 455.8 409.04 455.76 403.57 C 455.72 398.11 455.79 392.38 455.91 386.87 C 456.03 381.37 456.18 376.08 456.48 370.55 C 456.78 365.02 457.08 359.35 457.71 353.7 C 458.34 348.06 459.26 342.24 460.25 336.66 C 461.23 331.08 462.35 325.96 463.62 320.22 C 464.89 314.49 466.4 308.18 467.87 302.23 C 469.34 296.28 471.67 287.49 472.43 284.54 A 14 14 0 0 1 499.57 291.46 Z"/>
-      </g>
       <g id="cuerpo">
         <!-- Torso COMPLETO. Arranca en y=228, por encima del mentón (258), y llega
              a la cadera en y=598. Se dibuja entero por detrás de los brazos y del
@@ -62,26 +54,6 @@
              a la izquierda de las franjas, igual que en la foto. -->
         <path id="brazo-l-forma" class="t-principal" fill="#5B744B"
               d="M 492.03 273.66 C 490.97 276.76 488.36 286.38 485.69 292.28 C 483.02 298.17 478.37 305.43 476 309.04 C 473.63 312.65 474.24 311.32 471.45 313.93 C 468.66 316.55 463.44 321.13 459.26 324.74 C 455.08 328.34 450.9 331.99 446.39 335.57 C 441.89 339.15 437.23 342.65 432.25 346.21 C 427.27 349.78 421.54 353.71 416.51 356.97 C 411.48 360.22 407.09 362.85 402.1 365.73 C 397.11 368.62 391.74 371.64 386.55 374.27 C 381.36 376.9 376.1 379.34 370.97 381.52 C 365.85 383.7 361 385.5 355.81 387.33 C 350.62 389.16 345.24 391.19 339.84 392.5 C 334.44 393.8 326.81 394.79 323.4 395.17 C 319.98 395.55 321.83 395.49 319.34 394.79 C 316.85 394.09 310.79 391.92 308.48 390.97 C 306.17 390.03 307.82 391.34 305.5 389.11 C 303.17 386.89 296.63 380 294.53 377.62 C 292.43 375.24 293.8 377.41 292.9 374.81 C 292 372.21 289.83 365.53 289.13 362.02 C 288.43 358.5 288.39 358.03 288.71 353.71 C 289.03 349.39 289.81 341.61 291.05 336.11 C 292.3 330.62 294.29 326.02 296.17 320.73 C 298.05 315.44 300.08 309.69 302.34 304.39 C 304.59 299.1 307.54 294.18 309.68 288.97 C 311.82 283.75 313.63 278.43 315.15 273.11 C 316.68 267.79 318.13 260.16 318.83 257.05 C 319.54 253.94 319.29 254.88 319.38 254.45 A 17 17 0 0 1 352.62 261.55 C 352.2 263.59 351.26 268.97 350.05 273.78 C 348.85 278.59 347.23 284.95 345.39 290.41 C 343.55 295.86 341.32 301.12 339.02 306.51 C 336.73 311.89 333.83 317.25 331.62 322.7 C 329.42 328.16 327.29 334.27 325.82 339.24 C 324.34 344.21 323.25 349.61 322.75 352.53 C 322.24 355.44 322.64 355.54 322.77 356.76 C 322.9 357.97 322.86 359.12 323.51 359.8 C 324.17 360.48 323.57 361.46 326.69 360.83 C 329.82 360.2 337.09 357.79 342.27 356.02 C 347.45 354.25 352.51 352.43 357.76 350.19 C 363.02 347.95 368.81 345.15 373.81 342.57 C 378.81 339.99 382.92 337.61 387.79 334.71 C 392.65 331.81 398.15 328.39 403 325.16 C 407.85 321.93 412.21 318.83 416.89 315.33 C 421.57 311.84 426.49 307.97 431.1 304.17 C 435.71 300.36 441.81 294.91 444.56 292.5 C 447.31 290.09 445.99 291.86 447.59 289.72 C 449.18 287.58 452.05 284.23 454.12 279.66 C 456.18 275.1 458.99 265.23 459.97 262.34 A 17 17 0 0 1 492.03 273.66 Z"/>
-        <g id="mano-l">
-          <!-- Puño cerrado de perfil: silueta + cuatro pliegues de dedo. -->
-          <path id="mano-l-puno" class="t-principal" fill="#F8B465"
-                d="M 300 240 C 300 233.67 300.67 225.17 304 220 C 307.33 214.83 313.67 211 320 209 C 326.33 207 335.33 206.67 342 208 C 348.67 209.33 356.17 212.33 360 217 C 363.83 221.67 364.5 229.83 365 236 C 365.5 242.17 365.17 248.5 363 254 C 360.83 259.5 357 265.5 352 269 C 347 272.5 339.17 274.83 333 275 C 326.83 275.17 319.83 272.83 315 270 C 310.17 267.17 306.5 263 304 258 C 301.5 253 300 246.33 300 240 Z"/>
-          <path id="mano-l-dedo-1" class="t-fino" fill="none"
-                d="M 326 219 Q 342 215 358 222"/>
-          <path id="mano-l-dedo-2" class="t-fino" fill="none"
-                d="M 324 233 Q 341 229 357 236"/>
-          <path id="mano-l-dedo-3" class="t-fino" fill="none"
-                d="M 327 247 Q 343 243 355 250"/>
-          <path id="mano-l-dedo-4" class="t-fino" fill="none"
-                d="M 333 259 Q 345 256 352 261"/>
-          <!-- Pistache abierto camino a la boca: cáscara arriba, semilla abajo.
-               La punta llega al borde del cráneo y no más: la cabeza se pinta
-               después que el brazo, así que todo lo que entre en la cara se pierde. -->
-          <path id="pistache-mano-cascara" class="t-fino" fill="#FBD5A9"
-                d="M 344 220 Q 366.74 191.4 402 201 Q 379.26 229.6 344 220 Z"/>
-          <path id="pistache-mano-semilla" class="t-fino" fill="#F4E8C6"
-                d="M 350 243 Q 367.3 217.38 398 221 Q 380.7 246.62 350 243 Z"/>
-        </g>
       </g>
       <g id="bowl">
         <g id="bowl-cuenco"></g>
@@ -213,6 +185,46 @@
                    C 502.58 233.51 489.4 227.86 487.51 220.33 Z"/>
         </g>
       </g>
+      <!-- Mano izquierda: se pinta DESPUÉS de #cabeza a propósito. En el
+           packaging la mano y el pistache van por delante de la cara y la punta
+           toca la comisura de la boca; con la mano dentro de #brazo-l todo lo
+           que entra en la silueta del cráneo desaparece y el gesto lee
+           "acercándoselo", no "comiendo".
+           PARA EL RIGGER: en Rive esta mano se emparenta al hueso del brazo
+           izquierdo (piv-mano-l es la muñeca, y no se movió). Vive acá abajo
+           SOLO por orden de pintado — el SVG no tiene z-index y el único modo
+           de poner la mano delante de la cabeza es dibujarla después. Al
+           rotar #brazo-l en el SVG crudo la mano no acompaña: es esperable. -->
+      <g id="mano-l">
+        <!-- Puño cerrado de perfil: silueta + cuatro pliegues de dedo. -->
+        <path id="mano-l-puno" class="t-principal" fill="#F8B465"
+              d="M 300 240 C 300 233.67 300.67 225.17 304 220 C 307.33 214.83 313.67 211 320 209 C 326.33 207 335.33 206.67 342 208 C 348.67 209.33 356.17 212.33 360 217 C 363.83 221.67 364.5 229.83 365 236 C 365.5 242.17 365.17 248.5 363 254 C 360.83 259.5 357 265.5 352 269 C 347 272.5 339.17 274.83 333 275 C 326.83 275.17 319.83 272.83 315 270 C 310.17 267.17 306.5 263 304 258 C 301.5 253 300 246.33 300 240 Z"/>
+        <path id="mano-l-dedo-1" class="t-fino" fill="none"
+              d="M 326 219 Q 342 215 358 222"/>
+        <path id="mano-l-dedo-2" class="t-fino" fill="none"
+              d="M 324 233 Q 341 229 357 236"/>
+        <path id="mano-l-dedo-3" class="t-fino" fill="none"
+              d="M 327 247 Q 343 243 355 250"/>
+        <path id="mano-l-dedo-4" class="t-fino" fill="none"
+              d="M 333 259 Q 345 256 352 261"/>
+        <!-- Pistache abierto en dos gajos, agarrado por el puño y apoyado en la
+             mejilla. La punta de la cáscara queda en (443, 192): con el trazo de
+             5 llega a 445.5 y el contorno de la boca arranca en 446.8, o sea que
+             toca la comisura izquierda igual que en el packaging. El rostro
+             empieza en x≈417 a esta altura, así que los dos gajos cruzan la cara
+             y se ven enteros — es lo que el z-order de arriba habilita.
+             Son más largos que en la referencia (92 y 82 contra ~65) porque el
+             puño está 35 unidades más lejos de la cara que en el original y la
+             muñeca no se mueve; los grosores (28 y 26) mantienen la proporción
+             3.2:1 del pistache de la foto para que no lean como astillas.
+             Los dos gajos se pisan a lo largo de todo el eje a propósito: si se
+             abren en abanico, entre uno y otro se ve el fondo y el pistache deja
+             de leerse como una sola cáscara partida. -->
+        <path id="pistache-mano-cascara" class="t-fino" fill="#FBD5A9"
+              d="M 354 214 Q 391.78 175.82 443 192 Q 405.22 230.18 354 214 Z"/>
+        <path id="pistache-mano-semilla" class="t-fino" fill="#F4E8C6"
+              d="M 366 234 Q 399.12 198.8 445 214 Q 411.88 249.2 366 234 Z"/>
+      </g>
       <g id="chispas"></g>
     </g>
   </g>
@@ -224,7 +236,6 @@
     <circle id="piv-cola"          cx="0" cy="0" r="4" fill="#8B4D3F"/>
     <circle id="piv-pierna-post"   cx="0" cy="0" r="4" fill="#8B4D3F"/>
     <circle id="piv-pie-post"      cx="0" cy="0" r="4" fill="#8B4D3F"/>
-    <circle id="piv-brazo-post"    cx="486" cy="288" r="4" fill="#8B4D3F"/>
     <circle id="piv-pierna-apoyo"  cx="0" cy="0" r="4" fill="#8B4D3F"/>
     <circle id="piv-pie-apoyo"     cx="0" cy="0" r="4" fill="#8B4D3F"/>
     <circle id="piv-brazo-l"       cx="476" cy="268" r="4" fill="#8B4D3F"/>
