@@ -480,7 +480,7 @@ git commit -m "feat: tokens de color con pares de contraste verificados"
   - `idsDeGrupos(doc: Document): string[]`
   - `padreDe(doc: Document, id: string): string | null`
   - `hexUsados(doc: Document): string[]` — todos los hex del documento, en mayúsculas
-  - `atributosDeTrazo(doc: Document): Array<{ id: string; width: string; cap: string }>`
+  - `atributosDeTrazo(doc: Document): Array<{ id: string | null; width: string; cap: string }>` — resuelve `stroke-width` y `stroke-linecap` tanto del atributo del elemento como de la clase CSS declarada en el `<style>` del documento; si están los dos, gana el atributo. `id` es el `g[id]` contenedor más cercano, o `null` si el trazo no cuelga de ninguno.
 
 - [ ] **Step 1: Crear la fixture**
 
