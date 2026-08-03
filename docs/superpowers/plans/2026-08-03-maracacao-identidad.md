@@ -26,9 +26,10 @@ Aplican a **todas** las tareas. Copiadas del spec, verbatim donde hay valores.
 - **Sin librería de animación.** Solo CSS y Rive.
 - **Node ≥ 22.6.** Los scripts `emit-tokens.ts` y `emit-rig-spec.ts` importan TypeScript directo con `--experimental-strip-types`. En Node ≥ 23.6 el flag sobra. Si el entorno tiene menos, compilarlos con `tsx` en vez de cambiar el enfoque.
 
-**Referencias de dibujo** (ver §3 del spec — regla vinculante):
+**Referencias de dibujo** (ver §3 del spec — regla vinculante). **Ya están en el repo**, commiteadas antes de la Task 1:
 - `docs/referencias/packaging-foto.jpg` — **autoridad** en proporciones, tipografía, composición.
 - `docs/referencias/render-limpio.png` — **solo legibilidad**. Su textura de pincel, grosores variables y detalles agregados **no se copian**.
+- `docs/referencias/mascota-recorte-transparente.png` — el render con el fondo quitado, útil para comparar la silueta contra fondo claro. Mismas restricciones que el anterior.
 
 ---
 
@@ -2890,16 +2891,15 @@ git commit -m "feat: rig spec generado desde el código e isla de Rive con fallb
 - Consumes: todo lo anterior.
 - Produces: la suite que verifica los ocho criterios del §13 del spec.
 
-- [ ] **Step 1: Guardar las imágenes de referencia en el repo**
+- [ ] **Step 1: Confirmar que las referencias siguen versionadas**
+
+Se commitearon antes de la Task 1, porque la Task 7 ya dibuja contra ellas. Acá solo se verifica que nadie las haya borrado.
 
 ```bash
-mkdir -p docs/referencias
-# la foto original del packaging y el render limpio
-cp <ruta-de-la-foto> docs/referencias/packaging-foto.jpg
-cp <ruta-del-render> docs/referencias/render-limpio.png
+ls -la docs/referencias/
 ```
 
-Sin esto, la regla vinculante de §3 del spec no tiene contra qué verificarse.
+Esperado: `packaging-foto.jpg`, `render-limpio.png` y `mascota-recorte-transparente.png`.
 
 - [ ] **Step 2: Escribir el test de aceptación**
 
