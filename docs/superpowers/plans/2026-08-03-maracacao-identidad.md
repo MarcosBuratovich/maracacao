@@ -616,7 +616,7 @@ Este archivo se crea **vacío de dibujo pero completo de estructura**. Las tarea
 
 **Interfaces:**
 - Consumes: `test/svg-utils.ts` de Task 4.
-- Produces: `JERARQUIA: ReadonlyArray<{ id: string; padre: string | null }>` en `jerarquia.ts` — la fuente de verdad de la estructura, importable desde los tests y desde el generador del rig spec (Task 14).
+- Produces: `JERARQUIA: ReadonlyArray<{ id: string; padre: string | null }>` en `jerarquia.ts` — la fuente de verdad de la estructura, importable desde los tests y desde el generador del rig spec (Task 18).
 
 - [ ] **Step 1: Escribir `src/assets/brand/jerarquia.ts`**
 
