@@ -4,6 +4,39 @@ import { contrastRatio, nivelWcag, relativeLuminance } from '@/tokens/contrast'
 describe('relativeLuminance', () => {
   it('el negro es 0', () => expect(relativeLuminance('#000000')).toBe(0))
   it('el blanco es 1', () => expect(relativeLuminance('#FFFFFF')).toBeCloseTo(1, 5))
+
+  describe('validación de entrada', () => {
+    it('rechaza hex de largo incorrecto (5 dígitos)', () => {
+      expect(() => relativeLuminance('#12345')).toThrow('Hex inválido')
+    })
+    it('rechaza hex de largo incorrecto (7 dígitos)', () => {
+      expect(() => relativeLuminance('#1234567')).toThrow('Hex inválido')
+    })
+    it('rechaza shorthand de 3 dígitos', () => {
+      expect(() => relativeLuminance('#fff')).toThrow('Hex inválido')
+    })
+    it('rechaza 8 dígitos con alfa', () => {
+      expect(() => relativeLuminance('#FFFFFFFF')).toThrow('Hex inválido')
+    })
+    it('rechaza caracteres no hexadecimales', () => {
+      expect(() => relativeLuminance('#GGGGGG')).toThrow('Hex inválido')
+    })
+    it('rechaza string vacío', () => {
+      expect(() => relativeLuminance('')).toThrow('Hex inválido')
+    })
+    it('rechaza null con error documentado', () => {
+      // TypeScript cast necesario: la firma dice string, pero validamos en runtime
+      expect(() => relativeLuminance(null as unknown as string)).toThrow('Hex inválido')
+    })
+    it('rechaza undefined con error documentado', () => {
+      // TypeScript cast necesario: la firma dice string, pero validamos en runtime
+      expect(() => relativeLuminance(undefined as unknown as string)).toThrow('Hex inválido')
+    })
+    it('rechaza number con error documentado', () => {
+      // TypeScript cast necesario: la firma dice string, pero validamos en runtime
+      expect(() => relativeLuminance(123456 as unknown as string)).toThrow('Hex inválido')
+    })
+  })
 })
 
 describe('contrastRatio', () => {

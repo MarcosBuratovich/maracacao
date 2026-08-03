@@ -6,10 +6,10 @@ function canal(v: number): number {
 }
 
 export function relativeLuminance(hex: string): number {
-  const h = hex.replace('#', '')
-  if (!/^[0-9a-fA-F]{6}$/.test(h)) {
-    throw new Error(`Hex inválido: ${hex}. Se esperan 6 dígitos.`)
+  if (typeof hex !== 'string' || !/^#?[0-9a-fA-F]{6}$/.test(hex)) {
+    throw new Error(`Hex inválido: ${String(hex)}. Se esperan 6 dígitos hexadecimales.`)
   }
+  const h = hex.replace('#', '')
   const r = canal(parseInt(h.slice(0, 2), 16))
   const g = canal(parseInt(h.slice(2, 4), 16))
   const b = canal(parseInt(h.slice(4, 6), 16))
