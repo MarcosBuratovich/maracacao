@@ -1,0 +1,9 @@
+---
+import { svgDeMarca } from './svg-inline'
+import { copy } from '@/copy/marca'
+
+interface Props { alto?: number }
+const { alto = 32 } = Astro.props
+const svg = svgDeMarca('logotipo').replace('<svg', `<svg height="${alto}"`)
+---
+<span role="img" aria-label={copy.logoAria} set:html={svg} />

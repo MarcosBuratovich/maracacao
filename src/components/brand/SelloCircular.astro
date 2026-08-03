@@ -1,0 +1,31 @@
+---
+import { svgDeMarca } from './svg-inline'
+import { copy } from '@/copy/marca'
+
+interface Props { diametro?: number }
+const { diametro = 96 } = Astro.props
+
+// mascota-reducida.svg no trae width/height propio (solo viewBox 512x512):
+// sin fijarlos, el tamaño de reemplazo por defecto de un <svg> sin medidas
+// es indefinido entre navegadores. Se fuerza a llenar el cuadrado del span
+// exactamente al 100% x 100% — ni más ni menos.
+//
+// Por qué no más: la Task 14 (mascota reducida) midió que las orejas, no
+// lo vertical, son la restricción estructural de un recorte circular — el
+// punto más lejano del dibujo (borde de una oreja + medio trazo de su
+// contorno) cae a ~94% del medio-canvas (256 de 512 unidades del viewBox),
+// verificado tanto por cálculo geométrico como por render a alta
+// resolución (ver test/variantes-logo.test.ts, describe "piso de radio" —
+// el mismo piso que documenta task-14-report.md). Escalar esta imagen por
+// encima de ~106% del contenedor empuja ese punto fuera del círculo y
+// corta la oreja en línea recta. Al 100% queda ~6 puntos de margen bajo
+// ese piso: no hay recorte.
+const cabeza = svgDeMarca('mascota-reducida').replace('<svg', '<svg width="100%" height="100%"')
+---
+<span
+  class="inline-flex items-center justify-center overflow-hidden rounded-full"
+  style={`width:${diametro}px;height:${diametro}px;background:var(--mrc-verde-600)`}
+  role="img"
+  aria-label={copy.logoAria}
+  set:html={cabeza}
+/>
