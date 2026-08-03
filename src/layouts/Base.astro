@@ -1,0 +1,15 @@
+---
+interface Props { titulo: string }
+const { titulo } = Astro.props
+---
+<!doctype html>
+<html lang="es-MX">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{titulo}</title>
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>
