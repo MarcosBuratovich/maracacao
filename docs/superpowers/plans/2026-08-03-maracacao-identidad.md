@@ -890,7 +890,9 @@ import { dirname } from 'node:path'
 
 const [entrada, salida, ...resto] = process.argv.slice(2)
 if (!entrada || !salida) {
-  console.error('Uso: render-svg <entrada.svg> <salida.png> [--ancho N] [--fondo #HEX]')
+  console.error("Uso: render-svg <entrada.svg> <salida.png> [--ancho N] [--fondo '#HEX']")
+  console.error("Ej:  render-svg mascota.svg /tmp/m.png --ancho 900 --fondo '#FAF3E0'")
+  console.error('Las comillas en el color son obligatorias: sin ellas el shell trata el # como comentario.')
   process.exit(1)
 }
 const arg = (nombre, def) => {
