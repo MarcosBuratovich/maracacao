@@ -116,4 +116,65 @@ describe('render-svg', () => {
     expect(bufferTan.equals(bufferDefault)).toBe(false)
     expect(bufferVerde.equals(bufferDefault)).toBe(false)
   })
+
+  // Validación de argumentos: casos de error
+  describe('validación de argumentos', () => {
+    const runScript = (args: string[]) => {
+      let stderr = ''
+      let exitCode = 0
+      try {
+        execFileSync('node', ['scripts/render-svg.mjs', ...args], {
+          encoding: 'utf8'
+        })
+      } catch (err: unknown) {
+        const e = err as { stderr?: string; status?: number }
+        stderr = e.stderr || ''
+        exitCode = e.status || 1
+      }
+      return { stderr, exitCode }
+    }
+
+    it('falla si --ancho no tiene valor', () => {
+      const { stderr, exitCode } = runScript(['test/fixtures/ejemplo.svg', 'test/tmp/test.png', '--ancho'])
+      expect(exitCode).toBe(1)
+      expect(stderr).toMatch(/--ancho requiere un valor/)
+    })
+
+    it('falla si --ancho tiene valor no-numérico', () => {
+      const { stderr, exitCode } = runScript(['test/fixtures/ejemplo.svg', 'test/tmp/test.png', '--ancho', 'abc'])
+      expect(exitCode).toBe(1)
+      expect(stderr).toMatch(/debe ser un número positivo/)
+    })
+
+    it('falla si --ancho es cero', () => {
+      const { stderr, exitCode } = runScript(['test/fixtures/ejemplo.svg', 'test/tmp/test.png', '--ancho', '0'])
+      expect(exitCode).toBe(1)
+      expect(stderr).toMatch(/debe ser un número positivo/)
+    })
+
+    it('falla si --ancho es negativo', () => {
+      const { stderr, exitCode } = runScript(['test/fixtures/ejemplo.svg', 'test/tmp/test.png', '--ancho', '-100'])
+      expect(exitCode).toBe(1)
+      expect(stderr).toMatch(/debe ser un número positivo/)
+    })
+
+    it('falla si --fondo no tiene valor', () => {
+      const { stderr, exitCode } = runScript(['test/fixtures/ejemplo.svg', 'test/tmp/test.png', '--fondo'])
+      expect(exitCode).toBe(1)
+      expect(stderr).toMatch(/--fondo requiere un valor/)
+    })
+
+    it('falla si --ancho va seguido de otro flag sin valor', () => {
+      const { stderr, exitCode } = runScript(['test/fixtures/ejemplo.svg', 'test/tmp/test.png', '--ancho', '--fondo'])
+      expect(exitCode).toBe(1)
+      expect(stderr).toMatch(/--ancho requiere un valor.*flag/)
+    })
+
+    it('imprime mensaje de uso con comillas para evitar comentarios en shell', () => {
+      const { stderr, exitCode } = runScript(['test/fixtures/ejemplo.svg', 'test/tmp/test.png', '--ancho', 'x'])
+      expect(exitCode).toBe(1)
+      // Verifica que el mensaje de uso incluye comillas alrededor de #HEX
+      expect(stderr).toMatch(/\'#HEX\'/)
+    })
+  })
 })
