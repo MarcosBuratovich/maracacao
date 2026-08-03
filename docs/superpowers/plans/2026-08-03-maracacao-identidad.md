@@ -2352,13 +2352,17 @@ Agregar `mascotaAria: 'El mono de Maracacao bailando con un tazón de pistaches'
 Run: `pnpm vitest run test/ambiental.test.ts`
 Expected: PASS.
 
-- [ ] **Step 6: Verificación en navegador**
+- [ ] **Step 6: Verificación en navegador (montaje temporal)**
 
-```bash
-pnpm dev
-```
+Hasta la Task 17 no existe ninguna página que use `<Mascota/>`, así que el chequeo se hace montándola de forma descartable:
 
-Abrir la página, mirar la respiración y la cola. Después activar reduced-motion en el sistema operativo y confirmar que **todo queda quieto**, no lento.
+1. Agregar `<Mascota />` dentro de `src/pages/index.astro`, importándola.
+2. `pnpm dev` y abrir la página.
+3. Verificar las tres animaciones ambientales: la respiración del torso, el parpadeo y el vaivén de la cola. Cada parte tiene que girar sobre su pivote anatómico — si la cola pivotea desde su centro en vez de desde la cadera, el `transform-origin` está mal.
+4. Activar `prefers-reduced-motion` en el sistema operativo y recargar. **Todo tiene que quedar quieto, no lento.** Una animación a velocidad reducida es un fallo, no un aprobado.
+5. **Revertir el montaje**: sacar el import y el componente de `index.astro`, y confirmar con `git diff` que el archivo quedó igual que antes.
+
+El montaje es descartable a propósito: `index.astro` se reescribe entero en la Task 17, y adelantar ese trabajo acá chocaría con la capa de copy que crea la Task 15.
 
 - [ ] **Step 7: Commit**
 
