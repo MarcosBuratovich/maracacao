@@ -19,5 +19,5 @@ export function bloqueTheme(): string {
   const lineas = Object.entries(customProperties())
     .map(([k, v]) => `  ${k}: ${v};`)
     .join('\n')
-  return `@theme {\n${lineas}\n}\n`
+  return `@theme static {\n${lineas}\n}\n`
 }
