@@ -6,7 +6,7 @@ import { dirname } from 'node:path'
 const [entrada, salida, ...resto] = process.argv.slice(2)
 if (!entrada || !salida) {
   console.error('Uso: render-svg <entrada.svg> <salida.png> [--ancho N] [--fondo \'#HEX\']')
-  console.error('Ejemplo: render-svg input.svg output.png --ancho 200 --fondo \'#FAF3E0\'')
+  console.error('Ejemplo: pnpm render input.svg output.png --ancho 200 --fondo \'#FAF3E0\'')
   process.exit(1)
 }
 
