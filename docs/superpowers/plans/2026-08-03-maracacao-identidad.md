@@ -633,12 +633,10 @@ export const JERARQUIA = [
   { id: 'cola', padre: 'mono' },
   { id: 'pierna-post', padre: 'mono' },
   { id: 'pie-post', padre: 'pierna-post' },
-  { id: 'brazo-post', padre: 'mono' },
   { id: 'cuerpo', padre: 'mono' },
   { id: 'pierna-apoyo', padre: 'mono' },
   { id: 'pie-apoyo', padre: 'pierna-apoyo' },
   { id: 'brazo-l', padre: 'mono' },
-  { id: 'mano-l', padre: 'brazo-l' },
   { id: 'bowl', padre: 'mono' },
   { id: 'bowl-cuenco', padre: 'bowl' },
   { id: 'bowl-contenido', padre: 'bowl' },
@@ -656,6 +654,7 @@ export const JERARQUIA = [
   { id: 'cachete-r', padre: 'cabeza' },
   { id: 'nariz', padre: 'cabeza' },
   { id: 'boca', padre: 'cabeza' },
+  { id: 'mano-l', padre: 'mono' },
   { id: 'chispas', padre: 'mono' },
   { id: 'pivotes', padre: null },
 ] as const
@@ -665,7 +664,6 @@ export const PIVOTES = {
   'cola': 'cadera',
   'pierna-post': 'cadera',
   'pie-post': 'tobillo',
-  'brazo-post': 'hombro',
   'pierna-apoyo': 'cadera',
   'pie-apoyo': 'tobillo',
   'brazo-l': 'hombro',
@@ -789,10 +787,9 @@ Grupos vacíos en el orden de `JERARQUIA`, más la capa de pivotes con un marcad
     <g id="mono">
       <g id="cola"></g>
       <g id="pierna-post"><g id="pie-post"></g></g>
-      <g id="brazo-post"></g>
       <g id="cuerpo"></g>
       <g id="pierna-apoyo"><g id="pie-apoyo"></g></g>
-      <g id="brazo-l"><g id="mano-l"></g></g>
+      <g id="brazo-l"></g>
       <g id="bowl">
         <g id="bowl-cuenco"></g>
         <g id="bowl-contenido"></g>
@@ -811,6 +808,7 @@ Grupos vacíos en el orden de `JERARQUIA`, más la capa de pivotes con un marcad
         <g id="nariz"></g>
         <g id="boca"></g>
       </g>
+      <g id="mano-l"></g>
       <g id="chispas"></g>
     </g>
   </g>
@@ -822,7 +820,6 @@ Grupos vacíos en el orden de `JERARQUIA`, más la capa de pivotes con un marcad
     <circle id="piv-cola"          cx="0" cy="0" r="4" fill="#8B4D3F"/>
     <circle id="piv-pierna-post"   cx="0" cy="0" r="4" fill="#8B4D3F"/>
     <circle id="piv-pie-post"      cx="0" cy="0" r="4" fill="#8B4D3F"/>
-    <circle id="piv-brazo-post"    cx="0" cy="0" r="4" fill="#8B4D3F"/>
     <circle id="piv-pierna-apoyo"  cx="0" cy="0" r="4" fill="#8B4D3F"/>
     <circle id="piv-pie-apoyo"     cx="0" cy="0" r="4" fill="#8B4D3F"/>
     <circle id="piv-brazo-l"       cx="0" cy="0" r="4" fill="#8B4D3F"/>
@@ -1097,7 +1094,7 @@ git commit -m "feat: dibujo de la cabeza de la mascota con pivotes ubicados"
 ## Task 8: Dibujo — torso, brazos y manos
 
 **Files:**
-- Modify: `src/assets/brand/mascota.svg` — `#cuerpo`, `#brazo-l`, `#mano-l`, `#brazo-r`, `#mano-r`, `#brazo-post`; marcadores `piv-brazo-l`, `piv-mano-l`, `piv-brazo-r`, `piv-mano-r`, `piv-brazo-post`
+- Modify: `src/assets/brand/mascota.svg` — `#cuerpo`, `#brazo-l`, `#mano-l`, `#brazo-r`, `#mano-r`; marcadores `piv-brazo-l`, `piv-mano-l`, `piv-brazo-r`, `piv-mano-r`
 - Test: `test/mascota-torso.test.ts`
 
 **Interfaces:**
@@ -1125,7 +1122,7 @@ git commit -m "feat: dibujo de la cabeza de la mascota con pivotes ubicados"
 ```ts
 // test/mascota-torso.test.ts
 import { describe, it, expect } from 'vitest'
-import { cargarSvg, hexUsados } from './svg-utils'
+import { cargarSvg, hexUsados, padreDe, idsDeGrupos } from './svg-utils'
 import { todosLosColores } from '@/tokens/color'
 
 const doc = cargarSvg('src/assets/brand/mascota.svg')
@@ -1134,12 +1131,17 @@ const formas = (id: string) =>
   grupo(id).querySelectorAll('path, circle, ellipse, rect').length
 
 describe('torso y brazos — contenido', () => {
-  it.each(['cuerpo', 'brazo-l', 'mano-l', 'brazo-r', 'mano-r', 'brazo-post'])(
+  it.each(['cuerpo', 'brazo-l', 'mano-l', 'brazo-r', 'mano-r'])(
     '#%s tiene al menos una forma', (id) => expect(formas(id)).toBeGreaterThan(0),
   )
 
-  it('la mano izquierda vive dentro del brazo izquierdo', () => {
-    expect(grupo('mano-l').closest('g[id="brazo-l"]')).not.toBeNull()
+  it('la mano izquierda se pinta después de la cabeza — lleva el pistache a la boca', () => {
+    // Cerrado contra la referencia (§9.2 del spec): en el packaging la mano
+    // va por delante de la cara. En Rive se emparenta al hueso del brazo;
+    // acá vive después de #cabeza por orden de pintado.
+    expect(padreDe(doc, 'mano-l')).toBe('mono')
+    const orden = idsDeGrupos(doc)
+    expect(orden.indexOf('mano-l')).toBeGreaterThan(orden.indexOf('cabeza'))
   })
 
   it('la mano derecha vive dentro del brazo derecho', () => {
@@ -1155,7 +1157,7 @@ describe('torso y brazos — paleta', () => {
 })
 
 describe('torso y brazos — pivotes ubicados', () => {
-  it.each(['piv-brazo-l', 'piv-mano-l', 'piv-brazo-r', 'piv-mano-r', 'piv-brazo-post'])(
+  it.each(['piv-brazo-l', 'piv-mano-l', 'piv-brazo-r', 'piv-mano-r'])(
     '%s dejó de estar en el origen', (id) => {
       const el = doc.querySelector(`[id="${id}"]`)!
       expect(Number(el.getAttribute('cx'))).toBeGreaterThan(0)
@@ -1177,9 +1179,9 @@ Expected: FAIL — grupos vacíos, pivotes en el origen.
 
 - [ ] **Step 3: Dibujar torso, panza y franjas del pecho en `#cuerpo`**
 
-- [ ] **Step 4: Dibujar los tres brazos y las dos manos**
+- [ ] **Step 4: Dibujar los dos brazos y las dos manos**
 
-`#brazo-post` va detrás del cuerpo; `#brazo-l` y `#brazo-r` delante. Cada brazo dibuja su segmento completo hasta el hombro, incluso la parte que el torso tapa.
+`#brazo-l` y `#brazo-r` van delante del cuerpo. Cada brazo dibuja su segmento completo hasta el hombro, incluso la parte que el torso tapa.
 
 - [ ] **Step 5: Mover los marcadores de pivote a hombros y muñecas**
 

@@ -230,12 +230,10 @@ maracacao-mascota.svg          viewBox="0 0 1024 1024"
 │       ├── g#cola                 pivote: cadera
 │       ├── g#pierna-post
 │       │   └── g#pie-post         pivote: tobillo
-│       ├── g#brazo-post           pivote: hombro
 │       ├── g#cuerpo               torso + panza
 │       ├── g#pierna-apoyo         pivote: cadera
 │       │   └── g#pie-apoyo        pivote: tobillo
 │       ├── g#brazo-l              pivote: hombro
-│       │   └── g#mano-l           pivote: muñeca — la que va a la boca
 │       ├── g#bowl
 │       │   ├── g#bowl-cuenco
 │       │   ├── g#bowl-contenido
@@ -249,12 +247,13 @@ maracacao-mascota.svg          viewBox="0 0 1024 1024"
 │       │   ├── g#cachete-l · g#cachete-r
 │       │   ├── g#nariz
 │       │   └── g#boca ── path#boca-forma + path#lengua
+│       ├── g#mano-l               pivote: muñeca — pintada después de la cabeza para que el pistache llegue a la boca; en Rive se emparenta al hueso del brazo izquierdo
 │       └── g#chispas              las tres rayitas naranjas del "¡mmm!"
 │
 └── g#pivotes                      marcadores, ver 9.3
 ```
 
-El z-order exacto de piernas y brazos se cierra durante el redibujo, contra la referencia.
+El z-order exacto de piernas y brazos se cierra durante el redibujo, contra la referencia. **Cerrado en la Task 8:** se eliminó `g#brazo-post` — la referencia tiene dos brazos y ambos son visibles; el tercero era un fantasma del borrador — y `g#mano-l` pasó a pintarse después de la cabeza, porque en el packaging la mano va por delante de la cara al comer y la animación `Come` (§11.3) lo requiere.
 
 ### 9.3 La capa `g#pivotes`
 
