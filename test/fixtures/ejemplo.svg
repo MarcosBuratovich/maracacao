@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <g id="raiz">
+    <g id="hijo-a"><path d="M0 0 L10 10" stroke="#5B744B" stroke-width="4" stroke-linecap="round"/></g>
+    <g id="hijo-b"><circle cx="5" cy="5" r="2" fill="#F8B465"/></g>
+  </g>
+</svg>
