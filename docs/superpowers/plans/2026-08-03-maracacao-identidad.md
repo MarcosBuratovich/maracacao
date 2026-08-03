@@ -1267,9 +1267,13 @@ describe('mascota completa', () => {
     expect(formas('chispas')).toBe(3)
   })
 
-  it('cada grano tiene su propio pivote declarado como transform-origin', () => {
+  it('cada grano declara su pivote como atributo transform-origin', () => {
+    // Atributo de presentación de SVG 2, no style= — el archivo mantiene
+    // cero style= (técnica fijada en las reviews de las Tasks 7 y 8). El
+    // selector [transform] de los tests de "cero transform" no matchea
+    // transform-origin, así que no colisionan.
     for (const el of grupo('granos-orbita').querySelectorAll('[id^="grano-"]')) {
-      expect(el.getAttribute('style') ?? '').toMatch(/transform-origin:/)
+      expect(el.getAttribute('transform-origin') ?? '').toMatch(/^\d+(\.\d+)?[ ,]\d+(\.\d+)?$/)
     }
   })
 })
@@ -1313,7 +1317,7 @@ El borde va después del contenido para que lo tape por delante.
 
 - [ ] **Step 7: Dibujar los 14 granos y las 3 chispas**
 
-Cada grano lleva `style="transform-origin: CXpx CYpx"` en su propio centro, para que la animación de órbita lo rote sobre sí mismo.
+Cada grano lleva el atributo `transform-origin="CX CY"` (presentación SVG 2, no `style=` — el archivo mantiene cero `style=`) en su propio centro, para que la animación de órbita lo rote sobre sí mismo.
 
 - [ ] **Step 8: Ubicar los marcadores de pivote restantes**
 
