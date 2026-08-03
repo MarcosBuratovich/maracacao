@@ -18,7 +18,7 @@ Aplican a **todas** las tareas. Copiadas del spec, verbatim donde hay valores.
 - **Registro léxico mexicano.** El packaging dice **"pistaches"**, no "pistachos". Manda sobre cualquier corrección genérica.
 - **Cero `<text>` en los SVG de marca.** Todo lettering va como paths.
 - **Cero `<use>`, `<defs>` compartidos, gradientes o filtros** en `mascota.svg`. Rive los aplana de forma impredecible.
-- **Los trazos van como `stroke`**, nunca como contorno relleno. `stroke-linecap="round"`, `stroke-linejoin="round"`.
+- **En la ilustración, los trazos van como `stroke`**, nunca como contorno relleno. `stroke-linecap="round"`, `stroke-linejoin="round"`. Aplica a `mascota.svg` y `mascota-reducida.svg`. **No aplica al lettering** (Task 13): las letras son formas rellenas, no trazos animables — ahí un `stroke` sería el error.
 - **`prefers-reduced-motion` apaga, no atenúa.**
 - **Paleta cerrada.** Ningún color fuera de `src/tokens/color.ts` puede aparecer en un SVG de marca. Hay un test que lo verifica.
 - **Contrastes mínimos:** texto normal 4.5:1. Prohibidos: `crema` sobre `verde-500` (4.25) y `tan-500` sobre `verde-500` (2.89).
