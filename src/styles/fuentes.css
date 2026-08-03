@@ -1,0 +1,23 @@
+@font-face {
+  font-family: 'Fraunces Variable';
+  src: url('/fonts/fraunces-variable.woff2') format('woff2-variations');
+  font-weight: 300 900;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2074,
+                 U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215;
+}
+
+@font-face {
+  font-family: 'Work Sans Variable';
+  src: url('/fonts/work-sans-variable.woff2') format('woff2-variations');
+  font-weight: 300 700;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+2074,
+                 U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215;
+}
+
+/* Valor de partida de los ejes. Ver §7 del spec. */
+.display {
+  font-family: var(--mrc-font-display);
+  font-variation-settings: 'SOFT' 60, 'WONK' 1;
+}
