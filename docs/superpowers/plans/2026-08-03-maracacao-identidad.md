@@ -24,7 +24,8 @@ Aplican a **todas** las tareas. Copiadas del spec, verbatim donde hay valores.
 - **Contrastes mínimos:** texto normal 4.5:1. Prohibidos: `crema` sobre `verde-500` (4.25) y `tan-500` sobre `verde-500` (2.89).
 - **viewBox de la mascota:** `0 0 1024 1024`.
 - **Sin librería de animación.** Solo CSS y Rive.
-- **Node ≥ 22.6.** Los scripts `emit-tokens.ts` y `emit-rig-spec.ts` importan TypeScript directo con `--experimental-strip-types`. En Node ≥ 23.6 el flag sobra. Si el entorno tiene menos, compilarlos con `tsx` en vez de cambiar el enfoque.
+- **Node ≥ 22.6**, pero **sin contar con `--experimental-strip-types`**. Verificado en este entorno: Node v22.22.1 está compilado **sin soporte de TypeScript** y el flag falla con `ERR_NO_TYPESCRIPT`, así que no es cuestión de versión. Los scripts `emit-tokens.ts` y `emit-rig-spec.ts` se ejecutan con **`tsx`** (devDependency).
+  **No reimplementar la lógica dentro de un `.mjs` para esquivar el problema:** los scripts tienen que *importar* de `src/tokens/`, porque ahí es donde vive la versión que los tests verifican. Dos implementaciones de la misma serialización se desincronizan, y la que tiene tests no es la que genera el archivo.
 
 **Referencias de dibujo** (ver §3 del spec — regla vinculante). **Ya están en el repo**, commiteadas antes de la Task 1:
 - `docs/referencias/packaging-foto.jpg` — **autoridad** en proporciones, tipografía, composición.
@@ -1583,7 +1584,7 @@ export function bloqueTheme(): string {
 Agregar a `package.json`:
 
 ```json
-{ "scripts": { "tokens": "node --experimental-strip-types scripts/emit-tokens.ts" } }
+{ "scripts": { "tokens": "tsx scripts/emit-tokens.ts" } }
 ```
 
 ```ts
@@ -2832,7 +2833,7 @@ El \`.riv\` tiene que quedar **bajo 60 kB**. El runtime pesa ~90 kB gzip aparte.
 console.log('docs/rig-spec.md listo')
 ```
 
-Agregar `"rig-spec": "node --experimental-strip-types scripts/emit-rig-spec.ts"` a `package.json` y correrlo.
+Agregar `"rig-spec": "tsx scripts/emit-rig-spec.ts"` a `package.json` y correrlo.
 
 - [ ] **Step 4: Implementar la isla `MascotaRive.tsx`**
 
