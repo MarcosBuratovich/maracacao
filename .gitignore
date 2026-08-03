@@ -1,0 +1,21 @@
+# Dependencias
+node_modules/
+.pnpm-store/
+
+# Build
+dist/
+.astro/
+.output/
+
+# Entorno
+.env
+.env.*
+!.env.example
+
+# Companion visual de brainstorming (efímero)
+.superpowers/
+
+# Sistema
+.DS_Store
+Thumbs.db
+*.log
