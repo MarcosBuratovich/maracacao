@@ -59,6 +59,17 @@ describe('SelloCircular', () => {
     expect(html).toMatch(/<svg[^>]*\swidth="100%"/)
     expect(html).toMatch(/<svg[^>]*\sheight="100%"/)
   })
+
+  it('acepta una prop de tamaño (diametro) y la aplica a su contenedor efectivo', async () => {
+    // El <svg> inyectado siempre es width/height 100% (llena el círculo);
+    // `diametro` no se propaga al <svg> sino al <span> que lo recorta. El
+    // "contenedor efectivo" acá es ese span — si un refactor futuro de
+    // svgDeMarca/.replace() rompe la propagación de diametro, este test
+    // tiene que agarrarlo.
+    const html = await container.renderToString(SelloCircular, { props: { diametro: 64 } })
+    expect(html).toMatch(/width:\s*64px/)
+    expect(html).toMatch(/height:\s*64px/)
+  })
 })
 
 describe('SelloCircular — piso de radio (orejas)', () => {
@@ -143,6 +154,14 @@ describe('SelloCompleto', () => {
     expect(html).not.toContain('piv-cabeza')
     expect(html).not.toContain('piv-oreja-l')
   })
+
+  it('acepta una prop de tamaño (ancho) y la aplica a su contenedor efectivo', async () => {
+    // Los tres <svg> inyectados son width 100% de su <span> (arco/mascota/
+    // descriptor); `ancho` se aplica al <div> que los envuelve, no a los
+    // <svg> en sí. Contenedor efectivo = ese div.
+    const html = await container.renderToString(SelloCompleto, { props: { ancho: 200 } })
+    expect(html).toMatch(/width:\s*200px/)
+  })
 })
 
 describe('SelloReducido', () => {
@@ -155,6 +174,11 @@ describe('SelloReducido', () => {
     const html = await container.renderToString(SelloReducido)
     expect(html).not.toContain('id="pivotes"')
     expect(html).not.toContain('piv-cabeza')
+  })
+
+  it('acepta una prop de tamaño (ancho) y la aplica a su contenedor efectivo', async () => {
+    const html = await container.renderToString(SelloReducido, { props: { ancho: 150 } })
+    expect(html).toMatch(/width:\s*150px/)
   })
 })
 
@@ -172,6 +196,11 @@ describe('Monocromo', () => {
     const negativo = await container.renderToString(Monocromo, { props: { variante: 'negativo' } })
     expect(positivo).toContain('var(--mrc-tinta)')
     expect(negativo).toContain('var(--mrc-papel)')
+  })
+
+  it('acepta una prop de tamaño (alto) y la aplica al SVG inyectado', async () => {
+    const html = await container.renderToString(Monocromo, { props: { alto: 64 } })
+    expect(html).toMatch(/<svg[^>]*\sheight="64"/)
   })
 })
 
