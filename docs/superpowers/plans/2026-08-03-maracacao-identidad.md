@@ -280,7 +280,7 @@ export function nivelWcag(ratio: number): NivelWcag {
 - [ ] **Step 4: Correr el test y verificar que pasa**
 
 Run: `pnpm vitest run test/contrast.test.ts`
-Expected: PASS, 9 tests.
+Expected: PASS, 13 tests (2 + 3 + las 8 filas del `it.each`).
 
 - [ ] **Step 5: Commit**
 
