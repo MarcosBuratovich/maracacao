@@ -315,15 +315,16 @@ git commit -m "feat: cálculo de contraste WCAG"
 import { describe, it, expect } from 'vitest'
 import { contrastRatio, nivelWcag } from '@/tokens/contrast'
 import {
-  verde, tan, paresAprobados, paresProhibidos, todosLosColores,
+  verde, tan, rosa, paresAprobados, paresProhibidos, todosLosColores,
 } from '@/tokens/color'
 
 describe('rampas', () => {
-  it('verde y tan tienen los diez pasos', () => {
-    const pasos = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900]
-    expect(Object.keys(verde).map(Number).sort((a, b) => a - b)).toEqual(pasos)
-    expect(Object.keys(tan).map(Number).sort((a, b) => a - b)).toEqual(pasos)
-  })
+  it.each([['verde', verde], ['tan', tan], ['rosa', rosa]] as const)(
+    'la rampa %s tiene los diez pasos', (_nombre, rampa) => {
+      const pasos = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900]
+      expect(Object.keys(rampa).map(Number).sort((a, b) => a - b)).toEqual(pasos)
+    },
+  )
 
   it('el verde oscurece monótonamente de 50 a 900', () => {
     const pasos = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900] as const
@@ -407,6 +408,17 @@ export const tan = {
   500: '#F8B465', 600: '#CB9453', 700: '#9F7341', 800: '#72532E', 900: '#4A361E',
 } as const
 
+/**
+ * Base 500 medida del render en cachetes y boca. Se sumó en la Task 7: el
+ * original tiene cachetes y lengua rosas y la paleta no tenía ningún rosa,
+ * con lo cual la lengua quedaba crema y se leía como un diente.
+ * `rosa-500` sobre papel da 3.44 — no usar para texto normal.
+ */
+export const rosa = {
+  50: '#FBF3F2', 100: '#F5E3E2', 200: '#EBC8C5', 300: '#E0A9A4', 400: '#D48881',
+  500: '#C8665D', 600: '#A4544C', 700: '#80413C', 800: '#5C2F2B', 900: '#3C1F1C',
+} as const
+
 export const fijos = {
   papel: '#FAF3E0',
   crema: '#F4E8C6',
@@ -449,7 +461,10 @@ export const paresProhibidos = [
 ] as const
 
 export function todosLosColores(): string[] {
-  return [...Object.values(verde), ...Object.values(tan), ...Object.values(fijos)]
+  return [
+    ...Object.values(verde), ...Object.values(tan),
+    ...Object.values(rosa), ...Object.values(fijos),
+  ]
 }
 ```
 
@@ -1385,11 +1400,12 @@ Expected: FAIL — no se puede resolver `@/lib/tokenize-svg`
 - [ ] **Step 3: Implementar `src/lib/tokenize-svg.ts`**
 
 ```ts
-import { verde, tan, fijos } from '@/tokens/color'
+import { verde, tan, rosa, fijos } from '@/tokens/color'
 
 const MAPA: ReadonlyMap<string, string> = new Map([
   ...Object.entries(verde).map(([p, hex]) => [hex.toUpperCase(), `verde-${p}`] as const),
   ...Object.entries(tan).map(([p, hex]) => [hex.toUpperCase(), `tan-${p}`] as const),
+  ...Object.entries(rosa).map(([p, hex]) => [hex.toUpperCase(), `rosa-${p}`] as const),
   ...Object.entries(fijos).map(([n, hex]) => [hex.toUpperCase(), n] as const),
 ])
 
@@ -1483,7 +1499,7 @@ describe('bloqueTheme', () => {
 // que no pueden ver lo que el bundler hace con los tokens. Sin este test,
 // Tailwind puede descartar la mitad de las variables y todo queda en verde.
 describe('el CSS construido conserva todos los tokens', () => {
-  it('emite las 52 custom properties al bundle', async () => {
+  it('emite todas las custom properties al bundle', async () => {
     execFileSync('pnpm', ['build'], { stdio: 'pipe' })
     const hojas = readdirSync('dist/_astro').filter((f) => f.endsWith('.css'))
     expect(hojas.length).toBeGreaterThan(0)
@@ -1570,7 +1586,7 @@ export const amplitudes = {
 - [ ] **Step 5: Implementar `src/tokens/css.ts`**
 
 ```ts
-import { verde, tan, fijos, roles } from './color'
+import { verde, tan, rosa, fijos, roles } from './color'
 import { familias, escala } from './type'
 import { duraciones, easings } from './motion'
 
@@ -1578,6 +1594,7 @@ export function customProperties(): Record<string, string> {
   const props: Record<string, string> = {}
   for (const [paso, hex] of Object.entries(verde)) props[`--mrc-verde-${paso}`] = hex
   for (const [paso, hex] of Object.entries(tan)) props[`--mrc-tan-${paso}`] = hex
+  for (const [paso, hex] of Object.entries(rosa)) props[`--mrc-rosa-${paso}`] = hex
   for (const [nombre, hex] of Object.entries(fijos)) props[`--mrc-${nombre}`] = hex
   for (const [rol, hex] of Object.entries(roles)) props[`--mrc-rol-${rol}`] = hex
   for (const [nombre, valor] of Object.entries(familias)) props[`--mrc-font-${nombre}`] = valor

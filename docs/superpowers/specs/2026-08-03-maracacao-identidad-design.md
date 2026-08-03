@@ -123,6 +123,18 @@ Los colores medidos del render son **todos tonos medios** y no alcanzan para una
 | 300 | `#FBD5A9` | | 800 | `#72532E` |
 | 400 | `#FAC487` | | 900 | `#4A361E` |
 
+**Rosa** — base `500` medida del render en los cachetes y la boca de la mascota. Se agregó al sistema durante la Task 7: el original tiene cachetes y lengua rosas, la paleta cerrada no tenía ningún rosa, y sin él la lengua queda crema y se lee como un diente.
+
+| Paso | Hex | | Paso | Hex |
+|---|---|---|---|---|
+| 50 | `#FBF3F2` | | 500 | `#C8665D` |
+| 100 | `#F5E3E2` | | 600 | `#A4544C` |
+| 200 | `#EBC8C5` | | 700 | `#80413C` |
+| 300 | `#E0A9A4` | | 800 | `#5C2F2B` |
+| 400 | `#D48881` | | 900 | `#3C1F1C` |
+
+Usos previstos: `rosa-300` para el rubor de los cachetes y para la lengua, `rosa-700` para texto sobre banda clara (6.92, AA). **`rosa-500` sobre papel da 3.44 y no sirve para texto normal** — misma disciplina que el resto de las rampas.
+
 **Colores fijos**
 
 | Nombre | Hex | Uso |
