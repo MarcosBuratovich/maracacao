@@ -24,7 +24,7 @@ describe('mascota.svg — estructura', () => {
   it('no hay grupos de más', () => {
     const declarados = JERARQUIA.map((g) => g.id) as readonly string[]
     const sobrantes = idsDeGrupos(doc).filter(
-      (id) => !declarados.includes(id as never) && !id.startsWith('piv-') && !id.startsWith('grano-'),
+      (id) => !declarados.includes(id) && !id.startsWith('piv-') && !id.startsWith('grano-'),
     )
     expect(sobrantes).toEqual([])
   })
@@ -37,6 +37,7 @@ describe('mascota.svg — restricciones duras', () => {
     expect(fuente).not.toMatch(/<(linear|radial)Gradient/i)
   })
   it('no usa filtros', () => expect(fuente).not.toMatch(/<filter\b/i))
+  it('no usa <defs>', () => expect(doc.querySelector('defs')).toBeNull())
   it('no usa <image>', () => expect(doc.querySelector('image')).toBeNull())
 })
 
