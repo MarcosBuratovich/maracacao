@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Mono de Maracacao, mascota reducida">
+  <style>
+    /* Mismo criterio de mascota.svg (§9.1 del spec): la clase define SOLO
+       trazo (ancho, remate, unión) y nunca fill. A diferencia de
+       mascota.svg, acá el COLOR del trazo tampoco vive en la clase: va
+       como atributo plano `stroke="#372915"` en cada forma, igual que el
+       relleno va como atributo plano `fill`. Esto es necesario para que
+       `atributosDeTrazo` (test/svg-utils.ts) encuentre las formas — el
+       helper resuelve `stroke-width`/`stroke-linecap` tanto de atributo
+       como de clase, pero selecciona por `[stroke]` como atributo del
+       elemento, no por la cascada CSS. Trazo proporcionalmente más grueso
+       que en la cabeza completa (11/1024 ≈ 0.0107): acá 18/512 ≈ 0.0352
+       para el contorno y 24/512 ≈ 0.0469 para los ojos, que al ser trazo
+       abierto sin relleno son la única forma que sostiene el detalle. */
+    .t-contorno { stroke-width: 18; stroke-linecap: round; stroke-linejoin: round; }
+    .t-ojos     { stroke-width: 24; stroke-linecap: round; stroke-linejoin: round; }
+  </style>
+
+  <!-- Punto de partida: la cabeza de mascota.svg (Task 9), geometría
+       verificada por dos revisiones. Mismo bbox (eje x=512, corona
+       y=64, mentón y=258 en el viewBox 1024) reescalado x1.28 y
+       centrado en el canvas 512, sin `transform`: las coordenadas ya
+       vienen horneadas a la escala nueva.
+       Se quitó todo lo que no sobrevive a 32 px: cachetes, lengua,
+       detalle interno de oreja (la elipse tan) y el gancho de comisura
+       de la boca. Quedan 8 formas: cráneo, rostro, dos orejas, dos
+       ojos, nariz, boca — bien debajo del máximo de 12. -->
+
+  <g id="oreja-l">
+    <circle class="t-contorno" stroke="#372915" fill="#5B744B"
+            cx="88.45" cy="206.58" r="56.65"/>
+  </g>
+  <g id="oreja-r">
+    <circle class="t-contorno" stroke="#372915" fill="#5B744B"
+            cx="423.55" cy="206.58" r="56.65"/>
+  </g>
+
+  <g id="craneo">
+    <path class="t-contorno" stroke="#372915" fill="#5B744B"
+          d="M 256 131.84 C 345.2 131.84 406.68 192.12 406.68 274.09
+             C 406.68 341.58 347.61 380.16 256 380.16
+             C 164.39 380.16 105.32 341.58 105.32 274.09
+             C 105.32 192.12 166.8 131.84 256 131.84 Z"/>
+  </g>
+
+  <g id="rostro">
+    <path class="t-contorno" stroke="#372915" fill="#F8B465"
+          d="M 256 201.75 C 239.13 180.06 212.61 171.62 187.29 180.06
+             C 161.97 188.49 140.28 218.64 136.67 257.2
+             C 133.04 300.6 149.93 348.81 181.26 364.49
+             C 204.16 375.33 229.48 375.33 256 375.33
+             C 282.52 375.33 307.84 375.33 330.74 364.49
+             C 362.07 348.81 378.96 300.6 375.33 257.2
+             C 371.72 218.64 350.03 188.49 324.71 180.06
+             C 299.39 171.62 272.87 180.06 256 201.75 Z"/>
+  </g>
+
+  <!-- Ojos cerrados de sonrisa: arcos abiertos, igual criterio que
+       mascota.svg. `fill="none"` obligatorio y explícito: la clase
+       `.t-ojos` no lo declara. Trazo más grueso que el contorno a
+       propósito: es la única forma sin relleno detrás, y a 32 px un
+       arco fino desaparece. -->
+  <g id="ojo-l">
+    <path class="t-ojos" stroke="#372915" fill="none"
+          d="M 172.83 258.41 C 182.46 233.1 218.64 233.1 228.28 258.41"/>
+  </g>
+  <g id="ojo-r">
+    <path class="t-ojos" stroke="#372915" fill="none"
+          d="M 283.72 258.41 C 293.36 233.1 329.54 233.1 339.17 258.41"/>
+  </g>
+
+  <g id="nariz">
+    <path fill="#372915"
+          d="M 234.3 254.8 C 234.3 245.15 277.7 245.15 277.7 254.8
+             C 277.7 266.85 264.44 271.67 256 271.67
+             C 247.56 271.67 234.3 266.85 234.3 254.8 Z"/>
+  </g>
+
+  <g id="boca">
+    <path class="t-contorno" stroke="#372915" fill="#8B4D3F"
+          d="M 177.65 296.99 C 205.38 295.78 243.94 292.16 277.7 284.93
+             C 289.75 287.35 294.58 296.99 289.75 307.84
+             C 280.1 329.54 258.41 348.81 229.48 348.81
+             C 205.38 348.81 184.88 325.91 177.65 296.99 Z"/>
+  </g>
+</svg>
