@@ -38,6 +38,50 @@ describe('cabeza — trazo', () => {
   })
 })
 
+describe('cabeza — técnica de relleno', () => {
+  // La review de la Task 7 fijó esta técnica: las clases `.t-*` definen SOLO
+  // trazo y el relleno va como atributo plano, para que la importación a Rive
+  // no dependa de la cascada CSS. Los dos modos de romperla son silenciosos y
+  // catastróficos, así que van con red:
+  //   - si una clase vuelve a declarar `fill`, le gana al atributo de
+  //     presentación y todas esas formas se dibujan huecas;
+  //   - si una forma con clase se queda sin `fill`, cae al negro inicial
+  //     de SVG y se dibuja como una mancha sólida.
+  const estilo = doc.querySelector('style')?.textContent ?? ''
+
+  it.each(['t-principal', 't-interior', 't-fino'])(
+    '.%s define trazo y no declara fill',
+    (clase) => {
+      const bloque = estilo.match(new RegExp(`\\.${clase}\\s*\\{([^}]*)\\}`))?.[1]
+      expect(bloque).toBeDefined()
+      expect(bloque).toMatch(/\bstroke\s*:/)
+      expect(bloque).not.toMatch(/\bfill\s*:/)
+    },
+  )
+
+  it('toda forma con clase de trazo lleva un fill explícito', () => {
+    const conClase = [...grupo('cabeza').querySelectorAll('[class]')]
+    expect(conClase.length).toBeGreaterThan(0)
+    for (const el of conClase) {
+      expect(el.getAttribute('fill')).toMatch(/^(none|#[0-9A-F]{6})$/)
+    }
+  })
+
+  it('no queda ningún relleno por style inline', () => {
+    expect([...grupo('cabeza').querySelectorAll('[style]')]).toHaveLength(0)
+  })
+})
+
+describe('cabeza — geometría horneada', () => {
+  // El reescalado al presupuesto vertical se horneó en las coordenadas. Un
+  // `transform` sobreviviente movería el dibujo respecto de sus pivotes, que
+  // son coordenadas absolutas.
+  it('ni la cabeza ni sus formas usan transform', () => {
+    expect(grupo('cabeza').hasAttribute('transform')).toBe(false)
+    expect([...grupo('cabeza').querySelectorAll('[transform]')]).toHaveLength(0)
+  })
+})
+
 describe('cabeza — paleta', () => {
   it('no introduce colores fuera de los tokens', () => {
     const permitidos = todosLosColores()

@@ -1,15 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import { contrastRatio, nivelWcag } from '@/tokens/contrast'
 import {
-  verde, tan, fijos, roles, paresAprobados, paresProhibidos, todosLosColores,
+  verde, tan, rosa, fijos, roles, paresAprobados, paresProhibidos, todosLosColores,
 } from '@/tokens/color'
 
 describe('rampas', () => {
-  it('verde y tan tienen los diez pasos', () => {
-    const pasos = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900]
-    expect(Object.keys(verde).map(Number).sort((a, b) => a - b)).toEqual(pasos)
-    expect(Object.keys(tan).map(Number).sort((a, b) => a - b)).toEqual(pasos)
-  })
+  it.each([['verde', verde], ['tan', tan], ['rosa', rosa]] as const)(
+    'la rampa %s tiene los diez pasos', (_nombre, rampa) => {
+      const pasos = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900]
+      expect(Object.keys(rampa).map(Number).sort((a, b) => a - b)).toEqual(pasos)
+    },
+  )
 
   it('el verde oscurece monótonamente de 50 a 900', () => {
     const pasos = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900] as const
@@ -26,7 +27,7 @@ describe('rampas', () => {
   })
 
   it('todos los valores de rampas y fijos coinciden con el snapshot', () => {
-    expect({ verde, tan, fijos }).toMatchInlineSnapshot(`
+    expect({ verde, tan, rosa, fijos }).toMatchInlineSnapshot(`
       {
         "fijos": {
           "amarillo": "#ECC677",
@@ -35,6 +36,18 @@ describe('rampas', () => {
           "papel": "#FAF3E0",
           "suelo": "#E3BC87",
           "tinta": "#372915",
+        },
+        "rosa": {
+          "100": "#F5E3E2",
+          "200": "#EBC8C5",
+          "300": "#E0A9A4",
+          "400": "#D48881",
+          "50": "#FBF3F2",
+          "500": "#C8665D",
+          "600": "#A4544C",
+          "700": "#80413C",
+          "800": "#5C2F2B",
+          "900": "#3C1F1C",
         },
         "tan": {
           "100": "#FEF2E3",
@@ -66,9 +79,10 @@ describe('rampas', () => {
 
   it('todosLosColores() es exhaustivo', () => {
     const todos = todosLosColores()
-    expect(todos).toHaveLength(26)
+    expect(todos).toHaveLength(36)
     for (const v of Object.values(verde)) expect(todos).toContain(v)
     for (const t of Object.values(tan)) expect(todos).toContain(t)
+    for (const r of Object.values(rosa)) expect(todos).toContain(r)
     for (const f of Object.values(fijos)) expect(todos).toContain(f)
   })
 })

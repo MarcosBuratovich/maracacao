@@ -12,6 +12,17 @@ export const tan = {
   500: '#F8B465', 600: '#CB9453', 700: '#9F7341', 800: '#72532E', 900: '#4A361E',
 } as const
 
+/**
+ * Base 500 medida del render en cachetes y boca. Se sumó en la Task 7: el
+ * original tiene cachetes y lengua rosas y la paleta no tenía ningún rosa,
+ * con lo cual la lengua quedaba crema y se leía como un diente.
+ * `rosa-500` sobre papel da 3.44 — no usar para texto normal.
+ */
+export const rosa = {
+  50: '#FBF3F2', 100: '#F5E3E2', 200: '#EBC8C5', 300: '#E0A9A4', 400: '#D48881',
+  500: '#C8665D', 600: '#A4544C', 700: '#80413C', 800: '#5C2F2B', 900: '#3C1F1C',
+} as const
+
 export const fijos = {
   papel: '#FAF3E0',
   crema: '#F4E8C6',
@@ -54,5 +65,8 @@ export const paresProhibidos = [
 ] as const
 
 export function todosLosColores(): string[] {
-  return [...Object.values(verde), ...Object.values(tan), ...Object.values(fijos)]
+  return [
+    ...Object.values(verde), ...Object.values(tan),
+    ...Object.values(rosa), ...Object.values(fijos),
+  ]
 }

@@ -46,16 +46,21 @@ describe('bloqueTheme', () => {
   })
 
   /**
-   * Test del pipeline real: corre pnpm build y verifica que TODAS las 52 propiedades
+   * Test del pipeline real: corre pnpm build y verifica que TODAS las propiedades
    * --mrc-* lleguen al CSS que emite Tailwind. Es el único test que puede detectar
    * tree-shaking en @theme (sin static, Tailwind emite solo variables referenciadas).
    * Vitest importa directo de TypeScript sin pasar por Astro+Vite+Tailwind, así que
    * este test es crítico — todos los otros tests "pasan" pero el navegador recibe
    * artefacto incompleto. Si falla, significa que la compilación de Astro está
    * descartando variables silenciosamente.
+   *
+   * El conteo se deriva de `customProperties()` en vez de estar hardcodeado: la
+   * rampa rosa de la Task 7 lo movió de 52 a 62 y un número a mano obliga a
+   * editar el test cada vez que crece la paleta. El piso de 52 conserva la
+   * intención original — que el pipeline no pierda propiedades.
    */
   it(
-    'todas las 52 propiedades --mrc-* llegan al CSS compilado por Tailwind',
+    'todas las propiedades --mrc-* llegan al CSS compilado por Tailwind',
     { timeout: 120000 },
     async () => {
       // Correr build
@@ -89,11 +94,11 @@ describe('bloqueTheme', () => {
         }
       }
 
-      // Verificar que todas las 52 propiedades estén en el CSS compilado
+      // Verificar que todas las propiedades estén en el CSS compilado
       const props = customProperties()
       const propNames = Object.keys(props)
 
-      expect(propNames.length).toBe(52)
+      expect(propNames.length).toBeGreaterThanOrEqual(52)
 
       for (const propName of propNames) {
         expect(cssContent).toContain(propName)
