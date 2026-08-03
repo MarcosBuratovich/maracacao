@@ -971,7 +971,7 @@ git commit -m "feat: rasterizado de SVG para verificación visual"
 |---|---|
 | Referencia de forma | `docs/referencias/packaging-foto.jpg` (autoridad) |
 | Referencia de legibilidad | `docs/referencias/render-limpio.png` |
-| Caja de la cabeza dentro del viewBox 1024 | aprox. `x 300–700`, `y 90–420` |
+| Caja de la cabeza (contención, no objetivo) | la proporción real de la cabeza es **~1.80 de ancho/alto**, medida por dos revisiones independientes en foto y render; la caja original (`x 300–700`, `y 90–420`, relación 1.21) era incompatible y se trata como contención. Tras el reescalado del fix round: ~350×194, corona en y≈64 |
 | Clase de trazo del contorno exterior | `.t-principal` (11) |
 | Clase de trazo de detalles internos | `.t-interior` (8) |
 | Relleno del cráneo y orejas | `#5B744B` |
@@ -1108,7 +1108,9 @@ git commit -m "feat: dibujo de la cabeza de la mascota con pivotes ubicados"
 
 | Qué | Valor |
 |---|---|
-| Caja del torso | aprox. `x 340–660`, `y 400–700` |
+| **Presupuesto vertical (vinculante, fijado tras la review de la Task 7)** | corona y≈64 · planta de pies y≈956 · figura completa ≈4.6 cabezas · cabeza ≈194 de alto · suelo/ondas hasta y≈1004 |
+| Caja del torso | arranca bajo el mentón (~y 258); la cadera queda ≈ y 560; contención `x 350–660`. Las proporciones finales se juzgan contra la foto |
+| Técnica de relleno | atributo `fill` plano en cada forma; las clases `.t-*` definen **solo trazo** (sin `fill:none`) — no depende de la cascada CSS, robustez de importación a Rive. Decidido en la review de la Task 7 |
 | Relleno del torso | `#5B744B` |
 | Relleno de la panza | `#F8B465` |
 | Relleno de las manos | `#F8B465` |

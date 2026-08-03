@@ -18,6 +18,10 @@ dist/
 # Test artifacts
 test/tmp/
 
+# Infraestructura de agentes (worktrees, MCP)
+.claude/
+.playwright-mcp/
+
 # Sistema
 .DS_Store
 Thumbs.db
