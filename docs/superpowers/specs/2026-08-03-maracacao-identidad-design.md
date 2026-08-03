@@ -146,6 +146,7 @@ Los colores medidos del render son **todos tonos medios** y no alcanzan para una
 | Texto sobre banda verde profunda | `papel` / `verde-800` | 11.63 | AAA |
 | Botón amarillo | `tinta` / `amarillo` | 8.66 | AAA |
 | Botón bordó | `papel` / `bordo` | 5.87 | AA |
+| Acento sobre banda clara | `bordo` / `papel` | 5.87 | AA |
 
 **Prohibidos:** `crema` sobre `verde-500` (4.25) y `tan-500` sobre `verde-500` (2.89).
 
