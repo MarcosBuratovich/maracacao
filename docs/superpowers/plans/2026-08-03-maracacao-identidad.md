@@ -1382,6 +1382,23 @@ describe('tokenizarSvg', () => {
     expect(salida).toContain('var(--mrc-tinta, #372915)')
   })
 
+  it('es idempotente — la segunda pasada no envuelve los fallbacks de la primera', () => {
+    const una = tokenizarSvg('<path fill="#5B744B" stroke="#372915"/>')
+    expect(tokenizarSvg(una)).toBe(una)
+  })
+
+  it('cada color del sistema resuelve a una custom property existente con el mismo valor', () => {
+    // Las dos puntas del contrato: tokenize-svg emite var(--mrc-{nombre}) y
+    // css.ts emite --mrc-{nombre}. Derivan los nombres por separado; este
+    // test es lo único que impide que diverjan en silencio.
+    const props = customProperties()
+    for (const hex of todosLosColores()) {
+      const nombre = nombreDeToken(hex)
+      expect(nombre).not.toBeNull()
+      expect(props[`--mrc-${nombre}`]).toBe(hex)
+    }
+  })
+
   it('la mascota real queda sin ningún hex crudo fuera de los fallbacks', () => {
     const salida = tokenizarSvg(readFileSync('src/assets/brand/mascota.svg', 'utf8'))
     const crudos = [...salida.matchAll(/#[0-9A-Fa-f]{6}/g)]
@@ -1416,7 +1433,11 @@ export function nombreDeToken(hex: string): string | null {
 }
 
 export function tokenizarSvg(svg: string): string {
-  return svg.replace(/#[0-9A-Fa-f]{6}\b/g, (hex) => {
+  // El lookbehind evita retokenizar los fallbacks de una pasada anterior:
+  // sin él, aplicar la función dos veces anida var() sin límite
+  // (var(--mrc-tinta, var(--mrc-tinta, #372915))...). CSS lo resolvería
+  // igual, pero un pipeline que reprocese su salida crece para siempre.
+  return svg.replace(/(?<!var\(--mrc-[a-z0-9-]+, )#[0-9A-Fa-f]{6}\b/g, (hex) => {
     const token = nombreDeToken(hex)
     return token ? `var(--mrc-${token}, ${hex.toUpperCase()})` : hex
   })
