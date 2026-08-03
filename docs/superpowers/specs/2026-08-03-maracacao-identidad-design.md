@@ -26,6 +26,8 @@ Se evaluó el trazado automático (potrace, vtracer, Image Trace, vectorizer.ai)
 - **Ruido.** Textura de papel mate más artefactos JPEG producen cientos de paths basura.
 - **Estructura inservible.** Aun con un trazado perfecto, el resultado es una sopa de paths anónimos con los contornos como formas rellenas. Para animar hacen falta capas nombradas, pivotes y trazos como `stroke`.
 
+**¿Y por qué no trazar automáticamente el render de Gemini, que sí está limpio?** Porque resuelve solo uno de los seis problemas. El render tiene trazos de pincel digital con grosor variable y bordes blandos, rellenos con textura y moteado tonal, y ninguna separación entre partes. Un trazado suyo daría paths más prolijos pero igual de inservibles: contornos como formas rellenas, sin nombres, sin pivotes, sin geometría oculta. Y arrastraría a la marca la textura pictórica que el packaging original no tiene.
+
 **Decisión: redibujo vectorial a mano**, usando ambas imágenes como referencia.
 
 ## 3. Regla de referencias
@@ -169,7 +171,7 @@ Ambas se self-hostean como woff2, subset latino, con `font-display: swap` y prel
 
 ## 8. Sistema de logo
 
-Seis piezas, todas derivadas del mismo dibujo vectorial.
+Siete piezas, todas derivadas del mismo dibujo vectorial.
 
 | # | Pieza | Uso |
 |---|---|---|
@@ -179,8 +181,11 @@ Seis piezas, todas derivadas del mismo dibujo vectorial.
 | 4 | Isotipo suelto — la cabeza | Ilustración de apoyo, stickers |
 | 5 | Sello circular — cabeza en círculo | Favicon, avatar de redes, botón |
 | 6 | Monocromo positivo y negativo | Grabado, sellos, una tinta |
+| 7 | Lockup de header — cabeza + logotipo + descriptor | Header del sitio, mail, membrete |
 
-**Header del sitio:** pieza compuesta de **cabeza + logotipo recto + descriptor `CHOCOLATE MEXICANO`** en Fraunces con tracking abierto. Mantiene vivo el contraste dibujado/serif del packaging y dice qué se vende sin scrollear.
+**La pieza 7 es la que más se ve:** está en todas las páginas, todo el tiempo. Combina **cabeza + logotipo recto + descriptor `CHOCOLATE MEXICANO`** en Fraunces con tracking abierto. Mantiene vivo el contraste dibujado/serif del packaging y dice qué se vende sin scrollear.
+
+Va aparte de la 1 y la 2 porque el arco del sello es impracticable en una barra de 64 px de alto: obliga a achicar el texto o a comerse medio viewport.
 
 *Riesgo conocido, asumido:* en mobile este lockup se apelmaza y el descriptor a ~10 px es decorativo más que informativo. **Mitigación:** por debajo de 640 px el descriptor se oculta y queda cabeza + logotipo.
 
@@ -276,7 +281,7 @@ maracacao/
 2. **La styleguide es el sitio, no un anexo.** La portada del manual es `index.astro`; la landing se agrega después como otra ruta. Por eso el manual no se desactualiza: si se rompe un token, se rompe la página que lo documenta.
 3. **Un componente por variante de logo**, no uno con quince props. Cada uno inyecta su SVG **inline** —no como `<img>`— para poder animarlo y que herede `currentColor`.
 4. **Fuentes self-hosteadas.** Sin `<link>` a Google en producción: privacidad, velocidad, y que la identidad no dependa de un CDN ajeno.
-5. **Tres capas de animación** con regla clara de cuál usar: CSS keyframes para lo ambiental, Rive para el personaje, Motion para transiciones de UI. `prefers-reduced-motion` las apaga desde un solo lugar.
+5. **Dos capas de animación** con regla clara de cuál usar: **CSS keyframes y transiciones** para lo ambiental y para la UI, **Rive** para el personaje. `prefers-reduced-motion` las apaga desde un solo lugar. No se instala ninguna librería de animación de entrada — si más adelante aparece una interacción que necesite física de springs de verdad, se evalúa Motion entonces y se justifica el peso.
 
 ## 11. Rig de Rive e integración
 
