@@ -15,6 +15,9 @@ dist/
 # Companion visual de brainstorming (efímero)
 .superpowers/
 
+# Test artifacts
+test/tmp/
+
 # Sistema
 .DS_Store
 Thumbs.db

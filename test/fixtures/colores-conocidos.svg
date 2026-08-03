@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Fondo: verde oscuro #3A4A30 (como Task 9) -->
+  <rect width="100" height="100" fill="#3A4A30"/>
+
+  <!-- Región de prueba: rectángulo grande tan/beige #FAF3E0 (como Task 9) -->
+  <!-- Posicionado de forma que tiene suficiente espacio interior para muestreo seguro -->
+  <rect x="25" y="25" width="50" height="50" fill="#FAF3E0"/>
+
+  <!-- Pequeño rectángulo rojo para verificar que no hay confusión de canales -->
+  <rect x="10" y="10" width="15" height="15" fill="#FF3333"/>
+</svg>

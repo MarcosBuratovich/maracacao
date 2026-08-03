@@ -9,6 +9,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
+    "render": "node scripts/render-svg.mjs",
     "test": "vitest run",
     "typecheck": "astro check"
   },
