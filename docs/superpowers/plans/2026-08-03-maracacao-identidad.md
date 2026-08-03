@@ -314,7 +314,7 @@ git commit -m "feat: cálculo de contraste WCAG"
 import { describe, it, expect } from 'vitest'
 import { contrastRatio, nivelWcag } from '@/tokens/contrast'
 import {
-  verde, tan, fijos, paresAprobados, paresProhibidos, todosLosColores,
+  verde, tan, paresAprobados, paresProhibidos, todosLosColores,
 } from '@/tokens/color'
 
 describe('rampas', () => {
@@ -369,11 +369,16 @@ describe('pares prohibidos', () => {
   )
 
   it('ningún par prohibido aparece en la lista de aprobados', () => {
+    // Se comparan por clave, no campo a campo. Como los dos arrays son
+    // `as const`, TypeScript estrecha los hex a tipos literales y declara
+    // que la comparación nunca puede ser verdadera (ts2367) — o sea, prueba
+    // estáticamente lo mismo que este test verifica en runtime, y de paso
+    // rompe el build. Concatenar a string ensancha el tipo y deja el test
+    // vivo como red contra futuras ediciones de las listas.
+    const clave = (p: { frente: string; fondo: string }) => `${p.frente}|${p.fondo}`
+    const aprobadas = paresAprobados.map(clave)
     for (const p of paresProhibidos) {
-      const choque = paresAprobados.find(
-        (a) => a.frente === p.frente && a.fondo === p.fondo,
-      )
-      expect(choque).toBeUndefined()
+      expect(aprobadas).not.toContain(clave(p))
     }
   })
 })
