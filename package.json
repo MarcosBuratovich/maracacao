@@ -12,7 +12,7 @@
     "render": "node scripts/render-svg.mjs",
     "test": "vitest run",
     "typecheck": "astro check",
-    "tokens": "node scripts/emit-tokens.mjs"
+    "tokens": "tsx scripts/emit-tokens.ts"
   },
   "dependencies": {
     "@astrojs/mdx": "^7.0.5",
@@ -30,6 +30,7 @@
     "@types/react-dom": "^19.2.4",
     "linkedom": "^0.18.13",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.4",
     "typescript": "^6.0.3",
     "vitest": "^4.1.10"
   }

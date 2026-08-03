@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { customProperties, bloqueTheme } from '@/tokens/css'
 import { verde, fijos, todosLosColores } from '@/tokens/color'
 import { duraciones } from '@/tokens/motion'
@@ -35,6 +36,12 @@ describe('bloqueTheme', () => {
     expect(css.startsWith('@theme {')).toBe(true)
     expect(css.trimEnd().endsWith('}')).toBe(true)
     expect(css).toContain('--mrc-verde-500: #5B744B;')
+  })
+
+  it('el archivo generado coincide con bloqueTheme()', () => {
+    const esperado = `/* GENERADO por pnpm tokens. No editar a mano. */\n${bloqueTheme()}`
+    const actual = readFileSync('src/styles/tokens.generated.css', 'utf-8')
+    expect(actual).toBe(esperado)
   })
 })
 
