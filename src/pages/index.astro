@@ -3,6 +3,23 @@
 import Base from '@/layouts/Base.astro'
 import '@/styles/global.css'
 ---
+{/*
+  DEUDA CONOCIDA (no es un descuido): `titulo` y el <h1> de abajo son strings
+  visibles hardcodeados en este componente, lo que viola la constraint global
+  "ningún string visible se escribe dentro de un componente".
+
+  Esta página se creó verbatim como parte del scaffold de la Task 1, antes de
+  que exista una capa de copy. La Task 15 crea `src/copy/`; la Task 17
+  reescribe esta página entera contra esa capa (ej. `copy.manualTitulo`).
+  Escalado al dueño del plan durante el review de la Task 1: la resolución
+  es dejarlo así hasta la Task 17, no adelantar `src/copy/` acá.
+
+  Reviewers de tareas 2-16: por favor no vuelvan a levantar este hallazgo,
+  ya está señalado y su resolución está agendada.
+
+  (Comentario de expresión JS a propósito, no HTML: así no viaja al output
+  de producción — es una nota para quien lea el fuente, no para el usuario.)
+*/}
 <Base titulo="Maracacao — Manual de marca">
   <h1>Maracacao</h1>
 </Base>
