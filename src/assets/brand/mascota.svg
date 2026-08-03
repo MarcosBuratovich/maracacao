@@ -27,17 +27,94 @@
         <g id="bowl-borde"></g>
       </g>
       <g id="brazo-r"><g id="mano-r"></g></g>
+      <!-- Cabeza. Eje en x=512; corona en y=108, mentón en y=314 (alto 206),
+           oreja a oreja 372 (x 326–698). El relleno va en `style` y no en el
+           atributo `fill`: la regla `.t-principal { fill: none }` del <style>
+           le gana a un atributo de presentación en la cascada. -->
       <g id="cabeza">
-        <g id="oreja-l"></g>
-        <g id="oreja-r"></g>
-        <g id="craneo"></g>
-        <g id="rostro"></g>
-        <g id="ojo-l"></g>
-        <g id="ojo-r"></g>
-        <g id="cachete-l"></g>
-        <g id="cachete-r"></g>
-        <g id="nariz"></g>
-        <g id="boca"></g>
+        <!-- Orejas: discos COMPLETOS, por detrás del cráneo. No recortar la
+             mitad tapada: al rotarlas en Rive tiene que seguir habiendo disco. -->
+        <g id="oreja-l">
+          <circle id="oreja-l-disco" class="t-principal" style="fill:#5B744B"
+                  cx="373" cy="170" r="47"/>
+          <ellipse id="oreja-l-interior" class="t-interior" style="fill:#F8B465"
+                   cx="386" cy="170" rx="25" ry="24"/>
+        </g>
+        <g id="oreja-r">
+          <circle id="oreja-r-disco" class="t-principal" style="fill:#5B744B"
+                  cx="651" cy="170" r="47"/>
+          <ellipse id="oreja-r-interior" class="t-interior" style="fill:#F8B465"
+                   cx="638" cy="170" rx="25" ry="24"/>
+        </g>
+
+        <!-- Cráneo COMPLETO, por detrás del rostro. Tapa la mitad interna de
+             cada oreja y produce la muesca cóncava de la unión. -->
+        <g id="craneo">
+          <path id="craneo-forma" class="t-principal" style="fill:#5B744B"
+                d="M 512 108 C 586 108 637 158 637 226
+                   C 637 282 588 314 512 314
+                   C 436 314 387 282 387 226
+                   C 387 158 438 108 512 108 Z"/>
+        </g>
+
+        <!-- Rostro COMPLETO, por delante del cráneo. Borde superior en
+             corazón: dos lóbulos de ceja anchos con muesca en V sobre el eje. -->
+        <g id="rostro">
+          <path id="rostro-forma" class="t-principal" style="fill:#F8B465"
+                d="M 512 166 C 498 148 476 141 455 148
+                   C 434 155 416 180 413 212
+                   C 410 248 424 288 450 301
+                   C 469 310 490 310 512 310
+                   C 534 310 555 310 574 301
+                   C 600 288 614 248 611 212
+                   C 608 180 590 155 569 148
+                   C 548 141 526 148 512 166 Z"/>
+        </g>
+
+        <!-- Ojos cerrados de sonrisa: arcos abiertos, sin relleno. -->
+        <g id="ojo-l">
+          <path id="ojo-l-arco" class="t-interior" d="M 443 213 C 451 192 481 192 489 213"/>
+        </g>
+        <g id="ojo-r">
+          <path id="ojo-r-arco" class="t-interior" d="M 535 213 C 543 192 573 192 581 213"/>
+        </g>
+
+        <!-- Cachetes: mancha plana sin trazo. -->
+        <g id="cachete-l">
+          <ellipse id="cachete-l-mancha" fill="#8B4D3F" opacity="0.35"
+                   cx="436" cy="241" rx="21" ry="13"/>
+        </g>
+        <g id="cachete-r">
+          <ellipse id="cachete-r-mancha" fill="#8B4D3F" opacity="0.35"
+                   cx="588" cy="241" rx="21" ry="13"/>
+        </g>
+
+        <g id="nariz">
+          <path id="nariz-forma" fill="#372915"
+                d="M 494 210 C 494 202 530 202 530 210
+                   C 530 220 519 224 512 224
+                   C 505 224 494 220 494 210 Z"/>
+        </g>
+
+        <!-- Boca abierta de risa. Cuerpo en medialuna: comisura izquierda baja
+             y en punta, labio superior en alza hacia la derecha. El gancho de
+             la comisura derecha va como trazo abierto aparte: en la referencia
+             es un remate de pincel que se afina, y con trazo parejo no se
+             puede cerrar sin que se empaste. -->
+        <g id="boca">
+          <path id="boca-forma" class="t-interior" style="fill:#8B4D3F"
+                d="M 447 245 C 470 244 502 241 530 235
+                   C 540 237 544 245 540 254
+                   C 532 272 514 288 490 288
+                   C 470 288 453 269 447 245 Z"/>
+          <path id="boca-comisura" class="t-interior"
+                d="M 528 234 C 536 226 547 223 553 231
+                   C 559 239 560 244 560 251"/>
+          <path id="lengua" class="t-fino" style="fill:#F4E8C6"
+                d="M 486 274 C 491 264 511 257 524 263
+                   C 531 267 528 280 515 284
+                   C 502 288 488 282 486 274 Z"/>
+        </g>
       </g>
       <g id="chispas"></g>
     </g>
@@ -57,10 +134,14 @@
     <circle id="piv-mano-l"        cx="0" cy="0" r="4" fill="#8B4D3F"/>
     <circle id="piv-brazo-r"       cx="0" cy="0" r="4" fill="#8B4D3F"/>
     <circle id="piv-mano-r"        cx="0" cy="0" r="4" fill="#8B4D3F"/>
-    <circle id="piv-cabeza"        cx="0" cy="0" r="4" fill="#8B4D3F"/>
-    <circle id="piv-oreja-l"       cx="0" cy="0" r="4" fill="#8B4D3F"/>
-    <circle id="piv-oreja-r"       cx="0" cy="0" r="4" fill="#8B4D3F"/>
-    <circle id="piv-ojo-l"         cx="0" cy="0" r="4" fill="#8B4D3F"/>
-    <circle id="piv-ojo-r"         cx="0" cy="0" r="4" fill="#8B4D3F"/>
+    <!-- Cabeza: base del cuello, por debajo del mentón (y=314). -->
+    <circle id="piv-cabeza"        cx="512" cy="345" r="4" fill="#8B4D3F"/>
+    <!-- Orejas: unión con el cráneo = punto del borde del cráneo más cercano
+         al centro del disco de la oreja. -->
+    <circle id="piv-oreja-l"       cx="394" cy="181" r="4" fill="#8B4D3F"/>
+    <circle id="piv-oreja-r"       cx="630" cy="181" r="4" fill="#8B4D3F"/>
+    <!-- Ojos: centro del arco. -->
+    <circle id="piv-ojo-l"         cx="466" cy="205" r="4" fill="#8B4D3F"/>
+    <circle id="piv-ojo-r"         cx="558" cy="205" r="4" fill="#8B4D3F"/>
   </g>
 </svg>
