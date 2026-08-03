@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { contrastRatio, nivelWcag } from '@/tokens/contrast'
 import {
-  verde, tan, paresAprobados, paresProhibidos, todosLosColores,
+  verde, tan, fijos, roles, paresAprobados, paresProhibidos, todosLosColores,
 } from '@/tokens/color'
 
 describe('rampas', () => {
@@ -23,6 +23,95 @@ describe('rampas', () => {
 
   it('el 500 del verde es el color medido del render', () => {
     expect(verde[500]).toBe('#5B744B')
+  })
+
+  it('todos los valores de rampas y fijos coinciden con el snapshot', () => {
+    expect({ verde, tan, fijos }).toMatchInlineSnapshot(`
+      {
+        "fijos": {
+          "amarillo": "#ECC677",
+          "bordo": "#8B4D3F",
+          "crema": "#F4E8C6",
+          "papel": "#FAF3E0",
+          "suelo": "#E3BC87",
+          "tinta": "#372915",
+        },
+        "tan": {
+          "100": "#FEF2E3",
+          "200": "#FCE4C8",
+          "300": "#FBD5A9",
+          "400": "#FAC487",
+          "50": "#FEF9F3",
+          "500": "#F8B465",
+          "600": "#CB9453",
+          "700": "#9F7341",
+          "800": "#72532E",
+          "900": "#4A361E",
+        },
+        "verde": {
+          "100": "#E1E6DF",
+          "200": "#C4CDBE",
+          "300": "#A3B19A",
+          "400": "#7F9373",
+          "50": "#F2F4F1",
+          "500": "#5B744B",
+          "600": "#4B5F3E",
+          "700": "#3A4A30",
+          "800": "#2A3522",
+          "900": "#1B2316",
+        },
+      }
+    `)
+  })
+
+  it('todosLosColores() es exhaustivo', () => {
+    const todos = todosLosColores()
+    expect(todos).toHaveLength(26)
+    for (const v of Object.values(verde)) expect(todos).toContain(v)
+    for (const t of Object.values(tan)) expect(todos).toContain(t)
+    for (const f of Object.values(fijos)) expect(todos).toContain(f)
+  })
+})
+
+describe('roles semánticos', () => {
+  it('fondo-claro apunta al token correcto', () => {
+    expect(roles['fondo-claro']).toBe(fijos.papel)
+  })
+
+  it('fondo-oscuro apunta al token correcto', () => {
+    expect(roles['fondo-oscuro']).toBe(verde[700])
+  })
+
+  it('fondo-profundo apunta al token correcto', () => {
+    expect(roles['fondo-profundo']).toBe(verde[800])
+  })
+
+  it('texto-cuerpo apunta al token correcto', () => {
+    expect(roles['texto-cuerpo']).toBe(fijos.tinta)
+  })
+
+  it('texto-titulo apunta al token correcto', () => {
+    expect(roles['texto-titulo']).toBe(verde[700])
+  })
+
+  it('texto-secundario apunta al token correcto', () => {
+    expect(roles['texto-secundario']).toBe(verde[600])
+  })
+
+  it('texto-sobre-oscuro apunta al token correcto', () => {
+    expect(roles['texto-sobre-oscuro']).toBe(fijos.papel)
+  })
+
+  it('acento apunta al token correcto', () => {
+    expect(roles['acento']).toBe(fijos.bordo)
+  })
+
+  it('destacado apunta al token correcto', () => {
+    expect(roles['destacado']).toBe(fijos.amarillo)
+  })
+
+  it('contorno-ilustracion apunta al token correcto', () => {
+    expect(roles['contorno-ilustracion']).toBe(fijos.tinta)
   })
 })
 
