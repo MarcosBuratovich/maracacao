@@ -1469,12 +1469,28 @@ describe('customProperties', () => {
 })
 
 describe('bloqueTheme', () => {
-  it('genera un @theme válido de Tailwind', () => {
+  it('genera un @theme static de Tailwind', () => {
     const css = bloqueTheme()
-    expect(css.startsWith('@theme {')).toBe(true)
+    // `static` evita el tree-shaking de Tailwind. Ver el comentario en css.ts.
+    expect(css.startsWith('@theme static {')).toBe(true)
     expect(css.trimEnd().endsWith('}')).toBe(true)
     expect(css).toContain('--mrc-verde-500: #5B744B;')
   })
+})
+
+// Este es el único test que atraviesa el pipeline real. Los demás importan
+// los módulos de TypeScript directo, sin pasar por Astro/Vite/Tailwind, así
+// que no pueden ver lo que el bundler hace con los tokens. Sin este test,
+// Tailwind puede descartar la mitad de las variables y todo queda en verde.
+describe('el CSS construido conserva todos los tokens', () => {
+  it('emite las 52 custom properties al bundle', async () => {
+    execFileSync('pnpm', ['build'], { stdio: 'pipe' })
+    const hojas = readdirSync('dist/_astro').filter((f) => f.endsWith('.css'))
+    expect(hojas.length).toBeGreaterThan(0)
+    const css = hojas.map((f) => readFileSync(`dist/_astro/${f}`, 'utf8')).join('\n')
+    const faltantes = Object.keys(customProperties()).filter((k) => !css.includes(k))
+    expect(faltantes).toEqual([])
+  }, 120_000)
 })
 
 describe('movimiento', () => {
@@ -1575,7 +1591,14 @@ export function bloqueTheme(): string {
   const lineas = Object.entries(customProperties())
     .map(([k, v]) => `  ${k}: ${v};`)
     .join('\n')
-  return `@theme {\n${lineas}\n}\n`
+  // `static` es obligatorio, no cosmético. Un `@theme` normal hace
+  // tree-shaking: Tailwind emite solo las variables que detecta
+  // referenciadas textualmente en los archivos que escanea, y descarta el
+  // resto en silencio. Sin `static`, un `var(--mrc-ease-spring)` escrito
+  // dentro de un SVG generado o de una plantilla que Tailwind no alcance a
+  // ver resuelve a nada, y por spec de CSS la declaración cae al valor
+  // inicial sin ningún error. Con `static` se emiten todas siempre.
+  return `@theme static {\n${lineas}\n}\n`
 }
 ```
 
