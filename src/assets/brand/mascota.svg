@@ -21,16 +21,94 @@
     <g id="mono">
       <g id="cola"></g>
       <g id="pierna-post"><g id="pie-post"></g></g>
-      <g id="brazo-post"></g>
-      <g id="cuerpo"></g>
+      <g id="brazo-post">
+        <!-- Brazo del lado lejano, por detrás del torso. La referencia muestra dos
+             brazos y nada más, así que este va completo y completamente tapado: es
+             el miembro que el rig necesita si alguna pose lo saca de atrás del
+             cuerpo. Verificado: rotarlo ±20° no cambia un solo píxel del render. -->
+        <path id="brazo-post-forma" class="t-principal" fill="#5B744B"
+              d="M 499.57 291.46 C 498.81 294.4 496.44 303.31 495.01 309.1 C 493.58 314.88 492.28 320.23 490.98 326.18 C 489.69 332.12 488.24 338.7 487.24 344.78 C 486.24 350.86 485.53 356.6 485 362.68 C 484.48 368.76 484.3 374.99 484.09 381.25 C 483.89 387.52 483.75 394.07 483.75 400.25 C 483.75 406.43 483.85 412.55 484.1 418.36 C 484.36 424.17 484.83 429.49 485.29 435.12 C 485.74 440.74 486.38 447.54 486.82 452.12 C 487.26 456.69 487.74 460.82 487.93 462.56 A 14 14 0 0 1 460.07 465.44 C 459.89 463.69 459.42 459.61 458.97 454.96 C 458.52 450.3 457.86 443.4 457.39 437.51 C 456.92 431.62 456.4 425.29 456.13 419.63 C 455.86 413.98 455.8 409.04 455.76 403.57 C 455.72 398.11 455.79 392.38 455.91 386.87 C 456.03 381.37 456.18 376.08 456.48 370.55 C 456.78 365.02 457.08 359.35 457.71 353.7 C 458.34 348.06 459.26 342.24 460.25 336.66 C 461.23 331.08 462.35 325.96 463.62 320.22 C 464.89 314.49 466.4 308.18 467.87 302.23 C 469.34 296.28 471.67 287.49 472.43 284.54 A 14 14 0 0 1 499.57 291.46 Z"/>
+      </g>
+      <g id="cuerpo">
+        <!-- Torso COMPLETO. Arranca en y=228, por encima del mentón (258), y llega
+             a la cadera en y=598. Se dibuja entero por detrás de los brazos y del
+             bowl: al rotar un brazo tiene que aparecer torso, nunca fondo. Perfil
+             simétrico sobre x=512 — la asimetría de la referencia es el giro de 3/4
+             del dibujo original y en un rig se convierte en un bug de animación. -->
+        <path id="torso-forma" class="t-principal" fill="#5B744B"
+              d="M 512 228 C 523.33 228 538 237.33 546 248 C 554 258.67 554.33 275 560 292 C 565.67 309 574.33 330.33 580 350 C 585.67 369.67 590.33 390 594 410 C 597.67 430 600.67 451.67 602 470 C 603.33 488.33 604 504.67 602 520 C 600 535.33 597 550.67 590 562 C 583 573.33 573 582 560 588 C 547 594 528 598 512 598 C 496 598 477 594 464 588 C 451 582 441 573.33 434 562 C 427 550.67 424 535.33 422 520 C 420 504.67 420.67 488.33 422 470 C 423.33 451.67 426.33 430 430 410 C 433.67 390 438.33 369.67 444 350 C 449.67 330.33 458.33 309 464 292 C 469.67 275 470 258.67 478 248 C 486 237.33 500.67 228 512 228 Z"/>
+        <!-- Panza: mancha tan por delante del torso, embutida ~15 unidades adentro
+             de la silueta. Contorno `.t-interior` (8): en la referencia lee más fino
+             que la silueta del cuerpo. El bowl de la Task 9 le tapa la mitad de
+             arriba; lo que se ve es la franja de abajo. -->
+        <path id="panza" class="t-interior" fill="#F8B465"
+              d="M 512 378 C 525.33 378 541 383.33 552 394 C 563 404.67 572.33 425.33 578 442 C 583.67 458.67 586.67 477.33 586 494 C 585.33 510.67 581 529.33 574 542 C 567 554.67 554.33 564 544 570 C 533.67 576 522.67 578 512 578 C 501.33 578 490.33 576 480 570 C 469.67 564 457 554.67 450 542 C 443 529.33 438.67 510.67 438 494 C 437.33 477.33 440.33 458.67 446 442 C 451.67 425.33 461 404.67 472 394 C 483 383.33 498.67 378 512 378 Z"/>
+        <!-- Franjas del pecho: tres barras, medidas en la foto (y 288 / 316 / 344,
+             ancho 44). La tercera queda medio tapada por el bowl (Task 9), igual
+             que en la referencia. -->
+        <rect id="franja-1" class="t-interior" fill="#ECC677"
+              x="490" y="288" width="44" height="18" rx="9"/>
+        <rect id="franja-2" class="t-interior" fill="#ECC677"
+              x="490" y="316" width="44" height="18" rx="9"/>
+        <rect id="franja-3" class="t-interior" fill="#ECC677"
+              x="490" y="344" width="44" height="18" rx="9"/>
+      </g>
       <g id="pierna-apoyo"><g id="pie-apoyo"></g></g>
-      <g id="brazo-l"><g id="mano-l"></g></g>
+      <g id="brazo-l">
+        <!-- Brazo izquierdo en gancho, COMPLETO hasta el hombro. El casquete
+             proximal es un círculo centrado exactamente en piv-brazo-l: rotar sobre
+             el pivote lo deja invariante, así que el brazo no puede despegarse del
+             torso. El arco de ese casquete es además la línea del cuello que se ve
+             a la izquierda de las franjas, igual que en la foto. -->
+        <path id="brazo-l-forma" class="t-principal" fill="#5B744B"
+              d="M 492.03 273.66 C 490.97 276.76 488.36 286.38 485.69 292.28 C 483.02 298.17 478.37 305.43 476 309.04 C 473.63 312.65 474.24 311.32 471.45 313.93 C 468.66 316.55 463.44 321.13 459.26 324.74 C 455.08 328.34 450.9 331.99 446.39 335.57 C 441.89 339.15 437.23 342.65 432.25 346.21 C 427.27 349.78 421.54 353.71 416.51 356.97 C 411.48 360.22 407.09 362.85 402.1 365.73 C 397.11 368.62 391.74 371.64 386.55 374.27 C 381.36 376.9 376.1 379.34 370.97 381.52 C 365.85 383.7 361 385.5 355.81 387.33 C 350.62 389.16 345.24 391.19 339.84 392.5 C 334.44 393.8 326.81 394.79 323.4 395.17 C 319.98 395.55 321.83 395.49 319.34 394.79 C 316.85 394.09 310.79 391.92 308.48 390.97 C 306.17 390.03 307.82 391.34 305.5 389.11 C 303.17 386.89 296.63 380 294.53 377.62 C 292.43 375.24 293.8 377.41 292.9 374.81 C 292 372.21 289.83 365.53 289.13 362.02 C 288.43 358.5 288.39 358.03 288.71 353.71 C 289.03 349.39 289.81 341.61 291.05 336.11 C 292.3 330.62 294.29 326.02 296.17 320.73 C 298.05 315.44 300.08 309.69 302.34 304.39 C 304.59 299.1 307.54 294.18 309.68 288.97 C 311.82 283.75 313.63 278.43 315.15 273.11 C 316.68 267.79 318.13 260.16 318.83 257.05 C 319.54 253.94 319.29 254.88 319.38 254.45 A 17 17 0 0 1 352.62 261.55 C 352.2 263.59 351.26 268.97 350.05 273.78 C 348.85 278.59 347.23 284.95 345.39 290.41 C 343.55 295.86 341.32 301.12 339.02 306.51 C 336.73 311.89 333.83 317.25 331.62 322.7 C 329.42 328.16 327.29 334.27 325.82 339.24 C 324.34 344.21 323.25 349.61 322.75 352.53 C 322.24 355.44 322.64 355.54 322.77 356.76 C 322.9 357.97 322.86 359.12 323.51 359.8 C 324.17 360.48 323.57 361.46 326.69 360.83 C 329.82 360.2 337.09 357.79 342.27 356.02 C 347.45 354.25 352.51 352.43 357.76 350.19 C 363.02 347.95 368.81 345.15 373.81 342.57 C 378.81 339.99 382.92 337.61 387.79 334.71 C 392.65 331.81 398.15 328.39 403 325.16 C 407.85 321.93 412.21 318.83 416.89 315.33 C 421.57 311.84 426.49 307.97 431.1 304.17 C 435.71 300.36 441.81 294.91 444.56 292.5 C 447.31 290.09 445.99 291.86 447.59 289.72 C 449.18 287.58 452.05 284.23 454.12 279.66 C 456.18 275.1 458.99 265.23 459.97 262.34 A 17 17 0 0 1 492.03 273.66 Z"/>
+        <g id="mano-l">
+          <!-- Puño cerrado de perfil: silueta + cuatro pliegues de dedo. -->
+          <path id="mano-l-puno" class="t-principal" fill="#F8B465"
+                d="M 300 240 C 300 233.67 300.67 225.17 304 220 C 307.33 214.83 313.67 211 320 209 C 326.33 207 335.33 206.67 342 208 C 348.67 209.33 356.17 212.33 360 217 C 363.83 221.67 364.5 229.83 365 236 C 365.5 242.17 365.17 248.5 363 254 C 360.83 259.5 357 265.5 352 269 C 347 272.5 339.17 274.83 333 275 C 326.83 275.17 319.83 272.83 315 270 C 310.17 267.17 306.5 263 304 258 C 301.5 253 300 246.33 300 240 Z"/>
+          <path id="mano-l-dedo-1" class="t-fino" fill="none"
+                d="M 326 219 Q 342 215 358 222"/>
+          <path id="mano-l-dedo-2" class="t-fino" fill="none"
+                d="M 324 233 Q 341 229 357 236"/>
+          <path id="mano-l-dedo-3" class="t-fino" fill="none"
+                d="M 327 247 Q 343 243 355 250"/>
+          <path id="mano-l-dedo-4" class="t-fino" fill="none"
+                d="M 333 259 Q 345 256 352 261"/>
+          <!-- Pistache abierto camino a la boca: cáscara arriba, semilla abajo.
+               La punta llega al borde del cráneo y no más: la cabeza se pinta
+               después que el brazo, así que todo lo que entre en la cara se pierde. -->
+          <path id="pistache-mano-cascara" class="t-fino" fill="#FBD5A9"
+                d="M 344 220 Q 366.74 191.4 402 201 Q 379.26 229.6 344 220 Z"/>
+          <path id="pistache-mano-semilla" class="t-fino" fill="#F4E8C6"
+                d="M 350 243 Q 367.3 217.38 398 221 Q 380.7 246.62 350 243 Z"/>
+        </g>
+      </g>
       <g id="bowl">
         <g id="bowl-cuenco"></g>
         <g id="bowl-contenido"></g>
         <g id="bowl-borde"></g>
       </g>
-      <g id="brazo-r"><g id="mano-r"></g></g>
+      <g id="brazo-r">
+        <!-- Brazo derecho: arco desde el hombro, por fuera del bowl, hasta la
+             muñeca. Mismo criterio de casquete proximal centrado en el pivote. La
+             cuña de fondo que queda entre este brazo y el torso es la axila, y está
+             en la referencia. -->
+        <path id="brazo-r-forma" class="t-principal" fill="#5B744B"
+              d="M 555 252.51 C 557.82 253.75 566.7 257.54 571.92 259.98 C 577.14 262.42 581.56 264.53 586.31 267.17 C 591.06 269.81 595.62 272.48 600.41 275.8 C 605.2 279.12 610.41 283.22 615.07 287.1 C 619.72 290.97 623.78 294.68 628.35 299.07 C 632.92 303.47 638 308.42 642.5 313.47 C 647.01 318.51 651.34 323.87 655.38 329.33 C 659.43 334.79 663.16 340.44 666.76 346.22 C 670.37 352 673.74 357.85 677 364 C 680.26 370.15 683.73 377.47 686.33 383.11 C 688.92 388.75 690.35 392.25 692.56 397.85 C 694.78 403.45 697.33 410.42 699.61 416.7 C 701.88 422.99 704.38 428.95 706.23 435.57 C 708.09 442.19 710.08 450.27 710.74 456.42 C 711.4 462.58 711.2 466.59 710.21 472.5 C 709.22 478.42 707.29 485.92 704.81 491.92 C 702.34 497.93 698.12 504.54 695.36 508.52 C 692.6 512.49 691.36 513.34 688.24 515.79 C 685.12 518.23 681.42 520.81 676.64 523.19 C 671.85 525.57 665.32 528.24 659.52 530.08 C 653.72 531.92 647.57 533.42 641.83 534.23 C 636.09 535.05 630.23 535.29 625.06 534.97 C 619.9 534.66 615.21 533.45 610.85 532.32 C 606.49 531.2 600.9 528.9 598.91 528.22 A 17 17 0 0 1 609.09 495.78 C 610.34 496.22 614.08 497.61 616.6 498.42 C 619.11 499.24 621.82 500.23 624.18 500.67 C 626.54 501.11 626.71 501.5 630.76 501.04 C 634.81 500.58 643.04 499.47 648.48 497.92 C 653.93 496.37 660.4 493.11 663.42 491.71 C 666.44 490.32 665.55 490.53 666.61 489.56 C 667.66 488.59 668.62 487.68 669.75 485.91 C 670.88 484.13 672.21 482.45 673.4 478.92 C 674.59 475.39 676.31 467.98 676.89 464.73 C 677.47 461.48 677.62 463.3 676.88 459.44 C 676.13 455.58 674.24 447.52 672.43 441.58 C 670.62 435.64 668.23 429.72 666.02 423.79 C 663.8 417.85 661.63 411.88 659.16 405.97 C 656.7 400.05 654 393.96 651.23 388.3 C 648.46 382.63 645.58 377.24 642.54 371.96 C 639.51 366.69 636.31 361.51 633.02 356.63 C 629.72 351.75 626.41 347.15 622.78 342.69 C 619.15 338.24 615.25 334 611.24 329.89 C 607.23 325.78 603 321.82 598.75 318.02 C 594.49 314.21 590.11 310.34 585.68 307.04 C 581.26 303.75 576.83 300.96 572.18 298.27 C 567.53 295.58 562.97 293.36 557.78 290.9 C 552.58 288.44 543.79 284.73 541 283.49 A 17 17 0 0 1 555 252.51 Z"/>
+        <g id="mano-r">
+          <!-- Mano abierta sujetando el bowl: los dedos quedan sobre el frente del
+               cuenco que dibuja la Task 9 (caja medida en la referencia:
+               x 414–699, y 358–554). Pulgar arriba, tres dedos hacia la izquierda. -->
+          <path id="mano-r-palma" class="t-principal" fill="#F8B465"
+                d="M 500 519 C 500.67 513.67 506.33 506.17 512 502 C 517.67 497.83 528 496 534 494 C 540 492 544.33 492.67 548 490 C 551.67 487.33 552.67 480.33 556 478 C 559.33 475.67 564.33 474.67 568 476 C 571.67 477.33 574 482.33 578 486 C 582 489.67 587.67 493.33 592 498 C 596.33 502.67 602.33 508.33 604 514 C 605.67 519.67 605 527 602 532 C 599 537 593.67 541.33 586 544 C 578.33 546.67 566 548 556 548 C 546 548 534 546.33 526 544 C 518 541.67 512.33 538.17 508 534 C 503.67 529.83 499.33 524.33 500 519 Z"/>
+          <path id="mano-r-dedo-1" class="t-interior" fill="none"
+                d="M 552 500 Q 530 496 509 503"/>
+          <path id="mano-r-dedo-2" class="t-interior" fill="none"
+                d="M 550 517 Q 528 513 507 520"/>
+          <path id="mano-r-dedo-3" class="t-interior" fill="none"
+                d="M 548 532 Q 528 530 514 537"/>
+        </g>
+      </g>
       <!-- Cabeza. Eje en x=512; corona en y=64, mentón en y=258 (alto 194),
            oreja a oreja 350.33 (x 336.83–687.17). Los números salen del
            presupuesto vertical fijado en la review: corona y=64, planta de
@@ -146,13 +224,13 @@
     <circle id="piv-cola"          cx="0" cy="0" r="4" fill="#8B4D3F"/>
     <circle id="piv-pierna-post"   cx="0" cy="0" r="4" fill="#8B4D3F"/>
     <circle id="piv-pie-post"      cx="0" cy="0" r="4" fill="#8B4D3F"/>
-    <circle id="piv-brazo-post"    cx="0" cy="0" r="4" fill="#8B4D3F"/>
+    <circle id="piv-brazo-post"    cx="486" cy="288" r="4" fill="#8B4D3F"/>
     <circle id="piv-pierna-apoyo"  cx="0" cy="0" r="4" fill="#8B4D3F"/>
     <circle id="piv-pie-apoyo"     cx="0" cy="0" r="4" fill="#8B4D3F"/>
-    <circle id="piv-brazo-l"       cx="0" cy="0" r="4" fill="#8B4D3F"/>
-    <circle id="piv-mano-l"        cx="0" cy="0" r="4" fill="#8B4D3F"/>
-    <circle id="piv-brazo-r"       cx="0" cy="0" r="4" fill="#8B4D3F"/>
-    <circle id="piv-mano-r"        cx="0" cy="0" r="4" fill="#8B4D3F"/>
+    <circle id="piv-brazo-l"       cx="476" cy="268" r="4" fill="#8B4D3F"/>
+    <circle id="piv-mano-l"        cx="332" cy="276" r="4" fill="#8B4D3F"/>
+    <circle id="piv-brazo-r"       cx="548" cy="268" r="4" fill="#8B4D3F"/>
+    <circle id="piv-mano-r"        cx="612" cy="510" r="4" fill="#8B4D3F"/>
     <!-- Cabeza: base del cuello, por debajo del mentón (y=258). -->
     <circle id="piv-cabeza"        cx="512" cy="287.19" r="4" fill="#8B4D3F"/>
     <!-- Orejas: unión con el cráneo = punto del borde del cráneo más cercano
