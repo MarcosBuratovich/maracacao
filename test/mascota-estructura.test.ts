@@ -22,9 +22,9 @@ describe('mascota.svg — estructura', () => {
   })
 
   it('no hay grupos de más', () => {
-    const declarados = JERARQUIA.map((g) => g.id)
+    const declarados = JERARQUIA.map((g) => g.id) as readonly string[]
     const sobrantes = idsDeGrupos(doc).filter(
-      (id) => !declarados.includes(id) && !id.startsWith('piv-') && !id.startsWith('grano-'),
+      (id) => !declarados.includes(id as never) && !id.startsWith('piv-') && !id.startsWith('grano-'),
     )
     expect(sobrantes).toEqual([])
   })
