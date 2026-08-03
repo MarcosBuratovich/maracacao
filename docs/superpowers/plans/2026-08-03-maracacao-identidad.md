@@ -1895,7 +1895,7 @@ git commit -m "feat: lettering custom calcado del packaging, una letra por path"
 ```ts
 // test/mascota-reducida.test.ts
 import { describe, it, expect } from 'vitest'
-import { cargarSvg, hexUsados } from './svg-utils'
+import { cargarSvg, hexUsados, atributosDeTrazo } from './svg-utils'
 import { todosLosColores } from '@/tokens/color'
 
 const doc = cargarSvg('src/assets/brand/mascota-reducida.svg')
@@ -1917,14 +1917,16 @@ describe('mascota reducida', () => {
   })
 
   it('el trazo es proporcionalmente más grueso que en la mascota completa', () => {
-    const anchos = [...doc.querySelectorAll('[stroke-width]')]
-      .map((e) => Number(e.getAttribute('stroke-width')))
-    const enStyle = (doc.querySelector('style')?.textContent ?? '')
-      .match(/stroke-width:\s*(\d+)/g)?.map((s) => Number(s.match(/\d+/)![0])) ?? []
-    const todos = [...anchos, ...enStyle]
-    expect(todos.length).toBeGreaterThan(0)
+    // Se lee con el helper compartido de la Task 4, que resuelve tanto el
+    // atributo del elemento como el valor que llega por clase CSS.
+    // Reimplementar la lectura acá dejaría dos definiciones de "grosor de
+    // trazo" conviviendo, y en cuanto una cambie la otra miente.
+    const anchos = atributosDeTrazo(doc)
+      .map((t) => Number(t.width))
+      .filter((n) => Number.isFinite(n) && n > 0)
+    expect(anchos.length).toBeGreaterThan(0)
     // 11/1024 = 0.0107 ; el objetivo es al menos 14/512 = 0.027
-    expect(Math.max(...todos) / 512).toBeGreaterThan(0.025)
+    expect(Math.max(...anchos) / 512).toBeGreaterThan(0.025)
   })
 
   it('no introduce colores fuera de los tokens', () => {
