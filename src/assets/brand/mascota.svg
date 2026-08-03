@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Mono de Maracacao">
+  <style>
+    /* Trazo de marcador: parejo, terminales redondeados. Ver §9.1 del spec. */
+    .t-principal { fill: none; stroke: #372915; stroke-width: 11;
+                   stroke-linecap: round; stroke-linejoin: round; }
+    .t-interior  { fill: none; stroke: #372915; stroke-width: 8;
+                   stroke-linecap: round; stroke-linejoin: round; }
+    .t-fino      { fill: none; stroke: #372915; stroke-width: 5;
+                   stroke-linecap: round; stroke-linejoin: round; }
+    /* La capa de pivotes se borra después de riggear. */
+    #pivotes { display: none; }
+  </style>
+
+  <g id="escena">
+    <g id="suelo"></g>
+    <g id="granos-orbita"></g>
+    <g id="mono">
+      <g id="cola"></g>
+      <g id="pierna-post"><g id="pie-post"></g></g>
+      <g id="brazo-post"></g>
+      <g id="cuerpo"></g>
+      <g id="pierna-apoyo"><g id="pie-apoyo"></g></g>
+      <g id="brazo-l"><g id="mano-l"></g></g>
+      <g id="bowl">
+        <g id="bowl-cuenco"></g>
+        <g id="bowl-contenido"></g>
+        <g id="bowl-borde"></g>
+      </g>
+      <g id="brazo-r"><g id="mano-r"></g></g>
+      <g id="cabeza">
+        <g id="oreja-l"></g>
+        <g id="oreja-r"></g>
+        <g id="craneo"></g>
+        <g id="rostro"></g>
+        <g id="ojo-l"></g>
+        <g id="ojo-r"></g>
+        <g id="cachete-l"></g>
+        <g id="cachete-r"></g>
+        <g id="nariz"></g>
+        <g id="boca"></g>
+      </g>
+      <g id="chispas"></g>
+    </g>
+  </g>
+
+  <!-- Marcadores de pivote. Alinear el origen de cada objeto en Rive contra
+       su marcador y después borrar esta capa entera. Ver §9.3 del spec.
+       Las coordenadas se ajustan al dibujar cada parte (tareas 6-9). -->
+  <g id="pivotes">
+    <circle id="piv-cola"          cx="0" cy="0" r="4" fill="#8B4D3F"/>
+    <circle id="piv-pierna-post"   cx="0" cy="0" r="4" fill="#8B4D3F"/>
+    <circle id="piv-pie-post"      cx="0" cy="0" r="4" fill="#8B4D3F"/>
+    <circle id="piv-brazo-post"    cx="0" cy="0" r="4" fill="#8B4D3F"/>
+    <circle id="piv-pierna-apoyo"  cx="0" cy="0" r="4" fill="#8B4D3F"/>
+    <circle id="piv-pie-apoyo"     cx="0" cy="0" r="4" fill="#8B4D3F"/>
+    <circle id="piv-brazo-l"       cx="0" cy="0" r="4" fill="#8B4D3F"/>
+    <circle id="piv-mano-l"        cx="0" cy="0" r="4" fill="#8B4D3F"/>
+    <circle id="piv-brazo-r"       cx="0" cy="0" r="4" fill="#8B4D3F"/>
+    <circle id="piv-mano-r"        cx="0" cy="0" r="4" fill="#8B4D3F"/>
+    <circle id="piv-cabeza"        cx="0" cy="0" r="4" fill="#8B4D3F"/>
+    <circle id="piv-oreja-l"       cx="0" cy="0" r="4" fill="#8B4D3F"/>
+    <circle id="piv-oreja-r"       cx="0" cy="0" r="4" fill="#8B4D3F"/>
+    <circle id="piv-ojo-l"         cx="0" cy="0" r="4" fill="#8B4D3F"/>
+    <circle id="piv-ojo-r"         cx="0" cy="0" r="4" fill="#8B4D3F"/>
+  </g>
+</svg>
