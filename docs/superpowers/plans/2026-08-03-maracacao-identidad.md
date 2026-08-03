@@ -709,6 +709,7 @@ describe('mascota.svg — estructura', () => {
 describe('mascota.svg — restricciones duras', () => {
   it('no usa <text>', () => expect(doc.querySelector('text')).toBeNull())
   it('no usa <use>', () => expect(doc.querySelector('use')).toBeNull())
+  it('no usa <defs>', () => expect(doc.querySelector('defs')).toBeNull())
   it('no usa gradientes', () => {
     expect(fuente).not.toMatch(/<(linear|radial)Gradient/i)
   })
@@ -891,7 +892,7 @@ import { dirname } from 'node:path'
 const [entrada, salida, ...resto] = process.argv.slice(2)
 if (!entrada || !salida) {
   console.error("Uso: render-svg <entrada.svg> <salida.png> [--ancho N] [--fondo '#HEX']")
-  console.error("Ej:  render-svg mascota.svg /tmp/m.png --ancho 900 --fondo '#FAF3E0'")
+  console.error("Ej:  pnpm render mascota.svg /tmp/m.png --ancho 900 --fondo '#FAF3E0'")
   console.error('Las comillas en el color son obligatorias: sin ellas el shell trata el # como comentario.')
   process.exit(1)
 }
