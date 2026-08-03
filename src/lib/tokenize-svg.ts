@@ -12,7 +12,10 @@ export function nombreDeToken(hex: string): string | null {
 }
 
 export function tokenizarSvg(svg: string): string {
-  return svg.replace(/#[0-9A-Fa-f]{6}\b/g, (hex) => {
+  // Lookbehind negativo: excluye hex ya precedidos por un fallback var(--mrc-
+  // para que la función sea idempotente. Sin esto, aplicada dos veces envuelve
+  // los hex dentro de los fallbacks: var(--mrc-tinta, var(--mrc-tinta, #372915))
+  return svg.replace(/(?<!var\(--mrc-[a-z0-9-]+, )#[0-9A-Fa-f]{6}\b/g, (hex) => {
     const token = nombreDeToken(hex)
     return token ? `var(--mrc-${token}, ${hex.toUpperCase()})` : hex
   })

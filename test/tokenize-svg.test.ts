@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { nombreDeToken, tokenizarSvg } from '@/lib/tokenize-svg'
+import { customProperties } from '@/tokens/css'
+import { todosLosColores } from '@/tokens/color'
 import { readFileSync } from 'node:fs'
 
 describe('nombreDeToken', () => {
@@ -32,5 +34,21 @@ describe('tokenizarSvg', () => {
         return !antes.includes('var(--mrc-')
       })
     expect(crudos).toEqual([])
+  })
+
+  it('es idempotente — la segunda pasada no envuelve los fallbacks de la primera', () => {
+    const una = tokenizarSvg('<path fill="#5B744B" stroke="#372915"/>')
+    expect(tokenizarSvg(una)).toBe(una)
+  })
+})
+
+describe('contrato con customProperties', () => {
+  it('cada color del sistema resuelve a una custom property existente con el mismo valor', () => {
+    const props = customProperties()
+    for (const hex of todosLosColores()) {
+      const nombre = nombreDeToken(hex)
+      expect(nombre).not.toBeNull()
+      expect(props[`--mrc-${nombre}`]).toBe(hex)
+    }
   })
 })
