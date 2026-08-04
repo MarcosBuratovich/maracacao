@@ -12,10 +12,28 @@ import { copy } from '@/copy/marca'
 // `class` se mantiene: Bandas.astro (Task 17) ya lo usa.
 interface Props { rive?: boolean; class?: string }
 const { rive = false, class: clase = '' } = Astro.props
-const svg = svgDeMarca('mascota')
+
+// mascota.svg no trae width/height propio (solo viewBox 1024×1024).
+// Sin esto, el <svg> inyectado ignora la clase Tailwind de altura de quien
+// llama (`h-40`, `h-56`...) y se autodimensiona con el algoritmo de
+// reemplazo del navegador — medido en vivo en 696×696 (tapando texto en
+// tres páginas del manual) y en 0×0 en el hero de la portada (flex item
+// sin ancho propio).
+// Fix (Task 17, fix round 1): el <svg> llena el 100%×100% del contenedor,
+// mismo mecanismo que los otros cinco componentes de SVG de marca, y el
+// contenedor fija aspect-ratio:1/1 (el viewBox es cuadrado) para que la
+// altura de la clase determine también el ancho. El mismo string
+// dimensionado viaja como fallback a la isla de Rive.
+const svg = svgDeMarca('mascota').replace('<svg', '<svg width="100%" height="100%"')
 ---
 {rive ? (
   <MascotaRive client:visible src="/brand/mono.riv" fallback={svg} class={clase} />
 ) : (
-  <div class={`mascota ${clase}`} role="img" aria-label={copy.mascotaAria} set:html={svg} />
+  <div
+    class={`mascota ${clase}`}
+    style="aspect-ratio:1/1"
+    role="img"
+    aria-label={copy.mascotaAria}
+    set:html={svg}
+  />
 )}

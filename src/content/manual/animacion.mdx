@@ -1,0 +1,40 @@
+---
+titulo: Animación
+resumen: Los siete principios de movimiento y la animación ambiental en vivo.
+orden: 5
+---
+import Mascota from '@/components/brand/Mascota.astro'
+import TablaMovimiento from '@/components/manual/TablaMovimiento.astro'
+import { ruta } from '@/lib/rutas'
+
+Dos capas, con una regla clara de cuál usar: CSS para lo ambiental y la
+interfaz, un rig dedicado para el personaje. `prefers-reduced-motion` las
+apaga a las dos desde un solo lugar. Lo de abajo es la capa CSS — corre
+sola, sin depender de nada más.
+
+## Los siete principios
+
+1. Nada se mueve en línea recta. Todo describe un arco.
+2. Anticipación siempre: antes de subir, baja un poco.
+3. Peso: cola y orejas llegan tarde, 80–120 ms de retardo respecto del cuerpo.
+4. Nunca más de dos cosas moviéndose a la vez fuera del idle.
+5. El easing por defecto es un spring suave, no `ease-in-out`.
+6. Duraciones: micro 120–200 ms · gestos 300–500 ms · ambientales 3–5 s.
+7. `prefers-reduced-motion` apaga, no atenúa.
+
+## En números
+
+Los valores exactos detrás de esos rangos, leídos del mismo token que usa
+el CSS.
+
+<TablaMovimiento />
+
+## En vivo
+
+Respiración del torso, parpadeo con jitter y vaivén de cola sobre la
+cadera — la anatomía completa está en la <a
+href={ruta('manual/mascota')}>página de mascota</a>. Activá "reducir
+movimiento" en el sistema operativo y recargá: con esa preferencia activa
+todo tiene que quedar quieto, no lento.
+
+<Mascota class="h-56" />

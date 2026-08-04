@@ -1,0 +1,21 @@
+---
+// Los números exactos detrás de los rangos del §12 del spec, en vivo
+// desde el token — no transcritos a mano.
+import { duraciones, easings } from '@/tokens/motion'
+---
+<table class="w-full text-sm">
+  <tbody>
+    {Object.entries(duraciones).map(([nombre, ms]) => (
+      <tr>
+        <td class="p-3">{nombre}</td>
+        <td class="p-3 text-right tabular-nums">{ms}ms</td>
+      </tr>
+    ))}
+    {Object.entries(easings).map(([nombre, valor]) => (
+      <tr>
+        <td class="p-3">{nombre}</td>
+        <td class="p-3 text-right font-mono text-xs">{valor}</td>
+      </tr>
+    ))}
+  </tbody>
+</table>

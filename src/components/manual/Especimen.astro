@@ -1,0 +1,28 @@
+---
+// Fila de especimen tipográfico: tamaño y familia salen de los tokens
+// (§7 del spec). El texto de la muestra lo pasa quien llama al
+// componente (contenido MDX o `copy`, nunca hardcodeado acá).
+import { escala, familias, ejesFraunces } from '@/tokens/type'
+
+interface Props {
+  paso: keyof typeof escala
+  familia: 'display' | 'texto'
+  texto: string
+}
+const { paso, familia, texto } = Astro.props
+const tamano = escala[paso]
+const fuente = familias[familia]
+// Los ejes variables de Fraunces (SOFT/WONK) solo aplican al rol display —
+// Work Sans no es variable en los ejes que usa este sistema.
+const variable =
+  familia === 'display'
+    ? `font-variation-settings:'SOFT' ${ejesFraunces.SOFT}, 'WONK' ${ejesFraunces.WONK}, 'opsz' ${ejesFraunces.opsz};`
+    : ''
+---
+<p
+  class="m-0 border-b border-black/10 py-3 leading-tight last:border-0"
+  style={`font-family:${fuente};font-size:${tamano};${variable}`}
+>
+  {texto}
+  <span class="ml-3 align-middle text-[10px] tabular-nums opacity-50">{paso} · {tamano}</span>
+</p>

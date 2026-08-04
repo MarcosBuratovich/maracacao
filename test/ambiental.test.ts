@@ -68,4 +68,20 @@ describe('<Mascota/>', () => {
     expect(html).toContain('<svg')
     expect(html).not.toContain('id="pivotes"')
   })
+
+  // Fix round 1/5: mascota.svg no trae width/height propio, y era el
+  // único de los seis componentes de SVG de marca que no lo compensaba —
+  // el <svg> inyectado se autodimensionaba ignorando la clase Tailwind de
+  // altura del wrapper (696×696 medido en vivo, tapando texto; 0×0 en un
+  // contexto flex sin ancho propio). El mecanismo: el <svg> llena
+  // 100%×100% de su contenedor, y el contenedor fija aspect-ratio:1/1
+  // (el viewBox es cuadrado) para que la altura de la clase del wrapper
+  // determine también el ancho.
+  it('el <svg> inyectado lleva el mecanismo de tamaño (no depende del tamaño de reemplazo por defecto)', async () => {
+    const html = await container.renderToString(Mascota, { props: { class: 'h-40' } })
+    expect(html).toMatch(/<svg[^>]*\swidth="100%"/)
+    expect(html).toMatch(/<svg[^>]*\sheight="100%"/)
+    expect(html).toMatch(/style="aspect-ratio:1\/1"/)
+    expect(html).toContain('h-40')
+  })
 })

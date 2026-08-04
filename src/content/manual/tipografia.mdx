@@ -1,0 +1,39 @@
+---
+titulo: Tipografía
+resumen: El pairing Fraunces + Work Sans y los ejes variables del display.
+orden: 2
+---
+import Especimen from '@/components/manual/Especimen.astro'
+import { ejesFraunces } from '@/tokens/type'
+import { ruta } from '@/lib/rutas'
+import { copy } from '@/copy/marca'
+
+El logotipo `MARACACAO` va dibujado a mano como vectores: no depende de
+ninguna fuente (ver la <a href={ruta('manual/logo')}>página de logo</a>).
+Lo que sigue es para todo lo demás — títulos, cuerpo, interfaz y
+etiquetas.
+
+El packaging original ya tenía un contraste tipográfico deliberado: una
+sans dibujada a mano para la marca, serif para el descriptor de sabor.
+Poner otra redonda hecha a mano en los títulos duplicaría la voz del
+logotipo. Fraunces mantiene esa regla.
+
+## Display — Fraunces
+
+Variable, con dos ejes fuera de lo común: `SOFT` redondea terminales,
+`WONK` introduce asimetrías de letra dibujada — un dial entre "juguetona"
+y "profesional" que además se puede animar. Valor de partida:
+`SOFT {ejesFraunces.SOFT}`, `WONK {ejesFraunces.WONK}`, `opsz {ejesFraunces.opsz}`.
+
+<Especimen paso="display-xl" familia="display" texto={copy.tipoMuestraDisplay} />
+<Especimen paso="display-l" familia="display" texto={copy.tipoMuestraDisplay} />
+<Especimen paso="titulo" familia="display" texto={copy.tipoMuestraDisplay} />
+<Especimen paso="subtitulo" familia="display" texto={copy.tipoMuestraDisplay} />
+
+## Texto — Work Sans
+
+Cuerpo, interfaz y etiquetas. Sin ejes variables propios en este sistema.
+
+<Especimen paso="cuerpo" familia="texto" texto={copy.tipoMuestraTexto} />
+<Especimen paso="menor" familia="texto" texto={copy.tipoMuestraTexto} />
+<Especimen paso="etiqueta" familia="texto" texto={copy.tipoMuestraTexto} />

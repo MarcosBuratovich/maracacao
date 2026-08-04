@@ -1,0 +1,19 @@
+---
+// Calcula en vivo: si alguien toca un token y rompe un par, se ve acá.
+import { paresAprobados } from '@/tokens/color'
+import { contrastRatio, nivelWcag } from '@/tokens/contrast'
+---
+<table class="w-full text-sm">
+  <tbody>
+    {paresAprobados.map((p) => {
+      const ratio = contrastRatio(p.frente, p.fondo)
+      return (
+        <tr>
+          <td class="p-3" style={`background:${p.fondo};color:${p.frente}`}>{p.uso}</td>
+          <td class="p-3 text-right tabular-nums">{ratio.toFixed(2)}</td>
+          <td class="p-3">{nivelWcag(ratio)}</td>
+        </tr>
+      )
+    })}
+  </tbody>
+</table>

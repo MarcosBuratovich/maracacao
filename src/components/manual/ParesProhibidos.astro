@@ -1,0 +1,21 @@
+---
+// Combinaciones que NO cumplen 4.5:1 (§6.3 del spec). Mismo cálculo en
+// vivo que TablaContraste: si algún día un par prohibido dejara de
+// fallar, esta tabla lo reflejaría sola.
+import { paresProhibidos } from '@/tokens/color'
+import { contrastRatio, nivelWcag } from '@/tokens/contrast'
+---
+<table class="w-full text-sm">
+  <tbody>
+    {paresProhibidos.map((p) => {
+      const ratio = contrastRatio(p.frente, p.fondo)
+      return (
+        <tr>
+          <td class="p-3" style={`background:${p.fondo};color:${p.frente}`}>{p.razon}</td>
+          <td class="p-3 text-right tabular-nums">{ratio.toFixed(2)}</td>
+          <td class="p-3">{nivelWcag(ratio)}</td>
+        </tr>
+      )
+    })}
+  </tbody>
+</table>

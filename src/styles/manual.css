@@ -1,0 +1,39 @@
+/* Estilos del cuerpo del manual (<Content /> del MDX, ver
+   src/pages/manual/[...slug].astro). Todo valor de color/tamaño sale de
+   las custom properties de tokens.generated.css — nada hardcodeado.
+
+   `table:not([class])` apunta solo a las tablas que arma remark a partir
+   de una tabla Markdown plana (referencias.mdx). Las tablas de los
+   componentes de demostración (TablaContraste, ParesProhibidos,
+   TablaMovimiento) ya traen su propia clase de Tailwind y quedan afuera
+   a propósito, para no pisar el padding que ya definen. */
+
+.prose-manual :is(h2, h3) {
+  font-family: var(--mrc-font-display);
+  font-variation-settings: 'SOFT' 60, 'WONK' 1;
+  color: var(--mrc-verde-700);
+  margin-top: 2.5rem;
+  margin-bottom: 0.75rem;
+}
+.prose-manual h2 { font-size: var(--mrc-text-titulo); }
+.prose-manual h3 { font-size: var(--mrc-text-subtitulo); }
+.prose-manual > :first-child { margin-top: 0; }
+
+.prose-manual p { margin: 0 0 1rem; line-height: 1.6; }
+.prose-manual a { color: var(--mrc-bordo); text-decoration: underline; text-underline-offset: 2px; }
+.prose-manual :is(ul, ol) { margin: 0 0 1rem 1.25rem; }
+.prose-manual li { margin-bottom: 0.35rem; }
+
+.prose-manual table:not([class]) {
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+}
+.prose-manual table:not([class]) :is(th, td) {
+  border-bottom: 1px solid var(--mrc-verde-100);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.prose-manual figure { margin: 0 0 1.5rem; }
+.prose-manual img { display: block; height: auto; max-width: 100%; }
+.prose-manual figcaption { margin-top: 0.5rem; }

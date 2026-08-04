@@ -45,6 +45,23 @@ describe('LockupHeader', () => {
     expect(html).toMatch(/<svg[^>]*\sheight="22"/) // logotipo, 0.5 × 44
     expect(html).toMatch(/<svg[^>]*\sheight="13"/) // descriptor, 0.3 × 44
   })
+
+  // Fix de integración (Task 17, ver el comentario en LockupHeader.astro).
+  // El lettering de logotipo.svg/descriptor.svg trae fill crema fijo
+  // (contraste ≈1.10 contra el papel — casi invisible sobre banda clara,
+  // que es donde vive este header). Regresión: que no vuelva el crema
+  // crudo y que el mecanismo currentColor + token de título siga ahí.
+  it('el lettering (logotipo/descriptor) usa currentColor, no el fill crema crudo', async () => {
+    const html = await container.renderToString(LockupHeader)
+    expect(html).not.toContain('fill: var(--mrc-crema')
+    expect(html).not.toContain('#F4E8C6')
+    expect(html).toContain('fill: currentColor')
+  })
+
+  it('fija el color del lettering con el token de título sobre banda clara', async () => {
+    const html = await container.renderToString(LockupHeader)
+    expect(html).toContain('color:var(--mrc-rol-texto-titulo)')
+  })
 })
 
 describe('SelloCircular', () => {

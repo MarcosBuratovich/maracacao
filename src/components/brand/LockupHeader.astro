@@ -21,12 +21,43 @@ const altoLogotipo = Math.round(alto * 0.5)
 const altoDescriptor = Math.round(alto * 0.3)
 
 const cabeza = svgDeMarca('mascota-reducida').replace('<svg', `<svg height="${alto}"`)
-const logotipo = svgDeMarca('logotipo').replace('<svg', `<svg height="${altoLogotipo}"`)
-const descriptor = svgDeMarca('descriptor').replace('<svg', `<svg height="${altoDescriptor}"`)
+
+// Fix de integración (Task 17) sobre un componente de la Task 15. El
+// lettering de logotipo.svg/descriptor.svg va en fill crema fijo — su
+// `<style>.letra{fill:...}` tokeniza a var(--mrc-crema, #F4E8C6) — pensado
+// para "texto crema sobre banda verde" (paresAprobados, AAA), nunca para
+// banda clara. Este header vive sobre banda clara (ver index.astro y
+// manual/[...slug].astro), así que el crema crudo daba un contraste
+// ≈1.10 contra el papel: el lettering quedaba prácticamente invisible,
+// justo lo opuesto al criterio de aceptación 3 del spec ("el logo se lee
+// a 32 px y a tres metros"). Misma técnica que Monocromo.astro ya usa
+// para currentColor, adaptada de atributo `fill="..."` a la propiedad CSS
+// `fill:...;` del <style> embebido de estos dos SVG en particular. El
+// color se fija acá con el rol de texto-título sobre banda clara
+// (`--mrc-rol-texto-titulo`, verde-700, contraste 8.61 AAA sobre papel —
+// el mismo par que ya aprueba `paresAprobados` para "títulos sobre banda
+// clara"). La cabeza (mascota-reducida) no se toca: sus fills son
+// literales por forma, no CSS de clase, y ya están aprobados sobre papel.
+//
+// BANDA CLARA ÚNICAMENTE. El fix es de un solo modo, no adaptativo: el
+// color queda fijo en verde-700, así que sobre una banda verde-700 el
+// lettering renderiza verde-700 sobre verde-700 — invisible, el mismo
+// síntoma original en espejo (probado en vivo, fix round 1/5). Este
+// componente no resuelve "cualquier fondo", resuelve "banda clara",
+// que es donde viven sus dos usos reales (index.astro,
+// manual/[...slug].astro). Simétrico a Logotipo.astro/SelloCompleto.astro,
+// que son banda oscura únicamente por la razón inversa (crema crudo,
+// documentado en la prosa de logo.mdx).
+const logotipo = svgDeMarca('logotipo')
+  .replace(/fill:\s*var\(--mrc-[a-z0-9-]+,\s*#[0-9A-Fa-f]{6}\);/, 'fill: currentColor;')
+  .replace('<svg', `<svg height="${altoLogotipo}"`)
+const descriptor = svgDeMarca('descriptor')
+  .replace(/fill:\s*var\(--mrc-[a-z0-9-]+,\s*#[0-9A-Fa-f]{6}\);/, 'fill: currentColor;')
+  .replace('<svg', `<svg height="${altoDescriptor}"`)
 ---
 <a href="/" class="flex items-center gap-3" aria-label={copy.logoAria}>
   <span class="shrink-0" style={`height:${alto}px`} set:html={cabeza} />
-  <span class="flex flex-col">
+  <span class="flex flex-col" style="color:var(--mrc-rol-texto-titulo)">
     <span set:html={logotipo} />
     <span class="descriptor hidden sm:block" set:html={descriptor} />
   </span>
