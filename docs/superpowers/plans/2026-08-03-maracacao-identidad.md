@@ -2380,8 +2380,12 @@ Expected: FAIL — el CSS y el componente no existen.
 }
 
 .mascota #cuerpo {
-  transform-origin: 500px 640px; /* cadera */
-  animation: respiracion var(--mrc-dur-ambiental) var(--mrc-ease-entrada) infinite;
+  /* La cadera real del torso: vértice documentado del propio path (y=598),
+     no un promedio de los pivotes de pierna, que son de grupos hermanos. */
+  transform-origin: 512px 598px;
+  /* Principio 5 del spec: el easing por defecto es el spring del token,
+     no ease-in-out ni un easing de UI. */
+  animation: respiracion var(--mrc-dur-ambiental) var(--mrc-ease-spring) infinite;
 }
 
 .mascota #cabeza {
@@ -2394,8 +2398,11 @@ Expected: FAIL — el CSS y el componente no existen.
 }
 
 .mascota #cola {
-  transform-origin: 560px 660px; /* cadera */
-  animation: cola calc(var(--mrc-dur-ambiental) * 1.25) ease-in-out infinite;
+  transform-origin: 540px 574px; /* piv-cola real */
+  animation: cola calc(var(--mrc-dur-ambiental) * 1.25) var(--mrc-ease-spring) infinite;
+  /* Principio 3 del spec: la cola llega tarde — 80-120 ms de retardo
+     respecto del cuerpo. */
+  animation-delay: 100ms;
 }
 
 /* El spec dice apagar, no atenuar. */
