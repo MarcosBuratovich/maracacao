@@ -33,8 +33,17 @@
 }
 
 .mascota #cuerpo {
-  transform-origin: 512px 560px; /* cadera */
-  animation: respiracion var(--mrc-dur-ambiental) var(--mrc-ease-entrada) infinite;
+  /* Fix round 1/5: la cadera real del torso es el vértice documentado en el
+     propio path de #cuerpo (…C 547 594 528 598 512 598 C…, y≈598) — no un
+     promedio de los pivotes de pierna, que son de grupos HERMANOS (hundidos
+     a propósito adentro del torso para que rotar la pierna no abra fondo,
+     no para marcar la cadera de #cuerpo). */
+  transform-origin: 512px 598px;
+  /* Fix round 1/5, Principio 5 del spec (§12): "Easing por defecto: spring
+     suave, no ease-in-out". --mrc-ease-entrada es un easing de UI (entrada
+     de paneles/modales), no el spring orgánico que pide una animación
+     ambiental continua. */
+  animation: respiracion var(--mrc-dur-ambiental) var(--mrc-ease-spring) infinite;
 }
 
 .mascota #cabeza {
@@ -56,7 +65,13 @@
 
 .mascota #cola {
   transform-origin: 540px 574px; /* cadera, piv-cola */
-  animation: cola calc(var(--mrc-dur-ambiental) * 1.25) ease-in-out infinite;
+  /* Fix round 1/5, Principio 5: spring del token, no el keyword literal
+     ease-in-out (el anti-ejemplo exacto que nombra el spec). */
+  animation: cola calc(var(--mrc-dur-ambiental) * 1.25) var(--mrc-ease-spring) infinite;
+  /* Fix round 1/5, Principio 3 del spec (§12): "Peso: cola y orejas llegan
+     tarde, 80-120 ms respecto del cuerpo". #cuerpo arranca en fase 0; la
+     cola arranca 100ms después, dentro del rango. */
+  animation-delay: 100ms;
 }
 
 /* El spec dice apagar, no atenuar: `animation: none`, nunca el anti-patrón
