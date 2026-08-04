@@ -8,6 +8,30 @@ import { copy } from '@/copy/marca'
 
 interface Props { class?: string }
 const { class: clase = '' } = Astro.props
-const svg = svgDeMarca('mascota')
+
+// Fix round 1/5: mascota.svg no trae width/height propio (solo viewBox
+// 1024x1024) — el mismo problema que ya se arregló en los otros cinco
+// componentes de SVG de marca (LockupHeader, Logotipo, Monocromo,
+// IsotipoSuelto, SelloCircular). <Mascota/> era el único que se lo había
+// saltado: sin esto, el <svg> inyectado ignora la clase Tailwind de
+// altura que pasa quien llama (`h-40`, `h-56`...) y se autodimensiona con
+// el algoritmo de reemplazo del navegador — medido en vivo por el
+// reviewer en 696×696 (tapando texto en Bandas.astro, mascota.mdx y
+// animacion.mdx) y en 0×0 en el hero de index.astro (flex item sin ancho
+// propio, sin nada que le dé un tamaño).
+//
+// Fix: el <svg> llena el 100%×100% de su contenedor, mismo mecanismo que
+// SelloCircular. El propio contenedor (`.mascota`) fija
+// `aspect-ratio:1/1` acá abajo — el viewBox es cuadrado — para que la
+// altura que fija la clase de quien llama determine también el ancho, en
+// vez de que el div de bloque por defecto ocupe el 100% del contenedor
+// padre y estire el dibujo.
+const svg = svgDeMarca('mascota').replace('<svg', '<svg width="100%" height="100%"')
 ---
-<div class={`mascota ${clase}`} role="img" aria-label={copy.mascotaAria} set:html={svg} />
+<div
+  class={`mascota ${clase}`}
+  style="aspect-ratio:1/1"
+  role="img"
+  aria-label={copy.mascotaAria}
+  set:html={svg}
+/>

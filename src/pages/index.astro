@@ -14,7 +14,7 @@ import '@/styles/global.css'
 
 const indice = (await getCollection('manual')).sort((a, b) => a.data.orden - b.data.orden)
 ---
-<Base titulo="Maracacao — Manual de marca">
+<Base titulo={copy.tituloPortada}>
   <div style="background:var(--mrc-papel);color:var(--mrc-tinta);font-family:var(--mrc-font-texto)" class="min-h-screen">
     {/*
       LockupHeader (Task 15) ya resuelve su propio contraste — el

@@ -38,6 +38,16 @@ const cabeza = svgDeMarca('mascota-reducida').replace('<svg', `<svg height="${al
 // el mismo par que ya aprueba `paresAprobados` para "títulos sobre banda
 // clara"). La cabeza (mascota-reducida) no se toca: sus fills son
 // literales por forma, no CSS de clase, y ya están aprobados sobre papel.
+//
+// BANDA CLARA ÚNICAMENTE. El fix es de un solo modo, no adaptativo: el
+// color queda fijo en verde-700, así que sobre una banda verde-700 el
+// lettering renderiza verde-700 sobre verde-700 — invisible, el mismo
+// síntoma original en espejo (probado en vivo, fix round 1/5). Este
+// componente no resuelve "cualquier fondo", resuelve "banda clara",
+// que es donde viven sus dos usos reales (index.astro,
+// manual/[...slug].astro). Simétrico a Logotipo.astro/SelloCompleto.astro,
+// que son banda oscura únicamente por la razón inversa (crema crudo,
+// documentado en la prosa de logo.mdx).
 const logotipo = svgDeMarca('logotipo')
   .replace(/fill:\s*var\(--mrc-[a-z0-9-]+,\s*#[0-9A-Fa-f]{6}\);/, 'fill: currentColor;')
   .replace('<svg', `<svg height="${altoLogotipo}"`)

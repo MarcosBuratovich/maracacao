@@ -22,6 +22,17 @@ export const copy = {
   navAnterior: 'Anterior',
   navSiguiente: 'Siguiente',
 
+  // Fix round 1/5: los <title> de index.astro y manual/[...slug].astro
+  // estaban hardcodeados como string literal en el atributo `titulo` de
+  // <Base>, violando la regla 1 de la §10.6 ("ningún string visible
+  // dentro de un componente") — la misma regla que el comentario de
+  // arriba ya cita. `tituloPortada` es el <title> completo de la home;
+  // `sufijoTituloPagina` es la cola que `manual/[...slug].astro` compone
+  // con `pagina.data.titulo` (el único dato que sí viene del frontmatter
+  // MDX, no de acá).
+  tituloPortada: 'Maracacao — Manual de marca',
+  sufijoTituloPagina: 'Manual Maracacao',
+
   // Bandas.astro (§6.4 del spec) — el mono cambiando de banda.
   demoBandaClara: 'Banda clara: el mono recorta contra el papel.',
   demoBandaOscura: 'Banda verde: el contorno sostiene la figura.',

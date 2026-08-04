@@ -20,7 +20,7 @@ const posicion = indice.findIndex((p) => p.id === pagina.id)
 const anterior = posicion > 0 ? indice[posicion - 1] : undefined
 const siguiente = posicion < indice.length - 1 ? indice[posicion + 1] : undefined
 ---
-<Base titulo={`${pagina.data.titulo} — Manual Maracacao`}>
+<Base titulo={`${pagina.data.titulo} — ${copy.sufijoTituloPagina}`}>
   <div style="background:var(--mrc-papel);color:var(--mrc-tinta);font-family:var(--mrc-font-texto)" class="min-h-screen">
     {/* Ver el comentario equivalente en index.astro: LockupHeader ya
        resuelve su propio contraste (currentColor + token de título, Task

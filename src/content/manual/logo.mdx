@@ -20,10 +20,15 @@ El lettering de `MARACACAO` y del descriptor va dibujado en el crema de
 la paleta, pensado para banda verde, no para papel. Las piezas 1, 2 y 3
 lo usan tal cual sale del SVG, así que se muestran sobre una banda
 oscura por esa razón — no es una elección de esta página, es lo que
-exige el propio dibujo. El lockup de header (7) es la excepción: resuelve
-su propio contraste (currentColor + el rol de texto-título, ver el
-comentario en `LockupHeader.astro`) y por eso se muestra directo sobre
-papel, como vive en el sitio real.
+exige el propio dibujo. Son piezas de banda oscura únicamente.
+
+El lockup de header (7) es la excepción, pero en la dirección
+contraria, no en las dos: pisa el lettering con `currentColor` y lo fija
+en verde-700 (ver el comentario en `LockupHeader.astro`), así que se
+muestra directo sobre papel, como vive en el sitio real. Eso lo vuelve
+banda clara únicamente — no "cualquier fondo": sobre una banda verde el
+mismo verde-700 quedaría de lettering y de fondo, invisible en espejo
+del defecto original.
 
 ## 1. Sello completo
 
