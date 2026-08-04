@@ -1,0 +1,16 @@
+---
+// Demuestra §6.4 del spec: el sitio alterna secciones papel/verde-700 y el
+// mono cambia de tono al cruzar bandas.
+import Mascota from '@/components/brand/Mascota.astro'
+import { copy } from '@/copy/marca'
+---
+<div class="overflow-hidden rounded-lg">
+  <section class="px-6 py-10" style="background:var(--mrc-papel);color:var(--mrc-tinta)">
+    <p>{copy.demoBandaClara}</p>
+    <Mascota class="h-40" />
+  </section>
+  <section class="px-6 py-10" style="background:var(--mrc-verde-700);color:var(--mrc-papel)">
+    <p>{copy.demoBandaOscura}</p>
+    <Mascota class="h-40" />
+  </section>
+</div>

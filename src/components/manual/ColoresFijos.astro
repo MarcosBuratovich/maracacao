@@ -1,0 +1,15 @@
+---
+// Colores fijos del sistema (§6.2 del spec): no forman rampa, son roles
+// puntuales (fondo, contorno, acento...). El color del label se decide
+// leyendo la luminancia real del propio hex — no hay una lista a mano de
+// "cuáles son oscuros"; si un token cambia, el label se ajusta solo.
+import { fijos } from '@/tokens/color'
+import { relativeLuminance } from '@/tokens/contrast'
+---
+<div class="flex overflow-hidden rounded-lg">
+  {Object.entries(fijos).map(([nombre, hex]) => (
+    <div class="flex-1 pb-2 pt-10 text-center text-[10px]" style={`background:${hex}`}>
+      <span style={`color:${relativeLuminance(hex) > 0.4 ? fijos.tinta : fijos.papel}`}>{nombre}</span>
+    </div>
+  ))}
+</div>

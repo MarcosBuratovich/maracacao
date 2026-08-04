@@ -1,0 +1,52 @@
+---
+titulo: Color
+resumen: Rampas, roles y los pares de contraste verificados.
+orden: 1
+---
+import Rampa from '@/components/manual/Rampa.astro'
+import TablaContraste from '@/components/manual/TablaContraste.astro'
+import ColoresFijos from '@/components/manual/ColoresFijos.astro'
+import ParesProhibidos from '@/components/manual/ParesProhibidos.astro'
+import Bandas from '@/components/manual/Bandas.astro'
+
+Los colores medidos del render original son tonos medios: no alcanzan
+para interfaz por sí solos. Para texto y UI se usan los pasos oscuros de
+cada rampa — los colores de la ilustración se quedan en la ilustración.
+
+## Rampas
+
+Verde es la base del sistema: su paso `500` es el color medido del
+render. Tan es solo ilustración y superficies decorativas, nunca texto
+sobre verde. Rosa se sumó después para los cachetes y la lengua de la
+mascota.
+
+<Rampa nombre="verde" />
+<Rampa nombre="tan" />
+<Rampa nombre="rosa" />
+
+## Colores fijos
+
+Roles puntuales que no forman rampa: fondo de banda clara, superficie
+cálida, contorno de la ilustración, acento y destacados.
+
+<ColoresFijos />
+
+## Pares aprobados
+
+Calculados en vivo desde los tokens. Si un número baja de 4.5, el test falla.
+
+<TablaContraste />
+
+## Combinaciones prohibidas
+
+Fallan el mínimo de 4.5:1 y no se usan para texto, aunque se vean bien en
+la ilustración.
+
+<ParesProhibidos />
+
+## Bandas alternadas
+
+El sitio alterna secciones de fondo claro y fondo verde, evocando las
+caras del packaging. La mascota cambia de tono al cruzar la banda.
+
+<Bandas />

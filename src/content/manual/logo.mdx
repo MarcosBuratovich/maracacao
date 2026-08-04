@@ -1,0 +1,89 @@
+---
+titulo: Logo
+resumen: Las siete variantes, derivadas todas del mismo dibujo vectorial.
+orden: 3
+---
+import LockupHeader from '@/components/brand/LockupHeader.astro'
+import SelloCompleto from '@/components/brand/SelloCompleto.astro'
+import SelloReducido from '@/components/brand/SelloReducido.astro'
+import Logotipo from '@/components/brand/Logotipo.astro'
+import IsotipoSuelto from '@/components/brand/IsotipoSuelto.astro'
+import SelloCircular from '@/components/brand/SelloCircular.astro'
+import Monocromo from '@/components/brand/Monocromo.astro'
+import { ruta } from '@/lib/rutas'
+
+Siete piezas, todas derivadas del mismo dibujo vectorial. Cada componente
+inyecta su SVG inline — nunca como `<img>` — para heredar los tokens de
+color y poder animarse.
+
+El lettering de `MARACACAO` y del descriptor va dibujado en el crema de
+la paleta, pensado para banda verde, no para papel. Las piezas 1, 2 y 3
+lo usan tal cual sale del SVG, así que se muestran sobre una banda
+oscura por esa razón — no es una elección de esta página, es lo que
+exige el propio dibujo. El lockup de header (7) es la excepción: resuelve
+su propio contraste (currentColor + el rol de texto-título, ver el
+comentario en `LockupHeader.astro`) y por eso se muestra directo sobre
+papel, como vive en el sitio real.
+
+## 1. Sello completo
+
+Arco + mascota + descriptor. Para packaging, piezas grandes y hero.
+
+<div class="flex justify-center rounded-lg p-8" style="background:var(--mrc-verde-700)">
+  <SelloCompleto />
+</div>
+
+## 2. Sello reducido
+
+Arco + mascota, sin descriptor. Cuando el descriptor sobra.
+
+<div class="flex justify-center rounded-lg p-8" style="background:var(--mrc-verde-700)">
+  <SelloReducido />
+</div>
+
+## 3. Logotipo recto
+
+Firma, pie de página, legales.
+
+<div class="flex justify-center rounded-lg p-8" style="background:var(--mrc-verde-700)">
+  <Logotipo />
+</div>
+
+## 4. Isotipo suelto
+
+Solo la cabeza, ilustración de apoyo y stickers — la mascota completa
+está documentada en la <a href={ruta('manual/mascota')}>página de
+mascota</a>.
+
+<IsotipoSuelto />
+
+## 5. Sello circular
+
+Favicon, avatar de redes, botón. La pieza que más trabajo de diseño
+pidió: a 32 px la cara se vuelve una mancha si no se simplifica de
+verdad — menos líneas, más contraste, cero detalle interno.
+
+<SelloCircular />
+
+## 6. Monocromo
+
+Una sola tinta, para grabado, sellos y piezas de una sola tinta.
+
+<div class="flex flex-wrap items-start gap-6">
+  <Monocromo variante="positivo" />
+  <div style="background:var(--mrc-verde-700);border-radius:0.5rem;padding:1.5rem">
+    <Monocromo variante="negativo" />
+  </div>
+</div>
+
+## 7. Lockup de header
+
+Cabeza + logotipo recto + descriptor, en Fraunces con tracking abierto.
+Es la pieza que más se ve: está en todas las páginas, todo el tiempo, y
+dice qué se vende sin scrollear. Bajo 640 px el descriptor se oculta y
+queda cabeza + logotipo — el lockup completo se apelmaza en pantallas
+chicas.
+
+<div class="rounded-lg p-6" style="background:var(--mrc-papel)">
+  <LockupHeader />
+</div>

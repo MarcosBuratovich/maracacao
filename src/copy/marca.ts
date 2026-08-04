@@ -10,4 +10,26 @@ export const copy = {
   navSabores: 'Sabores',
   navOrigen: 'Origen',
   navTienda: 'Tienda',
+
+  // Task 17 — styleguide navegable (src/pages/index.astro,
+  // src/pages/manual/[...slug].astro y src/content/manual/*.mdx). Resuelve
+  // la deuda dejada a propósito en la Task 1: `index.astro` tenía un <h1>
+  // hardcodeado con un comentario que apuntaba acá.
+  manualTitulo: 'Manual de marca',
+  manualIntro:
+    'Cada color, tipografía y variante de logo de esta página sale en vivo del código de marca: nada es una captura vieja.',
+  navIndice: 'Índice del manual',
+  navAnterior: 'Anterior',
+  navSiguiente: 'Siguiente',
+
+  // Bandas.astro (§6.4 del spec) — el mono cambiando de banda.
+  demoBandaClara: 'Banda clara: el mono recorta contra el papel.',
+  demoBandaOscura: 'Banda verde: el contorno sostiene la figura.',
+
+  // Especimen.astro (tipografia.mdx). El texto de Fraunces es el propio
+  // descriptor de sabor del packaging original (§3 del spec: "serif para
+  // el descriptor de sabor"); el de Work Sans es una oración de cuerpo
+  // nueva, en el mismo registro es-MX ("pistaches", no "pistachos").
+  tipoMuestraDisplay: 'Chocolate blanco y pistaches',
+  tipoMuestraTexto: 'Hecho a mano, en lotes chicos, con pistaches de verdad.',
 } as const

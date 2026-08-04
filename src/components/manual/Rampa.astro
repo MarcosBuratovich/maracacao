@@ -1,0 +1,13 @@
+---
+import { verde, tan, rosa } from '@/tokens/color'
+interface Props { nombre: 'verde' | 'tan' | 'rosa' }
+const { nombre } = Astro.props
+const rampa = nombre === 'verde' ? verde : nombre === 'tan' ? tan : rosa
+---
+<div class="flex overflow-hidden rounded-lg">
+  {Object.entries(rampa).map(([paso, hex]) => (
+    <div class="flex-1 pb-2 pt-10 text-center text-[10px]" style={`background:${hex}`}>
+      <span style={`color:${Number(paso) >= 500 ? '#FAF3E0' : '#372915'}`}>{paso}</span>
+    </div>
+  ))}
+</div>

@@ -1,0 +1,64 @@
+---
+titulo: Referencias
+resumen: De dónde sale el dibujo y qué autoridad tiene cada imagen fuente.
+orden: 6
+---
+import { ruta } from '@/lib/rutas'
+
+Maracacao ya existe como marca, pero no hay acceso a los archivos fuente
+del packaging ni al envoltorio físico. Todo el material de partida son
+dos imágenes. Por eso la reconstrucción vectorial de este sistema es
+**interpretativa**: la paleta y las proporciones finales son decisiones
+de diseño, no mediciones del impreso.
+
+## Regla de referencias
+
+Vinculante: sin esta regla, el PNG de Gemini termina tratado como arte
+oficial.
+
+| Fuente | Autoridad sobre |
+|---|---|
+| Foto del packaging | Proporciones, tipografía, composición, qué elementos existen |
+| Render de Gemini | Legibilidad — resuelve el "no se entiende qué hay ahí" de la foto |
+| Ninguna de las dos | Es el objetivo final |
+
+El objetivo es **plano, de trazo parejo y geometría regularizada**. Ni la
+textura de papel de la foto, ni el pincel digital de Gemini.
+
+Lo que Gemini cambió y no se adopta: rellenos con textura de pincel y
+moteado tonal, trazos de grosor variable con bordes blandos, y
+proporciones más grandes o redondeadas que el original. Lo que Gemini
+cambió y sí es un error a revertir: la tipografía — reemplazó la sans
+redonda hecha a mano del original por una serif de alto contraste. Esa
+sans dibujada a mano vuelve en el <a
+href={ruta('manual/tipografia')}>sistema tipográfico</a>.
+
+## Foto del envoltorio
+
+Manda sobre proporciones, tipografía, composición y qué elementos existen.
+
+<figure class="max-w-sm">
+  <img src="/referencias/packaging-foto.jpg" alt="Foto del envoltorio original de Maracacao: borrosa, en perspectiva, con la cartulina curvada" class="rounded-lg" />
+  <figcaption class="mt-2 text-xs opacity-60">900×1600, JPEG progresivo. Colores lavados por la iluminación.</figcaption>
+</figure>
+
+## Render de Gemini
+
+Manda solo sobre legibilidad — nunca sobre qué existe o en qué
+proporción.
+
+<figure class="max-w-sm">
+  <img src="/referencias/render-limpio.png" alt="Render generado con Gemini: más legible, pero con tipografía y proporciones distintas del original" class="rounded-lg" />
+  <figcaption class="mt-2 text-xs opacity-60">1536×2730, generado con IA a partir de la foto.</figcaption>
+</figure>
+
+## Recorte de apoyo
+
+Un recorte transparente derivado del render de Gemini, usado como
+referencia rápida de composición durante el redibujo. No es una tercera
+fuente con autoridad propia: hereda la del render del que sale.
+
+<figure class="max-w-xs">
+  <img src="/referencias/mascota-recorte-transparente.png" alt="Recorte transparente de la mascota, derivado del render de Gemini" class="rounded-lg" />
+  <figcaption class="mt-2 text-xs opacity-60">Recorte de apoyo, no una fuente independiente.</figcaption>
+</figure>

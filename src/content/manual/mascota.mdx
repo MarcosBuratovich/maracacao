@@ -1,0 +1,35 @@
+---
+titulo: Mascota
+resumen: El personaje — jerarquía, pivotes y las reglas que lo mantienen animable.
+orden: 4
+---
+import Mascota from '@/components/brand/Mascota.astro'
+import Jerarquia from '@/components/manual/Jerarquia.astro'
+import { ruta } from '@/lib/rutas'
+
+**Goloso · ágil · orgulloso · hecho a mano · mexicano sin folklore.** Esa
+es la personalidad detrás de cada línea del dibujo.
+
+<Mascota class="h-64" />
+
+## Construcción
+
+El trazo va como `stroke`, no como contorno relleno — así se puede
+animar y escalar sin deformarse. Cada parte animable es un `<g>` propio,
+con pivote en su articulación real (hombro, cadera, tobillo), no en el
+centro de su caja. Sin gradientes ni filtros: los fills son planos.
+
+Para tamaños chicos existe una versión reducida, simplificada a
+propósito — ver el <a href={ruta('manual/logo')}>sello circular</a> en la
+página de logo.
+
+## Jerarquía
+
+El orden de esta lista es el orden real de pintado del SVG: mover
+`#cabeza` mueve ojos, boca y orejas gratis. Los pivotes marcados son los
+que mide la capa `#pivotes` del archivo fuente.
+
+<Jerarquia />
+
+Ver cómo se mueve en la <a href={ruta('manual/animacion')}>página de
+animación</a>.

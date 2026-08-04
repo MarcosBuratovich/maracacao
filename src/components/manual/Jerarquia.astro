@@ -1,0 +1,25 @@
+---
+// Documenta la jerarquía real de mascota.svg leyendo el contrato de
+// src/assets/brand/jerarquia.ts (§9.2 del spec) — no es una transcripción
+// a mano: si la jerarquía del SVG cambia, esta lista cambia con ella.
+import { JERARQUIA, PIVOTES } from '@/assets/brand/jerarquia'
+
+const pivotePorId: Record<string, string> = PIVOTES
+
+function profundidad(id: string): number {
+  const nodo = JERARQUIA.find((n) => n.id === id)
+  if (!nodo || nodo.padre === null) return 0
+  return 1 + profundidad(nodo.padre)
+}
+---
+<ul class="space-y-1 font-mono text-sm">
+  {JERARQUIA.map((n) => {
+    const pivote = pivotePorId[n.id]
+    return (
+      <li style={`padding-left:${profundidad(n.id) * 1.25}rem`}>
+        <span>#{n.id}</span>
+        {pivote && <span class="ml-2 text-xs opacity-60">— pivote: {pivote}</span>}
+      </li>
+    )
+  })}
+</ul>
