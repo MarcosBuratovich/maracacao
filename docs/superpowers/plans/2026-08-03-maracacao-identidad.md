@@ -2572,10 +2572,10 @@ Componentes de demostración primero:
 ```astro
 ---
 // src/components/manual/Rampa.astro
-import { verde, tan } from '@/tokens/color'
-interface Props { nombre: 'verde' | 'tan' }
+import { verde, tan, rosa } from '@/tokens/color'
+interface Props { nombre: 'verde' | 'tan' | 'rosa' }
 const { nombre } = Astro.props
-const rampa = nombre === 'verde' ? verde : tan
+const rampa = nombre === 'verde' ? verde : nombre === 'tan' ? tan : rosa
 ---
 <div class="flex overflow-hidden rounded-lg">
   {Object.entries(rampa).map(([paso, hex]) => (
@@ -2650,6 +2650,7 @@ import Bandas from '@/components/manual/Bandas.astro'
 
 <Rampa nombre="verde" />
 <Rampa nombre="tan" />
+<Rampa nombre="rosa" />
 
 ## Pares aprobados
 
