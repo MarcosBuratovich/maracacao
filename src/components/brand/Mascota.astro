@@ -1,0 +1,13 @@
+---
+// Fallback ambiental (Task 16): respiración + parpadeo + vaivén de cola en
+// CSS puro. Task 18 lo reemplaza por el rig de Rive; hasta entonces (y
+// siempre que el usuario tenga prefers-reduced-motion) esto es lo que se ve.
+import { svgDeMarca } from './svg-inline'
+import '@/styles/mascota-ambiental.css'
+import { copy } from '@/copy/marca'
+
+interface Props { class?: string }
+const { class: clase = '' } = Astro.props
+const svg = svgDeMarca('mascota')
+---
+<div class={`mascota ${clase}`} role="img" aria-label={copy.mascotaAria} set:html={svg} />

@@ -1,0 +1,72 @@
+/* Animación ambiental de <Mascota/> (Task 16): respiración, parpadeo y
+   vaivén de cola. Es el fallback OBLIGATORIO que ve quien tiene
+   prefers-reduced-motion o mientras carga el rig de Rive (Task 18) — no un
+   adorno opcional.
+
+   Duraciones y easings salen siempre de las custom properties emitidas por
+   `pnpm tokens` (`src/styles/tokens.generated.css`, generadas desde
+   `src/tokens/motion.ts`): nunca un valor de tiempo hardcodeado acá. Así un
+   ajuste de ritmo en el token se propaga sin tocar este archivo.
+
+   Cada parte rota/escala sobre su pivote anatómico REAL, medido en la capa
+   `#pivotes` de `mascota.svg` (Task 9) — no sobre el centro de su bounding
+   box. La cola pivotea desde su nacimiento en la cadera (540, 574): así se
+   ve viva. Desde el centro de su caja se vería como un limpiaparabrisas. */
+
+/* Respiración: el torso escala apenas, desde la base hacia arriba. */
+@keyframes respiracion {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.02); }
+}
+
+/* Parpadeo: los ojos (arco de sonrisa) se cierran un instante en un ciclo
+   largo. `steps(1, end)` a propósito: un parpadeo no se interpola, salta. */
+@keyframes parpadeo {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95%           { transform: scaleY(0.1); }
+}
+
+/* Cola: vaivén sobre la cadera. */
+@keyframes cola {
+  0%, 100% { transform: rotate(-6deg); }
+  50%      { transform: rotate(6deg); }
+}
+
+.mascota #cuerpo {
+  transform-origin: 512px 560px; /* cadera */
+  animation: respiracion var(--mrc-dur-ambiental) var(--mrc-ease-entrada) infinite;
+}
+
+.mascota #cabeza {
+  transform-origin: 512px 287.19px; /* base del cuello, piv-cabeza */
+}
+
+.mascota #ojo-l,
+.mascota #ojo-r {
+  animation: parpadeo var(--mrc-dur-parpadeo) steps(1, end) infinite;
+}
+
+.mascota #ojo-l {
+  transform-origin: 468.68px 155.35px; /* centro del arco, piv-ojo-l */
+}
+
+.mascota #ojo-r {
+  transform-origin: 555.32px 155.35px; /* centro del arco, piv-ojo-r */
+}
+
+.mascota #cola {
+  transform-origin: 540px 574px; /* cadera, piv-cola */
+  animation: cola calc(var(--mrc-dur-ambiental) * 1.25) ease-in-out infinite;
+}
+
+/* El spec dice apagar, no atenuar: `animation: none`, nunca el anti-patrón
+   de bajar la duración a algo imperceptible (p. ej. 0.01ms) — eso sigue
+   siendo movimiento, solo que más difícil de notar que está ahí. */
+@media (prefers-reduced-motion: reduce) {
+  .mascota #cuerpo,
+  .mascota #ojo-l,
+  .mascota #ojo-r,
+  .mascota #cola {
+    animation: none;
+  }
+}
