@@ -1,13 +1,21 @@
 ---
 // Fallback ambiental (Task 16): respiración + parpadeo + vaivén de cola en
-// CSS puro. Task 18 lo reemplaza por el rig de Rive; hasta entonces (y
-// siempre que el usuario tenga prefers-reduced-motion) esto es lo que se ve.
+// CSS puro. Es el que se ve siempre que `rive` no está pedido, mientras
+// `public/brand/mono.riv` no existe o no cargó todavía, y siempre —sin
+// excepción— bajo prefers-reduced-motion (eso lo decide MascotaRive.tsx en
+// el cliente; acá no hay forma de saberlo en build/SSR).
 import { svgDeMarca } from './svg-inline'
+import MascotaRive from './MascotaRive'
 import '@/styles/mascota-ambiental.css'
 import { copy } from '@/copy/marca'
 
-interface Props { class?: string }
-const { class: clase = '' } = Astro.props
+// `class` se mantiene: Bandas.astro (Task 17) ya lo usa.
+interface Props { rive?: boolean; class?: string }
+const { rive = false, class: clase = '' } = Astro.props
 const svg = svgDeMarca('mascota')
 ---
-<div class={`mascota ${clase}`} role="img" aria-label={copy.mascotaAria} set:html={svg} />
+{rive ? (
+  <MascotaRive client:visible src="/brand/mono.riv" fallback={svg} class={clase} />
+) : (
+  <div class={`mascota ${clase}`} role="img" aria-label={copy.mascotaAria} set:html={svg} />
+)}
