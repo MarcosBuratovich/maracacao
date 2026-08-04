@@ -156,13 +156,28 @@ aporta, no vale la pena.
 
 ## Integración con el sitio
 
-No hace falta tocar código para riggear, pero esto ubica dónde termina tu trabajo:
+**Sí hace falta tocar código para que el sitio use el `.riv`** — poner el archivo en
+`public/brand/mono.riv` no alcanza por sí solo. Ningún lugar del sitio hoy le pide el
+rig a la mascota, así que aunque el archivo exista nadie lo carga. Esto es lo que hay
+que tocar y dónde termina tu trabajo:
 
+- `<Mascota/>` (`src/components/brand/Mascota.astro`) tiene un prop `rive` apagado por
+  default. Para encender el rig en un uso concreto de la mascota, el cambio es de una
+  palabra en el `.astro`/`.mdx` que la monta:
+
+  ```astro
+  <Mascota rive class="h-56" />
+  ```
+
+  Eso monta `MascotaRive` (`src/components/brand/MascotaRive.tsx`) como isla de React
+  (`client:visible`), que carga `/brand/mono.riv` y busca ahí la state machine
+  `MonoSM` documentada abajo.
 - El archivo exportado se llama **`mono.riv`** y va en `public/brand/mono.riv`.
-- Mientras ese archivo no exista (o falle al cargar, o tarde), el sitio no se entera:
-  sigue mostrando `mascota.svg` estático con una animación ambiental en CSS puro
-  (respiración, parpadeo, vaivén de cola). Podés iterar y exportar versiones parciales
-  sin miedo a dejar el sitio roto en ningún momento.
+- Con `rive` prendido en algún componente, mientras `mono.riv` no exista (o falle al
+  cargar, o tarde), el sitio no se entera: sigue mostrando `mascota.svg` estático con
+  una animación ambiental en CSS puro (respiración, parpadeo, vaivén de cola). Podés
+  iterar y exportar versiones parciales sin miedo a dejar el sitio roto en ningún
+  momento.
 - Con `prefers-reduced-motion` activo, el sitio directamente no monta el rig — nadie ve
   el `.riv` corriendo en ese caso, así que no hace falta diseñar una versión "reducida"
   de la animación.

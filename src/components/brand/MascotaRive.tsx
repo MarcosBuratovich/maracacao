@@ -54,15 +54,28 @@ export default function MascotaRive({ src, fallback, class: clase = '' }: Props)
 
   const riveLoaded = permitido && Boolean(rive)
 
+  // Fix B3 (review final, Important): el mismo bug de tamaño que ya se pagó
+  // en Mascota.astro (Task 17, fix round 1) — el <svg> o <canvas> sin
+  // width/height propio se autodimensiona con el algoritmo de reemplazo del
+  // navegador en vez de responder a la clase Tailwind de altura de quien
+  // llama, midiendo 696×696 (tapando texto) o 0×0 (ítem flex sin ancho
+  // propio) según el contexto. Mascota.astro lo resuelve fijando
+  // aspect-ratio:1/1 en el <div> que envuelve el SVG estático — acá hace
+  // falta el mismo fix en los DOS contenedores que se turnan según
+  // `riveLoaded`: el que envuelve el fallback (mismo <svg> width/height
+  // 100% que Mascota.astro ya prepara) y el <canvas> real de Rive, que no
+  // trae ninguna medida propia hasta que useRive termina de cargar el .riv.
+  const aspectoCuadrado = { aspectRatio: '1/1' }
+
   return (
     // role="img" + aria-label acá (no solo en el SVG del fallback, que trae
     // el suyo propio incrustado): el <canvas> de Rive no tiene nombre
     // accesible propio, así que sin esto el mono queda mudo para lectores de
     // pantalla en cuanto el rig reemplaza al fallback.
-    <div className={`mascota ${clase}`} role="img" aria-label={copy.mascotaAria}>
-      {!riveLoaded && <div dangerouslySetInnerHTML={{ __html: fallback }} />}
+    <div className={`mascota ${clase}`} style={aspectoCuadrado} role="img" aria-label={copy.mascotaAria}>
+      {!riveLoaded && <div style={aspectoCuadrado} dangerouslySetInnerHTML={{ __html: fallback }} />}
       {permitido && (
-        <RiveComponent style={{ display: riveLoaded ? 'block' : 'none' }} />
+        <RiveComponent style={{ ...aspectoCuadrado, display: riveLoaded ? 'block' : 'none' }} />
       )}
     </div>
   )
