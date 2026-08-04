@@ -163,18 +163,34 @@
              proximal es un círculo centrado exactamente en piv-brazo-l: rotar sobre
              el pivote lo deja invariante, así que el brazo no puede despegarse del
              torso. El arco de ese casquete es además la línea del cuello que se ve
-             a la izquierda de las franjas, igual que en la foto. -->
+             a la izquierda de las franjas, igual que en la foto.
+             El gancho está MÁS CERRADO que en la Task 8 (la muñeca pasó de
+             x 336 a x 364) para que el puño llegue al cachete y el pistache
+             pueda medir ~65 como en el packaging. Dos números del eje no son
+             de dibujo sino de rasterización, y están explicados en el §A.3 del
+             fix round 1 de la Task 9: la cola del barrido baja 9 unidades para que
+             al rotar −20° el brazo cruce el labio del bowl de lleno en vez de
+             rasparlo, y la muesca del codo cierra con un redondeo de radio 9 en
+             vez de en punta para que la cuña de fondo del ojal no se afine
+             hasta un píxel. Ninguno de los dos se puede tocar sin re-correr
+             `test/mascota-rig.test.ts`. -->
         <path id="brazo-l-forma" class="t-principal" fill="#5B744B"
-              d="M 492.03 273.66 C 490.97 276.76 488.36 286.38 485.69 292.28 C 483.02 298.17 478.37 305.43 476 309.04 C 473.63 312.65 474.24 311.32 471.45 313.93 C 468.66 316.55 463.44 321.13 459.26 324.74 C 455.08 328.34 450.9 331.99 446.39 335.57 C 441.89 339.15 437.23 342.65 432.25 346.21 C 427.27 349.78 421.54 353.71 416.51 356.97 C 411.48 360.22 407.09 362.85 402.1 365.73 C 397.11 368.62 391.74 371.64 386.55 374.27 C 381.36 376.9 376.1 379.34 370.97 381.52 C 365.85 383.7 361 385.5 355.81 387.33 C 350.62 389.16 345.24 391.19 339.84 392.5 C 334.44 393.8 326.81 394.79 323.4 395.17 C 319.98 395.55 321.83 395.49 319.34 394.79 C 316.85 394.09 310.79 391.92 308.48 390.97 C 306.17 390.03 307.82 391.34 305.5 389.11 C 303.17 386.89 296.63 380 294.53 377.62 C 292.43 375.24 293.8 377.41 292.9 374.81 C 292 372.21 289.83 365.53 289.13 362.02 C 288.43 358.5 288.39 358.03 288.71 353.71 C 289.03 349.39 289.81 341.61 291.05 336.11 C 292.3 330.62 294.29 326.02 296.17 320.73 C 298.05 315.44 300.08 309.69 302.34 304.39 C 304.59 299.1 307.54 294.18 309.68 288.97 C 311.82 283.75 313.63 278.43 315.15 273.11 C 316.68 267.79 318.13 260.16 318.83 257.05 C 319.54 253.94 319.29 254.88 319.38 254.45 A 17 17 0 0 1 352.62 261.55 C 352.2 263.59 351.26 268.97 350.05 273.78 C 348.85 278.59 347.23 284.95 345.39 290.41 C 343.55 295.86 341.32 301.12 339.02 306.51 C 336.73 311.89 333.83 317.25 331.62 322.7 C 329.42 328.16 327.29 334.27 325.82 339.24 C 324.34 344.21 323.25 349.61 322.75 352.53 C 322.24 355.44 322.64 355.54 322.77 356.76 C 322.9 357.97 322.86 359.12 323.51 359.8 C 324.17 360.48 323.57 361.46 326.69 360.83 C 329.82 360.2 337.09 357.79 342.27 356.02 C 347.45 354.25 352.51 352.43 357.76 350.19 C 363.02 347.95 368.81 345.15 373.81 342.57 C 378.81 339.99 382.92 337.61 387.79 334.71 C 392.65 331.81 398.15 328.39 403 325.16 C 407.85 321.93 412.21 318.83 416.89 315.33 C 421.57 311.84 426.49 307.97 431.1 304.17 C 435.71 300.36 441.81 294.91 444.56 292.5 C 447.31 290.09 445.99 291.86 447.59 289.72 C 449.18 287.58 452.05 284.23 454.12 279.66 C 456.18 275.1 458.99 265.23 459.97 262.34 A 17 17 0 0 1 492.03 273.66 Z"/>
+              d="M 492.05 273.59 C 491.35 275.69 489.54 281.71 487.81 286.16 C 486.08 290.6 483.85 296.1 481.69 300.25 C 479.54 304.41 477.36 307.96 474.9 311.1 C 472.43 314.24 470.08 316.28 466.91 319.11 C 463.74 321.93 459.33 325.3 455.88 328.05 C 452.44 330.8 449.44 332.92 446.21 335.63 C 442.98 338.34 439.92 341.32 436.51 344.32 C 433.09 347.32 429.32 350.62 425.75 353.62 C 422.18 356.61 418.63 359.47 415.07 362.31 C 411.52 365.15 408.38 367.83 404.42 370.67 C 400.46 373.51 395.55 376.82 391.33 379.37 C 387.1 381.92 383.34 383.8 379.06 385.97 C 374.79 388.13 370.36 390.46 365.68 392.38 C 361 394.29 354.8 396.11 350.98 397.46 C 347.16 398.82 345.4 399.75 342.76 400.49 C 340.12 401.24 337.27 401.76 335.15 401.93 C 333.03 402.11 332.05 402.07 330.07 401.54 C 328.09 401.02 324.97 399.7 323.27 398.76 C 321.57 397.82 320.89 396.99 319.88 395.91 C 318.88 394.83 317.95 393.54 317.24 392.31 C 316.53 391.08 316.03 389.99 315.62 388.54 C 315.2 387.09 314.84 385.33 314.75 383.61 C 314.66 381.89 314.49 380.93 315.09 378.2 C 315.7 375.47 316.92 371.23 318.36 367.24 C 319.79 363.25 322.08 358.35 323.72 354.28 C 325.35 350.21 326.72 346.78 328.15 342.83 C 329.59 338.87 331.03 334.6 332.32 330.55 C 333.61 326.5 334.79 322.54 335.91 318.51 C 337.03 314.48 338.05 310.48 339.03 306.35 C 340.01 302.22 340.94 297.93 341.78 293.71 C 342.61 289.5 343.38 285.31 344.04 281.07 C 344.7 276.82 345.23 272.42 345.75 268.24 C 346.26 264.06 346.89 258.03 347.12 255.98 A 17 17 0 0 1 380.88 260.02 C 380.65 262.04 380.07 267.75 379.52 272.15 C 378.98 276.55 378.34 281.72 377.61 286.42 C 376.88 291.11 376.05 295.68 375.13 300.31 C 374.22 304.94 373.19 309.66 372.11 314.2 C 371.04 318.74 369.67 323.83 368.68 327.57 C 367.68 331.31 366.64 334.41 366.16 336.63 C 365.67 338.84 365.57 339.51 365.78 340.87 C 365.99 342.24 366.59 343.7 367.4 344.81 C 368.22 345.93 369.42 346.95 370.66 347.57 C 371.89 348.18 373.43 348.53 374.81 348.51 C 376.19 348.49 377.41 348.28 378.94 347.44 C 380.46 346.61 381.44 345.49 383.94 343.53 C 386.44 341.57 390.59 338.36 393.93 335.69 C 397.26 333.02 400.65 330.29 403.95 327.52 C 407.25 324.75 410.37 322.03 413.73 319.07 C 417.1 316.12 420.55 312.78 424.12 309.78 C 427.7 306.78 431.73 303.83 435.21 301.06 C 438.68 298.29 442.77 295.01 444.96 293.14 C 447.16 291.27 447.32 291.18 448.38 289.82 C 449.44 288.46 450.08 287.52 451.32 284.97 C 452.57 282.42 454.43 278.27 455.87 274.51 C 457.3 270.75 459.27 264.43 459.95 262.41 A 17 17 0 0 1 492.05 273.59 Z"/>
       </g>
-      <!-- Bowl. La caja sale medida contra la referencia en la Task 8 y la mano
-           derecha ya está dibujada apoyada sobre ella: x 414–698, y 358–554,
-           con las puntas del borde a la altura de y=414. Concretamente la
-           elipse exterior del labio es rx 142 / ry 56 centrada en (556, 414):
-           tapa en 358, labio frontal en 470, puntas en 414 y 698. (La nota de
-           la Task 8 anotaba `ry 34 en (557,372)`, que no cierra ni con su
-           propia caja ni con la referencia; la caja sí cierra con las dos y es
-           la que la mano necesita — ver el reporte de la Task 9.)
+      <!-- Bowl. La caja del conjunto "cuenco + contenido" sale medida contra la
+           referencia en la Task 8 (x 414–698, y 358–554) y la mano derecha ya
+           está dibujada apoyada sobre ella. Los `y 358` de esa caja son la CIMA
+           DEL MONTÓN de pistaches, que desborda el labio; el labio en sí se
+           remidió en la Task 9 y es más bajo.
+           Geometría real del cuenco, que es la que hay que leer para riggear:
+           la elipse del labio es `A 142 28` con centro en (556, 434) — o sea
+           rx 142 / ry 28 —, con la tapa del arco en y=406, el frente del arco
+           en y=462 y las dos puntas en (414, 434) y (698, 434). El fondo del
+           cuenco baja hasta y=558, cuatro unidades más que la caja de la
+           Task 8, para que la mano derecha apoye sobre la panza del cuenco en
+           vez de colgar del filo. La `rx 142` no es libre: con 138 el brazo
+           derecho rotado −20° raspaba la punta del labio y aparecía una región
+           de fondo de 1 px (§7.3 del reporte de la Task 9).
            El z-order de los tres subgrupos es el que pide el dibujo: el cuenco
            entero atrás (su arco superior ES el borde de atrás, que en la
            referencia se ve por detrás de los pistaches), el contenido en el
@@ -221,11 +237,12 @@
         </g>
         <g id="bowl-borde">
           <!-- Labio frontal: lente entre el arco frontal de la elipse exterior
-               (baja a 470) y el de una elipse de ry 24 (baja a 438). Las dos
-               comparten las puntas (414,414) y (698,414), así que la banda se
-               afina hasta cero en los extremos — que es cómo se ve un borde
-               circular en perspectiva, y evita el remate recto que dejaría un
-               anillo con puntas planas. -->
+               (`A 142 28`, que baja hasta y=462) y el de una elipse interior
+               achatada (`A 142 4`, que baja hasta y=438). Las dos comparten las
+               puntas (414, 434) y (698, 434), así que la banda mide 24 de alto
+               en el centro y se afina hasta cero en los extremos — que es cómo
+               se ve un borde circular en perspectiva, y evita el remate recto
+               que dejaría un anillo con puntas planas. -->
           <path id="bowl-borde-forma" class="t-principal" fill="#8B4D3F"
                 d="M 414 434 A 142 28 0 0 0 698 434 A 142 4 0 0 1 414 434 Z"/>
         </g>
@@ -361,39 +378,48 @@
            que entra en la silueta del cráneo desaparece y el gesto lee
            "acercándoselo", no "comiendo".
            PARA EL RIGGER: en Rive esta mano se emparenta al hueso del brazo
-           izquierdo (piv-mano-l es la muñeca, y no se movió). Vive acá abajo
-           SOLO por orden de pintado — el SVG no tiene z-index y el único modo
-           de poner la mano delante de la cabeza es dibujarla después. Al
-           rotar #brazo-l en el SVG crudo la mano no acompaña: es esperable. -->
+           izquierdo. piv-mano-l es la muñeca y está en (360, 276), a la altura
+           del casquete distal de #brazo-l-forma (centrado en (364, 258)); si el
+           gancho del brazo se vuelve a mover, este marcador se mueve con él.
+           Vive acá abajo SOLO por orden de pintado — el SVG no tiene z-index y
+           el único modo de poner la mano delante de la cabeza es dibujarla
+           después. Al rotar #brazo-l en el SVG crudo la mano no acompaña: es
+           esperable. -->
       <g id="mano-l">
-        <!-- Puño cerrado de perfil: silueta + cuatro pliegues de dedo. -->
+        <!-- Puño cerrado de perfil: silueta + cuatro pliegues de dedo. Es el
+             mismo puño de la Task 8 corrido 28 unidades a la derecha, que es
+             lo que el gancho más cerrado de #brazo-l habilita: el hueco puño →
+             comisura pasa de 81 a 54 (en el packaging es 47). -->
         <path id="mano-l-puno" class="t-principal" fill="#F8B465"
-              d="M 300 240 C 300 233.67 300.67 225.17 304 220 C 307.33 214.83 313.67 211 320 209 C 326.33 207 335.33 206.67 342 208 C 348.67 209.33 356.17 212.33 360 217 C 363.83 221.67 364.5 229.83 365 236 C 365.5 242.17 365.17 248.5 363 254 C 360.83 259.5 357 265.5 352 269 C 347 272.5 339.17 274.83 333 275 C 326.83 275.17 319.83 272.83 315 270 C 310.17 267.17 306.5 263 304 258 C 301.5 253 300 246.33 300 240 Z"/>
+              d="M 328 240 C 328 233.67 328.67 225.17 332 220 C 335.33 214.83 341.67 211 348 209 C 354.33 207 363.33 206.67 370 208 C 376.67 209.33 384.17 212.33 388 217 C 391.83 221.67 392.5 229.83 393 236 C 393.5 242.17 393.17 248.5 391 254 C 388.83 259.5 385 265.5 380 269 C 375 272.5 367.17 274.83 361 275 C 354.83 275.17 347.83 272.83 343 270 C 338.17 267.17 334.5 263 332 258 C 329.5 253 328 246.33 328 240 Z"/>
         <path id="mano-l-dedo-1" class="t-fino" fill="none"
-              d="M 326 219 Q 342 215 358 222"/>
+              d="M 354 219 Q 370 215 386 222"/>
         <path id="mano-l-dedo-2" class="t-fino" fill="none"
-              d="M 324 233 Q 341 229 357 236"/>
+              d="M 352 233 Q 369 229 385 236"/>
         <path id="mano-l-dedo-3" class="t-fino" fill="none"
-              d="M 327 247 Q 343 243 355 250"/>
+              d="M 355 247 Q 371 243 383 250"/>
         <path id="mano-l-dedo-4" class="t-fino" fill="none"
-              d="M 333 259 Q 345 256 352 261"/>
-        <!-- Pistache abierto en dos gajos, agarrado por el puño y apoyado en la
-             mejilla. La punta de la cáscara queda en (443, 192): con el trazo de
-             5 llega a 445.5 y el contorno de la boca arranca en 446.8, o sea que
-             toca la comisura izquierda igual que en el packaging. El rostro
-             empieza en x≈417 a esta altura, así que los dos gajos cruzan la cara
-             y se ven enteros — es lo que el z-order de arriba habilita.
-             Son más largos que en la referencia (92 y 82 contra ~65) porque el
-             puño está 35 unidades más lejos de la cara que en el original y la
-             muñeca no se mueve; los grosores (28 y 26) mantienen la proporción
-             3.2:1 del pistache de la foto para que no lean como astillas.
-             Los dos gajos se pisan a lo largo de todo el eje a propósito: si se
-             abren en abanico, entre uno y otro se ve el fondo y el pistache deja
-             de leerse como una sola cáscara partida. -->
-        <path id="pistache-mano-cascara" class="t-fino" fill="#FBD5A9"
-              d="M 354 214 Q 391.78 175.82 443 192 Q 405.22 230.18 354 214 Z"/>
+              d="M 361 259 Q 373 256 380 261"/>
+        <!-- Cáscara partida, chiquita y redondeada, apoyada en el cachete: la
+             silueta del packaging, medida sobre la referencia (gajo de arriba
+             x 383–443 · y 184–216, gajo de abajo x 390–437 · y 216–248).
+             DOS GAJOS QUE SE PISAN, no dos lentes paralelas: el de abajo se
+             pinta PRIMERO y el de arriba encima, así el de arriba se ve entero
+             con su punta en la boca y el de abajo asoma por debajo. Si se
+             separan, entre uno y otro aparece fondo y la cáscara se parte en
+             astillas — es el error que documentó el fix round 1 de la Task 8.
+             Cada gajo es dos cuadráticas (panza arriba y panza abajo) rematadas
+             por un arco: la BASE REDONDEADA es lo que lo distingue de una
+             rodaja, que es como leía la versión de 92 unidades.
+             La punta del gajo de arriba está en (446, 194): con el trazo de 5
+             llega a 448.5 y el contorno de la boca ocupa de 446.8 a 454.8, o
+             sea que se SOLAPA con la comisura izquierda. Ese solape es el gesto
+             de "comiendo" y es lo que habilita el z-order de arriba (la mano se
+             pinta después de #cabeza). Largo del gajo de arriba: 66. -->
         <path id="pistache-mano-semilla" class="t-fino" fill="#F4E8C6"
-              d="M 366 234 Q 399.12 198.8 445 214 Q 411.88 249.2 366 234 Z"/>
+              d="M 391.52 214.01 Q 415.32 192.55 442 219 Q 419.4 260.43 392.48 229.99 A 8 8 0 0 1 391.52 214.01 Z"/>
+        <path id="pistache-mano-cascara" class="t-fino" fill="#FBD5A9"
+              d="M 380.88 207.33 Q 403 167.78 446 194 Q 421.76 226.87 385.12 220.67 A 7 7 0 0 1 380.88 207.33 Z"/>
       </g>
       <!-- Las tres rayitas del "¡mmm!", arriba y a la izquierda de la cabeza.
            Mancha plana sin trazo, como la nariz y los cachetes: en la
@@ -427,7 +453,7 @@
     <circle id="piv-pierna-apoyo"  cx="556" cy="556" r="4" fill="#8B4D3F"/>
     <circle id="piv-pie-apoyo"     cx="551" cy="872" r="4" fill="#8B4D3F"/>
     <circle id="piv-brazo-l"       cx="476" cy="268" r="4" fill="#8B4D3F"/>
-    <circle id="piv-mano-l"        cx="332" cy="276" r="4" fill="#8B4D3F"/>
+    <circle id="piv-mano-l"        cx="360" cy="276" r="4" fill="#8B4D3F"/>
     <circle id="piv-brazo-r"       cx="548" cy="268" r="4" fill="#8B4D3F"/>
     <circle id="piv-mano-r"        cx="612" cy="510" r="4" fill="#8B4D3F"/>
     <!-- Cabeza: base del cuello, por debajo del mentón (y=258). -->
