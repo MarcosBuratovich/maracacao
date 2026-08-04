@@ -1,0 +1,33 @@
+---
+import { svgDeMarca } from './svg-inline'
+import { copy } from '@/copy/marca'
+
+interface Props { alto?: number }
+const { alto = 44 } = Astro.props
+
+// Ninguno de los tres SVG trae width/height propio (solo viewBox): sin
+// fijarlos acá, el tamaño de reemplazo por defecto de un <svg> sin medidas
+// es indefinido entre navegadores y no responde al contenedor (un <span>
+// con `items-end`/`items-center`, no `stretch`, no fuerza el tamaño del
+// hijo). Se fija la altura de cada SVG explícitamente — igual criterio que
+// ya usa Logotipo.astro — y se deja el ancho "auto": el navegador lo
+// calcula con el aspect ratio del propio viewBox.
+//
+// Proporciones del lockup: logotipo a la mitad de la altura de la cabeza,
+// descriptor más chico todavía. Jerarquía tipográfica del §8 del spec: la
+// voz dibujada (cabeza + logotipo) manda, el descriptor es la voz
+// secundaria en serif — y además es lo primero que se oculta bajo 640px.
+const altoLogotipo = Math.round(alto * 0.5)
+const altoDescriptor = Math.round(alto * 0.3)
+
+const cabeza = svgDeMarca('mascota-reducida').replace('<svg', `<svg height="${alto}"`)
+const logotipo = svgDeMarca('logotipo').replace('<svg', `<svg height="${altoLogotipo}"`)
+const descriptor = svgDeMarca('descriptor').replace('<svg', `<svg height="${altoDescriptor}"`)
+---
+<a href="/" class="flex items-center gap-3" aria-label={copy.logoAria}>
+  <span class="shrink-0" style={`height:${alto}px`} set:html={cabeza} />
+  <span class="flex flex-col">
+    <span set:html={logotipo} />
+    <span class="descriptor hidden sm:block" set:html={descriptor} />
+  </span>
+</a>

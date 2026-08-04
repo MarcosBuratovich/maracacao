@@ -1,0 +1,28 @@
+---
+// Una sola tinta: se descartan los fills del sistema y todo hereda currentColor.
+import { svgDeMarca } from './svg-inline'
+import { copy } from '@/copy/marca'
+
+interface Props { variante?: 'positivo' | 'negativo'; alto?: number }
+const { variante = 'positivo', alto = 120 } = Astro.props
+
+// Mismo arreglo de tamaño que el resto: se fija la altura del SVG
+// explícitamente (el ancho lo calcula el navegador vía aspect ratio) y se
+// vuelve `inline-block` el <span> que lo envuelve — un <span> es inline
+// por defecto y la propiedad `height` no tiene efecto en una caja inline
+// no reemplazada, así que sin esto el estilo de abajo sería un no-op si el
+// componente se usa fuera de un contenedor flex/grid.
+const plano = svgDeMarca('mascota-reducida')
+  .replace(/fill="var\(--mrc-[^)]*\)"/g, 'fill="currentColor"')
+  .replace(/stroke="var\(--mrc-[^)]*\)"/g, 'stroke="currentColor"')
+  .replace('<svg', `<svg height="${alto}"`)
+
+const color = variante === 'positivo' ? 'var(--mrc-tinta)' : 'var(--mrc-papel)'
+---
+<span
+  class="inline-block"
+  style={`color:${color};height:${alto}px`}
+  role="img"
+  aria-label={copy.logoAria}
+  set:html={plano}
+/>

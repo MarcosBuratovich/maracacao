@@ -1,0 +1,22 @@
+---
+import { svgDeMarca } from './svg-inline'
+import { copy } from '@/copy/marca'
+
+interface Props { ancho?: number }
+const { ancho = 320 } = Astro.props
+
+// Mismo motivo que en LockupHeader/SelloCircular: sin width/height propio
+// en el SVG de origen, el tamaño de reemplazo por defecto es indefinido y
+// no responde al ancho del <span> que lo contiene. Acá el layout está
+// gobernado por ANCHO (las clases w-full/w-4/5/w-1/2 de abajo, relativas a
+// `ancho`), así que se fija el ancho del SVG al 100% de su propio
+// contenedor y se deja la altura "auto" según el aspect ratio del viewBox.
+const arco = svgDeMarca('logotipo-arco').replace('<svg', '<svg width="100%"')
+const mascota = svgDeMarca('mascota').replace('<svg', '<svg width="100%"')
+const descriptor = svgDeMarca('descriptor').replace('<svg', '<svg width="100%"')
+---
+<div class="flex flex-col items-center" style={`width:${ancho}px`} role="img" aria-label={copy.logoAria}>
+  <span class="w-full" set:html={arco} />
+  <span class="-mt-2 w-4/5" set:html={mascota} />
+  <span class="w-1/2" set:html={descriptor} />
+</div>

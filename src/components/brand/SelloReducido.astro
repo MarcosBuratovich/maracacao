@@ -1,0 +1,15 @@
+---
+import { svgDeMarca } from './svg-inline'
+import { copy } from '@/copy/marca'
+
+interface Props { ancho?: number }
+const { ancho = 280 } = Astro.props
+
+// Ver el comentario de SelloCompleto.astro: mismo motivo, mismo arreglo.
+const arco = svgDeMarca('logotipo-arco').replace('<svg', '<svg width="100%"')
+const mascota = svgDeMarca('mascota').replace('<svg', '<svg width="100%"')
+---
+<div class="flex flex-col items-center" style={`width:${ancho}px`} role="img" aria-label={copy.logoAria}>
+  <span class="w-full" set:html={arco} />
+  <span class="-mt-2 w-4/5" set:html={mascota} />
+</div>
