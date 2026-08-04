@@ -51,16 +51,63 @@ describe('LockupHeader', () => {
   // (contraste ≈1.10 contra el papel — casi invisible sobre banda clara,
   // que es donde vive este header). Regresión: que no vuelva el crema
   // crudo y que el mecanismo currentColor + token de título siga ahí.
+  //
+  // Fix B1 (review final): la reescritura pasó de apuntar a la regla CSS
+  // del <style> embebido (`fill: var(--mrc-crema, ...);`) a apuntar al
+  // atributo de presentación de cada <path> (`fill="var(--mrc-crema, ...)"`)
+  // — misma técnica que Monocromo.astro:16-17. El <style> de los tres SVG
+  // de lettering ya no lleva ningún color, así que esas dos formas viejas
+  // ya no pueden aparecer en absoluto.
   it('el lettering (logotipo/descriptor) usa currentColor, no el fill crema crudo', async () => {
     const html = await container.renderToString(LockupHeader)
     expect(html).not.toContain('fill: var(--mrc-crema')
+    expect(html).not.toContain('fill="var(--mrc-crema')
     expect(html).not.toContain('#F4E8C6')
-    expect(html).toContain('fill: currentColor')
+    expect(html).not.toContain('fill: currentColor') // ya no es una regla CSS...
+    expect(html).toContain('fill="currentColor"') // ...es un atributo por <path>
   })
 
   it('fija el color del lettering con el token de título sobre banda clara', async () => {
     const html = await container.renderToString(LockupHeader)
     expect(html).toContain('color:var(--mrc-rol-texto-titulo)')
+  })
+})
+
+// B1 (review final, Critical): los tres SVG de lettering traían su color en
+// una regla CSS de clase (`.letra { fill: #F4E8C6; }`) dentro de un <style>
+// embebido sin scopear. Al inlinear varios SVG en el mismo documento (como
+// hace /manual/logo, que junta las 7 variantes), esos <style> aplican al
+// documento entero — no al SVG que los trae. LockupHeader reescribe SU
+// copia a `fill: currentColor`, y esa regla, por venir última en el
+// documento y tener la misma especificidad que la de logotipo.svg /
+// logotipo-arco.svg (ambos con lettering crema, pensado para banda oscura),
+// les ganaba la cascada: MARACACAO se pintaba con el currentColor heredado
+// del header (tinta sobre verde-700 ≈ 1.48 de contraste) en vez del crema
+// del propio archivo. El fix mueve el color a un atributo de presentación
+// por <path> — los atributos no tienen cascada entre documentos, cada SVG
+// es dueño del suyo — así que el mecanismo de conflicto no es que "hoy no
+// choquen", es que ya no existe una regla de la que pueda depender ningún
+// otro SVG.
+describe('lettering embebido: sin conflicto de cascada entre variantes (B1)', () => {
+  it('el documento no contiene ninguna regla .letra con fill en un <style>', async () => {
+    // Composición deliberada: LockupHeader (crema -> currentColor, banda
+    // clara) + Logotipo (crema crudo, banda oscura) en el mismo documento —
+    // exactamente la convivencia que rompía en /manual/logo. Si cualquiera
+    // de los dos todavía definiera el color en una regla CSS de clase, esta
+    // aserción lo agarra sin importar el orden de render.
+    const cabecera = await container.renderToString(LockupHeader)
+    const logotipo = await container.renderToString(Logotipo)
+    const documento = `<html><body>${cabecera}${logotipo}</body></html>`
+
+    const estilos = [...documento.matchAll(/<style>([\s\S]*?)<\/style>/g)].map((m) => m[1]).join('\n')
+    expect(estilos).not.toMatch(/\.letra\s*\{[^}]*\bfill\s*:/)
+  })
+
+  it('cada letra sigue llevando su color como atributo de presentación (viaja con el archivo)', async () => {
+    const html = await container.renderToString(Logotipo)
+    // Sobre banda oscura, Logotipo usa el SVG tal cual sale de svgDeMarca:
+    // fill tokenizado en el atributo, no reescrito a currentColor.
+    expect(html).toMatch(/<path[^>]*class="letra"[^>]*fill="var\(--mrc-crema, #F4E8C6\)"/)
   })
 })
 

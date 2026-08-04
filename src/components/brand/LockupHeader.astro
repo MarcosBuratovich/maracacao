@@ -23,21 +23,36 @@ const altoDescriptor = Math.round(alto * 0.3)
 const cabeza = svgDeMarca('mascota-reducida').replace('<svg', `<svg height="${alto}"`)
 
 // Fix de integración (Task 17) sobre un componente de la Task 15. El
-// lettering de logotipo.svg/descriptor.svg va en fill crema fijo — su
-// `<style>.letra{fill:...}` tokeniza a var(--mrc-crema, #F4E8C6) — pensado
-// para "texto crema sobre banda verde" (paresAprobados, AAA), nunca para
-// banda clara. Este header vive sobre banda clara (ver index.astro y
+// lettering de logotipo.svg/descriptor.svg va en fill crema fijo — cada
+// `<path class="letra">` tokeniza a fill="var(--mrc-crema, #F4E8C6)" —
+// pensado para "texto crema sobre banda verde" (paresAprobados, AAA), nunca
+// para banda clara. Este header vive sobre banda clara (ver index.astro y
 // manual/[...slug].astro), así que el crema crudo daba un contraste
 // ≈1.10 contra el papel: el lettering quedaba prácticamente invisible,
 // justo lo opuesto al criterio de aceptación 3 del spec ("el logo se lee
-// a 32 px y a tres metros"). Misma técnica que Monocromo.astro ya usa
-// para currentColor, adaptada de atributo `fill="..."` a la propiedad CSS
-// `fill:...;` del <style> embebido de estos dos SVG en particular. El
-// color se fija acá con el rol de texto-título sobre banda clara
-// (`--mrc-rol-texto-titulo`, verde-700, contraste 8.61 AAA sobre papel —
-// el mismo par que ya aprueba `paresAprobados` para "títulos sobre banda
-// clara"). La cabeza (mascota-reducida) no se toca: sus fills son
-// literales por forma, no CSS de clase, y ya están aprobados sobre papel.
+// a 32 px y a tres metros"). El color se fija acá con el rol de
+// texto-título sobre banda clara (`--mrc-rol-texto-titulo`, verde-700,
+// contraste 8.61 AAA sobre papel — el mismo par que ya aprueba
+// `paresAprobados` para "títulos sobre banda clara"). La cabeza
+// (mascota-reducida) no se toca: sus fills son literales por forma, no CSS
+// de clase, y ya están aprobados sobre papel.
+//
+// Fix B1 (review final, Critical): el color de las letras vivía en un
+// `<style>.letra{fill:...}` embebido en los tres SVG de lettering. Al
+// inlinear varios SVG en la misma página (como hace /manual/logo, que
+// junta las 7 variantes), un `<style>` sin scopear aplica al *documento*
+// entero, no solo al SVG que lo trae — así que la reescritura de este
+// componente (que apuntaba a esa regla CSS) pisaba también el `.letra` de
+// logotipo.svg/logotipo-arco.svg de las variantes 1-3 si venía después en
+// el documento: MARACACAO se pintaba con el currentColor heredado del
+// header (tinta sobre verde-700 ≈ 1.48 de contraste) en vez de su propio
+// crema. Arreglo real en los tres archivos (no acá): el color pasó de la
+// regla CSS a un atributo `fill="..."` de presentación en cada <path> — un
+// atributo no tiene cascada entre documentos, cada SVG es dueño del suyo.
+// Esta reescritura sigue ese mismo cambio: en vez de tocar la propiedad
+// CSS `fill:...;` de un <style>, reemplaza el atributo `fill="var(--mrc-...)"`
+// de cada <path> por `fill="currentColor"` — la técnica exacta que
+// Monocromo.astro:16-17 ya usa para lo mismo.
 //
 // BANDA CLARA ÚNICAMENTE. El fix es de un solo modo, no adaptativo: el
 // color queda fijo en verde-700, así que sobre una banda verde-700 el
@@ -49,10 +64,10 @@ const cabeza = svgDeMarca('mascota-reducida').replace('<svg', `<svg height="${al
 // que son banda oscura únicamente por la razón inversa (crema crudo,
 // documentado en la prosa de logo.mdx).
 const logotipo = svgDeMarca('logotipo')
-  .replace(/fill:\s*var\(--mrc-[a-z0-9-]+,\s*#[0-9A-Fa-f]{6}\);/, 'fill: currentColor;')
+  .replace(/fill="var\(--mrc-[^)]*\)"/g, 'fill="currentColor"')
   .replace('<svg', `<svg height="${altoLogotipo}"`)
 const descriptor = svgDeMarca('descriptor')
-  .replace(/fill:\s*var\(--mrc-[a-z0-9-]+,\s*#[0-9A-Fa-f]{6}\);/, 'fill: currentColor;')
+  .replace(/fill="var\(--mrc-[^)]*\)"/g, 'fill="currentColor"')
   .replace('<svg', `<svg height="${altoDescriptor}"`)
 ---
 <a href="/" class="flex items-center gap-3" aria-label={copy.logoAria}>

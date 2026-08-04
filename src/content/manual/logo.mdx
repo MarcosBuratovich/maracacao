@@ -68,7 +68,15 @@ Favicon, avatar de redes, botón. La pieza que más trabajo de diseño
 pidió: a 32 px la cara se vuelve una mancha si no se simplifica de
 verdad — menos líneas, más contraste, cero detalle interno.
 
-<SelloCircular />
+<div class="flex flex-wrap items-end gap-6">
+  <SelloCircular />
+  <div class="flex flex-col items-center gap-2">
+    <SelloCircular diametro={32} />
+    <span class="text-[11px]" style="color:var(--mrc-rol-texto-secundario)">
+      32 px — criterio de aceptación 3
+    </span>
+  </div>
+</div>
 
 ## 6. Monocromo
 
