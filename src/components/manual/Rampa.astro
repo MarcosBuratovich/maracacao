@@ -1,5 +1,10 @@
 ---
-import { verde, tan, rosa } from '@/tokens/color'
+// Fix B2 (review final, Important): hardcodeaba el papel y la tinta como
+// hex a mano acá en vez de leer fijos.papel/fijos.tinta — falsificaba el
+// criterio de aceptación 4 ("un solo lugar define los colores") en el
+// propio componente que dibuja las rampas del manual. Mismo criterio que
+// ya usa su hermano ColoresFijos.astro.
+import { verde, tan, rosa, fijos } from '@/tokens/color'
 interface Props { nombre: 'verde' | 'tan' | 'rosa' }
 const { nombre } = Astro.props
 const rampa = nombre === 'verde' ? verde : nombre === 'tan' ? tan : rosa
@@ -7,7 +12,7 @@ const rampa = nombre === 'verde' ? verde : nombre === 'tan' ? tan : rosa
 <div class="flex overflow-hidden rounded-lg">
   {Object.entries(rampa).map(([paso, hex]) => (
     <div class="flex-1 pb-2 pt-10 text-center text-[10px]" style={`background:${hex}`}>
-      <span style={`color:${Number(paso) >= 500 ? '#FAF3E0' : '#372915'}`}>{paso}</span>
+      <span style={`color:${Number(paso) >= 500 ? fijos.papel : fijos.tinta}`}>{paso}</span>
     </div>
   ))}
 </div>
