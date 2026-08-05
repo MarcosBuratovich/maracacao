@@ -1,15 +1,15 @@
 // Copy de la presentación de identidad (src/pages/index.astro y
 // src/components/landing/*). Misma regla que marca.ts: ningún string
 // visible dentro de un componente. Registro es-MX — "pistaches",
-// "empaque", "plumón" — voz de la marca: golosa, ágil, orgullosa, sin
-// folklore (§12 del spec de identidad).
+// "empaque", "plumón", "chueca".
 //
 // Retro de Marcos (2026-08-05), guardada como test en landing.test.ts:
 // — El personaje no se llama "mono" en el copy visible.
-// — Nada de contenido de negocio inventado: ni sabores que no existan en
-//   el empaque, ni precios, ni datos de origen. Lo que se presenta es lo
-//   que está en el manual de marca.
-// — El sitio que viene es una landing informativa, no un ecommerce.
+// — Nada de contenido de negocio inventado; el único sabor real es el del
+//   empaque. Sin ecommerce: la página que viene es informativa.
+// — Tono personal y directo, como Marcos hablándole a su cliente. Nada de
+//   floritura de copywriter: frases cortas, pocas rayas, cero tríadas
+//   perfectas, cero metáforas apiladas ("voces", "sin letras chicas").
 export const landing = {
   titulo: 'Maracacao — Presentación de identidad',
   skipLink: 'Ir al contenido',
@@ -17,35 +17,35 @@ export const landing = {
 
   hero: {
     overline: 'Presentación de identidad',
-    titulo: 'El chocolate ya estaba listo. Ahora la marca también.',
-    sub: 'Una mascota con antojo, los colores medidos de tu empaque y una familia de logos que trabaja a cualquier tamaño: esta es la identidad de Maracacao.',
-    ctaRecorrido: 'Recorrer la identidad',
-    ctaManual: 'Abrir el manual de marca',
+    titulo: 'Así quedó tu marca.',
+    sub: 'Partimos de tu empaque y armamos todo lo demás: la mascota redibujada, los colores medidos y los logos para cada uso. Baja y velo andando.',
+    ctaRecorrido: 'Ver la marca',
+    ctaManual: 'Abrir el manual',
   },
 
   personaje: {
     overline: 'El personaje',
-    titulo: 'El personaje del empaque, ahora vivo',
+    titulo: 'Tu personaje, ahora se mueve',
     prosa:
-      'Nació dibujado en tu empaque y lo redibujamos vector por vector: mismo gesto, mismos granos de cacao, mismas ganas de chocolate. Hoy es un personaje por capas — cabeza, cola, brazos, pistache — listo para animarse sin perder el trazo de plumón.',
+      'Lo sacamos de tu empaque y lo redibujamos vector por vector, sin cambiarle el gesto ni el trazo de plumón. Quedó armado por capas (cabeza, cola, brazos, pistache) para poder animarlo.',
     fotoEtiqueta: 'Tu empaque original',
     fotoAlt:
       'Fotografía del empaque original de Maracacao: tableta envuelta en papel verde con el sello dibujado a mano',
-    vectorEtiqueta: 'El redibujo vectorial',
+    vectorEtiqueta: 'El redibujo',
     hintSaluda: 'Pásale el cursor: te saluda.',
     rasgos: ['Goloso', 'Ágil', 'Orgulloso', 'Hecho a mano'],
   },
 
   firmas: {
     overline: 'El sistema de logos',
-    titulo: 'Siete formas de firmar',
+    titulo: 'Siete versiones del logo',
     intro:
-      'Del empaque al favicon: cada variante tiene su tamaño, su fondo y su momento. Ninguna se improvisa.',
+      'No hay que adivinar cuál va dónde: cada una tiene su tamaño y su fondo, y el manual lo deja por escrito.',
     // Mismo orden que la tabla §8 del spec de identidad. `banda` decide el
     // fondo del tile: las piezas con lettering crema solo viven en banda
     // oscura; el lockup de header, solo en banda clara (ver LockupHeader.astro).
     variantes: [
-      { nombre: 'Sello completo', uso: 'Empaque, carteles y momentos grandes' },
+      { nombre: 'Sello completo', uso: 'Empaque, carteles y piezas grandes' },
       { nombre: 'Sello reducido', uso: 'Piezas medianas, sin descriptor' },
       { nombre: 'Logotipo', uso: 'Firma, pie de página y papelería' },
       { nombre: 'Isotipo', uso: 'Stickers e ilustración de apoyo' },
@@ -57,85 +57,84 @@ export const landing = {
 
   paleta: {
     overline: 'El color',
-    titulo: 'Una paleta medida, no inventada',
+    titulo: 'Los colores, medidos de tu empaque',
     prosa:
-      'Los colores salen de tu empaque: los verdes, los tonos de chocolate y el rosa que le da vida a la cara del personaje. Cada combinación de texto pasó las pruebas de contraste — se lee bien en pantalla chica, con sol y sin lentes.',
-    tabletaCaption: 'De los 36 colores del sistema, los 18 que más se ven. Nos comimos un cuadrito.',
+      'No inventamos nada: medimos los verdes, los cafés y el rosa de los cachetes directo de tu empaque. Todas las combinaciones de texto pasan las pruebas de contraste, para que se lean bien hasta en el teléfono.',
+    tabletaCaption: 'Son 36 en total; estos son los 18 que más se usan. Sí, nos comimos un cuadrito.',
     tabletaAria: 'La paleta de color acomodada como tableta de chocolate, con un cuadrito mordido',
     rampas: [
-      { clave: 'verde', etiqueta: 'Verde — la voz principal' },
-      { clave: 'tan', etiqueta: 'Tan — la ilustración' },
-      { clave: 'rosa', etiqueta: 'Rosa — los cachetes' },
+      { clave: 'verde', etiqueta: 'Verde, el principal' },
+      { clave: 'tan', etiqueta: 'Tan, para la ilustración' },
+      { clave: 'rosa', etiqueta: 'Rosa, para los cachetes' },
     ],
-    fijosEtiqueta: 'Los fijos — papel, crema, tinta, bordó, amarillo y suelo',
+    fijosEtiqueta: 'Los fijos: papel, crema, tinta, bordó, amarillo y suelo',
   },
 
   voces: {
     overline: 'La tipografía',
-    titulo: 'Dos voces que se llevan bien',
+    titulo: 'Dos tipografías, cada una en lo suyo',
     frauncesNombre: 'Fraunces',
     frauncesRol:
-      'La voz de los antojos: títulos y nombres de sabor. Es variable — puede ponerse más suave o más traviesa, y eso también se anima.',
+      'Para títulos y nombres de sabor. Es variable: se puede poner más suave o más chueca, y eso también se anima. Mírala moverse aquí arriba.',
     workSansNombre: 'Work Sans',
-    workSansRol: 'La voz que acompaña: cuerpo, botones y etiquetas. Clara a cualquier tamaño.',
-    nota: 'El logotipo MARACACAO no es tipografía: es lettering dibujado a mano, calcado de tu empaque.',
+    workSansRol: 'Para el texto de todos los días: párrafos, botones, etiquetas. Se lee bien incluso chiquita.',
+    nota: 'Ojo: el logotipo MARACACAO no es una fuente. Está dibujado a mano, calcado de tu empaque.',
   },
 
   movimiento: {
     overline: 'El movimiento',
     titulo: 'Se mueve con calma',
     prosa:
-      'Respira, parpadea y mueve la cola como quien no tiene prisa. Nada viaja en línea recta — todo describe un arco — y nunca se mueven más de dos cosas a la vez. Si tu teléfono pide menos movimiento, el personaje se queda quieto y la página no pierde nada.',
-    demoHint: 'Este de aquí ya está vivo — míralo respirar.',
-    principios: ['Arcos, nunca rectas', 'Peso: la cola llega tarde', 'Spring suave por defecto'],
+      'Respira, parpadea y mueve la cola, sin prisa. Las reglas son pocas: todo se mueve en arcos, nunca más de dos cosas a la vez, y si tu teléfono pide menos movimiento, todo se queda quieto.',
+    demoHint: 'Míralo respirar.',
+    principios: ['Todo en arcos', 'La cola llega tardecito', 'Rebote suave'],
   },
 
   adelanto: {
     overline: 'Lo que viene',
     titulo: 'Un adelanto del sitio',
     prosa:
-      'Así se va a sentir el sitio: bandas que alternan como las caras de tu empaque y la información al centro. Una landing informativa por ahora — sin tienda — para presentar la marca, sus sabores y su historia.',
+      'El siguiente paso es la página pública. Va a ser informativa, sin tienda por ahora: presentar la marca, los sabores y la historia. Aquí van dos muestras de cómo se vería.',
     chip: 'Vista previa',
     sabores: {
       titulo: 'Cada sabor, con su tableta',
       texto:
-        'La sección de sabores presenta cada tableta con su nombre, empezando por la que ya existe en tu empaque.',
+        'Cada tableta con su nombre. Por ahora la única real es la de tu empaque; las demás se suman cuando existan.',
       // Único sabor real: el del empaque original (§3 del spec: la foto es
-      // la autoridad). Los demás se suman cuando existan.
+      // la autoridad).
       items: [{ nombre: 'Chocolate blanco y pistaches', tono: 'blanco' }] as const,
     },
     origen: {
       titulo: 'De dónde viene',
       prosa:
-        'La sección de origen cuenta la historia del cacao y de cómo se vuelve tableta, con la voz de la marca. El contenido lo pone Maracacao; la identidad ya sabe contarlo.',
+        'Aquí va tu historia: de dónde viene el cacao y cómo lo trabajas. Ese texto lo pones tú; el diseño ya está listo.',
     },
   },
 
   // Cotización de Marcos (2026-08-05): su pago es 500 USD, el dominio va
-  // aparte y se renueva. El hosting es real que sale gratis: el sitio es
-  // estático (astro build) y entra en el plan sin costo de cualquier
-  // hosting estático. El rango del dominio es precio de mercado, marcado
-  // como estimado — no un dato inventado del negocio.
+  // aparte y se renueva. El hosting sí sale gratis: el sitio es estático
+  // (astro build) y entra en el plan sin costo de cualquier hosting
+  // estático. El rango del dominio es precio de mercado, estimado.
   inversion: {
     overline: 'La inversión',
-    titulo: 'Números claros, sin letras chicas',
+    titulo: 'Lo que cuesta',
     prosa:
-      'El sitio es estático: se publica sin pagar servidor. Lo único que se renueva cada año es el dominio.',
+      'La página no necesita servidor de paga. Lo único que se renueva cada año es el dominio.',
     lineas: [
       {
         concepto: 'Diseño y desarrollo',
-        detalle: 'Identidad completa, manual de marca y esta presentación — pago único',
+        detalle: 'Identidad completa, manual de marca y esta presentación. Pago único.',
         monto: '500 USD',
       },
       {
         concepto: 'Dominio',
-        detalle: 'Se contrata directo con el registrador y se renueva cada año (estimado)',
+        detalle: 'Lo contratas directo con el registrador; el precio depende del dominio que elijas.',
         monto: '10 a 30 USD al año',
       },
       {
         concepto: 'Publicación y hosting',
-        detalle: 'La página es estática: entra en el plan sin costo del hosting',
-        monto: 'Incluido',
+        detalle: 'Entra en el plan gratuito de cualquier hosting estático.',
+        monto: 'Sin costo',
       },
     ],
     remate: 'Para arrancar: 500 USD y el dominio del primer año.',
@@ -146,15 +145,15 @@ export const landing = {
     overline: 'Ya está construido',
     titulo: 'Todo esto ya existe',
     prosa:
-      'No son maquetas: cada color, logo y animación de esta página sale del sistema real de la marca. El manual de marca vive en este mismo sitio y se actualiza solo — lo que ves es lo que hay.',
+      'Nada de esta página es maqueta: los colores, los logos y las animaciones salen del sistema ya construido. En el manual queda todo documentado para quien lo necesite después, sea imprenta, redes o quien haga el sitio.',
     numeros: [
-      { cifra: '7', concepto: 'variantes de logo' },
+      { cifra: '7', concepto: 'versiones del logo' },
       { cifra: '36', concepto: 'colores medidos' },
-      { cifra: '2', concepto: 'familias tipográficas' },
+      { cifra: '2', concepto: 'tipografías' },
       { cifra: '1', concepto: 'personaje con antojo' },
     ],
-    ctaManual: 'Explorar el manual de marca',
-    siguiente: 'Lo que sigue: darle cuerda al personaje en Rive y construir la landing informativa.',
+    ctaManual: 'Abrir el manual de marca',
+    siguiente: 'Sigue: animar al personaje y armar la página pública.',
   },
 
   footer: {
