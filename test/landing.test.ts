@@ -7,8 +7,9 @@
  * revelado por scroll no esconda contenido sin JS ni con reduced-motion.
  */
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { experimental_AstroContainer as AstroContainer } from 'astro/container'
+import { cargarSvg, hexUsados } from './svg-utils'
 import { landing, precioMXN } from '@/copy/landing'
 import { copy } from '@/copy/marca'
 import { todosLosColores } from '@/tokens/color'
@@ -159,6 +160,16 @@ describe('PaletaTableta (elemento firma)', () => {
     const usados = [...html.matchAll(/background:(#[0-9A-Fa-f]{6})/g)].map((m) => m[1])
     expect(usados.length).toBeGreaterThan(0)
     for (const hex of usados) expect(permitidos).toContain(hex)
+  })
+})
+
+describe('favicon — el sello circular del §8, generado', () => {
+  it('existe y solo usa colores del sistema', () => {
+    expect(existsSync('public/favicon.svg')).toBe(true)
+    const rogue = hexUsados(cargarSvg('public/favicon.svg')).filter(
+      (c) => !todosLosColores().includes(c),
+    )
+    expect(rogue).toEqual([])
   })
 })
 

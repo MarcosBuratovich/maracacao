@@ -14,10 +14,11 @@ import { landing } from '@/copy/landing'
 // 6×3, curada: la fila de verdes (la voz principal), la fila cálida del
 // cacao y la fila del rosa con los claros. El mordido es el verde-300 de
 // la esquina superior derecha — claro, para que la mordida y las migajas
-// se lean sobre el papel de la banda.
+// se lean sobre el papel de la banda. La tinta no va como cuadrito: es el
+// MARCO de la tableta (visto en vivo: tinta sobre tinta desaparecía).
 const filas = [
   [verde[800], verde[700], verde[600], verde[500], verde[400], verde[300]],
-  [fijos.tinta, fijos.bordo, tan[800], tan[600], fijos.suelo, fijos.amarillo],
+  [fijos.bordo, tan[800], tan[600], tan[400], fijos.suelo, fijos.amarillo],
   [rosa[700], rosa[500], rosa[300], rosa[100], fijos.crema, fijos.papel],
 ] as const
 const cuadritos = filas.flat()

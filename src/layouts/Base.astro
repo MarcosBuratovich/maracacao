@@ -9,6 +9,9 @@ const { titulo } = Astro.props
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="preload" href="/fonts/fraunces-variable.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/work-sans-variable.woff2" as="font" type="font/woff2" crossorigin />
+    {/* Sello circular del §8 ("favicon, avatar de redes"), generado con
+        `pnpm favicon` desde el asset y el token verde-600. */}
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>{titulo}</title>
   </head>
   <body>

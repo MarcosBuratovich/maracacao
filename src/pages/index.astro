@@ -38,7 +38,7 @@ const rampas = { verde: Object.values(verde), tan: Object.values(tan), rosa: Obj
       <div class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-6 py-6">
         <LockupHeader />
         <nav>
-          <a href={ruta('manual')} class="b-menor" style="color:var(--mrc-verde-600);font-weight:600">
+          <a href={ruta('manual')} class="b-menor whitespace-nowrap" style="color:var(--mrc-verde-600);font-weight:600">
             {landing.navManual}
           </a>
         </nav>
@@ -79,8 +79,8 @@ const rampas = { verde: Object.values(verde), tan: Object.values(tan), rosa: Obj
               ))}
             </ul>
           </div>
-          <div class="flex items-end justify-center gap-6 sm:gap-10" data-revelar class:list="retardo-1">
-            <figure class="w-2/5 max-w-44">
+          <div class="flex items-center justify-center gap-6 sm:gap-10" data-revelar class:list="retardo-1">
+            <figure class="w-2/5 max-w-52">
               <img src="/referencias/packaging-foto.jpg" alt={landing.mono.fotoAlt} class="foto-empaque" loading="lazy" />
               <figcaption class="b-menor b-sec mt-3 text-center">{landing.mono.fotoEtiqueta}</figcaption>
             </figure>

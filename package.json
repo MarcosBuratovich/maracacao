@@ -13,7 +13,8 @@
     "test": "vitest run",
     "typecheck": "astro check",
     "tokens": "tsx scripts/emit-tokens.ts",
-    "rig-spec": "tsx scripts/emit-rig-spec.ts"
+    "rig-spec": "tsx scripts/emit-rig-spec.ts",
+    "favicon": "tsx scripts/emit-favicon.ts"
   },
   "dependencies": {
     "@astrojs/mdx": "^7.0.5",
