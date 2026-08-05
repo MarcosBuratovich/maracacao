@@ -2,6 +2,13 @@
 
 **Fecha:** 2026-08-04 · **Rama:** `identidad-maracacao` · **Estado:** lista para merge tras review final de rama completa.
 
+> **Actualización 2026-08-05:** sobre esta rama nació `presentacion-cliente`
+> (spec: `docs/superpowers/specs/2026-08-05-presentacion-cliente-design.md`):
+> la presentación de identidad para el cliente vive ahora en `/` y la portada
+> del manual se mudó a `/manual/`. La landing pública con Rive (proyecto 2)
+> sigue pendiente; la presentación ya define bandas, botones, tabletas de
+> sabor y el patrón de revelado por scroll que esa landing puede heredar.
+
 ## Qué se entrega
 
 - **Mascota vectorial completa y riggeada** (`src/assets/brand/mascota.svg`): 1024×1024, capas nombradas según el contrato de `jerarquia.ts`, pivotes anatómicos marcados, geometría oculta verificada por batería automatizada (`test/mascota-rig.test.ts`: ráster BFS + invariante analítica del casquete proximal).
