@@ -227,15 +227,6 @@
 }
 .tsabor-franja { position: absolute; top: 0.55rem; left: 0; right: 0; height: 0.32rem; }
 .tsabor-nombre { margin-top: 1rem; font-weight: 600; max-width: 13rem; }
-.tsabor-precio { margin-top: 0.5rem; }
-.chip-precio {
-  background: var(--mrc-amarillo);
-  color: var(--mrc-tinta);
-  border-radius: 999px;
-  padding: 0.25rem 0.75rem;
-  font-size: var(--mrc-text-menor);
-  font-weight: 600;
-}
 
 /* ——— Tarjetas de vista previa (banda profunda "El adelanto") ——— */
 

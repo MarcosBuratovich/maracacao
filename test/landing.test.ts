@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync, existsSync } from 'node:fs'
 import { experimental_AstroContainer as AstroContainer } from 'astro/container'
 import { cargarSvg, hexUsados } from './svg-utils'
-import { landing, precioMXN } from '@/copy/landing'
+import { landing } from '@/copy/landing'
 import { copy } from '@/copy/marca'
 import { todosLosColores } from '@/tokens/color'
 import Banda from '@/components/landing/Banda.astro'
@@ -52,10 +52,27 @@ describe('registro es-MX del copy visible (§10.6 del spec de identidad)', () =>
   })
 })
 
-describe('precios en pesos con locale es-MX (§10.6: Intl)', () => {
-  it('formatea sin centavos y con signo de pesos', () => {
-    expect(precioMXN(95)).toMatch(/^\$\s?95$/)
-    expect(precioMXN(110)).toMatch(/^\$\s?110$/)
+// Retro de Marcos (2026-08-05), fijada como guard para que no se destape:
+// el personaje no se llama "mono" en el copy visible de la presentación
+// (\b evita el falso positivo de "Monocromo"), y el sitio que viene es una
+// landing informativa — sin carrito ni precios.
+describe('retro 2026-08-05 — sin "mono", sin ecommerce, sin datos inventados', () => {
+  const textos = stringsVisibles(landing)
+
+  it('el copy de la presentación nunca dice "mono"', () => {
+    for (const t of textos) expect(t).not.toMatch(/\bmonos?\b/i)
+  })
+
+  it('sin carrito ni precios', () => {
+    for (const t of textos) {
+      expect(t.toLowerCase()).not.toContain('carrito')
+      expect(t).not.toMatch(/\$\s?\d/)
+    }
+  })
+
+  it('un solo sabor: el del empaque original', () => {
+    expect(landing.adelanto.sabores.items).toHaveLength(1)
+    expect(landing.adelanto.sabores.items[0].nombre).toBe('Chocolate blanco y pistaches')
   })
 })
 
@@ -89,10 +106,10 @@ describe('la presentación en /', () => {
     for (const { nombre } of landing.firmas.variantes) expect(html).toContain(nombre)
   })
 
-  it('las vistas previas van marcadas como tales', async () => {
+  it('las dos vistas previas (Sabores y Origen) van marcadas como tales', async () => {
     const html = await container.renderToString(Portada)
     const chips = html.match(new RegExp(landing.adelanto.chip, 'g')) ?? []
-    expect(chips.length).toBeGreaterThanOrEqual(3)
+    expect(chips.length).toBe(2)
   })
 
   it('enlaza al manual vía ruta() y no usa la isla de Rive', async () => {
@@ -176,16 +193,16 @@ describe('favicon — el sello circular del §8, generado', () => {
 describe('TabletaSabor (chocolate con logo)', () => {
   it.each(['blanco', 'leche', 'oscuro'] as const)('el tono %s arma la tableta completa', async (tono) => {
     const html = await container.renderToString(TabletaSabor, {
-      props: { nombre: 'Sabor de prueba', tono, precio: 95 },
+      props: { nombre: 'Sabor de prueba', tono },
     })
     expect(html.match(/class="tsabor-cuadro"/g)).toHaveLength(8)
     expect(html).toContain('<svg') // el logotipo inline sobre la envoltura
-    expect(html).toMatch(/\$\s?95/)
+    expect(html).toContain('Sabor de prueba')
   })
 
   it('la envoltura y el chocolate usan colores del sistema', async () => {
     const html = await container.renderToString(TabletaSabor, {
-      props: { nombre: 'Sabor de prueba', tono: 'oscuro', precio: 110 },
+      props: { nombre: 'Sabor de prueba', tono: 'oscuro' },
     })
     const permitidos = todosLosColores()
     const usados = [...html.matchAll(/background:(#[0-9A-Fa-f]{6})/g)].map((m) => m[1])

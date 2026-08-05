@@ -68,11 +68,11 @@ const rampas = { verde: Object.values(verde), tan: Object.values(tan), rosa: Obj
       <Banda fondo="papel" id="identidad">
         <div class="grid items-center gap-12 md:grid-cols-2">
           <div data-revelar>
-            <span class="b-overline">{landing.mono.overline}</span>
-            <h2 class="b-titulo mt-3">{landing.mono.titulo}</h2>
-            <p class="mt-5 leading-relaxed">{landing.mono.prosa}</p>
+            <span class="b-overline">{landing.personaje.overline}</span>
+            <h2 class="b-titulo mt-3">{landing.personaje.titulo}</h2>
+            <p class="mt-5 leading-relaxed">{landing.personaje.prosa}</p>
             <ul class="mt-6 flex flex-wrap gap-2">
-              {landing.mono.rasgos.map((r) => (
+              {landing.personaje.rasgos.map((r) => (
                 <li class="b-menor rounded-full border-2 px-3 py-1 font-semibold" style="border-color:var(--mrc-verde-200);color:var(--mrc-verde-600)">
                   {r}
                 </li>
@@ -81,13 +81,13 @@ const rampas = { verde: Object.values(verde), tan: Object.values(tan), rosa: Obj
           </div>
           <div class="flex items-center justify-center gap-6 sm:gap-10" data-revelar class:list="retardo-1">
             <figure class="w-2/5 max-w-52">
-              <img src="/referencias/packaging-foto.jpg" alt={landing.mono.fotoAlt} class="foto-empaque" loading="lazy" />
-              <figcaption class="b-menor b-sec mt-3 text-center">{landing.mono.fotoEtiqueta}</figcaption>
+              <img src="/referencias/packaging-foto.jpg" alt={landing.personaje.fotoAlt} class="foto-empaque" loading="lazy" />
+              <figcaption class="b-menor b-sec mt-3 text-center">{landing.personaje.fotoEtiqueta}</figcaption>
             </figure>
             <figure class="saluda w-1/2">
               <Mascota class="h-48 sm:h-64" />
               <figcaption class="b-menor b-sec mt-3 text-center">
-                {landing.mono.vectorEtiqueta} · {landing.mono.hintSaluda}
+                {landing.personaje.vectorEtiqueta} · {landing.personaje.hintSaluda}
               </figcaption>
             </figure>
           </div>
@@ -198,7 +198,7 @@ const rampas = { verde: Object.values(verde), tan: Object.values(tan), rosa: Obj
           <figure class="saluda flex flex-col items-center" data-revelar class:list="retardo-1">
             <Mascota class="h-56 sm:h-64" />
             <figcaption class="b-menor b-sec mt-4 text-center">
-              {landing.movimiento.demoHint} {landing.mono.hintSaluda}
+              {landing.movimiento.demoHint} {landing.personaje.hintSaluda}
             </figcaption>
           </figure>
         </div>
@@ -213,36 +213,26 @@ const rampas = { verde: Object.values(verde), tan: Object.values(tan), rosa: Obj
           <p class="mt-4 leading-relaxed">{landing.adelanto.prosa}</p>
         </div>
 
-        <div class="mt-10 grid gap-6">
+        <div class="mt-10 grid gap-6 md:grid-cols-2">
           <article class="tarjeta-preview" data-fondo="papel" data-revelar>
             <span class="chip">{landing.adelanto.chip} · {copy.navSabores}</span>
-            <h3 class="b-titulo mt-5" style="font-size:var(--mrc-text-display-l)">{landing.adelanto.sabores.titulo}</h3>
-            <div class="mt-8 grid gap-10 sm:grid-cols-3">
+            <h3 class="b-subtitulo mt-5">{landing.adelanto.sabores.titulo}</h3>
+            <p class="mt-3 leading-relaxed">{landing.adelanto.sabores.texto}</p>
+            <div class="mt-8 flex justify-center">
               {landing.adelanto.sabores.items.map((s) => (
-                <TabletaSabor nombre={s.nombre} tono={s.tono} precio={s.precio} />
+                <TabletaSabor nombre={s.nombre} tono={s.tono} />
               ))}
             </div>
           </article>
 
-          <div class="grid gap-6 md:grid-cols-2">
-            <article class="tarjeta-preview" data-fondo="verde" data-revelar>
-              <span class="chip">{landing.adelanto.chip} · {copy.navOrigen}</span>
-              <h3 class="b-subtitulo mt-5">{landing.adelanto.origen.titulo}</h3>
-              <p class="mt-3 leading-relaxed">{landing.adelanto.origen.prosa}</p>
-              <div class="mt-6 flex justify-end">
-                <Mascota class="h-32" />
-              </div>
-            </article>
-            <article class="tarjeta-preview" data-fondo="crema" data-revelar class:list="retardo-1">
-              <span class="chip">{landing.adelanto.chip} · {copy.navTienda}</span>
-              <h3 class="b-subtitulo mt-5">{landing.adelanto.tienda.titulo}</h3>
-              <p class="mt-3 leading-relaxed">{landing.adelanto.tienda.prosa}</p>
-              <div class="mt-6 flex flex-wrap gap-3" aria-hidden="true">
-                <span class="boton boton-amarillo">{landing.adelanto.tienda.botonPrimario}</span>
-                <span class="boton boton-bordo">{landing.adelanto.tienda.botonSecundario}</span>
-              </div>
-            </article>
-          </div>
+          <article class="tarjeta-preview" data-fondo="verde" data-revelar class:list="retardo-1">
+            <span class="chip">{landing.adelanto.chip} · {copy.navOrigen}</span>
+            <h3 class="b-subtitulo mt-5">{landing.adelanto.origen.titulo}</h3>
+            <p class="mt-3 leading-relaxed">{landing.adelanto.origen.prosa}</p>
+            <div class="mt-6 flex justify-end">
+              <Mascota class="h-36" />
+            </div>
+          </article>
         </div>
       </Banda>
 
