@@ -85,7 +85,7 @@ describe('la presentación en /', () => {
     expect(html).toMatch(/class="mascota entra"/)
   })
 
-  it('el ritmo de bandas es el del spec (§2): papel/verde alternado, profundo solo en el umbral y el footer', async () => {
+  it('el ritmo de bandas es el del spec (§2): papel/verde alternado, profundo en el umbral y el footer, crema para la inversión', async () => {
     const html = await container.renderToString(Portada)
     const fondos = [...html.matchAll(/<section class="banda[^"]*" data-fondo="(\w+)"/g)].map((m) => m[1])
     expect(fondos).toEqual([
@@ -96,9 +96,16 @@ describe('la presentación en /', () => {
       'verde', // las voces
       'papel', // el movimiento
       'profundo', // el adelanto
+      'crema', // la inversión
       'papel', // el cierre
       'profundo', // footer
     ])
+  })
+
+  it('la inversión muestra la cotización: 500 USD y el dominio aparte', async () => {
+    const html = await container.renderToString(Portada)
+    expect(html).toContain('500 USD')
+    for (const { concepto } of landing.inversion.lineas) expect(html).toContain(concepto)
   })
 
   it('muestra las siete variantes con su nombre', async () => {

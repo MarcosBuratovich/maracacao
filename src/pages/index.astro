@@ -236,7 +236,31 @@ const rampas = { verde: Object.values(verde), tan: Object.values(tan), rosa: Obj
         </div>
       </Banda>
 
-      {/* 8 — El cierre: todo esto ya existe. */}
+      {/* 8 — La inversión: la cotización de Marcos, en banda crema para
+          que el momento del dinero se distinga del recorrido sin romper
+          la alternancia papel/verde. */}
+      <Banda fondo="crema" angosta>
+        <div data-revelar>
+          <span class="b-overline">{landing.inversion.overline}</span>
+          <h2 class="b-titulo mt-3">{landing.inversion.titulo}</h2>
+          <p class="mt-5 leading-relaxed">{landing.inversion.prosa}</p>
+        </div>
+        <dl class="inv-tabla mt-10" data-revelar class:list="retardo-1">
+          {landing.inversion.lineas.map((l) => (
+            <div class="inv-linea">
+              <div>
+                <dt class="inv-concepto">{l.concepto}</dt>
+                <dd class="inv-detalle">{l.detalle}</dd>
+              </div>
+              <dd class="inv-monto">{l.monto}</dd>
+            </div>
+          ))}
+        </dl>
+        <p class="inv-remate mt-8" data-revelar class:list="retardo-2">{landing.inversion.remate}</p>
+        <p class="b-menor b-sec mt-2" data-revelar class:list="retardo-2">{landing.inversion.nota}</p>
+      </Banda>
+
+      {/* 9 — El cierre: todo esto ya existe. */}
       <Banda fondo="papel">
         <div class="mx-auto max-w-2xl text-center" data-revelar>
           <span class="b-overline">{landing.cierre.overline}</span>

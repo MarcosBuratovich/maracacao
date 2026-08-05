@@ -111,6 +111,37 @@ export const landing = {
     },
   },
 
+  // Cotización de Marcos (2026-08-05): su pago es 500 USD, el dominio va
+  // aparte y se renueva. El hosting es real que sale gratis: el sitio es
+  // estático (astro build) y entra en el plan sin costo de cualquier
+  // hosting estático. El rango del dominio es precio de mercado, marcado
+  // como estimado — no un dato inventado del negocio.
+  inversion: {
+    overline: 'La inversión',
+    titulo: 'Números claros, sin letras chicas',
+    prosa:
+      'El sitio es estático: se publica sin pagar servidor. Lo único que se renueva cada año es el dominio.',
+    lineas: [
+      {
+        concepto: 'Diseño y desarrollo',
+        detalle: 'Identidad completa, manual de marca y esta presentación — pago único',
+        monto: '500 USD',
+      },
+      {
+        concepto: 'Dominio',
+        detalle: 'Se contrata directo con el registrador y se renueva cada año (estimado)',
+        monto: '10 a 30 USD al año',
+      },
+      {
+        concepto: 'Publicación y hosting',
+        detalle: 'La página es estática: entra en el plan sin costo del hosting',
+        monto: 'Incluido',
+      },
+    ],
+    remate: 'Para arrancar: 500 USD y el dominio del primer año.',
+    nota: 'Montos en dólares estadounidenses (USD).',
+  },
+
   cierre: {
     overline: 'Ya está construido',
     titulo: 'Todo esto ya existe',
