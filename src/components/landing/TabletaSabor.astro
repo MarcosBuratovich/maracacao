@@ -1,0 +1,40 @@
+---
+// Visual de producto para la vista previa "Sabores": una tableta asomando
+// de su envoltura verde con el logotipo crema (par AAA sobre verde-700) y
+// franja de color por sabor. Colores importados de los tokens; el tono del
+// chocolate y su ranura vienen del mapa de abajo, nunca de un hex a mano.
+import Logotipo from '@/components/brand/Logotipo.astro'
+import { verde, tan, fijos } from '@/tokens/color'
+import { precioMXN } from '@/copy/landing'
+
+interface Props {
+  nombre: string
+  tono: 'blanco' | 'leche' | 'oscuro'
+  precio: number
+}
+const { nombre, tono, precio } = Astro.props
+
+// ranura = el fondo que asoma entre cuadritos (la sombra del molde);
+// cuadro = el chocolate; franja = la banda de sabor en la envoltura.
+const tonos = {
+  blanco: { ranura: tan[300], cuadro: fijos.crema },
+  leche: { ranura: tan[800], cuadro: fijos.bordo },
+  oscuro: { ranura: verde[900], cuadro: fijos.tinta },
+} as const
+const t = tonos[tono]
+---
+<div class="tsabor">
+  <div class="tsabor-visual" aria-hidden="true">
+    <div class="tsabor-barra" style={`background:${t.ranura}`}>
+      {Array.from({ length: 8 }).map(() => (
+        <span class="tsabor-cuadro" style={`background:${t.cuadro}`} />
+      ))}
+    </div>
+    <div class="tsabor-envoltura" style={`background:${verde[700]}`}>
+      <span class="tsabor-franja" style={`background:${t.cuadro}`}></span>
+      <Logotipo alto={20} />
+    </div>
+  </div>
+  <p class="tsabor-nombre">{nombre}</p>
+  <p class="tsabor-precio"><span class="chip-precio">{precioMXN(precio)}</span></p>
+</div>

@@ -1,0 +1,20 @@
+---
+// Banda de la presentación (§2 del spec 2026-08-05). El ritmo papel/verde
+// alternado viene de §6.4 del spec de identidad; acá cada banda expone sus
+// colores como custom properties de alcance local (--b-*) para que el
+// contenido use siempre pares aprobados sin repetir estilos inline.
+// El mapa fondo → pares vive en landing.css.
+interface Props {
+  fondo?: 'papel' | 'verde' | 'profundo' | 'crema'
+  id?: string
+  class?: string
+  /** Ancho del contenido. La presentación usa el mismo max-w-5xl del manual. */
+  angosta?: boolean
+}
+const { fondo = 'papel', id, class: clase = '', angosta = false } = Astro.props
+---
+<section class={`banda ${clase}`} data-fondo={fondo} id={id}>
+  <div class={`mx-auto ${angosta ? 'max-w-3xl' : 'max-w-5xl'} px-6 py-16 md:py-24`}>
+    <slot />
+  </div>
+</section>

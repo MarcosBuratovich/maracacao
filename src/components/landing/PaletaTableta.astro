@@ -1,0 +1,35 @@
+---
+// El elemento firma de la presentación (§2 del spec 2026-08-05): la paleta
+// acomodada como tableta de chocolate, con un cuadrito mordido. Codifica
+// dos verdades de la marca: la paleta sale de un empaque de chocolate, y
+// el personaje es goloso.
+//
+// Los colores se IMPORTAN de los tokens — nunca hex a mano (guard B2, que
+// ahora también escanea src/components/landing). La base tinta de la
+// tableta hace de "ranura" entre cuadritos y es lo que se ve dentro de la
+// mordida: el chocolate por debajo del color.
+import { verde, tan, rosa, fijos } from '@/tokens/color'
+import { landing } from '@/copy/landing'
+
+// 6×3, curada: la fila de verdes (la voz principal), la fila cálida del
+// cacao y la fila del rosa con los claros. El mordido es el verde-300 de
+// la esquina superior derecha — claro, para que la mordida y las migajas
+// se lean sobre el papel de la banda.
+const filas = [
+  [verde[800], verde[700], verde[600], verde[500], verde[400], verde[300]],
+  [fijos.tinta, fijos.bordo, tan[800], tan[600], fijos.suelo, fijos.amarillo],
+  [rosa[700], rosa[500], rosa[300], rosa[100], fijos.crema, fijos.papel],
+] as const
+const cuadritos = filas.flat()
+const MORDIDO = 5 // índice del verde-300, esquina superior derecha
+---
+<figure class="tableta" data-revelar>
+  <div class="tableta-cuerpo" role="img" aria-label={landing.paleta.tabletaAria}>
+    {cuadritos.map((color, i) => (
+      <span class={i === MORDIDO ? 'cuadrito mordido' : 'cuadrito'} style={`background:${color}`} />
+    ))}
+    <span class="migaja migaja-1" style={`background:${verde[300]}`} aria-hidden="true" />
+    <span class="migaja migaja-2" style={`background:${verde[300]}`} aria-hidden="true" />
+  </div>
+  <figcaption class="tableta-caption">{landing.paleta.tabletaCaption}</figcaption>
+</figure>

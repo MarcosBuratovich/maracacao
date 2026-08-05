@@ -1,0 +1,22 @@
+---
+// Tile de una variante de logo para la banda "Siete formas de firmar".
+// Cada pieza se muestra SOLO sobre su banda aprobada (ver los comentarios
+// de LockupHeader.astro y Logotipo.astro): `clara` = papel para el lockup
+// de header y los fills literales; `oscura` = verde-800 para el lettering
+// crema. El caption queda afuera del área de exhibición, sobre la banda
+// verde-700 que envuelve la grilla.
+interface Props {
+  nombre: string
+  uso: string
+  banda: 'clara' | 'oscura'
+  class?: string
+}
+const { nombre, uso, banda, class: clase = '' } = Astro.props
+---
+<div class={`tile ${clase}`}>
+  <div class="tile-area" data-banda={banda}>
+    <slot />
+  </div>
+  <p class="tile-nombre">{nombre}</p>
+  <p class="tile-uso">{uso}</p>
+</div>

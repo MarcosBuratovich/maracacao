@@ -1,57 +1,300 @@
 ---
-// src/pages/index.astro
-//
-// Reescrita entera por la Task 17 contra la capa de copy de la Task 15,
-// tal como quedó agendado en el comentario de la Task 1: el <h1>
-// hardcodeado de aquella versión pasa a `copy.manualTitulo` acá abajo.
-import { getCollection } from 'astro:content'
+// src/pages/index.astro — Presentación de identidad al cliente.
+// Spec: docs/superpowers/specs/2026-08-05-presentacion-cliente-design.md
+// La portada del manual que vivía acá se mudó a src/pages/manual/index.astro.
 import Base from '@/layouts/Base.astro'
 import LockupHeader from '@/components/brand/LockupHeader.astro'
 import Mascota from '@/components/brand/Mascota.astro'
+import SelloCompleto from '@/components/brand/SelloCompleto.astro'
+import SelloReducido from '@/components/brand/SelloReducido.astro'
+import Logotipo from '@/components/brand/Logotipo.astro'
+import IsotipoSuelto from '@/components/brand/IsotipoSuelto.astro'
+import SelloCircular from '@/components/brand/SelloCircular.astro'
+import Monocromo from '@/components/brand/Monocromo.astro'
+import Banda from '@/components/landing/Banda.astro'
+import VarianteTile from '@/components/landing/VarianteTile.astro'
+import PaletaTableta from '@/components/landing/PaletaTableta.astro'
+import TabletaSabor from '@/components/landing/TabletaSabor.astro'
 import { ruta } from '@/lib/rutas'
 import { copy } from '@/copy/marca'
+import { landing } from '@/copy/landing'
+import { verde, tan, rosa, fijos } from '@/tokens/color'
 import '@/styles/global.css'
+import '@/styles/landing.css'
 
-const indice = (await getCollection('manual')).sort((a, b) => a.data.orden - b.data.orden)
+const v = landing.firmas.variantes
+const rampas = { verde: Object.values(verde), tan: Object.values(tan), rosa: Object.values(rosa) }
 ---
-<Base titulo={copy.tituloPortada}>
-  <div style="background:var(--mrc-papel);color:var(--mrc-tinta);font-family:var(--mrc-font-texto)" class="min-h-screen">
-    {/*
-      LockupHeader (Task 15) ya resuelve su propio contraste — el
-      lettering de logotipo.svg/descriptor.svg pisa su fill crema por
-      currentColor + `--mrc-rol-texto-titulo` (fix de integración, Task
-      17, ver el comentario en LockupHeader.astro). Vive directo sobre el
-      papel de la página, sin banda propia.
-    */}
-    <header>
-      <div class="mx-auto max-w-5xl px-6 py-6">
+<Base titulo={landing.titulo}>
+  {/* La clase `js` se agrega inline y ANTES del primer paint: el estado
+      oculto del revelado por scroll solo existe bajo html.js (landing.css),
+      así que sin JS la página queda entera y visible. */}
+  <script is:inline>document.documentElement.classList.add('js')</script>
+
+  <a href="#contenido" class="salto">{landing.skipLink}</a>
+
+  <div style="background:var(--mrc-papel)">
+    <header data-fondo="papel" style="background:var(--b-fondo)">
+      <div class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-6 py-6">
         <LockupHeader />
+        <nav>
+          <a href={ruta('manual')} class="b-menor" style="color:var(--mrc-verde-600);font-weight:600">
+            {landing.navManual}
+          </a>
+        </nav>
       </div>
     </header>
-    <main class="mx-auto max-w-5xl px-6 pb-16">
-      <section class="flex flex-col items-center gap-6 py-10 text-center md:flex-row md:text-left">
-        <div class="flex-1">
-          <h1 class="display" style="font-size:var(--mrc-text-display-xl)">{copy.manualTitulo}</h1>
-          <p class="mt-4 max-w-prose" style={`font-size:var(--mrc-text-subtitulo);color:var(--mrc-verde-700)`}>
-            {copy.manualIntro}
-          </p>
-        </div>
-        <Mascota class="h-48 shrink-0 md:h-56" />
-      </section>
 
-      <ul class="mt-8 grid gap-4 sm:grid-cols-2">
-        {indice.map((p) => (
-          <li>
-            <a href={ruta(`manual/${p.id}`)} class="block h-full rounded-lg p-5" style="background:var(--mrc-crema)">
-              <span class="text-xs tabular-nums" style="color:var(--mrc-verde-600)">0{p.data.orden}</span>
-              <h2 class="display mt-1" style="font-size:var(--mrc-text-titulo);color:var(--mrc-verde-700)">
-                {p.data.titulo}
-              </h2>
-              <p class="mt-1 text-sm" style="color:var(--mrc-tinta)">{p.data.resumen}</p>
-            </a>
-          </li>
-        ))}
-      </ul>
+    <main id="contenido">
+      {/* 1 — Hero: la página abre como abre el empaque. */}
+      <Banda fondo="verde">
+        <div class="flex flex-col items-center gap-10 text-center">
+          <div class="mascota entra">
+            <SelloCompleto ancho={330} />
+          </div>
+          <div class="max-w-2xl">
+            <span class="b-overline entra entra-2">{landing.hero.overline}</span>
+            <h1 class="b-titulo mt-3 entra entra-2">{landing.hero.titulo}</h1>
+            <p class="b-prosa mx-auto mt-5 entra entra-3">{landing.hero.sub}</p>
+            <div class="mt-8 flex flex-wrap items-center justify-center gap-4 entra entra-4">
+              <a href="#identidad" class="boton boton-amarillo">{landing.hero.ctaRecorrido}</a>
+              <a href={ruta('manual')} class="boton boton-fantasma">{landing.hero.ctaManual}</a>
+            </div>
+          </div>
+        </div>
+      </Banda>
+
+      {/* 2 — El personaje: del empaque al vector. */}
+      <Banda fondo="papel" id="identidad">
+        <div class="grid items-center gap-12 md:grid-cols-2">
+          <div data-revelar>
+            <span class="b-overline">{landing.mono.overline}</span>
+            <h2 class="b-titulo mt-3">{landing.mono.titulo}</h2>
+            <p class="mt-5 leading-relaxed">{landing.mono.prosa}</p>
+            <ul class="mt-6 flex flex-wrap gap-2">
+              {landing.mono.rasgos.map((r) => (
+                <li class="b-menor rounded-full border-2 px-3 py-1 font-semibold" style="border-color:var(--mrc-verde-200);color:var(--mrc-verde-600)">
+                  {r}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div class="flex items-end justify-center gap-6 sm:gap-10" data-revelar class:list="retardo-1">
+            <figure class="w-2/5 max-w-44">
+              <img src="/referencias/packaging-foto.jpg" alt={landing.mono.fotoAlt} class="foto-empaque" loading="lazy" />
+              <figcaption class="b-menor b-sec mt-3 text-center">{landing.mono.fotoEtiqueta}</figcaption>
+            </figure>
+            <figure class="saluda w-1/2">
+              <Mascota class="h-48 sm:h-64" />
+              <figcaption class="b-menor b-sec mt-3 text-center">
+                {landing.mono.vectorEtiqueta} · {landing.mono.hintSaluda}
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+      </Banda>
+
+      {/* 3 — Las firmas: cada variante sobre su banda aprobada. */}
+      <Banda fondo="verde">
+        <div class="max-w-2xl" data-revelar>
+          <span class="b-overline">{landing.firmas.overline}</span>
+          <h2 class="b-titulo mt-3">{landing.firmas.titulo}</h2>
+          <p class="mt-4 leading-relaxed">{landing.firmas.intro}</p>
+        </div>
+        <div class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3" data-revelar class:list="retardo-1">
+          <VarianteTile nombre={v[0].nombre} uso={v[0].uso} banda="oscura" class="lg:row-span-2">
+            <SelloCompleto ancho={190} />
+          </VarianteTile>
+          <VarianteTile nombre={v[1].nombre} uso={v[1].uso} banda="oscura">
+            <SelloReducido ancho={170} />
+          </VarianteTile>
+          <VarianteTile nombre={v[2].nombre} uso={v[2].uso} banda="oscura">
+            <Logotipo alto={30} />
+          </VarianteTile>
+          <VarianteTile nombre={v[3].nombre} uso={v[3].uso} banda="clara">
+            <IsotipoSuelto alto={110} />
+          </VarianteTile>
+          <VarianteTile nombre={v[4].nombre} uso={v[4].uso} banda="clara">
+            <SelloCircular diametro={96} />
+          </VarianteTile>
+          <VarianteTile nombre={v[5].nombre} uso={v[5].uso} banda="clara">
+            <Monocromo alto={100} />
+          </VarianteTile>
+          <VarianteTile nombre={v[6].nombre} uso={v[6].uso} banda="clara" class="sm:col-span-2">
+            <LockupHeader alto={44} />
+          </VarianteTile>
+        </div>
+      </Banda>
+
+      {/* 4 — La paleta, con el elemento firma. */}
+      <Banda fondo="papel">
+        <div class="grid items-center gap-12 md:grid-cols-2">
+          <div data-revelar>
+            <span class="b-overline">{landing.paleta.overline}</span>
+            <h2 class="b-titulo mt-3">{landing.paleta.titulo}</h2>
+            <p class="mt-5 leading-relaxed">{landing.paleta.prosa}</p>
+          </div>
+          <PaletaTableta />
+        </div>
+        <div class="mt-14 grid gap-8 md:grid-cols-3" data-revelar>
+          {landing.paleta.rampas.map((r) => (
+            <div>
+              <div class="rampa-tira">
+                {rampas[r.clave].map((color) => <span style={`background:${color}`} />)}
+              </div>
+              <p class="rampa-etiqueta">{r.etiqueta}</p>
+            </div>
+          ))}
+        </div>
+        <div class="mt-8" data-revelar>
+          <div class="flex flex-wrap gap-3">
+            {Object.values(fijos).map((color) => <span class="fijo-punto" style={`background:${color}`} />)}
+          </div>
+          <p class="rampa-etiqueta">{landing.paleta.fijosEtiqueta}</p>
+        </div>
+      </Banda>
+
+      {/* 5 — Las voces tipográficas. */}
+      <Banda fondo="verde">
+        <div class="text-center" data-revelar>
+          <span class="b-overline">{landing.voces.overline}</span>
+          <h2 class="b-titulo mt-3">{landing.voces.titulo}</h2>
+        </div>
+        <p class="wonkea mx-auto mt-12 max-w-3xl text-center" data-revelar
+          style={`font-family:var(--mrc-font-display);font-size:clamp(var(--mrc-text-display-l), 5vw + 0.5rem, var(--mrc-text-display-xl));line-height:1.1;color:var(--mrc-crema)`}>
+          {copy.tipoMuestraDisplay}
+        </p>
+        <div class="mx-auto mt-12 grid max-w-3xl gap-6 sm:grid-cols-2" data-revelar class:list="retardo-1">
+          <div class="rounded-xl p-6" style="background:var(--mrc-verde-800)">
+            <p class="b-subtitulo">{landing.voces.frauncesNombre}</p>
+            <p class="mt-2 b-menor leading-relaxed">{landing.voces.frauncesRol}</p>
+          </div>
+          <div class="rounded-xl p-6" style="background:var(--mrc-verde-800)">
+            <p class="text-xl font-semibold" style="color:var(--mrc-crema)">{landing.voces.workSansNombre}</p>
+            <p class="mt-2 b-menor leading-relaxed">{landing.voces.workSansRol}</p>
+            <p class="mt-4 leading-relaxed">{copy.tipoMuestraTexto}</p>
+          </div>
+        </div>
+        <p class="b-menor mx-auto mt-8 max-w-3xl text-center" style="color:var(--mrc-crema)" data-revelar>
+          {landing.voces.nota}
+        </p>
+      </Banda>
+
+      {/* 6 — El movimiento, demostrado en vivo. */}
+      <Banda fondo="papel">
+        <div class="grid items-center gap-12 md:grid-cols-2">
+          <div data-revelar>
+            <span class="b-overline">{landing.movimiento.overline}</span>
+            <h2 class="b-titulo mt-3">{landing.movimiento.titulo}</h2>
+            <p class="mt-5 leading-relaxed">{landing.movimiento.prosa}</p>
+            <ul class="mt-6 flex flex-wrap gap-2">
+              {landing.movimiento.principios.map((p) => (
+                <li class="b-menor rounded-full border-2 px-3 py-1 font-semibold" style="border-color:var(--mrc-verde-200);color:var(--mrc-verde-600)">
+                  {p}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <figure class="saluda flex flex-col items-center" data-revelar class:list="retardo-1">
+            <Mascota class="h-56 sm:h-64" />
+            <figcaption class="b-menor b-sec mt-4 text-center">
+              {landing.movimiento.demoHint} {landing.mono.hintSaluda}
+            </figcaption>
+          </figure>
+        </div>
+      </Banda>
+
+      {/* 7 — El umbral: así se va a sentir el sitio. Tarjetas, no bandas:
+          la estructura distingue presentación de adelanto. */}
+      <Banda fondo="profundo">
+        <div class="max-w-2xl" data-revelar>
+          <span class="b-overline">{landing.adelanto.overline}</span>
+          <h2 class="b-titulo mt-3">{landing.adelanto.titulo}</h2>
+          <p class="mt-4 leading-relaxed">{landing.adelanto.prosa}</p>
+        </div>
+
+        <div class="mt-10 grid gap-6">
+          <article class="tarjeta-preview" data-fondo="papel" data-revelar>
+            <span class="chip">{landing.adelanto.chip} · {copy.navSabores}</span>
+            <h3 class="b-titulo mt-5" style="font-size:var(--mrc-text-display-l)">{landing.adelanto.sabores.titulo}</h3>
+            <div class="mt-8 grid gap-10 sm:grid-cols-3">
+              {landing.adelanto.sabores.items.map((s) => (
+                <TabletaSabor nombre={s.nombre} tono={s.tono} precio={s.precio} />
+              ))}
+            </div>
+          </article>
+
+          <div class="grid gap-6 md:grid-cols-2">
+            <article class="tarjeta-preview" data-fondo="verde" data-revelar>
+              <span class="chip">{landing.adelanto.chip} · {copy.navOrigen}</span>
+              <h3 class="b-subtitulo mt-5">{landing.adelanto.origen.titulo}</h3>
+              <p class="mt-3 leading-relaxed">{landing.adelanto.origen.prosa}</p>
+              <div class="mt-6 flex justify-end">
+                <Mascota class="h-32" />
+              </div>
+            </article>
+            <article class="tarjeta-preview" data-fondo="crema" data-revelar class:list="retardo-1">
+              <span class="chip">{landing.adelanto.chip} · {copy.navTienda}</span>
+              <h3 class="b-subtitulo mt-5">{landing.adelanto.tienda.titulo}</h3>
+              <p class="mt-3 leading-relaxed">{landing.adelanto.tienda.prosa}</p>
+              <div class="mt-6 flex flex-wrap gap-3" aria-hidden="true">
+                <span class="boton boton-amarillo">{landing.adelanto.tienda.botonPrimario}</span>
+                <span class="boton boton-bordo">{landing.adelanto.tienda.botonSecundario}</span>
+              </div>
+            </article>
+          </div>
+        </div>
+      </Banda>
+
+      {/* 8 — El cierre: todo esto ya existe. */}
+      <Banda fondo="papel">
+        <div class="mx-auto max-w-2xl text-center" data-revelar>
+          <span class="b-overline">{landing.cierre.overline}</span>
+          <h2 class="b-titulo mt-3">{landing.cierre.titulo}</h2>
+          <p class="mt-5 leading-relaxed">{landing.cierre.prosa}</p>
+        </div>
+        <dl class="mx-auto mt-12 grid max-w-3xl grid-cols-2 gap-8 text-center md:grid-cols-4" data-revelar class:list="retardo-1">
+          {landing.cierre.numeros.map((n) => (
+            <div>
+              <dt class="sr-only">{n.concepto}</dt>
+              <dd class="num-cifra">{n.cifra}</dd>
+              <dd class="num-concepto">{n.concepto}</dd>
+            </div>
+          ))}
+        </dl>
+        <div class="mt-12 text-center" data-revelar class:list="retardo-2">
+          <a href={ruta('manual')} class="boton boton-amarillo">{landing.cierre.ctaManual}</a>
+          <p class="b-menor b-sec mt-6">{landing.cierre.siguiente}</p>
+        </div>
+      </Banda>
     </main>
+
+    <footer>
+      <Banda fondo="profundo">
+        <div class="flex flex-col items-center gap-4 text-center">
+          <Logotipo alto={26} />
+          <p class="b-menor">{landing.footer.leyenda}</p>
+          <p class="b-menor" style="color:var(--mrc-crema)">{landing.footer.remate}</p>
+        </div>
+      </Banda>
+    </footer>
   </div>
 </Base>
+
+{/* Revelado por scroll. Por data-attribute y clases — nunca buscando por
+    id: los ids de los SVG inlineados están duplicados (deuda documentada
+    en el handoff) y este script no debe heredar esa ambigüedad. */}
+<script>
+  const observador = new IntersectionObserver(
+    (entradas) => {
+      for (const e of entradas) {
+        if (e.isIntersecting) {
+          e.target.classList.add('revelado')
+          observador.unobserve(e.target)
+        }
+      }
+    },
+    { threshold: 0.15, rootMargin: '0px 0px -40px 0px' },
+  )
+  for (const el of document.querySelectorAll('[data-revelar]')) observador.observe(el)
+</script>

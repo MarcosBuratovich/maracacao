@@ -1,0 +1,56 @@
+---
+// src/pages/manual/index.astro
+//
+// Portada del manual. Era src/pages/index.astro (Task 17) tal cual; se
+// mudó acá cuando la raíz pasó a ser la presentación de identidad
+// (spec 2026-08-05). No colisiona con [...slug].astro: ninguna entrada
+// de la colección tiene id vacío, y un index.astro estático gana sobre
+// la ruta rest para `/manual/`.
+import { getCollection } from 'astro:content'
+import Base from '@/layouts/Base.astro'
+import LockupHeader from '@/components/brand/LockupHeader.astro'
+import Mascota from '@/components/brand/Mascota.astro'
+import { ruta } from '@/lib/rutas'
+import { copy } from '@/copy/marca'
+import { landing } from '@/copy/landing'
+import '@/styles/global.css'
+
+const indice = (await getCollection('manual')).sort((a, b) => a.data.orden - b.data.orden)
+---
+<Base titulo={copy.tituloPortada}>
+  <div style="background:var(--mrc-papel);color:var(--mrc-tinta);font-family:var(--mrc-font-texto)" class="min-h-screen">
+    {/* LockupHeader resuelve su propio contraste sobre banda clara — ver
+        el comentario original en LockupHeader.astro (Task 17). */}
+    <header>
+      <div class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-6 py-6">
+        <LockupHeader />
+        <a href={ruta('')} class="text-sm" style="color:var(--mrc-verde-600)">{landing.manualIndice.volver}</a>
+      </div>
+    </header>
+    <main class="mx-auto max-w-5xl px-6 pb-16">
+      <section class="flex flex-col items-center gap-6 py-10 text-center md:flex-row md:text-left">
+        <div class="flex-1">
+          <h1 class="display" style="font-size:var(--mrc-text-display-xl)">{copy.manualTitulo}</h1>
+          <p class="mt-4 max-w-prose" style={`font-size:var(--mrc-text-subtitulo);color:var(--mrc-verde-700)`}>
+            {copy.manualIntro}
+          </p>
+        </div>
+        <Mascota class="h-48 shrink-0 md:h-56" />
+      </section>
+
+      <ul class="mt-8 grid gap-4 sm:grid-cols-2">
+        {indice.map((p) => (
+          <li>
+            <a href={ruta(`manual/${p.id}`)} class="block h-full rounded-lg p-5" style="background:var(--mrc-crema)">
+              <span class="text-xs tabular-nums" style="color:var(--mrc-verde-600)">0{p.data.orden}</span>
+              <h2 class="display mt-1" style="font-size:var(--mrc-text-titulo);color:var(--mrc-verde-700)">
+                {p.data.titulo}
+              </h2>
+              <p class="mt-1 text-sm" style="color:var(--mrc-tinta)">{p.data.resumen}</p>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </main>
+  </div>
+</Base>

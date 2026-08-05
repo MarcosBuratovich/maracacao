@@ -1,0 +1,334 @@
+/* Estilos de la presentación de identidad (src/pages/index.astro y
+   src/components/landing/*). Reglas de la casa:
+   — Ningún hex a mano: todo color es una custom property de
+     tokens.generated.css, y las sombras se derivan con color-mix.
+   — Ningún tiempo ni easing hardcodeado: siempre var(--mrc-dur-*) /
+     var(--mrc-ease-*).
+   — prefers-reduced-motion APAGA (la regla global de global.css ya mata
+     animation/transition; acá además se evita esconder contenido: el
+     estado inicial oculto del revelado solo existe bajo html.js + PRM off).
+
+   Cada banda (y cada tarjeta de vista previa) declara su fondo con
+   data-fondo y hereda un juego de --b-* que solo contiene pares aprobados
+   de contraste (§6.3 del spec de identidad):
+     papel/crema → texto tinta, títulos verde-700, acento bordó
+     verde/profundo → texto papel, títulos crema, acento crema        */
+
+[data-fondo='papel'] {
+  --b-fondo: var(--mrc-papel);
+  --b-texto: var(--mrc-tinta);
+  --b-titulo: var(--mrc-verde-700);
+  --b-sec: var(--mrc-verde-600);
+  --b-acento: var(--mrc-bordo);
+  --b-foco: var(--mrc-bordo);
+}
+[data-fondo='crema'] {
+  --b-fondo: var(--mrc-crema);
+  --b-texto: var(--mrc-tinta);
+  --b-titulo: var(--mrc-verde-700);
+  --b-sec: var(--mrc-verde-600);
+  --b-acento: var(--mrc-bordo);
+  --b-foco: var(--mrc-bordo);
+}
+[data-fondo='verde'] {
+  --b-fondo: var(--mrc-verde-700);
+  --b-texto: var(--mrc-papel);
+  --b-titulo: var(--mrc-crema);
+  --b-sec: var(--mrc-crema);
+  --b-acento: var(--mrc-crema);
+  --b-foco: var(--mrc-amarillo);
+}
+[data-fondo='profundo'] {
+  --b-fondo: var(--mrc-verde-800);
+  --b-texto: var(--mrc-papel);
+  --b-titulo: var(--mrc-crema);
+  --b-sec: var(--mrc-crema);
+  --b-acento: var(--mrc-crema);
+  --b-foco: var(--mrc-amarillo);
+}
+
+.banda {
+  background: var(--b-fondo);
+  color: var(--b-texto);
+  font-family: var(--mrc-font-texto);
+}
+
+/* ——— Tipografía de banda ——— */
+
+.b-overline {
+  display: block;
+  font-size: var(--mrc-text-etiqueta);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--b-acento);
+}
+
+.b-titulo {
+  font-family: var(--mrc-font-display);
+  font-variation-settings: 'SOFT' 60, 'WONK' 1;
+  font-weight: 600;
+  color: var(--b-titulo);
+  font-size: clamp(var(--mrc-text-display-l), 4vw + 1rem, var(--mrc-text-display-xl));
+  line-height: 1.08;
+  text-wrap: balance;
+}
+
+.b-subtitulo {
+  font-family: var(--mrc-font-display);
+  font-variation-settings: 'SOFT' 60, 'WONK' 1;
+  font-weight: 600;
+  color: var(--b-titulo);
+  font-size: var(--mrc-text-titulo);
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.b-prosa {
+  max-width: 42rem;
+  font-size: var(--mrc-text-subtitulo);
+  line-height: 1.55;
+}
+
+.b-sec { color: var(--b-sec); }
+.b-menor { font-size: var(--mrc-text-menor); }
+
+/* ——— Botones y chips (pares aprobados: tinta/amarillo AAA, papel/bordó AA) ——— */
+
+.boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0.8rem 1.6rem;
+  font-weight: 600;
+  font-size: var(--mrc-text-cuerpo);
+  text-decoration: none;
+}
+.boton-amarillo { background: var(--mrc-amarillo); color: var(--mrc-tinta); }
+.boton-bordo { background: var(--mrc-bordo); color: var(--mrc-papel); }
+.boton-fantasma { border: 2px solid currentColor; color: var(--b-texto); }
+
+.chip {
+  display: inline-block;
+  background: var(--mrc-amarillo);
+  color: var(--mrc-tinta);
+  border-radius: 999px;
+  padding: 0.3rem 0.8rem;
+  font-size: var(--mrc-text-etiqueta);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* ——— Foto del empaque original (§3 del spec: la foto es la autoridad) ——— */
+
+.foto-empaque {
+  border-radius: 0.75rem;
+  border: 6px solid var(--mrc-crema);
+  rotate: -2deg;
+  box-shadow: 0 16px 32px -16px color-mix(in srgb, var(--mrc-tinta) 45%, transparent);
+}
+
+/* ——— Grilla de variantes ——— */
+
+.tile-area {
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.5rem;
+  min-height: 9rem;
+  flex: 1;
+}
+.tile-area[data-banda='clara'] { background: var(--mrc-papel); }
+.tile-area[data-banda='oscura'] { background: var(--mrc-verde-800); }
+.tile { display: flex; flex-direction: column; height: 100%; }
+.tile-nombre { margin-top: 0.75rem; font-weight: 600; }
+.tile-uso { font-size: var(--mrc-text-menor); color: var(--b-sec); }
+
+/* ——— La tableta de la paleta (elemento firma) ——— */
+
+.tableta { display: flex; flex-direction: column; gap: 0.875rem; }
+.tableta-cuerpo {
+  position: relative;
+  background: var(--mrc-tinta);
+  border-radius: 1rem;
+  padding: 0.5rem;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.375rem;
+  box-shadow: 0 20px 40px -20px color-mix(in srgb, var(--mrc-tinta) 55%, transparent);
+}
+.cuadrito { aspect-ratio: 1; border-radius: 0.375rem; }
+/* La mordida: se come la esquina del cuadrito y deja ver la base tinta —
+   el chocolate por debajo del color. Las migajas quedan afuera, sobre la
+   banda de papel. */
+.cuadrito.mordido {
+  mask-image: radial-gradient(circle at 100% 0%, transparent 54%, #000 55%);
+}
+.migaja {
+  position: absolute;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 0.15rem;
+  top: -0.45rem;
+  right: -0.55rem;
+  rotate: 24deg;
+}
+.migaja-2 {
+  width: 0.34rem;
+  height: 0.34rem;
+  top: 0.55rem;
+  right: -0.8rem;
+  rotate: -18deg;
+}
+.tableta-caption { font-size: var(--mrc-text-menor); color: var(--b-sec); max-width: 26rem; }
+
+/* ——— Rampas y fijos (banda de color) ——— */
+
+.rampa-tira {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  height: 2.25rem;
+  /* Los pasos 50 casi se funden con el papel de la banda: el borde crema
+     cierra la tira sin inventar un color nuevo. */
+  border: 1px solid var(--mrc-crema);
+}
+.rampa-etiqueta { margin-top: 0.5rem; font-size: var(--mrc-text-menor); color: var(--b-sec); }
+.fijo-punto { width: 2.25rem; height: 2.25rem; border-radius: 999px; border: 2px solid var(--mrc-crema); }
+
+/* ——— Tableta de sabor (vista previa Sabores) ——— */
+
+.tsabor { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.tsabor-visual { width: min(11rem, 100%); }
+.tsabor-barra {
+  position: relative;
+  z-index: 0;
+  margin: 0 0.7rem;
+  border-radius: 0.5rem 0.5rem 0 0;
+  padding: 0.375rem 0.375rem 1.2rem;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.25rem;
+}
+.tsabor-cuadro { aspect-ratio: 1; border-radius: 0.25rem; }
+.tsabor-envoltura {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  margin-top: -1rem;
+  border-radius: 0.625rem;
+  padding: 1.3rem 1rem 1rem;
+  display: flex;
+  justify-content: center;
+}
+.tsabor-franja { position: absolute; top: 0.55rem; left: 0; right: 0; height: 0.32rem; }
+.tsabor-nombre { margin-top: 1rem; font-weight: 600; max-width: 13rem; }
+.tsabor-precio { margin-top: 0.5rem; }
+.chip-precio {
+  background: var(--mrc-amarillo);
+  color: var(--mrc-tinta);
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+  font-size: var(--mrc-text-menor);
+  font-weight: 600;
+}
+
+/* ——— Tarjetas de vista previa (banda profunda "El adelanto") ——— */
+
+.tarjeta-preview {
+  background: var(--b-fondo);
+  color: var(--b-texto);
+  border-radius: 1rem;
+  padding: 2rem;
+  box-shadow: 0 24px 48px -24px color-mix(in srgb, var(--mrc-verde-900) 70%, transparent);
+}
+
+/* ——— Números del cierre ——— */
+
+.num-cifra {
+  font-family: var(--mrc-font-display);
+  font-variation-settings: 'SOFT' 60, 'WONK' 1;
+  font-weight: 600;
+  font-size: var(--mrc-text-display-l);
+  color: var(--b-titulo);
+  line-height: 1;
+}
+.num-concepto { margin-top: 0.25rem; font-size: var(--mrc-text-menor); color: var(--b-sec); }
+
+/* ——— Accesibilidad ——— */
+
+.salto {
+  position: fixed;
+  top: -100%;
+  left: 1rem;
+  z-index: 50;
+  background: var(--mrc-amarillo);
+  color: var(--mrc-tinta);
+  padding: 0.6rem 1.1rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+}
+.salto:focus-visible { top: 1rem; }
+
+:is(a, button, .boton):focus-visible {
+  outline: 3px solid var(--b-foco, var(--mrc-bordo));
+  outline-offset: 3px;
+}
+
+/* ——— Movimiento. Todo bajo PRM off; global.css además apaga en bloque. ——— */
+
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+
+  /* Entrada del hero: puro CSS, sin depender de JS (juega al cargar). */
+  @keyframes subir {
+    from { opacity: 0; translate: 0 16px; }
+    to { opacity: 1; translate: 0 0; }
+  }
+  .entra { animation: subir var(--mrc-dur-gesto) var(--mrc-ease-entrada) both; }
+  .entra-2 { animation-delay: calc(var(--mrc-dur-micro) * 0.75); }
+  .entra-3 { animation-delay: calc(var(--mrc-dur-micro) * 1.5); }
+  .entra-4 { animation-delay: calc(var(--mrc-dur-micro) * 2.25); }
+
+  /* Revelado por scroll: el estado oculto SOLO existe si hay JS (html.js)
+     y sin reduced-motion — sin JS o con PRM, el contenido está siempre
+     visible. El observer vive en index.astro y trabaja por data-attribute,
+     nunca por id (ids duplicados del inlineado, ver handoff). */
+  html.js [data-revelar] { opacity: 0; translate: 0 18px; }
+  html.js [data-revelar].revelado {
+    opacity: 1;
+    translate: 0 0;
+    transition:
+      opacity var(--mrc-dur-gesto) var(--mrc-ease-entrada),
+      translate var(--mrc-dur-gesto) var(--mrc-ease-entrada);
+    transition-delay: var(--retardo, 0ms);
+  }
+  .retardo-1 { --retardo: calc(var(--mrc-dur-micro) * 0.5); }
+  .retardo-2 { --retardo: var(--mrc-dur-micro); }
+  .retardo-3 { --retardo: calc(var(--mrc-dur-micro) * 1.5); }
+  .retardo-4 { --retardo: calc(var(--mrc-dur-micro) * 2); }
+
+  /* Saluda (anticipo del estado `Saluda` de MonoSM, §11.3): la cabeza gira
+     8° con el spring del token. El pivote real del cuello ya lo fija
+     mascota-ambiental.css (transform-origin de #cabeza). */
+  .saluda .mascota :is(#cabeza) { transition: transform var(--mrc-dur-gesto) var(--mrc-ease-spring); }
+  .saluda:hover .mascota :is(#cabeza) { transform: rotate(8deg); }
+
+  /* El dial SOFT/WONK de Fraunces, en vivo sobre el specimen (§7: ese dial
+     "se puede animar" — acá se demuestra). */
+  @keyframes wonkear {
+    0%, 100% { font-variation-settings: 'SOFT' 60, 'WONK' 0; }
+    50% { font-variation-settings: 'SOFT' 100, 'WONK' 1; }
+  }
+  .wonkea { animation: wonkear calc(var(--mrc-dur-ambiental) * 2) var(--mrc-ease-spring) infinite; }
+
+  /* Micro-gestos */
+  .boton { transition: translate var(--mrc-dur-micro) var(--mrc-ease-entrada); }
+  .boton:hover { translate: 0 -2px; }
+  .cuadrito { transition: translate var(--mrc-dur-micro) var(--mrc-ease-entrada); }
+  .cuadrito:hover { translate: 0 -3px; }
+}
