@@ -64,6 +64,7 @@ export const sitio = {
     titulo: 'Regresar al sabor auténtico del cacao',
     // Palabras del cliente, del primer cuestionario (docs/contenido-sitio.md).
     prosa: 'Maracacao es una marca mexicana de chocolates y polvos elaborados con cacao y productos naturales. Busca regresar al sabor auténtico del cacao, con mezclas de sabores tradicionales, para consumidores y para cafeterías y negocios que valoran el chocolate mexicano auténtico.',
+    imagenAlt: 'El personaje de Maracacao sentado y sonriendo',
     notaHistoria: 'La historia de cómo empezó y de dónde viene su cacao: preguntas 2, 3 y 4.',
   },
 

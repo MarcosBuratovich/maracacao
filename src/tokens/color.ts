@@ -32,6 +32,30 @@ export const fijos = {
   suelo: '#E3BC87',
 } as const
 
+/**
+ * Colores MEDIDOS de las referencias reales del cliente (2026-08-10):
+ * fotos de empaques, etiquetas de la línea 250 g e ilustraciones del
+ * personaje (ver docs/referencias/estilo-cliente/). Son referencia de
+ * trabajo para el sitio público y los prompts de diseño — NO forman parte
+ * todavía del sistema de 36 (rampas + pares de contraste): esa
+ * re-derivación es la fase de diseño que sigue. Por eso no entran en
+ * todosLosColores().
+ *
+ * Hallazgo: el rojo de la envoltura mango-chile midió #C66361 ≈ rosa-500
+ * (#C8665D) — ya existe en el sistema, no se duplica acá.
+ */
+export const empaque = {
+  morado: '#774A95', // envoltura jengibre y naranja
+  verdeHoja: '#376042', // mini lima y chile
+  menta: '#B2C0AD', // mini zacate limón
+  naranja: '#DA8843', // envoltura/mini naranja
+  cafe: '#723D13', // etiqueta cocoa alcalina
+  amarilloEtiqueta: '#F3D87C', // recuadro de sabor de las etiquetas
+  rosaFondo: '#E5BFBF', // fondo de las fotos de producto
+  rojoPersonaje: '#BD1608', // cabeza del changuito (la sombra midió #A6271C)
+  cremaPersonaje: '#FBD98A', // cara y panza del changuito
+} as const
+
 export const roles = {
   'fondo-claro': fijos.papel,
   'fondo-oscuro': verde[700],

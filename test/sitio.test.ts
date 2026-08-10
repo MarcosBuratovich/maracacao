@@ -74,6 +74,12 @@ describe('la página /sitio', () => {
     expect(src).not.toMatch(/href="\/(?!\{)/)
   })
 
+  it('solo usa el personaje del cliente — la mascota del sistema quedó fuera (retro 2026-08-10)', () => {
+    const src = readFileSync('src/pages/sitio.astro', 'utf8')
+    expect(src).not.toContain('components/brand/Mascota')
+    expect(src).toContain('/sitio/personaje-sentado.webp')
+  })
+
   it('el video del personaje respeta reduced-motion (se pausa y da controles)', () => {
     const src = readFileSync('src/pages/sitio.astro', 'utf8')
     expect(src).toContain("matchMedia('(prefers-reduced-motion: reduce)')")
