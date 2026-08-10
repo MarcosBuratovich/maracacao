@@ -1,0 +1,43 @@
+---
+// Mazorca de cacao con granos sueltos. Decorativa y quieta a propósito:
+// nunca más de dos cosas moviéndose a la vez (§12) — en las bandas donde
+// vive, el movimiento lo ponen el vapor y las hojas.
+interface Props {
+  class?: string
+  /** Las mazorcas reales van del amarillo al rojizo; pasos del sistema. */
+  tono?: 'tan' | 'bordo' | 'amarillo'
+}
+const { class: clase = '', tono = 'tan' } = Astro.props
+const fills = {
+  tan: 'var(--mrc-tan-500)',
+  bordo: 'var(--mrc-bordo)',
+  amarillo: 'var(--mrc-amarillo)',
+} as const
+---
+<div class={`mazorca ${clase}`} style="aspect-ratio:1" aria-hidden="true">
+  <svg viewBox="0 0 200 200" width="100%" height="100%" fill="none">
+    <path d="M94 32 C 90 20 100 14 108 22"
+      stroke="var(--mrc-tinta)" stroke-width="6" stroke-linecap="round" />
+    <path d="M100 32 C 56 44 42 110 76 148 C 90 162 110 162 124 148 C 158 110 144 44 100 32 Z"
+      fill={fills[tono]} stroke="var(--mrc-tinta)" stroke-width="7" stroke-linejoin="round" />
+    <g stroke="var(--mrc-tinta)" stroke-width="4" stroke-linecap="round">
+      <path d="M74 52 C 62 88 64 118 82 146" />
+      <path d="M100 40 C 92 80 92 116 100 152" />
+      <path d="M126 52 C 138 88 136 118 118 146" />
+    </g>
+    <g fill="var(--mrc-tan-800)" stroke="var(--mrc-tinta)" stroke-width="4">
+      <ellipse cx="54" cy="170" rx="13" ry="9" transform="rotate(-18 54 170)" />
+      <ellipse cx="84" cy="178" rx="13" ry="9" transform="rotate(10 84 178)" />
+      <ellipse cx="148" cy="174" rx="13" ry="9" transform="rotate(-8 148 174)" />
+    </g>
+    <g stroke="var(--mrc-tinta)" stroke-width="3" stroke-linecap="round">
+      <path d="M47 170 C 52 167 57 167 61 171" />
+      <path d="M77 178 C 82 175 87 175 91 179" />
+      <path d="M141 174 C 146 171 151 171 155 175" />
+    </g>
+  </svg>
+</div>
+
+<style>
+  .mazorca { display: block; }
+</style>

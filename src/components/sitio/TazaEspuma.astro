@@ -1,0 +1,84 @@
+---
+// "Una taza con espuma" — el ejemplo que pidió el cliente, dibujado con
+// las reglas de la marca (§9.1 del spec de identidad): trazo como stroke
+// redondeado, fills planos de tokens (atributos de presentación, nunca
+// cascada), partes animables agrupadas por CLASE (no ids: los ids
+// duplicados del inlineado son deuda conocida). El vapor sube y se
+// desvanece; la espuma respira; el remolino de chocolate se mece con el
+// spring del token. prefers-reduced-motion apaga todo (regla global).
+interface Props { class?: string }
+const { class: clase = '' } = Astro.props
+---
+<div class={`taza-espuma ${clase}`} style="aspect-ratio:1" aria-hidden="true">
+  <svg viewBox="0 0 240 240" width="100%" height="100%" fill="none">
+    <g class="vapor">
+      <path class="hilo hilo-1" d="M96 84 C 91 70 103 62 98 46" stroke="var(--mrc-tan-400)" stroke-width="6" stroke-linecap="round" />
+      <path class="hilo hilo-2" d="M121 78 C 116 62 129 54 124 36" stroke="var(--mrc-tan-400)" stroke-width="6" stroke-linecap="round" />
+      <path class="hilo hilo-3" d="M146 84 C 141 70 153 62 148 46" stroke="var(--mrc-tan-400)" stroke-width="6" stroke-linecap="round" />
+    </g>
+
+    <path d="M178 126 C 206 120 210 160 180 166"
+      stroke="var(--mrc-tinta)" stroke-width="7" stroke-linecap="round" />
+
+    <path d="M62 112 L 69 186 C 71 202 171 202 173 186 L 180 112 Z"
+      fill="var(--mrc-papel)" stroke="var(--mrc-tinta)" stroke-width="7" stroke-linejoin="round" />
+
+    {/* Cenefa de hojitas, como la taza de cerámica del material del cliente. */}
+    <g class="cenefa" stroke="var(--mrc-verde-700)" stroke-width="4" stroke-linecap="round">
+      <path d="M92 156 C 96 150 102 150 106 156 C 102 162 96 162 92 156 Z" fill="var(--mrc-verde-700)" />
+      <path d="M136 156 C 140 150 146 150 150 156 C 146 162 140 162 136 156 Z" fill="var(--mrc-verde-700)" />
+      <circle cx="121" cy="157" r="4" fill="var(--mrc-verde-700)" stroke="none" />
+      <path d="M78 150 L 78 163 M 164 150 L 164 163" stroke="var(--mrc-verde-700)" />
+    </g>
+
+    <ellipse cx="121" cy="112" rx="59" ry="15"
+      fill="var(--mrc-bordo)" stroke="var(--mrc-tinta)" stroke-width="6" />
+
+    <path class="remolino" d="M121 112 C 134 109 133 116 120 117 C 104 118 103 108 122 106 C 143 105 145 117 121 119"
+      stroke="var(--mrc-suelo)" stroke-width="4" stroke-linecap="round" />
+
+    <g class="espuma" fill="var(--mrc-crema)" stroke="var(--mrc-tinta)" stroke-width="4">
+      <circle cx="70" cy="109" r="8" />
+      <circle cx="84" cy="116" r="6" />
+      <circle cx="158" cy="115" r="7" />
+      <circle cx="171" cy="108" r="8" />
+      <circle cx="146" cy="120" r="5" />
+      <circle cx="97" cy="121" r="4" />
+    </g>
+  </svg>
+</div>
+
+<style>
+  .taza-espuma { display: block; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    @keyframes subir-vapor {
+      0% { transform: translateY(10px); opacity: 0; }
+      30% { opacity: 0.9; }
+      100% { transform: translateY(-16px); opacity: 0; }
+    }
+    .hilo { animation: subir-vapor var(--mrc-dur-ambiental) var(--mrc-ease-entrada) infinite; }
+    .hilo-2 { animation-delay: calc(var(--mrc-dur-ambiental) / 3); }
+    .hilo-3 { animation-delay: calc(var(--mrc-dur-ambiental) / 3 * 2); }
+
+    @keyframes respirar-espuma {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    .espuma {
+      transform-origin: 121px 112px;
+      animation: respirar-espuma var(--mrc-dur-ambiental) var(--mrc-ease-spring) infinite;
+    }
+
+    @keyframes mecer-remolino {
+      0%, 100% { transform: rotate(-5deg); }
+      50% { transform: rotate(5deg); }
+    }
+    .remolino {
+      transform-origin: 121px 112px;
+      animation: mecer-remolino calc(var(--mrc-dur-ambiental) * 1.25) var(--mrc-ease-spring) infinite;
+      /* Peso (§12): el chocolate llega tarde respecto del vapor. */
+      animation-delay: 100ms;
+    }
+  }
+</style>

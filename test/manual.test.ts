@@ -85,9 +85,10 @@ describe('páginas de src/pages — sin <title> hardcodeado', () => {
 // no metadata, y es exactamente donde vivía el bug (un hex dentro de un
 // ternario JS que arma un `style="color:...`).
 describe('guard de hex a mano fuera de content/manual (B2)', () => {
-  // src/components/landing entró con la presentación (spec 2026-08-05):
-  // sus colores se importan de @/tokens/color, nunca se escriben.
-  const dirs = ['src/components/manual', 'src/components/landing', 'src/pages']
+  // src/components/landing entró con la presentación (spec 2026-08-05) y
+  // src/components/sitio con el borrador del sitio público: colores solo
+  // importados de @/tokens/color o como var(--mrc-*), nunca escritos.
+  const dirs = ['src/components/manual', 'src/components/landing', 'src/components/sitio', 'src/pages']
 
   it.each(dirs)('ningún .astro de %s escribe un hex a mano — se lee de los tokens', (dir) => {
     for (const archivo of archivosAstroEn(dir)) {
