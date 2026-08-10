@@ -1,122 +1,217 @@
 # Prompts de diseño — Maracacao
 
-Kit para generar assets del sitio en Claude, Seedream (imagen) y
-Seedance (video). Regla número uno, decidida por Marcos el 2026-08-10:
-**el único personaje es el changuito rojo del cliente** (el de los
-empaques reales y las ilustraciones de referencia en
-`docs/referencias/estilo-cliente/`). La mascota verde del proyecto de
-identidad no se usa en el sitio.
+Prompts COMPLETOS para copiar y pegar en Claude design / Seedream
+(imagen) y Seedance (video). Cada bloque es autocontenido: estilo +
+sujeto + reglas, no hay que armar nada.
 
-Los prompts van en inglés porque los modelos de imagen responden mejor;
-la explicación de cada uno, en español.
+**Dos cosas antes de pegar:**
+1. **Adjunta siempre una imagen de referencia** del changuito
+   (`docs/referencias/estilo-cliente/`) junto con el prompt — es lo que
+   mantiene al personaje idéntico entre imágenes.
+2. El único personaje es el changuito rojo del cliente. La mascota verde
+   del proyecto de identidad no se usa.
 
-## Paleta medida (tokens `--mrc-empaque-*`)
+Paleta medida (por si un prompt pide color): rojo personaje `#BD1608` ·
+crema personaje `#FBD98A` · morado `#774A95` · verde hoja `#376042` ·
+menta `#B2C0AD` · naranja `#DA8843` · café `#723D13` · amarillo etiqueta
+`#F3D87C` · rosa fondo `#E5BFBF` · rojo mango-chile `#C66361`.
 
-Colores medidos de los empaques, etiquetas e ilustraciones reales
-(`src/tokens/color.ts`, grupo `empaque`):
+---
 
-| Token | Hex | De dónde salió |
-|---|---|---|
-| rojoPersonaje | `#BD1608` | cuerpo del changuito (sombra `#A6271C`) |
-| cremaPersonaje | `#FBD98A` | cara, panza, manos |
-| morado | `#774A95` | envoltura jengibre y naranja |
-| verdeHoja | `#376042` | mini lima y chile |
-| menta | `#B2C0AD` | mini zacate limón |
-| naranja | `#DA8843` | envoltura naranja |
-| cafe | `#723D13` | etiqueta cocoa alcalina |
-| amarilloEtiqueta | `#F3D87C` | recuadro de sabor de las etiquetas |
-| rosaFondo | `#E5BFBF` | fondo de las fotos de producto |
+## 1 · El personaje (imagen)
 
-El rojo de la envoltura mango-chile midió `#C66361` ≈ `rosa-500` del
-sistema (`#C8665D`): ese ya existía. La re-derivación completa de la
-paleta del sitio (rampas y pares de contraste con estos colores) es
-parte de esta fase de diseño.
+### 1.1 Saludo — para el inicio
 
-## Bloque de estilo (pegar al inicio de TODO prompt de imagen)
+```
+Hand-drawn storybook illustration in the style of artisanal Mexican chocolate packaging. A slender, playful red monkey (brick-red #BD1608 body; warm cream #FBD98A face, muzzle, belly, hands and feet; rosy cheeks; happy closed eyes; small smile; long tail ending in a spiral curl) waves hello at the viewer with one arm raised high, holding a wrapped chocolate bar in the other hand. Thick rounded dark-brown outlines, flat warm fills, subtle crosshatch paper texture, plain white background. Joyful, warm, naive. No gradients, no 3D rendering, no drop shadows, no text, no watermark, no other characters. Square format, high resolution.
+```
 
-> Hand-drawn storybook illustration in the style of artisanal Mexican
-> chocolate packaging: thick rounded dark-brown outlines, flat warm
-> fills, subtle crosshatch/paper texture, plain white background.
-> The character is a slender, playful red monkey (brick red #BD1608
-> body, warm cream #FBD98A face, muzzle, belly, hands and feet, rosy
-> cheeks, happy closed eyes, small smile, long tail ending in a spiral
-> curl). Joyful, warm, naive. No gradients, no 3D, no drop shadows,
-> no text, no watermark.
+### 1.2 Antojo — mordida de chocolate
 
-**Siempre adjuntar como referencia** una o dos imágenes de
-`docs/referencias/estilo-cliente/` para fijar el personaje. Pedir
-2048 px o más, fondo blanco limpio (se recorta fácil).
+```
+Hand-drawn storybook illustration in the style of artisanal Mexican chocolate packaging. A slender, playful red monkey (brick-red #BD1608 body; warm cream #FBD98A face, muzzle, belly, hands and feet; rosy cheeks; happy closed eyes; small smile; long tail ending in a spiral curl) takes a delighted bite out of a single dark chocolate square held with both hands, tiny chocolate crumbs floating around its head. Thick rounded dark-brown outlines, flat warm fills, subtle crosshatch paper texture, plain white background. Joyful, warm, naive. No gradients, no 3D rendering, no drop shadows, no text, no watermark, no other characters. Square format, high resolution.
+```
 
-## Poses del personaje (una por prompt, después del bloque de estilo)
+### 1.3 Cosecha — colgado de la rama
 
-- **Saludo (hero):** "The monkey waves hello at the viewer with one arm
-  up, the other holding a wrapped chocolate bar."
-- **Antojo:** "The monkey takes a bite of a single chocolate square,
-  eyes closed in delight, crumbs floating."
-- **Cosecha:** "The monkey hangs from a cacao branch by its tail,
-  picking a ripe cacao pod, green leaves around."
-- **Chocolatero:** "The monkey pours cacao beans from a split cacao pod
-  into a stone bowl labeled with a leaf motif." *(ya existe, referencia)*
-- **Barista (sección negocios):** "The monkey in a tiny apron slides a
-  steaming cup of hot chocolate across a wooden counter."
-- **Cartero (contacto):** "The monkey holds an envelope sealed with a
-  chocolate square."
-- **Siesta (FAQ):** "The monkey naps on top of a giant chocolate bar,
-  tail curled like a question mark."
+```
+Hand-drawn storybook illustration in the style of artisanal Mexican chocolate packaging. A slender, playful red monkey (brick-red #BD1608 body; warm cream #FBD98A face, muzzle, belly, hands and feet; rosy cheeks; happy closed eyes; small smile; long tail ending in a spiral curl) hangs upside down from a cacao branch by its spiral tail, reaching for a ripe orange-brown cacao pod, a few deep-green cacao leaves (#376042) around the branch. Thick rounded dark-brown outlines, flat warm fills, subtle crosshatch paper texture, plain white background. Joyful, warm, naive. No gradients, no 3D rendering, no drop shadows, no text, no watermark, no other characters. Square format, high resolution.
+```
 
-## Ingredientes sueltos (estilo sticker, sin personaje)
+### 1.4 Barista — para cafeterías y negocios
 
-Mismo bloque de estilo, sin el personaje:
+```
+Hand-drawn storybook illustration in the style of artisanal Mexican chocolate packaging. A slender, playful red monkey (brick-red #BD1608 body; warm cream #FBD98A face, muzzle, belly, hands and feet; rosy cheeks; happy closed eyes; small smile; long tail ending in a spiral curl) wears a tiny apron and proudly slides a steaming ceramic cup of hot chocolate forward across a simple wooden counter. Thick rounded dark-brown outlines, flat warm fills, subtle crosshatch paper texture, plain white background. Joyful, warm, naive. No gradients, no 3D rendering, no drop shadows, no text, no watermark, no other characters. Square format, high resolution.
+```
 
-> Single isolated [INGREDIENT] in the same hand-drawn style, thick
-> dark-brown outline, flat fills, white background, sticker-like.
+### 1.5 Maestro — para el ABC del chocolate
 
-Lista para el sitio (una imagen por ingrediente): cacao pod whole and
-split · scattered cacao beans · cinnamon sticks · fresh mint sprig ·
-lemongrass blades · dried chile · mango slices · orange slice · sea
-salt crystals · tamarind pod · strawberry · pineapple wedge · cardamom
-pods · peppermint leaves. (Cubren los 15 sabores reales del catálogo.)
+```
+Hand-drawn storybook illustration in the style of artisanal Mexican chocolate packaging. A slender, playful red monkey (brick-red #BD1608 body; warm cream #FBD98A face, muzzle, belly, hands and feet; rosy cheeks; happy closed eyes; small smile; long tail ending in a spiral curl) stands like a tiny teacher pointing with a thin wooden stick at a floating split cacao pod showing its beans inside. Thick rounded dark-brown outlines, flat warm fills, subtle crosshatch paper texture, plain white background. Joyful, warm, naive. No gradients, no 3D rendering, no drop shadows, no text, no watermark, no other characters. Square format, high resolution.
+```
 
-## Escenas por sección del sitio
+### 1.6 Siesta — para preguntas frecuentes
 
-- **Inicio:** personaje en pose de saludo + taza con espuma (la taza ya
-  existe como SVG animado propio).
-- **Nuestros productos:** cada sabor con su mini-escena, como en los
-  empaques reales: el personaje interactuando con el ingrediente
-  (malabares de mangos, surfeando una ola de naranja…). Fondo del
-  recuadro en el color de la envoltura de ese sabor (tabla de arriba).
-- **ABC del chocolate:** ingredientes sticker + "the monkey as a tiny
-  teacher pointing at a floating cacao pod diagram".
-- **Recetas:** los videos (abajo).
-- **Quiénes somos:** "the monkey and a human pair of hands working
-  together at a wooden table with cacao beans and a molinillo" (sin
-  caras humanas: el cliente no quiere fotos de personas).
-- **Cafeterías y negocios:** pose barista.
+```
+Hand-drawn storybook illustration in the style of artisanal Mexican chocolate packaging. A slender, playful red monkey (brick-red #BD1608 body; warm cream #FBD98A face, muzzle, belly, hands and feet; rosy cheeks; happy closed eyes; small smile) naps peacefully lying on top of a giant chocolate bar, its long tail curled into the shape of a question mark above its head. Thick rounded dark-brown outlines, flat warm fills, subtle crosshatch paper texture, plain white background. Joyful, warm, naive. No gradients, no 3D rendering, no drop shadows, no text, no watermark, no other characters. Square format, high resolution.
+```
 
-## Video (Seedance) — loops de 6 a 8 segundos
+### 1.7 Cartero — para contacto
 
-> Seamless loop animation of the reference illustration, subtle
-> movement only, white background, no camera movement, no text.
+```
+Hand-drawn storybook illustration in the style of artisanal Mexican chocolate packaging. A slender, playful red monkey (brick-red #BD1608 body; warm cream #FBD98A face, muzzle, belly, hands and feet; rosy cheeks; happy closed eyes; small smile; long tail ending in a spiral curl) happily holds out a cream envelope sealed with a small square of dark chocolate. Thick rounded dark-brown outlines, flat warm fills, subtle crosshatch paper texture, plain white background. Joyful, warm, naive. No gradients, no 3D rendering, no drop shadows, no text, no watermark, no other characters. Square format, high resolution.
+```
 
-- **Molinillo:** ya existe (`public/sitio/changuito-molinillo.mp4`).
-- **Taza:** "steam gently rising from the hot chocolate cup, foam
-  bubbles slowly shifting, the swirl rotating very slowly."
-- **Saludo:** "the monkey waves, tail swaying softly, a few cacao beans
-  bouncing."
-- **Granos:** "cacao beans falling in a gentle stream into the bowl,
-  looping."
+---
 
-## Fotografía de producto (para cuando hagan fotos nuevas)
+## 2 · Ingredientes sueltos (estilo sticker, sin personaje)
 
-Mantener la dirección de arte que ya usan: fondo rosa polvo `#E5BFBF` o
-blanco cálido, luz suave de día, la barra al centro y el ingrediente
-real del sabor esparcido alrededor (naranjas, mangos, chiles). Sin
-props ajenos a la marca.
+Uno por sabor del catálogo. Mismo pie en todos.
 
-## Reglas duras (van en todos los prompts)
+### 2.1 Mazorca de cacao (general)
 
-1. Solo el changuito rojo — nunca otro personaje ni la mascota verde.
-2. Sin texto dentro de la imagen (el lettering lo pone el sistema).
-3. Sin degradados, sin 3D, sin sombras proyectadas.
-4. Fondo blanco (ilustración) o rosa polvo (foto).
-5. Los colores de la tabla de arriba, no inventados.
+```
+Hand-drawn sticker-style illustration in the style of artisanal Mexican chocolate packaging: one whole cacao pod and one split cacao pod showing cream-colored beans inside, with three loose cacao beans scattered beside them. Thick rounded dark-brown outlines, flat warm fills, subtle crosshatch paper texture, plain white background. No gradients, no 3D rendering, no drop shadows, no text, no watermark, no characters. Square format, high resolution.
+```
+
+### 2.2 Naranja con jengibre
+
+```
+Hand-drawn sticker-style illustration in the style of artisanal Mexican chocolate packaging: a juicy orange slice next to a knobby fresh ginger root with one small cut piece. Thick rounded dark-brown outlines, flat warm fills, subtle crosshatch paper texture, plain white background. No gradients, no 3D rendering, no drop shadows, no text, no watermark, no characters. Square format, high resolution.
+```
+
+### 2.3 Chamoy
+
+```
+Hand-drawn sticker-style illustration in the style of artisanal Mexican chocolate packaging: dried apricots with red chile flakes sprinkled around them and one dried chile on the side. Thick rounded dark-brown outlines, flat warm fills, subtle crosshatch paper texture, plain white background. No gradients, no 3D rendering, no drop shadows, no text, no watermark, no characters. Square format, high resolution.
+```
+
+### 2.4 Mango con chile
+
+```
+Hand-drawn sticker-style illustration in the style of artisanal Mexican chocolate packaging: fresh mango slices next to one whole mango and a small dried red chile with a few chile flakes. Thick rounded dark-brown outlines, flat warm fills, subtle crosshatch paper texture, plain white background. No gradients, no 3D rendering, no drop shadows, no text, no watermark, no characters. Square format, high resolution.
+```
+
+### 2.5 Pistache (chocolate blanco)
+
+```
+Hand-drawn sticker-style illustration in the style of artisanal Mexican chocolate packaging: shelled and unshelled pistachios, one shell half-open showing the green nut. Thick rounded dark-brown outlines, flat warm fills, subtle crosshatch paper texture, plain white background. No gradients, no 3D rendering, no drop shadows, no text, no watermark, no characters. Square format, high resolution.
+```
+
+### 2.6 Sal de mar
+
+```
+Hand-drawn sticker-style illustration in the style of artisanal Mexican chocolate packaging: a small heap of chunky sea salt crystals with a few crystals scattered apart. Thick rounded dark-brown outlines, flat warm fills, subtle crosshatch paper texture, plain white background. No gradients, no 3D rendering, no drop shadows, no text, no watermark, no characters. Square format, high resolution.
+```
+
+### 2.7 Limoncillo (zacate limón)
+
+```
+Hand-drawn sticker-style illustration in the style of artisanal Mexican chocolate packaging: fresh lemongrass blades tied in a small loose bundle. Thick rounded dark-brown outlines, flat warm fills, subtle crosshatch paper texture, plain white background. No gradients, no 3D rendering, no drop shadows, no text, no watermark, no characters. Square format, high resolution.
+```
+
+### 2.8 Tamarindo
+
+```
+Hand-drawn sticker-style illustration in the style of artisanal Mexican chocolate packaging: tamarind pods, one whole and one cracked open showing the sticky pulp and seeds. Thick rounded dark-brown outlines, flat warm fills, subtle crosshatch paper texture, plain white background. No gradients, no 3D rendering, no drop shadows, no text, no watermark, no characters. Square format, high resolution.
+```
+
+### 2.9 Lima y chile
+
+```
+Hand-drawn sticker-style illustration in the style of artisanal Mexican chocolate packaging: a bright lime cut in half next to a whole lime and one small red chile. Thick rounded dark-brown outlines, flat warm fills, subtle crosshatch paper texture, plain white background. No gradients, no 3D rendering, no drop shadows, no text, no watermark, no characters. Square format, high resolution.
+```
+
+### 2.10 Cardamomo
+
+```
+Hand-drawn sticker-style illustration in the style of artisanal Mexican chocolate packaging: green cardamom pods, one split open showing the dark seeds. Thick rounded dark-brown outlines, flat warm fills, subtle crosshatch paper texture, plain white background. No gradients, no 3D rendering, no drop shadows, no text, no watermark, no characters. Square format, high resolution.
+```
+
+### 2.11 Canela
+
+```
+Hand-drawn sticker-style illustration in the style of artisanal Mexican chocolate packaging: two crossed cinnamon sticks with visible spiral ends and a small pinch of ground cinnamon beside them. Thick rounded dark-brown outlines, flat warm fills, subtle crosshatch paper texture, plain white background. No gradients, no 3D rendering, no drop shadows, no text, no watermark, no characters. Square format, high resolution.
+```
+
+### 2.12 Menta / yerbabuena
+
+```
+Hand-drawn sticker-style illustration in the style of artisanal Mexican chocolate packaging: a fresh mint sprig with rounded serrated leaves and two loose leaves beside it. Thick rounded dark-brown outlines, flat warm fills, subtle crosshatch paper texture, plain white background. No gradients, no 3D rendering, no drop shadows, no text, no watermark, no characters. Square format, high resolution.
+```
+
+### 2.13 Fresas enchiladas
+
+```
+Hand-drawn sticker-style illustration in the style of artisanal Mexican chocolate packaging: ripe strawberries, one cut in half, with red chile flakes sprinkled over them. Thick rounded dark-brown outlines, flat warm fills, subtle crosshatch paper texture, plain white background. No gradients, no 3D rendering, no drop shadows, no text, no watermark, no characters. Square format, high resolution.
+```
+
+### 2.14 Piña con chile
+
+```
+Hand-drawn sticker-style illustration in the style of artisanal Mexican chocolate packaging: a pineapple wedge with skin and leafy crown fragment, chile flakes sprinkled on the fruit. Thick rounded dark-brown outlines, flat warm fills, subtle crosshatch paper texture, plain white background. No gradients, no 3D rendering, no drop shadows, no text, no watermark, no characters. Square format, high resolution.
+```
+
+### 2.15 Coriandro
+
+```
+Hand-drawn sticker-style illustration in the style of artisanal Mexican chocolate packaging: a small heap of round coriander seeds with a fresh coriander leaf sprig. Thick rounded dark-brown outlines, flat warm fills, subtle crosshatch paper texture, plain white background. No gradients, no 3D rendering, no drop shadows, no text, no watermark, no characters. Square format, high resolution.
+```
+
+---
+
+## 3 · Escenas por sabor (como los empaques reales)
+
+El personaje interactuando con el ingrediente, sobre el color de la
+envoltura de ese sabor. Dos ejemplos completos; para otro sabor, cambia
+el ingrediente, la acción y el hex de fondo (paleta de arriba).
+
+### 3.1 Mango con chile (fondo rojo #C66361)
+
+```
+Hand-drawn storybook illustration in the style of artisanal Mexican chocolate packaging. A slender, playful red monkey (brick-red #BD1608 body; warm cream #FBD98A face, muzzle, belly, hands and feet; rosy cheeks; happy closed eyes; small smile; long tail ending in a spiral curl) joyfully juggles a whole mango overhead while hugging another mango, mango slices floating around it. Flat solid background color #C66361, the character and props keep their thick rounded dark-brown outlines and flat warm fills with subtle crosshatch paper texture. No gradients, no 3D rendering, no drop shadows, no text, no watermark, no other characters. Vertical 3:4 format, high resolution.
+```
+
+### 3.2 Naranja con jengibre (fondo morado #774A95)
+
+```
+Hand-drawn storybook illustration in the style of artisanal Mexican chocolate packaging. A slender, playful red monkey (brick-red #BD1608 body; warm cream #FBD98A face, muzzle, belly, hands and feet; rosy cheeks; happy closed eyes; small smile; long tail ending in a spiral curl) dances in a ring with orange slices and knobby ginger roots floating around it like confetti. Flat solid background color #774A95, the character and props keep their thick rounded dark-brown outlines and flat warm fills with subtle crosshatch paper texture. No gradients, no 3D rendering, no drop shadows, no text, no watermark. Vertical 3:4 format, high resolution.
+```
+
+---
+
+## 4 · Escena de Quiénes somos (sin caras humanas)
+
+```
+Hand-drawn storybook illustration in the style of artisanal Mexican chocolate packaging. A slender, playful red monkey (brick-red #BD1608 body; warm cream #FBD98A face, muzzle, belly, hands and feet; rosy cheeks; happy closed eyes; small smile; long tail ending in a spiral curl) works side by side with a pair of human hands at a simple wooden table: the hands stir melted chocolate in a clay bowl with a wooden molinillo whisk while the monkey sorts cacao beans into a small basket, cacao pods and green leaves (#376042) at the edge of the table. Only the human hands and forearms are visible, never a face or body. Thick rounded dark-brown outlines, flat warm fills, subtle crosshatch paper texture, plain white background. No gradients, no 3D rendering, no drop shadows, no text, no watermark. Landscape 4:3 format, high resolution.
+```
+
+---
+
+## 5 · Video (Seedance) — adjuntar la imagen fija como referencia
+
+### 5.1 La taza humeante (loop)
+
+```
+Seamless 8 second loop animation of the attached illustration. Only subtle movement: steam wisps rise slowly from the hot chocolate cup and fade out, foam bubbles drift and gently pulse, the chocolate swirl rotates very slowly. Everything else stays perfectly still. Plain white background, no camera movement, no zoom, no text, hand-drawn storybook style preserved exactly.
+```
+
+### 5.2 El saludo (loop)
+
+```
+Seamless 8 second loop animation of the attached illustration. Only subtle movement: the red monkey waves its raised arm slowly side to side, its spiral tail sways softly, it blinks once. Everything else stays perfectly still. Plain white background, no camera movement, no zoom, no text, hand-drawn storybook style preserved exactly.
+```
+
+### 5.3 Los granos cayendo (loop)
+
+```
+Seamless 8 second loop animation of the attached illustration. Only subtle movement: cacao beans fall in a gentle continuous stream from the split pod into the bowl, one bean bounces off the rim, a faint puff of cocoa dust. The monkey's tail sways slightly. Everything else stays perfectly still. Plain white background, no camera movement, no zoom, no text, hand-drawn storybook style preserved exactly.
+```
+
+---
+
+## 6 · Fotografía de producto (para la siguiente sesión de fotos)
+
+```
+Product photography, artisanal Mexican chocolate brand: one wrapped chocolate bar standing upright at center on a flat dusty-pink background (#E5BFBF), soft natural daylight from the left, the flavor's real ingredients (fruit, spices) casually scattered around the base, shallow depth of field, warm and appetizing, no props unrelated to the brand, no text overlays, no hands.
+```
