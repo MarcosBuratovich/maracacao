@@ -60,6 +60,24 @@ diseñada, vista en el material de WhatsApp).
   nombre "Dulce Olivia" y si aparece en la página: pregunta abierta).
 - Sin dominio, sin correos propios (Gmail). Referencias: solo redes.
 
+## Dominio y marca (investigado 2026-08-10)
+
+- **maracacao.com está ocupado** por una comercializadora agrícola de
+  Ecuador (Quinindé, Esmeraldas; cacao en grano, maracuyá, café y
+  pimienta al mayoreo, desde 1992; marca propia "ALKATIFF"). No vende
+  chocolate al consumidor ni opera en México. El "©" de su pie de página
+  es copyright del sitio, no un registro de marca.
+- **Disponibles (RDAP, 2026-08-10):** maracacao.mx, maracacao.com.mx,
+  maracacaochocolate.com, chocolatemaracacao.com, maracacao.shop,
+  .store, .net, .online, .lat.
+- **IMPI (MARCia):** sin "MARACACAO" exacto registrado ni en trámite;
+  los más parecidos son MARACARÓ, MARACALAB, MIDACACAO (registrada,
+  comercializadora) y AMARCACAO (en trámite). Similares en el rubro
+  existen, así que la registrabilidad la debe evaluar un agente de PI.
+- **Plan sugerido:** registrar maracacao.mx (principal) +
+  maracacaochocolate.com (puerta internacional, redirige); iniciar
+  registro de marca ante IMPI (clase 30, considerar 35) cuanto antes.
+
 ## Material visual disponible
 
 - Fotos de producto del catálogo y las enviadas por WhatsApp (barras
