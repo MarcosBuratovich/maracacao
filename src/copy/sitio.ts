@@ -117,6 +117,33 @@ export const sitio = {
         ],
       },
     ],
+    // Las dos barras con imagen de producto reconstruida desde foto
+    // (scripts/envoltura-a-packshot.py). El porcentaje de cacao se leyó
+    // del propio arte recuperado, no de un supuesto: la envoltura de
+    // mango dice 73% y la de naranja y jengibre, 70%.
+    destacadas: {
+      titulo: 'Las barras',
+      intro: 'Setenta gramos, envueltas de a una. Estas dos son las que más salen.',
+      items: [
+        {
+          archivo: 'mango-chile',
+          nombre: 'Mango con chile',
+          cacao: '73% cacao',
+          precio: 108,
+          campo: 'petroleo',
+          alt: 'Barra Maracacao de mango con chile: envoltura color vino con el personaje haciendo malabares con mangos',
+        },
+        {
+          archivo: 'naranja-jengibre',
+          nombre: 'Naranja con jengibre',
+          cacao: '70% cacao',
+          precio: 122,
+          campo: 'caramelo',
+          alt: 'Barra Maracacao de naranja con jengibre: envoltura morada con una ronda de personajes y rodajas de naranja',
+        },
+      ],
+    },
+
     fotos: [
       {
         archivo: 'foto-barra-naranja-jengibre',

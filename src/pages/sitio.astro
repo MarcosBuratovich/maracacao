@@ -128,6 +128,33 @@ const tira = [...sitio.hero.tira, ...sitio.hero.tira]
           </div>
         </div>
 
+        {/* Las barras al frente: imagen de producto reconstruida, con
+            alfa, flotando sobre su campo de color. */}
+        <div class="canon aire-corto">
+          <div class="bloque">
+            <h3 class="titulo" data-revelar>{sitio.productos.destacadas.titulo}</h3>
+            <p class="cuerpo tenue destacadas-intro" data-revelar style="--retardo:120ms">
+              {sitio.productos.destacadas.intro}
+            </p>
+          </div>
+          <div class="simetrico destacadas" data-revelar style="--retardo:180ms">
+            {sitio.productos.destacadas.items.map((b) => (
+              <article class="pieza destacada">
+                <div class="arco destacada-arco" data-campo={b.campo}>
+                  <img src={`/sitio/packshot/${b.archivo}.webp`} alt={b.alt} loading="lazy" width="470" height="992" />
+                </div>
+                <div class="destacada-pie">
+                  <div>
+                    <h4 class="sub">{b.nombre}</h4>
+                    <p class="marca destacada-cacao">{b.cacao} · 70 g</p>
+                  </div>
+                  <span class="ficha-precio">{precioMXN(b.precio)}</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+
         <div class="canon prod-fotos">
           {sitio.productos.fotos.map((f, i) => (
             <figure class={`foto-${i + 1}`}>
@@ -166,7 +193,7 @@ const tira = [...sitio.hero.tira, ...sitio.hero.tira]
       <section class="seccion" data-tono="tinta">
         <div class="canon aire">
           <div class="bloque">
-            <p class="marca" data-revelar>{sitio.polvo.nota}</p>
+            <p class="chip-pronto" data-revelar>{sitio.polvo.nota}</p>
             <h2 class="display" data-lineas data-revelar>{sitio.polvo.titulo}</h2>
             <p class="cuerpo tenue polvo-intro" data-revelar style="--retardo:150ms">{sitio.polvo.intro}</p>
           </div>
@@ -449,6 +476,32 @@ const tira = [...sitio.hero.tira, ...sitio.hero.tira]
   .ficha-precio { margin-top: 0.75rem; display: block; }
   .prod-lineas .lista-limpia { margin-top: 1.25rem; }
 
+  /* Barras destacadas: el packshot tiene alfa, así que flota sobre el
+     campo en vez de ser un recuadro de foto. */
+  .destacadas-intro { margin-top: 1rem; }
+  .destacadas {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: clamp(2rem, 5vw, 4rem);
+    margin-top: clamp(2rem, 4vw, 3rem);
+  }
+  .destacada { margin: 0; }
+  /* Proporciones calculadas para que la barra rompa el arco SOLO por
+     arriba y su base quede adentro: la barra mide 0.474 de ancho/alto,
+     así que a 58% del arco su alto es 1.224 del ancho del arco. */
+  .destacada-arco { aspect-ratio: 4 / 4.9; margin: 3.5rem 0.5rem 1.5rem 0.6rem; }
+  .destacada-arco img { width: 58%; translate: 0 -10%; rotate: -5deg; }
+  .destacada-pie {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    border-top: 1px solid var(--linea);
+    padding-top: 1rem;
+  }
+  .destacada-cacao { margin-top: 0.35rem; }
+  .destacada-pie .ficha-precio { margin: 0; }
+
   .prod-fotos { margin-top: clamp(3.5rem, 8vw, 7rem); align-items: start; }
   .prod-fotos figure { margin: 0; }
   .foto-1 { grid-column: 1 / 5; }
@@ -475,6 +528,22 @@ const tira = [...sitio.hero.tira, ...sitio.hero.tira]
     grid-template-columns: repeat(4, 1fr);
     gap: clamp(1rem, 2vw, 2rem);
     margin-top: clamp(2.5rem, 5vw, 4.5rem);
+    /* Un punto más chica que las barras: es la línea que todavía no se
+       vende y no puede gritar más que el producto del mostrador. */
+    max-width: 62rem;
+    margin-inline: auto;
+  }
+  .chip-pronto {
+    display: inline-block;
+    border: 2px solid var(--texto);
+    border-radius: 999px;
+    padding: 0.4rem 1rem;
+    font-family: var(--mrc-font-texto);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 1.25rem;
   }
   .polvo-grilla figure { margin: 0; }
     /* Las etiquetas son mucho más angostas (0.52) que el arco: con el
