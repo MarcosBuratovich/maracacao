@@ -4,16 +4,19 @@
 // franja de color por sabor. Colores importados de los tokens; el tono del
 // chocolate y su ranura vienen del mapa de abajo, nunca de un hex a mano.
 //
-// Sin precio a propósito (retro 2026-08-05): el sitio que viene es una
-// landing informativa, no un ecommerce.
+// `precioTexto` es opcional y ya viene formateado por quien llama (el
+// borrador del sitio lo pasa con precioMXN — pregunta 11 del formulario:
+// los precios sí se muestran). La presentación no lo pasa y queda igual.
+// Sigue sin carrito: informativa, no ecommerce.
 import Logotipo from '@/components/brand/Logotipo.astro'
 import { verde, tan, fijos } from '@/tokens/color'
 
 interface Props {
   nombre: string
   tono: 'blanco' | 'leche' | 'oscuro'
+  precioTexto?: string
 }
-const { nombre, tono } = Astro.props
+const { nombre, tono, precioTexto } = Astro.props
 
 // ranura = el fondo que asoma entre cuadritos (la sombra del molde);
 // cuadro = el chocolate; la franja de la envoltura repite el tono.
@@ -37,4 +40,5 @@ const t = tonos[tono]
     </div>
   </div>
   <p class="tsabor-nombre">{nombre}</p>
+  {precioTexto && <p class="mt-2"><span class="chip-precio">{precioTexto}</span></p>}
 </div>

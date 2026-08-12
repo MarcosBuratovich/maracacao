@@ -40,11 +40,12 @@ describe('copy del borrador — registro y retro vigentes', () => {
     for (const t of textos) expect(t).not.toMatch(/\b(monos?|changos?|changuitos?)\b/i)
   })
 
-  it('sin carrito y sin precios: el borrador no decide la pregunta 11', () => {
+  it('sin carrito; los precios van como números por precioMXN (pregunta 11: sí se muestran)', () => {
     for (const t of textos) {
       expect(t.toLowerCase()).not.toContain('carrito')
-      expect(t).not.toMatch(/\$\s?\d/)
+      expect(t).not.toMatch(/\$\s?\d/) // nunca precios pegados en strings
     }
+    for (const d of sitio.productos.destacadas) expect(typeof d.precio).toBe('number')
   })
 
   it('las 15 barras del catálogo están, sin inventar la 16', () => {
@@ -61,11 +62,20 @@ describe('la página /sitio', () => {
     expect(html).toContain(sitio.contacto.catalogoUrl)
   })
 
-  it('cada dato faltante va marcado con su pregunta del cuestionario', async () => {
+  it('lo que sigue pendiente va marcado con su pregunta (tras el formulario quedan pocas)', async () => {
     const html = await container.renderToString(Borrador)
     const marcas = html.match(/pregunta[s]? \d+/g) ?? []
-    expect(marcas.length).toBeGreaterThanOrEqual(7)
+    expect(marcas.length).toBeGreaterThanOrEqual(3)
     expect(html).toContain(sitio.aviso)
+  })
+
+  it('el contenido del formulario ya está adentro: precios, receta real, Tabasco y el correo nuevo', async () => {
+    const html = await container.renderToString(Borrador)
+    expect(html).toMatch(/\$\s?108/)
+    expect(html).toContain(sitio.recetas.destacada.titulo)
+    expect(html).toContain('Tabasco')
+    expect(html).toContain('maracacaomx@gmail.com')
+    expect(html).toContain(sitio.contacto.puntoVenta)
   })
 
   it('no pide la isla de Rive y no busca por id', () => {

@@ -13,7 +13,7 @@ import TazaEspuma from '@/components/sitio/TazaEspuma.astro'
 import HojaCacao from '@/components/sitio/HojaCacao.astro'
 import Mazorca from '@/components/sitio/Mazorca.astro'
 import Canela from '@/components/sitio/Canela.astro'
-import { sitio } from '@/copy/sitio'
+import { sitio, precioMXN } from '@/copy/sitio'
 import '@/styles/global.css'
 import '@/styles/landing.css'
 import '@/styles/sitio.css'
@@ -63,7 +63,7 @@ import '@/styles/sitio.css'
         </div>
         <div class="mt-10 grid gap-10 sm:grid-cols-3" data-revelar class:list="retardo-1">
           {sitio.productos.destacadas.map((s) => (
-            <TabletaSabor nombre={s.nombre} tono={s.tono} />
+            <TabletaSabor nombre={s.nombre} tono={s.tono} precioTexto={precioMXN(s.precio)} />
           ))}
         </div>
         <ul class="mt-10 flex flex-wrap gap-2" data-revelar>
@@ -71,10 +71,6 @@ import '@/styles/sitio.css'
             <li class="sabor-chip">{b}</li>
           ))}
         </ul>
-        <div class="mt-8 space-y-2" data-revelar>
-          <p class="pendiente-nota"><span class="chip">{sitio.pendiente}</span> {sitio.productos.notaBarras}</p>
-          <p class="pendiente-nota"><span class="chip">{sitio.pendiente}</span> {sitio.productos.notaBolsas}</p>
-        </div>
       </Banda>
 
       {/* El ABC del chocolate */}
@@ -84,35 +80,52 @@ import '@/styles/sitio.css'
           <h2 class="b-titulo mt-3">{sitio.abc.titulo}</h2>
           <p class="mt-4 leading-relaxed">{sitio.abc.intro}</p>
         </div>
-        <div class="mt-10 grid gap-6 md:grid-cols-3" data-revelar class:list="retardo-1">
+        <div class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4" data-revelar class:list="retardo-1">
           <div class="tema-card">
-            <Mazorca class="h-28 self-start" />
+            <Mazorca class="h-24 self-start" />
             <h3 class="b-subtitulo">{sitio.abc.temas[0].titulo}</h3>
-            <p class="pendiente-nota"><span class="chip">{sitio.pendiente}</span> {sitio.abc.temas[0].nota}</p>
+            <p class="b-menor b-sec">{sitio.abc.temas[0].nota}</p>
           </div>
           <div class="tema-card">
-            <TazaEspuma class="h-28 self-start" />
+            <TazaEspuma class="h-24 self-start" />
             <h3 class="b-subtitulo">{sitio.abc.temas[1].titulo}</h3>
-            <p class="pendiente-nota"><span class="chip">{sitio.pendiente}</span> {sitio.abc.temas[1].nota}</p>
+            <p class="b-menor b-sec">{sitio.abc.temas[1].nota}</p>
           </div>
           <div class="tema-card">
-            <Canela class="h-24 self-start" />
+            <Canela class="h-20 self-start" />
             <h3 class="b-subtitulo">{sitio.abc.temas[2].titulo}</h3>
-            <p class="pendiente-nota"><span class="chip">{sitio.pendiente}</span> {sitio.abc.temas[2].nota}</p>
+            <p class="b-menor b-sec">{sitio.abc.temas[2].nota}</p>
+          </div>
+          <div class="tema-card">
+            <HojaCacao class="h-24 self-start" tono="400" />
+            <h3 class="b-subtitulo">{sitio.abc.temas[3].titulo}</h3>
+            <p class="b-menor b-sec">{sitio.abc.temas[3].nota}</p>
           </div>
         </div>
+        <p class="b-prosa mx-auto mt-10 text-center" style="font-family:var(--mrc-font-display);color:var(--mrc-crema)" data-revelar>
+          {sitio.abc.cita}
+        </p>
       </Banda>
 
-      {/* Recetas */}
+      {/* Recetas — la primera de las cuatro reales del cliente. */}
       <Banda fondo="papel">
-        <div class="grid items-center gap-12 md:grid-cols-2">
+        <div class="grid items-start gap-12 md:grid-cols-2">
           <div data-revelar>
             <span class="b-overline">{sitio.recetas.overline}</span>
             <h2 class="b-titulo mt-3">{sitio.recetas.titulo}</h2>
             <p class="mt-4 leading-relaxed">{sitio.recetas.intro}</p>
-            <p class="pendiente-nota mt-6"><span class="chip">{sitio.pendiente}</span> {sitio.recetas.notaRecetas}</p>
+            <div class="receta-card mt-8">
+              <h3 class="b-subtitulo">{sitio.recetas.destacada.titulo}</h3>
+              <p class="b-menor b-sec mt-1">{sitio.recetas.destacada.porcion}</p>
+              <ul class="mt-4 list-disc space-y-1 pl-5">
+                {sitio.recetas.destacada.ingredientes.map((i) => <li>{i}</li>)}
+              </ul>
+              <p class="mt-4 leading-relaxed">{sitio.recetas.destacada.pasos}</p>
+              <p class="b-menor mt-3 font-semibold" style="color:var(--mrc-bordo)">{sitio.recetas.destacada.tip}</p>
+            </div>
+            <p class="b-menor b-sec mt-4">{sitio.recetas.notaRecetas}</p>
           </div>
-          <figure class="video-personaje mx-auto w-full max-w-xs" data-revelar class:list="retardo-1">
+          <figure class="video-personaje mx-auto w-full max-w-xs md:sticky md:top-10" data-revelar class:list="retardo-1">
             <video
               src="/sitio/changuito-molinillo.mp4"
               poster="/sitio/changuito-molinillo-poster.jpg"
@@ -134,7 +147,6 @@ import '@/styles/sitio.css'
             <span class="b-overline">{sitio.quienes.overline}</span>
             <h2 class="b-titulo mt-3">{sitio.quienes.titulo}</h2>
             <p class="b-prosa mt-5">{sitio.quienes.prosa}</p>
-            <p class="pendiente-nota mt-6"><span class="chip">{sitio.pendiente}</span> {sitio.quienes.notaHistoria}</p>
           </div>
           {/* Solo el personaje del cliente — la mascota del sistema quedó
               fuera del sitio (decisión de Marcos, 2026-08-10). */}
@@ -188,7 +200,8 @@ import '@/styles/sitio.css'
               {sitio.contacto.catalogoNombre}
             </a>
           </div>
-          <p class="pendiente-nota mt-8 justify-center"><span class="chip">{sitio.pendiente}</span> {sitio.contacto.notaContacto}</p>
+          <p class="mt-6" style="color:var(--mrc-crema)">{sitio.contacto.puntoVenta}</p>
+          <p class="pendiente-nota mt-6 justify-center"><span class="chip">{sitio.pendiente}</span> {sitio.contacto.notaContacto}</p>
         </div>
       </Banda>
     </main>

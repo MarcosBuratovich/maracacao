@@ -41,6 +41,24 @@
   box-shadow: 0 24px 48px -24px color-mix(in srgb, var(--mrc-tinta) 45%, transparent);
 }
 
+/* Precio (par aprobado tinta/amarillo). */
+.chip-precio {
+  background: var(--mrc-amarillo);
+  color: var(--mrc-tinta);
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+  font-size: var(--mrc-text-menor);
+  font-weight: 600;
+}
+
+/* Receta destacada. */
+.receta-card {
+  background: var(--mrc-crema);
+  border-radius: 1rem;
+  padding: 1.75rem;
+}
+.receta-card li { font-size: var(--mrc-text-menor); }
+
 /* Tarjetas de tema del ABC. */
 .tema-card {
   background: var(--mrc-verde-800);

@@ -1,8 +1,43 @@
 # Contenido confirmado para la página pública
 
 Fuentes: cuestionario 1 respondido (docx 2026-08-07), respuestas de
-Marcos (2026-08-10) y el catálogo en línea
-(chocolateria.pulpos.shop, revisado 2026-08-10).
+Marcos (2026-08-10), el catálogo en línea (chocolateria.pulpos.shop,
+revisado 2026-08-10) y **las respuestas del formulario v3
+(2026-08-12, verbatim en `respuestas-formulario.md`)** — casi todo
+respondido.
+
+## Lo nuevo del formulario (2026-08-12)
+
+- **Correo oficial: maracacaomx@gmail.com** (ya no el de Dulce Olivia).
+- **Punto de venta:** Mercado de Coyoacán, Malintzin s/n, Col. del
+  Carmen, Coyoacán, C.P. 04100, CDMX.
+- **15 sabores finales** (la de almendras no sale). **Todos 70% cacao**
+  ("para que el chocolate sea el protagonista") — ojo: el empaque de
+  mango con chile decía 73%, confirmar cuál manda.
+- **Minis:** solo en paquetes de 6, sabores siempre distintos (surtido).
+- **Bolsas de 250 g = GOTAS de chocolate** (~10 g c/u): botana, fundir
+  para taza o frappé, repostería. Además viene el chocolate en polvo
+  (cocoa natural + alcalina + pasta de cacao).
+- **Precios: SÍ se muestran** en la página (pregunta 11 decidida).
+- **Historia real:** nació en 2024, en una cocina, explorando
+  combinaciones. Equipo sin nombres propios; promueven el buen chocolate
+  mexicano con buenas prácticas ambientales.
+- **Origen real:** el chocolate se elabora en **Tabasco**, la zona
+  cacaotera más grande del país; cuidado especial en fermentación y
+  manejo del grano. (Ahora sí es dato del cliente.)
+- **ABC:** 4 temas elegidos (porcentaje, catar, sin aditivos,
+  beneficios) con TEXTOS COMPLETOS del cliente + un mini-FAQ de 14
+  preguntas del chocolate (bloom, snap, cocoa natural vs alcalina, cómo
+  leer etiquetas…). Beneficios: texto de antioxidantes — pasar por el
+  filtro COFEPRIS al redactar.
+- **4 recetas completas:** chocolate caliente jengibre-naranja, frappé
+  naranja-jengibre, peras con chocolate y canela, mousse de cardamomo.
+- **B2B:** sí quieren la sección; fichas técnicas con TODOS los datos
+  "por terminar" (PDFs en camino); condiciones de mayoreo: "con Oli".
+- **FAQ:** avalaron las preguntas típicas propuestas ("todas esas");
+  faltan las respuestas finales.
+- **Sigue pendiente:** WhatsApp y redes (pregunta 20), respuestas de
+  FAQ, PDFs de fichas, condiciones de mayoreo, elección de dominio.
 
 ## Decisiones cerradas
 
