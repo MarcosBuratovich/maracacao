@@ -54,28 +54,42 @@ describe('copy del borrador — registro y retro vigentes', () => {
   })
 })
 
-describe('la página /sitio', () => {
-  it('renderiza el contenido real: barras, correo y catálogo', async () => {
+describe('la página /sitio (alta fidelidad, centro de información)', () => {
+  it('renderiza el contenido real: barras, correo, catálogo, precios, Tabasco y punto de venta', async () => {
     const html = await container.renderToString(Borrador)
     for (const barra of sitio.productos.barras) expect(html).toContain(barra)
     expect(html).toContain(sitio.contacto.correo)
     expect(html).toContain(sitio.contacto.catalogoUrl)
-  })
-
-  it('lo que sigue pendiente va marcado con su pregunta (tras el formulario quedan pocas)', async () => {
-    const html = await container.renderToString(Borrador)
-    const marcas = html.match(/pregunta[s]? \d+/g) ?? []
-    expect(marcas.length).toBeGreaterThanOrEqual(3)
-    expect(html).toContain(sitio.aviso)
-  })
-
-  it('el contenido del formulario ya está adentro: precios, receta real, Tabasco y el correo nuevo', async () => {
-    const html = await container.renderToString(Borrador)
     expect(html).toMatch(/\$\s?108/)
-    expect(html).toContain(sitio.recetas.destacada.titulo)
     expect(html).toContain('Tabasco')
-    expect(html).toContain('maracacaomx@gmail.com')
     expect(html).toContain(sitio.contacto.puntoVenta)
+  })
+
+  it('títulos concretos, sin juegos de palabras: cada sección lleva su nombre', async () => {
+    const html = await container.renderToString(Borrador)
+    for (const titulo of [
+      sitio.productos.titulo, sitio.abc.titulo, sitio.recetas.titulo,
+      sitio.quienes.titulo, sitio.negocios.titulo, sitio.faq.titulo,
+      sitio.contacto.titulo,
+    ]) {
+      expect(html).toContain(titulo)
+    }
+  })
+
+  it('las 4 recetas del cliente y las 8 preguntas frecuentes están completas', async () => {
+    const html = await container.renderToString(Borrador)
+    expect(sitio.recetas.lista).toHaveLength(4)
+    for (const r of sitio.recetas.lista) expect(html).toContain(r.titulo)
+    expect(sitio.faq.items).toHaveLength(8)
+    expect(html.match(/<details class="faq-item"/g)).toHaveLength(8)
+    for (const paso of sitio.abc.catar.pasos) expect(html).toContain(paso.nombre)
+  })
+
+  it('sin marcas de maqueta: ni aviso de borrador ni chips de pendiente', async () => {
+    const html = await container.renderToString(Borrador)
+    expect(html).not.toContain('Borrador')
+    expect(html).not.toContain('PENDIENTE')
+    expect(html).not.toMatch(/pregunta \d+/)
   })
 
   it('no pide la isla de Rive y no busca por id', () => {
@@ -85,10 +99,13 @@ describe('la página /sitio', () => {
     expect(src).not.toMatch(/href="\/(?!\{)/)
   })
 
-  it('solo usa el personaje del cliente — la mascota del sistema quedó fuera (retro 2026-08-10)', () => {
+  it('solo usa el personaje del cliente, con los assets sin fondo', () => {
     const src = readFileSync('src/pages/sitio.astro', 'utf8')
     expect(src).not.toContain('components/brand/Mascota')
-    expect(src).toContain('/sitio/personaje-sentado.webp')
+    expect(src).toContain('/sitio/personaje-sentado-t.webp')
+    expect(src).toContain('/sitio/personaje-molinillo-t.webp')
+    // El logo transparente solo sobre banda clara (el header es papel).
+    expect(src).toContain('/sitio/logo-t.png')
   })
 
   it('el video del personaje respeta reduced-motion (se pausa y da controles)', () => {

@@ -1,44 +1,81 @@
-/* Estilos propios del BORRADOR del sitio público (src/pages/sitio.astro).
-   Las bandas, botones, chips y el revelado vienen de landing.css; acá solo
-   lo nuevo. Mismas reglas: ningún hex, ningún tiempo a mano. */
+/* Estilos del sitio público (src/pages/sitio.astro). Las bandas, botones
+   y el revelado vienen de landing.css; acá lo propio del sitio. Mismas
+   reglas: ningún hex, ningún tiempo a mano. */
 
-/* Barra de aviso: esto es un borrador de trabajo. */
-.aviso-borrador {
-  background: var(--mrc-amarillo);
-  color: var(--mrc-tinta);
-  font-size: var(--mrc-text-menor);
-  font-weight: 600;
-  text-align: center;
-  padding: 0.5rem 1rem;
+/* ——— Header fijo sobre papel, con el logo transparente (solo banda clara) ——— */
+
+.sitio-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: var(--mrc-papel);
+  border-bottom: 1px solid var(--mrc-crema);
 }
-
-/* Nota de pendiente: el chip amarillo marca lo que falta que respondan. */
-.pendiente-nota {
-  display: flex;
-  align-items: baseline;
-  gap: 0.6rem;
-  font-size: var(--mrc-text-menor);
-  color: var(--b-sec);
-}
-
-/* Sabores como fichitas — nombres reales del catálogo. */
-.sabor-chip {
-  background: var(--b-fondo);
-  border: 2px solid var(--mrc-verde-200);
+.sitio-nav a {
   color: var(--mrc-verde-700);
-  border-radius: 999px;
-  padding: 0.45rem 1rem;
   font-weight: 600;
   font-size: var(--mrc-text-menor);
+  text-decoration: none;
+  padding: 0.25rem 0.1rem;
+}
+.sitio-nav a:hover { color: var(--mrc-bordo); }
+
+/* ——— Minis flotando (la energía de la foto real de las minis) ——— */
+
+.mini-flota {
+  position: absolute;
+  width: var(--tam);
+  aspect-ratio: 1 / 1.12;
+  background: var(--cuerpo);
+  border-radius: calc(var(--tam) * 0.12);
+  rotate: var(--rot);
+  box-shadow: 0 14px 28px -16px color-mix(in srgb, var(--mrc-verde-900) 75%, transparent);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: calc(var(--tam) * 0.12);
+}
+.mini-flota::after {
+  content: '';
+  width: 62%;
+  height: calc(var(--tam) * 0.2);
+  background: var(--mrc-empaque-amarilloEtiqueta);
+  border-radius: calc(var(--tam) * 0.05);
+}
+/* En pantalla angosta las minis pisarían el texto del hero. (El display
+   de esta clase le gana a `hidden` de Tailwind por orden de hojas: se
+   apaga acá, no con utilidades.) */
+@media (max-width: 767px) {
+  .mini-flota { display: none; }
 }
 
-/* El video del personaje (asset del cliente, recortado a la pose del
-   molinillo). El script de la página lo pausa bajo reduced-motion. */
-.video-personaje video {
-  display: block;
-  width: 100%;
+/* ——— Tarjetas de línea de producto ——— */
+
+.linea-card {
+  background: var(--mrc-crema);
   border-radius: 1rem;
-  box-shadow: 0 24px 48px -24px color-mix(in srgb, var(--mrc-tinta) 45%, transparent);
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  height: 100%;
+}
+.linea-card ul { display: flex; flex-direction: column; gap: 0.5rem; }
+.linea-card li {
+  font-size: var(--mrc-text-menor);
+  line-height: 1.5;
+  padding-left: 1.1rem;
+  position: relative;
+}
+.linea-card li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.42em;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--mrc-bordo);
 }
 
 /* Precio (par aprobado tinta/amarillo). */
@@ -49,22 +86,88 @@
   padding: 0.25rem 0.75rem;
   font-size: var(--mrc-text-menor);
   font-weight: 600;
+  white-space: nowrap;
 }
 
-/* Receta destacada. */
+/* Sabores como fichitas. */
+.sabor-chip {
+  background: var(--b-fondo);
+  border: 2px solid var(--mrc-verde-200);
+  color: var(--mrc-verde-700);
+  border-radius: 999px;
+  padding: 0.45rem 1rem;
+  font-weight: 600;
+  font-size: var(--mrc-text-menor);
+}
+
+/* ——— El ABC: pasos de cata con número grande y bloques de texto ——— */
+
+.abc-bloque {
+  background: var(--mrc-verde-800);
+  border-radius: 1rem;
+  padding: 1.75rem;
+}
+.paso {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+.paso-numero {
+  font-family: var(--mrc-font-display);
+  font-variation-settings: 'SOFT' 60, 'WONK' 1;
+  font-weight: 600;
+  font-size: var(--mrc-text-display-l);
+  line-height: 1;
+  color: var(--mrc-amarillo);
+}
+.paso-nombre { font-weight: 600; color: var(--mrc-crema); }
+.paso-texto { font-size: var(--mrc-text-menor); line-height: 1.55; }
+
+/* ——— Recetas ——— */
+
 .receta-card {
   background: var(--mrc-crema);
   border-radius: 1rem;
   padding: 1.75rem;
+  height: 100%;
 }
 .receta-card li { font-size: var(--mrc-text-menor); }
 
-/* Tarjetas de tema del ABC. */
-.tema-card {
-  background: var(--mrc-verde-800);
+.video-personaje video {
+  display: block;
+  width: 100%;
   border-radius: 1rem;
-  padding: 1.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+  box-shadow: 0 24px 48px -24px color-mix(in srgb, var(--mrc-tinta) 45%, transparent);
 }
+
+/* ——— FAQ con <details> nativo ——— */
+
+.faq-item {
+  border-bottom: 1px solid var(--mrc-crema);
+}
+.faq-item summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 1.1rem 0;
+  font-family: var(--mrc-font-display);
+  font-variation-settings: 'SOFT' 60, 'WONK' 1;
+  font-weight: 600;
+  font-size: var(--mrc-text-subtitulo);
+  color: var(--mrc-verde-700);
+}
+.faq-item summary::-webkit-details-marker { display: none; }
+.faq-item summary::after {
+  content: '+';
+  font-family: var(--mrc-font-texto);
+  color: var(--mrc-bordo);
+  font-size: var(--mrc-text-titulo);
+  line-height: 1;
+  flex-shrink: 0;
+}
+.faq-item[open] summary::after { content: '−'; }
+.faq-item p { padding: 0 0 1.25rem; max-width: 60ch; line-height: 1.6; }
