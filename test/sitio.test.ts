@@ -180,14 +180,21 @@ describe('sistema editorial', () => {
 })
 
 describe('la página en construcción en / (lo público mientras llega el dominio)', () => {
-  it('muestra las dos voces: el sello inline y el personaje en movimiento, con catálogo y correo', async () => {
+  it('muestra el sello inline y el personaje recortado, con catálogo y correo', async () => {
     const html = await container.renderToString(EnConstruccion)
     expect(html).toContain('fill="currentColor"') // el sello, inline, toma la tinta de su sección
     expect(html).toContain(sitio.marca.wordmark)
-    expect(html).toContain('/sitio/changuito-molinillo.mp4')
+    // El video del cliente trae fondo blanco: sobre la tinta se ve como
+    // un parche, así que va la versión estática sin fondo.
+    expect(html).not.toContain('.mp4')
+    expect(html).toContain('/sitio/personaje-molinillo-t.webp')
     expect(html).toContain(sitio.contacto.catalogoUrl)
     expect(html).toContain(sitio.contacto.correo)
     expect(html).toContain(sitio.construccion.encabezado)
+  })
+
+  it('el título va al punto, sin juegos de palabras', () => {
+    expect(sitio.construccion.encabezado).toBe('Sitio en construcción')
   })
 
   it('sin la mascota del sistema y sin enlaces a presentación/manual/borrador (van por URL directa)', async () => {
@@ -199,11 +206,10 @@ describe('la página en construcción en / (lo público mientras llega el domini
     expect(html).not.toContain('href="/presentacion"')
   })
 
-  it('el video respeta reduced-motion (lo resuelve el módulo editorial)', () => {
+  it('carga el módulo editorial, que apaga el movimiento bajo reduced-motion', () => {
     expect(readFileSync('src/pages/index.astro', 'utf8')).toContain("import '@/scripts/editorial'")
     const js = readFileSync('src/scripts/editorial.ts', 'utf8')
     expect(js).toContain("matchMedia('(prefers-reduced-motion: reduce)')")
-    expect(js).toContain('video.pause()')
   })
 })
 

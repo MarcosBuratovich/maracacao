@@ -3,11 +3,11 @@
 // Lo que ve quien entra por el dominio mientras el sitio se termina.
 // Mismo sistema editorial que /sitio: el sello se estampa, el wordmark
 // abre su tracking en la tipografía del propio logotipo, y el canon
-// marca sus registros. El personaje aparece al final, chico y en
-// movimiento: la nota hecha a mano bajo la firma.
+// marca sus registros (simétricos acá, como el sello).
 //
-// El sitio completo vive en /sitio, la presentación en /presentacion y
-// el manual en /manual — sin enlaces desde acá: van por URL directa.
+// Sin juegos de palabras: dice lo que pasa. El personaje va estático y
+// recortado — el video del cliente trae fondo blanco y sobre la tinta
+// se ve como un parche.
 import Base from '@/layouts/Base.astro'
 import selloRaw from '@/assets/brand/sello-mano.svg?raw'
 import { sitio } from '@/copy/sitio'
@@ -19,7 +19,7 @@ const sello = selloRaw.replace('<svg', '<svg aria-hidden="true" focusable="false
 <Base titulo={sitio.construccion.titulo} fuentes="sitio">
   <div class="ed" data-tono="tinta">
     <main class="seccion portada">
-      <div class="registro"><span></span><span></span></div>
+      <div class="registro registro-simetrico"><span></span><span></span></div>
 
       <div class="portada-centro">
         <div class="portada-sello sello estampa" set:html={sello} />
@@ -54,12 +54,11 @@ const sello = selloRaw.replace('<svg', '<svg aria-hidden="true" focusable="false
         </div>
 
         <figure class="portada-personaje entra-suave" style="--retardo:1500ms">
-          <video
-            src="/sitio/changuito-molinillo.mp4"
-            poster="/sitio/changuito-molinillo-poster.jpg"
-            muted loop playsinline autoplay preload="metadata"
-            aria-label={sitio.construccion.videoAria}
-          ></video>
+          <img
+            src="/sitio/personaje-molinillo-t.webp"
+            alt={sitio.construccion.personajeAlt}
+            width="460" height="814"
+          />
         </figure>
 
         <ul class="portada-meta marca entra-suave" style="--retardo:1600ms">
@@ -80,15 +79,15 @@ const sello = selloRaw.replace('<svg', '<svg aria-hidden="true" focusable="false
   }
   /* Ritmo ajustado para que la portada entre en una pantalla de 900 px
      sin scroll (medido en vivo: con el ritmo del sitio se pasaba). */
-  .portada-centro { text-align: center; padding-block: clamp(2.5rem, 5vh, 4rem); }
-  /* El padding va solo en los bloques de texto: al sello y al video,
+  .portada-centro { text-align: center; padding-block: clamp(2rem, 4vh, 3rem); }
+  /* El padding va solo en los bloques de texto: al sello y al personaje,
      que tienen ancho fijo, los colapsaría (box-sizing border-box). */
   .portada-centro > :not(.monumento, .portada-sello, .portada-personaje) {
     padding-inline: clamp(1.25rem, 5.5vw, 5.5rem);
   }
   .portada-sello {
-    width: clamp(5rem, 9vw, 8rem);
-    margin: 0 auto clamp(1.5rem, 3.5vh, 2.5rem);
+    width: clamp(4.5rem, 8vw, 7rem);
+    margin: 0 auto clamp(1.25rem, 3vh, 2rem);
   }
   .portada-descriptor { margin-top: clamp(0.9rem, 2vh, 1.5rem); letter-spacing: 0.42em; }
   .portada-regla {
@@ -97,7 +96,7 @@ const sello = selloRaw.replace('<svg', '<svg aria-hidden="true" focusable="false
     padding: 0;
   }
   .portada-titulo { margin-top: clamp(1.5rem, 3.5vh, 2.25rem); }
-  .portada-sub { margin: 1rem auto 0; max-width: 44ch; }
+  .portada-sub { margin: 1rem auto 0; max-width: 56ch; }
   .portada-acciones {
     display: flex;
     flex-wrap: wrap;
@@ -106,24 +105,17 @@ const sello = selloRaw.replace('<svg', '<svg aria-hidden="true" focusable="false
     margin-top: clamp(1.75rem, 3.5vh, 2.25rem);
   }
   .portada-personaje {
-    width: clamp(4rem, 6vw, 5.5rem);
-    margin: clamp(1.75rem, 3.5vh, 2.5rem) auto 0;
+    width: clamp(4.5rem, 6vw, 6rem);
+    margin: clamp(1.25rem, 2.5vh, 1.75rem) auto 0;
   }
-  .portada-personaje video {
-    display: block;
-    width: 100%;
-    aspect-ratio: 1;
-    object-fit: cover;
-    border-radius: 999px;
-    border: 1px solid var(--linea);
-  }
+  .portada-personaje img { display: block; width: 100%; height: auto; }
   .portada-meta {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
     gap: 0.4rem 2.5rem;
     list-style: none;
-    margin: 1.5rem 0 0;
+    margin: 1.25rem 0 0;
     padding-inline: 1.25rem;
   }
   @media (max-width: 900px) {

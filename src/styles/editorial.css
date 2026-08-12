@@ -16,13 +16,16 @@
 
 /* ---------- 1. Lienzo y tonos ---------- */
 
+/* Peso 400 y no 300: Jost en 300 y Cormorant en tamaños chicos se leían
+   con esfuerzo (retro de Marcos). Toda la escala menor subió un escalón
+   y ninguna serif baja de ~1.35rem. */
 .ed {
   --ease-libro: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-tinta: cubic-bezier(0.7, 0, 0.2, 1);
   background: var(--fondo);
   color: var(--texto);
   font-family: var(--mrc-font-sans);
-  font-weight: 300;
+  font-weight: 400;
   font-synthesis: none;
   -webkit-font-smoothing: antialiased;
 }
@@ -117,6 +120,10 @@
 }
 .registro span:nth-child(1) { grid-column: 2; }
 .registro span:nth-child(2) { grid-column: 8; }
+/* En las secciones simétricas (hero, contacto) el canon asimétrico se
+   lee como un error de alineación contra el sello centrado: ahí las dos
+   marcas van a 1/9 de cada borde. */
+.registro-simetrico span:nth-child(2) { grid-column: 9; }
 @media (max-width: 900px) { .registro { display: none; } }
 
 /* ---------- 3. Tipografía ---------- */
@@ -169,37 +176,38 @@
 
 .sub {
   font-family: var(--mrc-font-sello);
-  font-weight: 400;
-  font-size: clamp(1.25rem, 1.7vw, 1.6rem);
-  line-height: 1.25;
+  font-weight: 500;
+  font-size: clamp(1.375rem, 1.8vw, 1.75rem);
+  line-height: 1.22;
   margin: 0;
 }
 
 .marca {
   font-family: var(--mrc-font-sans);
-  font-size: 0.6875rem;
-  font-weight: 400;
-  letter-spacing: 0.26em;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--tenue);
   margin: 0;
 }
 
 .cuerpo {
-  font-size: clamp(1rem, 0.42vw + 0.9rem, 1.15rem);
+  font-size: clamp(1.0625rem, 0.4vw + 0.95rem, 1.2rem);
   line-height: 1.7;
-  font-weight: 300;
+  font-weight: 400;
   max-width: 62ch;
   margin: 0;
 }
 .cuerpo + .cuerpo { margin-top: 1.1em; }
 .tenue { color: var(--tenue); }
-.menor { font-size: 0.875rem; line-height: 1.6; }
+.menor { font-size: 0.9375rem; line-height: 1.65; }
 
 .nota-margen {
   font-family: var(--mrc-font-sans);
-  font-size: 0.6875rem;
-  letter-spacing: 0.16em;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--tenue);
   line-height: 1.9;
@@ -217,7 +225,7 @@
 /* ---------- 4. Botones y enlaces ---------- */
 
 .cta {
-  --alto-linea: 1.15em;
+  --alto-linea: 1.3em;
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -229,9 +237,9 @@
   text-decoration: none;
   color: var(--texto);
   font-family: var(--mrc-font-sans);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 500;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   isolation: isolate;
 }
@@ -275,8 +283,8 @@
   display: inline-flex;
   align-items: baseline;
   gap: 0.65rem;
-  font-size: 0.95rem;
-  font-weight: 300;
+  font-size: 1.0625rem;
+  font-weight: 400;
 }
 .sabor::before {
   content: '';
@@ -332,12 +340,12 @@
 .ficha { border-top: 1px solid var(--linea); padding-top: 1.5rem; }
 .ficha-precio {
   font-family: var(--mrc-font-sello);
-  font-size: 1.5rem;
-  font-weight: 400;
+  font-size: 1.625rem;
+  font-weight: 500;
 }
 .lista-limpia { list-style: none; margin: 0; padding: 0; }
 .lista-limpia li {
-  font-size: 0.95rem;
+  font-size: 1rem;
   line-height: 1.55;
   padding: 0.55rem 0 0.55rem 1.1rem;
   position: relative;
@@ -357,7 +365,7 @@
 .marco-foto img { display: block; width: 100%; height: 100%; object-fit: cover; }
 
 .paso { display: grid; grid-template-columns: 3.5rem 1fr; gap: 1.25rem; padding-block: 1.1rem; border-top: 1px solid var(--linea); }
-.paso-n { font-family: var(--mrc-font-sello); font-size: 1.75rem; line-height: 1; color: var(--tenue); }
+.paso-n { font-family: var(--mrc-font-sello); font-weight: 500; font-size: 1.875rem; line-height: 1; color: var(--tenue); }
 
 .faq { border-top: 1px solid var(--linea); }
 .faq summary {
@@ -375,7 +383,7 @@
 .faq summary::-webkit-details-marker { display: none; }
 .faq summary::after { content: '+'; font-family: var(--mrc-font-sans); font-weight: 300; color: var(--tenue); }
 .faq[open] summary::after { content: '–'; }
-.faq p { padding: 0 0 1.4rem; max-width: 60ch; color: var(--tenue); line-height: 1.7; }
+.faq p { padding: 0 0 1.4rem; max-width: 60ch; color: var(--tenue); line-height: 1.7; font-size: 1.0625rem; }
 
 /* ---------- 7. Cursor de sello ---------- */
 
@@ -407,7 +415,7 @@
   text-transform: uppercase;
   color: var(--cursor-color, var(--mrc-ed-tinta));
 }
-.cursor-anillo b { font-weight: 400; opacity: 0; transition: opacity 0.25s; }
+.cursor-anillo b { font-weight: 500; opacity: 0; transition: opacity 0.25s; }
 /* El cursor nativo se apaga solo cuando el propio está activo (puntero
    fino y sin reduced-motion): el script pone la clase. */
 html.cursor-propio, html.cursor-propio * { cursor: none; }
@@ -459,8 +467,9 @@ html.acoplado .barra-sello { opacity: 1; transform: none; }
 .barra-nav { display: flex; gap: 1.9rem; }
 .barra-nav a {
   font-family: var(--mrc-font-sans);
-  font-size: 0.6875rem;
-  letter-spacing: 0.2em;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: inherit;
   text-decoration: none;

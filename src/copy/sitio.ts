@@ -41,7 +41,28 @@ export const sitio = {
     lugar: 'Coyoacán, Ciudad de México',
     cacao: '70% cacao',
     hecho: 'Hecho a mano',
-    bajar: 'Bajar',
+    tiraAria: 'Barras de Maracacao del catálogo',
+    // Fotos reales del catálogo (chocolateria.pulpos.shop), recortadas
+    // al vertical de la barra. El hero no lo llena una decoración: lo
+    // llena el producto.
+    // Curada: quedan fuera las fotos del catálogo que muestran barras de
+    // Dulce Olivia (la otra marca de la casa) — en el hero de Maracacao
+    // solo va empaque de Maracacao.
+    tira: [
+      { archivo: 'naranja-jengibre', nombre: 'Naranja con jengibre' },
+      { archivo: 'mango-chile', nombre: 'Mango con chile' },
+      { archivo: 'limoncillo', nombre: 'Limoncillo' },
+      { archivo: 'sal-de-mar', nombre: 'Sal de mar' },
+      { archivo: 'canela', nombre: 'Canela' },
+      { archivo: 'lima-chile', nombre: 'Lima y chile' },
+      { archivo: 'tamarindo', nombre: 'Tamarindo' },
+      { archivo: 'paquete-seis', nombre: 'Paquete de seis minis' },
+      { archivo: 'blanco-pistache', nombre: 'Chocolate blanco con pistache' },
+      { archivo: 'chamoy', nombre: 'Chamoy' },
+      { archivo: 'yerbabuena', nombre: 'Yerbabuena' },
+      { archivo: 'fresas-enchiladas', nombre: 'Fresas enchiladas' },
+      { archivo: 'gotas', nombre: 'Gotas de chocolate' },
+    ] as const,
   },
 
   manifiesto: {
@@ -61,6 +82,8 @@ export const sitio = {
         nombre: 'Barras',
         presentacion: '70 gramos · 70% cacao',
         precioDesde: 108,
+        imagen: 'linea-barras',
+        imagenAlt: 'Barra Maracacao de mango con chile sobre una mesa de madera, con granos de cacao alrededor',
         bullets: [
           'El cacao al frente del sabor, con menos protagonismo del azúcar',
           'Frutas, hierbas y especias: cada barra es una experiencia distinta',
@@ -71,6 +94,8 @@ export const sitio = {
         nombre: 'Gotas de chocolate',
         presentacion: '250 gramos · 70% cacao',
         precioDesde: 258,
+        imagen: 'linea-gotas',
+        imagenAlt: 'Bolsa de 250 gramos de gotas de chocolate Maracacao',
         bullets: [
           'Porciones de unos 10 gramos, listas para usar',
           'Para galletas, brownies y coberturas, o para fundir en taza y frappé',
@@ -80,6 +105,8 @@ export const sitio = {
       {
         nombre: 'Chocolate en polvo',
         presentacion: '250 gramos · Próximamente',
+        imagen: 'linea-polvo',
+        imagenAlt: 'Etiqueta del chocolate en polvo de cardamomo',
         bullets: [
           'Cocoa natural, cocoa alcalina y pasta de cacao',
           'Se integra fácil en bebidas calientes o frías',
@@ -185,7 +212,7 @@ export const sitio = {
     titulo: 'Recetas',
     intro: 'Cuatro maneras de llevar el chocolate de la barra a la mesa, con las gotas y el chocolate en polvo.',
     notaMargen: ['Taza', 'Frío', 'Postre'],
-    videoAria: 'El personaje de Maracacao batiendo chocolate en una taza con su molinillo',
+    imagenAlt: 'El personaje de Maracacao batiendo chocolate en una taza con su molinillo',
     etiquetaTip: 'Tip Maracacao',
     lista: [
       {
@@ -269,13 +296,14 @@ export const sitio = {
   },
 
   // Página en construcción — lo público mientras se termina el sitio.
+  // Sin juegos de palabras: al punto (retro de Marcos, 2026-08-12).
   construccion: {
-    titulo: 'Maracacao — Muy pronto',
-    encabezado: 'Estamos poniendo la mesa',
-    sub: 'La página de Maracacao está en construcción. Mientras tanto, el catálogo está abierto y el chocolate, disponible.',
+    titulo: 'Maracacao — Sitio en construcción',
+    encabezado: 'Sitio en construcción',
+    sub: 'Estamos armando la página. Mientras tanto, el catálogo está abierto y el chocolate, disponible.',
     ctaCatalogo: 'Ver el catálogo',
     ctaCorreo: 'Escríbenos',
-    videoAria: 'El personaje de Maracacao batiendo chocolate con su molinillo',
+    personajeAlt: 'El personaje de Maracacao batiendo chocolate con su molinillo',
     logoAlt: 'Sello de Maracacao: la huella de una mano dentro de un círculo, con la palma formada por granos de cacao',
     lugar: 'Mercado de Coyoacán',
     muyPronto: 'Muy pronto',
