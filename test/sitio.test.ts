@@ -89,8 +89,9 @@ describe('la página /sitio', () => {
 })
 
 describe('la página en construcción en / (lo público mientras llega el dominio)', () => {
-  it('muestra al personaje en movimiento con salidas útiles: catálogo y correo', async () => {
+  it('muestra las dos voces: el sello oficial y el personaje en movimiento, con catálogo y correo', async () => {
     const html = await container.renderToString(EnConstruccion)
+    expect(html).toContain('/sitio/logo-maracacao.webp') // logo oficial (decisión 2026-08-12)
     expect(html).toContain('/sitio/changuito-molinillo.mp4')
     expect(html).toContain(sitio.contacto.catalogoUrl)
     expect(html).toContain(sitio.contacto.correo)

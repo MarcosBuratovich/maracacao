@@ -19,6 +19,7 @@ export const sitio = {
     ctaCatalogo: 'Ver el catálogo',
     ctaCorreo: 'Escríbenos',
     videoAria: 'El personaje de Maracacao batiendo chocolate con su molinillo',
+    logoAlt: 'Logotipo de Maracacao: la huella de una mano dentro de un círculo, con la palma formada por granos de cacao',
     muyPronto: 'Muy pronto',
   },
   skipLink: 'Ir al contenido',

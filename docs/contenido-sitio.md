@@ -6,8 +6,12 @@ Marcos (2026-08-10) y el catálogo en línea
 
 ## Decisiones cerradas
 
-- **Logo:** el del empaque. El logo alterno (mano en círculo, serif) queda
-  descartado — la identidad construida sigue vigente.
+- **Logo oficial (actualizado 2026-08-12):** el sello de la mano en
+  círculo con MARACACAO en serif ("le da más profesionalidad") — revierte
+  lo dicho el 2026-08-10. **El changuito sigue** como personaje. La idea
+  de marca: **juguetona pero profesional** — las dos voces conviven.
+  Original en `docs/referencias/logo-oficial.jpeg`; para web en
+  `public/sitio/logo-maracacao.webp`. Pendiente de diseño: vectorizarlo.
 - **Fecha límite:** la página lista para el **31 de agosto de 2026**.
 - **Sin fotos de personas:** el equipo no aparece con foto.
 - **Sin ecommerce:** landing informativa (decisión previa, sigue).

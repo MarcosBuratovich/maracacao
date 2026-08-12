@@ -29,7 +29,7 @@ Eres el diseñador web de Maracacao, marca mexicana de chocolate artesanal. Dise
 
 Sistema de diseño obligatorio: bandas de color plenas alternando papel crema #FAF3E0 y verde profundo #3A4A30; títulos en serif cálida estilo Fraunces, texto en sans estilo Work Sans; acentos bordó #8B4D3F y amarillo #ECC677; colores de empaque disponibles: morado #774A95, rojo #C66361, verde hoja #376042, menta #B2C0AD, naranja #DA8843. El personaje es el changuito rojo ilustrado que te adjunto (único personaje permitido). Tono es-MX cálido y directo, frases cortas. Mobile-first, contraste AA mínimo, sin degradados ni sombras 3D.
 
-Contenido real: logotipo MARACACAO (lettering a mano, arriba); título "Chocolate mexicano, de verdad"; bajada "Solo cacao, esencias naturales y azúcar de caña. Sin químicos, saborizantes ni aditivos."; botones "Ver los sabores" y "Ir al catálogo"; menú: Productos, ABC del chocolate, Recetas, Quiénes somos, Negocios, FAQ, Contacto.
+Contenido real: el logo oficial es el sello de la mano en círculo con MARACACAO en serif (te lo adjunto) — esa es la voz profesional; el changuito rojo es la voz juguetona y las dos conviven ("juguetona pero profesional"). El lettering a mano del empaque existe también como recurso secundario. Título "Chocolate mexicano, de verdad"; bajada "Solo cacao, esencias naturales y azúcar de caña. Sin químicos, saborizantes ni aditivos."; botones "Ver los sabores" y "Ir al catálogo"; menú: Productos, ABC del chocolate, Recetas, Quiénes somos, Negocios, FAQ, Contacto.
 
 Debe lograr: marca y antojo en 3 segundos, y que se entienda que es informativa (el catálogo de compra es un enlace externo).
 

@@ -1,50 +1,75 @@
 ---
 // src/pages/index.astro — Página EN CONSTRUCCIÓN.
-// Es lo que ve quien entre por el dominio mientras el sitio se termina
-// (decisión de Marcos, 2026-08-12). El changuito del cliente en
-// movimiento, el lettering del empaque y dos salidas útiles: el catálogo
-// (la venta ya existe ahí) y el correo. La presentación completa vive en
-// /presentacion, el manual en /manual y el borrador en /sitio — sin
-// enlaces desde acá: se comparten por URL directa.
+// Es lo que ve quien entre por el dominio mientras el sitio se termina.
+// La escena toma su energía de la foto real de las minis: envolturas de
+// colores regadas alrededor del changuito, flotando despacio. Los colores
+// son los MEDIDOS de los empaques (tokens --mrc-empaque-*, 2026-08-10).
+// La presentación vive en /presentacion, el manual en /manual y el
+// borrador en /sitio — sin enlaces desde acá: van por URL directa.
 import Base from '@/layouts/Base.astro'
-import { svgDeMarca } from '@/components/brand/svg-inline'
 import { sitio } from '@/copy/sitio'
 import '@/styles/global.css'
 import '@/styles/landing.css'
 
-// El arco y el descriptor del empaque, en crema sobre la banda verde
-// (par AAA aprobado). Mismo dimensionado que usan los componentes de
-// marca: ancho fijo, altura por aspect ratio.
-const arco = svgDeMarca('logotipo-arco').replace('<svg', '<svg width="100%"')
-const descriptor = svgDeMarca('descriptor').replace('<svg', '<svg width="100%"')
+// Las minis flotando: color del cuerpo, color de la etiqueta, tamaño,
+// posición, inclinación y fase de la animación. `chica: true` se oculta
+// en pantallas angostas para no amontonar.
+const envolturas = [
+  { cuerpo: 'morado', etiqueta: 'amarilloEtiqueta', tam: 6.0, top: 14, left: 10, rot: -12, fase: 0 },
+  { cuerpo: 'naranja', etiqueta: 'amarilloEtiqueta', tam: 4.5, top: 66, left: 7, rot: 9, fase: 0.35, abajo: true },
+  { cuerpo: 'menta', etiqueta: 'amarilloEtiqueta', tam: 5.2, top: 17, left: 84, rot: 11, fase: 0.6 },
+  { cuerpo: 'rosaFondo', etiqueta: 'amarilloEtiqueta', tam: 4.0, top: 72, left: 87, rot: -9, fase: 0.2, abajo: true },
+  { cuerpo: 'verdeHoja', etiqueta: 'amarilloEtiqueta', tam: 3.6, top: 42, left: 15, rot: 16, fase: 0.5, chica: true },
+  { cuerpo: 'amarilloEtiqueta', etiqueta: 'cremaPersonaje', tam: 3.8, top: 40, left: 81, rot: -16, fase: 0.8, chica: true },
+  { cuerpo: 'morado', etiqueta: 'amarilloEtiqueta', tam: 3.0, top: 86, left: 28, rot: 7, fase: 0.65, chica: true },
+  { cuerpo: 'naranja', etiqueta: 'amarilloEtiqueta', tam: 3.4, top: 7, left: 66, rot: -7, fase: 0.45, chica: true },
+] as const
+
+// La cinta de arriba: los colores del anaquel, en orden de fiesta.
+const cinta = ['morado', 'naranja', 'menta', 'amarilloEtiqueta', 'verdeHoja', 'rosaFondo'] as const
 ---
 <Base titulo={sitio.construccion.titulo}>
-  <main class="banda" data-fondo="verde" style="min-height:100vh;min-height:100dvh;display:grid;place-items:center">
-    <div class="flex max-w-lg flex-col items-center gap-5 px-6 py-12 text-center">
-      <div class="w-56 sm:w-64 entra" aria-hidden="true">
-        <span set:html={arco} />
+  <main class="escena banda" data-fondo="verde">
+    <div class="cinta" aria-hidden="true">
+      {cinta.map((c) => <span style={`background:var(--mrc-empaque-${c})`} />)}
+    </div>
+
+    {envolturas.map((e) => (
+      <div
+        class={`envuelta${'chica' in e && e.chica ? ' envuelta-chica' : ''}${'abajo' in e && e.abajo ? ' envuelta-abajo' : ''}`}
+        style={`--cuerpo:var(--mrc-empaque-${e.cuerpo});--etiqueta:var(--mrc-empaque-${e.etiqueta});--tam:${e.tam}rem;--rot:${e.rot}deg;--fase:${e.fase};top:${e.top}%;left:${e.left}%`}
+        aria-hidden="true"
+      >
+        <span class="envuelta-etiqueta"></span>
+      </div>
+    ))}
+
+    <div class="centro flex flex-col items-center gap-6 px-6 py-12 text-center">
+      {/* Las dos voces de la marca, tocándose: el sello profesional como
+          ancla y el changuito en video asomado como sticker en su esquina
+          ("juguetona pero profesional", decisión de Marcos 2026-08-12). */}
+      <div class="marca-doble entra">
+        <img
+          src="/sitio/logo-maracacao.webp"
+          alt={sitio.construccion.logoAlt}
+          class="marca-sello"
+          width="560"
+          height="560"
+        />
+        <figure class="video-personaje aro entra entra-2">
+          <video
+            src="/sitio/changuito-molinillo.mp4"
+            poster="/sitio/changuito-molinillo-poster.jpg"
+            muted
+            loop
+            playsinline
+            autoplay
+            preload="metadata"
+            aria-label={sitio.construccion.videoAria}
+          ></video>
+        </figure>
       </div>
 
-      <figure class="video-personaje entra entra-2" style="width:min(13rem,60vw)">
-        <video
-          src="/sitio/changuito-molinillo.mp4"
-          poster="/sitio/changuito-molinillo-poster.jpg"
-          muted
-          loop
-          playsinline
-          autoplay
-          preload="metadata"
-          aria-label={sitio.construccion.videoAria}
-          style="border-radius:999px;aspect-ratio:1;object-fit:cover;width:100%"
-        ></video>
-      </figure>
-
-      <div class="w-40 sm:w-44 entra entra-2" aria-hidden="true">
-        <span set:html={descriptor} />
-      </div>
-
-      {/* El descriptor dibujado ya dice "CHOCOLATE MEXICANO": sin overline
-          que lo repita. */}
       <div class="entra entra-3">
         <h1 class="b-titulo">{sitio.construccion.encabezado}</h1>
         <p class="b-prosa mx-auto mt-4">{sitio.construccion.sub}</p>
@@ -63,6 +88,95 @@ const descriptor = svgDeMarca('descriptor').replace('<svg', '<svg width="100%"')
     </div>
   </main>
 </Base>
+
+<style>
+  .escena {
+    position: relative;
+    overflow: hidden;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: grid;
+    place-items: center;
+  }
+
+  .cinta {
+    position: absolute;
+    inset: 0 0 auto 0;
+    display: flex;
+    height: 0.6rem;
+  }
+  .cinta span { flex: 1; }
+
+  .centro { position: relative; max-width: 32rem; }
+
+  /* El sello profesional (imagen sobre su propio crema) con esquinas
+     redondeadas, y el changuito asomado sobre su esquina inferior derecha. */
+  .marca-doble { position: relative; }
+  .marca-sello {
+    display: block;
+    width: min(19rem, 74vw);
+    height: auto;
+    border-radius: 1.25rem;
+    box-shadow: 0 28px 56px -28px color-mix(in srgb, var(--mrc-verde-900) 85%, transparent);
+  }
+  .aro {
+    /* Esquina superior derecha: crema vacío — nunca sobre el wordmark. */
+    position: absolute;
+    right: -2.25rem;
+    top: -1.75rem;
+    width: min(8.5rem, 34vw);
+    rotate: 6deg;
+  }
+  .aro video {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: 999px;
+    border: 5px solid var(--mrc-crema);
+    box-shadow: 0 20px 40px -20px color-mix(in srgb, var(--mrc-verde-900) 85%, transparent);
+  }
+
+  /* Las minis regadas, como en la foto real del cliente. */
+  .envuelta {
+    position: absolute;
+    width: var(--tam);
+    aspect-ratio: 1 / 1.12;
+    background: var(--cuerpo);
+    border-radius: calc(var(--tam) * 0.12);
+    rotate: var(--rot);
+    box-shadow: 0 14px 28px -16px color-mix(in srgb, var(--mrc-verde-900) 75%, transparent);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: calc(var(--tam) * 0.12);
+  }
+  .envuelta-etiqueta {
+    width: 62%;
+    height: calc(var(--tam) * 0.2);
+    background: var(--etiqueta);
+    border-radius: calc(var(--tam) * 0.05);
+  }
+
+  @media (max-width: 640px) {
+    .envuelta-chica { display: none; }
+    .envuelta { opacity: 0.9; }
+    /* En pantalla angosta el texto ocupa casi todo el ancho: las minis
+       de media altura se anclan a las esquinas de abajo. */
+    .envuelta-abajo { top: auto !important; bottom: 2.5%; }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    @keyframes flotar {
+      0%, 100% { translate: 0 0; rotate: var(--rot); }
+      50% { translate: 0 -10px; rotate: calc(var(--rot) + 3deg); }
+    }
+    .envuelta {
+      animation: flotar calc(var(--mrc-dur-ambiental) * 1.6) var(--mrc-ease-spring) infinite;
+      animation-delay: calc(var(--mrc-dur-ambiental) * var(--fase) * -1);
+    }
+  }
+</style>
 
 <script>
   // El video respeta reduced-motion: quieto, con controles y su póster.
