@@ -45,7 +45,7 @@ describe('copy del borrador — registro y retro vigentes', () => {
       expect(t.toLowerCase()).not.toContain('carrito')
       expect(t).not.toMatch(/\$\s?\d/) // nunca precios pegados en strings
     }
-    for (const d of sitio.productos.destacadas) expect(typeof d.precio).toBe('number')
+    for (const f of sitio.productos.fotos) expect(typeof f.precio).toBe('number')
   })
 
   it('las 15 barras del catálogo están, sin inventar la 16', () => {
@@ -105,7 +105,7 @@ describe('la página /sitio (alta fidelidad, centro de información)', () => {
     expect(src).toContain('/sitio/personaje-sentado-t.webp')
     expect(src).toContain('/sitio/personaje-molinillo-t.webp')
     // El logo transparente solo sobre banda clara (el header es papel).
-    expect(src).toContain('/sitio/logo-t.png')
+    expect(src).toContain('/sitio/logo.svg')
   })
 
   it('el video del personaje respeta reduced-motion (se pausa y da controles)', () => {

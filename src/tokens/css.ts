@@ -1,4 +1,4 @@
-import { verde, tan, rosa, fijos, roles, empaque } from './color'
+import { verde, tan, rosa, fijos, roles, empaque, etiqueta } from './color'
 import { familias, escala } from './type'
 import { duraciones, easings } from './motion'
 
@@ -9,6 +9,7 @@ export function customProperties(): Record<string, string> {
   for (const [paso, hex] of Object.entries(rosa)) props[`--mrc-rosa-${paso}`] = hex
   for (const [nombre, hex] of Object.entries(fijos)) props[`--mrc-${nombre}`] = hex
   for (const [nombre, hex] of Object.entries(empaque)) props[`--mrc-empaque-${nombre}`] = hex
+  for (const [nombre, hex] of Object.entries(etiqueta)) props[`--mrc-etiqueta-${nombre}`] = hex
   for (const [rol, hex] of Object.entries(roles)) props[`--mrc-rol-${rol}`] = hex
   for (const [nombre, valor] of Object.entries(familias)) props[`--mrc-font-${nombre}`] = valor
   for (const [nombre, valor] of Object.entries(escala)) props[`--mrc-text-${nombre}`] = valor

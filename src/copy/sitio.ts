@@ -87,13 +87,44 @@ export const sitio = {
       'Menta intensa', 'Fresas enchiladas', 'Piña con chile',
       'Coriandro', 'Yerbabuena',
     ],
-    destacadas: [
-      { nombre: 'Chocolate blanco con pistache', tono: 'blanco', precio: 108 },
-      { nombre: 'Sal de mar', tono: 'oscuro', precio: 108 },
-      { nombre: 'Mango con chile', tono: 'leche', precio: 108 },
+    // Fotos reales del catálogo, con sus precios reales.
+    fotos: [
+      {
+        archivo: 'foto-barra-naranja-jengibre',
+        nombre: 'Barra naranja con jengibre',
+        alt: 'Barra Maracacao de naranja con jengibre en su envoltura morada, rodeada de naranjas',
+        precio: 122,
+      },
+      {
+        archivo: 'foto-barra-mango-chile',
+        nombre: 'Barra mango con chile',
+        alt: 'Barra Maracacao de mango con chile en su envoltura roja, junto a mangos frescos',
+        precio: 108,
+      },
+      {
+        archivo: 'foto-minis',
+        nombre: 'Paquete de seis minis',
+        alt: 'Paquete de seis minis Maracacao de 10 gramos en envolturas de colores',
+        precio: 118,
+      },
     ] as const,
-    notaMinis: 'También hay minis de 10 gramos, en paquete de seis con sabores siempre distintos.',
-    precioMinis: 118,
+    notaMinis: 'Las minis de 10 gramos van en paquete de seis, con sabores siempre distintos.',
+    polvo: {
+      titulo: 'La línea de chocolate en polvo',
+      nota: 'Próximamente',
+      // Las ocho etiquetas reales (docs/referencias/etiquetas/).
+      sabores: [
+        { archivo: 'etiqueta-naranja-jengibre', nombre: 'Naranja y jengibre' },
+        { archivo: 'etiqueta-canela', nombre: 'Canela' },
+        { archivo: 'etiqueta-limoncillo', nombre: 'Limoncillo' },
+        { archivo: 'etiqueta-chile', nombre: 'Chile' },
+        { archivo: 'etiqueta-menta', nombre: 'Menta' },
+        { archivo: 'etiqueta-cardamomo', nombre: 'Cardamomo' },
+        { archivo: 'etiqueta-cocoa-natural', nombre: 'Cocoa natural' },
+        { archivo: 'etiqueta-cocoa-alcalina', nombre: 'Cocoa alcalina' },
+      ] as const,
+      altPrefijo: 'Etiqueta del chocolate en polvo sabor',
+    },
     tagline: 'Más cacao, ingredientes sencillos y muchas maneras de disfrutarlo.',
   },
 

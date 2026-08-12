@@ -47,6 +47,43 @@
   --b-foco: var(--mrc-amarillo);
 }
 
+/* Bandas de la paleta de etiquetas (medidas de los empaques reales,
+   2026-08-12). Solo pares que pasan AA: papel/crema sobre cacao (7.93 /
+   7.19), carmin (10.05 / 9.12), petroleo (5.98 / 5.42) y morado (5.39 /
+   4.89). El chile (4.45) NO tiene banda: solo acentos grandes. */
+[data-fondo='cacao'] {
+  --b-fondo: var(--mrc-etiqueta-cacao);
+  --b-texto: var(--mrc-papel);
+  --b-titulo: var(--mrc-crema);
+  --b-sec: var(--mrc-crema);
+  --b-acento: var(--mrc-crema);
+  --b-foco: var(--mrc-amarillo);
+}
+[data-fondo='carmin'] {
+  --b-fondo: var(--mrc-etiqueta-carmin);
+  --b-texto: var(--mrc-papel);
+  --b-titulo: var(--mrc-crema);
+  --b-sec: var(--mrc-crema);
+  --b-acento: var(--mrc-crema);
+  --b-foco: var(--mrc-amarillo);
+}
+[data-fondo='petroleo'] {
+  --b-fondo: var(--mrc-etiqueta-petroleo);
+  --b-texto: var(--mrc-papel);
+  --b-titulo: var(--mrc-crema);
+  --b-sec: var(--mrc-crema);
+  --b-acento: var(--mrc-crema);
+  --b-foco: var(--mrc-amarillo);
+}
+[data-fondo='morado'] {
+  --b-fondo: var(--mrc-etiqueta-morado);
+  --b-texto: var(--mrc-papel);
+  --b-titulo: var(--mrc-crema);
+  --b-sec: var(--mrc-crema);
+  --b-acento: var(--mrc-crema);
+  --b-foco: var(--mrc-amarillo);
+}
+
 .banda {
   background: var(--b-fondo);
   color: var(--b-texto);

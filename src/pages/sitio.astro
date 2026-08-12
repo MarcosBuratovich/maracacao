@@ -7,11 +7,6 @@
 // SOLO vive sobre banda clara; sobre bandas oscuras iría la tarjeta.
 import Base from '@/layouts/Base.astro'
 import Banda from '@/components/landing/Banda.astro'
-import TabletaSabor from '@/components/landing/TabletaSabor.astro'
-import TazaEspuma from '@/components/sitio/TazaEspuma.astro'
-import HojaCacao from '@/components/sitio/HojaCacao.astro'
-import Mazorca from '@/components/sitio/Mazorca.astro'
-import Canela from '@/components/sitio/Canela.astro'
 import { sitio, precioMXN } from '@/copy/sitio'
 import '@/styles/global.css'
 import '@/styles/landing.css'
@@ -27,11 +22,11 @@ const nav = [
   ['#contacto', sitio.nav.contacto],
 ] as const
 
-// Minis flotando en el hero, colores medidos del empaque.
+// Minis flotando en el hero, con la paleta viva de las etiquetas.
 const minis = [
   { cuerpo: 'morado', tam: 4.4, top: 8, left: 74, rot: -11, fase: 0 },
-  { cuerpo: 'naranja', tam: 3.4, top: 64, left: 68, rot: 9, fase: 0.4 },
-  { cuerpo: 'menta', tam: 3.8, top: 26, left: 92, rot: 13, fase: 0.7 },
+  { cuerpo: 'chile', tam: 3.4, top: 64, left: 68, rot: 9, fase: 0.4 },
+  { cuerpo: 'cielo', tam: 3.8, top: 26, left: 92, rot: 13, fase: 0.7 },
 ] as const
 ---
 <Base titulo={sitio.titulo}>
@@ -42,7 +37,7 @@ const minis = [
   <div style="background:var(--mrc-papel)" data-fondo="papel">
     <header class="sitio-header">
       <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 py-3">
-        <img src="/sitio/logo-t.png" alt={sitio.construccion.logoAlt} class="h-16 w-auto sm:h-20" width="560" height="560" />
+        <img src="/sitio/logo.svg" alt={sitio.construccion.logoAlt} class="h-16 w-auto sm:h-20" width="560" height="560" />
         <nav class="sitio-nav flex flex-wrap items-center gap-x-5 gap-y-1" aria-label="Secciones">
           {nav.map(([href, etiqueta]) => <a href={href}>{etiqueta}</a>)}
         </nav>
@@ -50,8 +45,8 @@ const minis = [
     </header>
 
     <main id="contenido">
-      {/* Hero */}
-      <Banda fondo="verde">
+      {/* Hero — el piso oscuro del sitio es el café cacao de la etiqueta. */}
+      <Banda fondo="cacao">
         <div class="relative grid items-center gap-10 md:grid-cols-[3fr_2fr]">
           {minis.map((m) => (
             <div
@@ -103,9 +98,21 @@ const minis = [
           ))}
         </div>
 
-        <div class="mt-14 grid gap-10 sm:grid-cols-3" data-revelar>
-          {sitio.productos.destacadas.map((s) => (
-            <TabletaSabor nombre={s.nombre} tono={s.tono} precioTexto={precioMXN(s.precio)} />
+        <div class="mt-14 grid gap-8 sm:grid-cols-3" data-revelar>
+          {sitio.productos.fotos.map((f) => (
+            <figure>
+              <img
+                src={`/sitio/${f.archivo}.webp`}
+                alt={f.alt}
+                class="w-full rounded-2xl"
+                loading="lazy"
+                style="box-shadow:0 24px 48px -24px color-mix(in srgb, var(--mrc-tinta) 45%, transparent)"
+              />
+              <figcaption class="mt-3 flex items-baseline justify-between gap-3">
+                <span class="font-semibold">{f.nombre}</span>
+                <span class="chip-precio">{precioMXN(f.precio)}</span>
+              </figcaption>
+            </figure>
           ))}
         </div>
 
@@ -115,14 +122,33 @@ const minis = [
             <li class="sabor-chip">{b}</li>
           ))}
         </ul>
-        <p class="b-menor b-sec mt-6" data-revelar>
-          {sitio.productos.notaMinis} <span class="chip-precio">{precioMXN(sitio.productos.precioMinis)}</span>
-        </p>
+        <p class="b-menor b-sec mt-6" data-revelar>{sitio.productos.notaMinis}</p>
+
+        <div class="mt-14 flex items-baseline justify-between gap-4" data-revelar>
+          <h3 class="b-subtitulo">{sitio.productos.polvo.titulo}</h3>
+          <span class="chip-precio">{sitio.productos.polvo.nota}</span>
+        </div>
+        <div class="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4" data-revelar class:list="retardo-1">
+          {sitio.productos.polvo.sabores.map((s) => (
+            <figure>
+              <img
+                src={`/sitio/${s.archivo}.webp`}
+                alt={`${sitio.productos.polvo.altPrefijo} ${s.nombre}`}
+                class="w-full rounded-xl"
+                loading="lazy"
+                style="box-shadow:0 16px 32px -18px color-mix(in srgb, var(--mrc-tinta) 45%, transparent)"
+              />
+              <figcaption class="b-menor mt-2 text-center font-semibold" style="color:var(--mrc-verde-700)">
+                {s.nombre}
+              </figcaption>
+            </figure>
+          ))}
+        </div>
         <p class="mt-10 font-semibold" style="color:var(--mrc-bordo)" data-revelar>{sitio.productos.tagline}</p>
       </Banda>
 
       {/* El ABC del chocolate */}
-      <Banda fondo="verde" id="abc">
+      <Banda fondo="petroleo" id="abc">
         <div class="max-w-2xl" data-revelar>
           <h2 class="b-titulo">{sitio.abc.titulo}</h2>
           <p class="mt-4 leading-relaxed">{sitio.abc.intro}</p>
@@ -145,10 +171,7 @@ const minis = [
           </div>
 
           <div class="abc-bloque" data-revelar class:list="retardo-1">
-            <div class="flex items-start justify-between gap-4">
-              <h3 class="b-subtitulo">{sitio.abc.catar.titulo}</h3>
-              <TazaEspuma class="h-20 shrink-0" />
-            </div>
+            <h3 class="b-subtitulo">{sitio.abc.catar.titulo}</h3>
             <ol class="mt-6 flex flex-col gap-5">
               {sitio.abc.catar.pasos.map((p, i) => (
                 <li class="paso">
@@ -205,48 +228,39 @@ const minis = [
         </div>
       </Banda>
 
-      {/* Quiénes somos */}
-      <Banda fondo="verde" id="quienes">
+      {/* Quiénes somos — sobre el morado de la etiqueta de naranja y jengibre. */}
+      <Banda fondo="morado" id="quienes">
         <div class="grid items-center gap-12 md:grid-cols-[1fr_auto]">
           <div class="max-w-2xl" data-revelar>
             <h2 class="b-titulo">{sitio.quienes.titulo}</h2>
             <p class="b-prosa mt-5">{sitio.quienes.prosa}</p>
             <p class="b-prosa mt-4">{sitio.quienes.origen}</p>
           </div>
-          <div class="flex items-end justify-center gap-3 sm:gap-4" data-revelar class:list="retardo-1">
-            <HojaCacao class="h-16 sm:h-24" tono="400" />
-            <img
-              src="/sitio/personaje-sentado-t.webp"
-              alt={sitio.quienes.imagenAlt}
-              class="h-40 w-auto sm:h-56"
-              width="560" height="991"
-              loading="lazy"
-            />
-            <HojaCacao class="h-14 sm:h-20" tono="600" tarde />
-          </div>
+          <img
+            src="/sitio/personaje-sentado-t.webp"
+            alt={sitio.quienes.imagenAlt}
+            class="mx-auto h-44 w-auto sm:h-64"
+            width="560" height="991"
+            loading="lazy"
+            data-revelar class:list="retardo-1"
+          />
         </div>
       </Banda>
 
       {/* Para cafeterías y negocios */}
       <Banda fondo="crema" id="negocios">
-        <div class="grid items-center gap-10 md:grid-cols-[2fr_1fr]">
-          <div data-revelar>
-            <h2 class="b-titulo">{sitio.negocios.titulo}</h2>
-            <p class="mt-4 max-w-2xl leading-relaxed">{sitio.negocios.prosa}</p>
-            <ul class="mt-6 flex flex-wrap gap-2">
-              {sitio.negocios.fichasDatos.map((d) => (
-                <li class="b-menor rounded-full border-2 px-3 py-1 font-semibold" style="border-color:var(--mrc-verde-200);color:var(--mrc-verde-600)">
-                  {d}
-                </li>
-              ))}
-            </ul>
-            <div class="mt-8">
-              <a href={`mailto:${sitio.contacto.correo}`} class="boton boton-bordo">{sitio.negocios.ctaFichas}</a>
-            </div>
-          </div>
-          <div class="mx-auto flex items-end gap-6" data-revelar class:list="retardo-1">
-            <Mazorca class="h-32" tono="bordo" />
-            <Canela class="h-20" />
+        <div class="max-w-2xl" data-revelar>
+          <h2 class="b-titulo">{sitio.negocios.titulo}</h2>
+          <p class="mt-4 leading-relaxed">{sitio.negocios.prosa}</p>
+          <ul class="mt-6 flex flex-wrap gap-2">
+            {sitio.negocios.fichasDatos.map((d) => (
+              <li class="b-menor rounded-full border-2 px-3 py-1 font-semibold" style="border-color:var(--mrc-verde-200);color:var(--mrc-verde-600)">
+                {d}
+              </li>
+            ))}
+          </ul>
+          <div class="mt-8">
+            <a href={`mailto:${sitio.contacto.correo}`} class="boton boton-bordo">{sitio.negocios.ctaFichas}</a>
           </div>
         </div>
       </Banda>
@@ -267,8 +281,8 @@ const minis = [
         </div>
       </Banda>
 
-      {/* Contacto */}
-      <Banda fondo="profundo" id="contacto">
+      {/* Contacto — cierre cálido sobre el carmín de la canela (AAA). */}
+      <Banda fondo="carmin" id="contacto">
         <div class="text-center" data-revelar>
           <h2 class="b-titulo">{sitio.contacto.titulo}</h2>
           <div class="mt-8 flex flex-wrap items-center justify-center gap-4">
@@ -283,8 +297,8 @@ const minis = [
     </main>
 
     <footer>
-      <Banda fondo="profundo">
-        <div class="flex flex-col items-center gap-2 text-center" style="border-top:1px solid var(--mrc-verde-700);padding-top:2rem">
+      <Banda fondo="cacao">
+        <div class="flex flex-col items-center gap-2 text-center">
           <p class="font-semibold" style="color:var(--mrc-crema)">{sitio.footer.leyenda}</p>
           <p class="b-menor">{sitio.footer.nota}</p>
         </div>

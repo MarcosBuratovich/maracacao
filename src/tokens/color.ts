@@ -56,6 +56,26 @@ export const empaque = {
   cremaPersonaje: '#FBD98A', // cara y panza del changuito
 } as const
 
+/**
+ * Los fondos de las OCHO etiquetas reales de la línea de polvos (medidos
+ * 2026-08-12, `docs/referencias/etiquetas/`). Son la paleta viva del
+ * sitio público — el "replanteo" pedido por Marcos: el oliva del sistema
+ * de identidad se sintió apagado al lado de esto. Contrastes medidos:
+ * cacao 7.93 y carmin 10.05 sobre papel (AAA); petroleo 5.98, morado
+ * 5.39 y caramelo 4.68 (AA); chile 4.45 (solo display/grande); menta y
+ * cielo son claros (texto tinta: 6.64 / 5.74).
+ */
+export const etiqueta = {
+  morado: '#7E4BB0', // naranja & jengibre
+  carmin: '#7D0302', // canela
+  menta: '#95BC94', // limoncillo
+  cacao: '#723D13', // cocoa alcalina
+  chile: '#CB3C40', // chile
+  cielo: '#7CAEB2', // menta
+  caramelo: '#976125', // cocoa natural
+  petroleo: '#136769', // cardamomo
+} as const
+
 export const roles = {
   'fondo-claro': fijos.papel,
   'fondo-oscuro': verde[700],

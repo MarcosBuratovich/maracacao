@@ -103,7 +103,8 @@
 /* ——— El ABC: pasos de cata con número grande y bloques de texto ——— */
 
 .abc-bloque {
-  background: var(--mrc-verde-800);
+  /* Un paso más hondo que la banda petróleo, sin inventar un color. */
+  background: color-mix(in srgb, var(--mrc-etiqueta-petroleo) 72%, var(--mrc-tinta));
   border-radius: 1rem;
   padding: 1.75rem;
 }
