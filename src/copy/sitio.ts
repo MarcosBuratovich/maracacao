@@ -7,6 +7,20 @@
 // número de pregunta del cuestionario.
 export const sitio = {
   titulo: 'Maracacao — Borrador del sitio',
+
+  // Página en construcción — lo único público "de verdad" mientras el
+  // dominio apunta acá (decisión de Marcos, 2026-08-12). El catálogo sí
+  // se enlaza: la venta ya existe ahí.
+  construccion: {
+    titulo: 'Maracacao — Muy pronto',
+    overline: 'Chocolate mexicano',
+    encabezado: 'Estamos poniendo la mesa',
+    sub: 'La página de Maracacao está en construcción. Mientras tanto, el catálogo está abierto y el chocolate, disponible.',
+    ctaCatalogo: 'Ver el catálogo',
+    ctaCorreo: 'Escríbenos',
+    videoAria: 'El personaje de Maracacao batiendo chocolate con su molinillo',
+    muyPronto: 'Muy pronto',
+  },
   skipLink: 'Ir al contenido',
   aviso: 'Borrador para revisar ideas. Lo marcado en amarillo falta que nos lo respondan.',
   pendiente: 'Pendiente',

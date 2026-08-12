@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs'
 import { experimental_AstroContainer as AstroContainer } from 'astro/container'
 import { sitio } from '@/copy/sitio'
 import Borrador from '@/pages/sitio.astro'
+import EnConstruccion from '@/pages/index.astro'
 import TazaEspuma from '@/components/sitio/TazaEspuma.astro'
 import HojaCacao from '@/components/sitio/HojaCacao.astro'
 import Mazorca from '@/components/sitio/Mazorca.astro'
@@ -82,6 +83,31 @@ describe('la página /sitio', () => {
 
   it('el video del personaje respeta reduced-motion (se pausa y da controles)', () => {
     const src = readFileSync('src/pages/sitio.astro', 'utf8')
+    expect(src).toContain("matchMedia('(prefers-reduced-motion: reduce)')")
+    expect(src).toContain('video.pause()')
+  })
+})
+
+describe('la página en construcción en / (lo público mientras llega el dominio)', () => {
+  it('muestra al personaje en movimiento con salidas útiles: catálogo y correo', async () => {
+    const html = await container.renderToString(EnConstruccion)
+    expect(html).toContain('/sitio/changuito-molinillo.mp4')
+    expect(html).toContain(sitio.contacto.catalogoUrl)
+    expect(html).toContain(sitio.contacto.correo)
+    expect(html).toContain(sitio.construccion.encabezado)
+  })
+
+  it('sin la mascota del sistema y sin enlaces a presentación/manual/borrador (van por URL directa)', async () => {
+    const src = readFileSync('src/pages/index.astro', 'utf8')
+    expect(src).not.toContain('components/brand/Mascota')
+    const html = await container.renderToString(EnConstruccion)
+    expect(html).not.toContain('href="/manual"')
+    expect(html).not.toContain('href="/sitio"')
+    expect(html).not.toContain('href="/presentacion"')
+  })
+
+  it('el video respeta reduced-motion', () => {
+    const src = readFileSync('src/pages/index.astro', 'utf8')
     expect(src).toContain("matchMedia('(prefers-reduced-motion: reduce)')")
     expect(src).toContain('video.pause()')
   })

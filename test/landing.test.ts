@@ -16,7 +16,7 @@ import { todosLosColores } from '@/tokens/color'
 import Banda from '@/components/landing/Banda.astro'
 import PaletaTableta from '@/components/landing/PaletaTableta.astro'
 import TabletaSabor from '@/components/landing/TabletaSabor.astro'
-import Portada from '@/pages/index.astro'
+import Portada from '@/pages/presentacion.astro'
 
 const container = await AstroContainer.create()
 
@@ -128,7 +128,7 @@ describe('la presentación en /', () => {
   })
 
   it('ningún enlace interno crudo en el fuente — anclas de página permitidas', () => {
-    const src = readFileSync('src/pages/index.astro', 'utf8')
+    const src = readFileSync('src/pages/presentacion.astro', 'utf8')
     expect(src).not.toMatch(/href="\/(?!\{)/)
   })
 })
@@ -156,7 +156,7 @@ describe('el revelado por scroll no esconde contenido (criterio 5 del spec)', ()
   })
 
   it('el script del observer trabaja por data-attribute, nunca por id (ids duplicados del inlineado)', () => {
-    const src = readFileSync('src/pages/index.astro', 'utf8')
+    const src = readFileSync('src/pages/presentacion.astro', 'utf8')
     expect(src).toContain("querySelectorAll('[data-revelar]')")
     expect(src).not.toContain('getElementById')
   })
