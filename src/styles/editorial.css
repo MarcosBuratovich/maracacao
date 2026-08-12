@@ -24,7 +24,7 @@
   --ease-tinta: cubic-bezier(0.7, 0, 0.2, 1);
   background: var(--fondo);
   color: var(--texto);
-  font-family: var(--mrc-font-sans);
+  font-family: var(--mrc-font-texto);
   font-weight: 400;
   font-synthesis: none;
   -webkit-font-smoothing: antialiased;
@@ -183,7 +183,7 @@
 }
 
 .marca {
-  font-family: var(--mrc-font-sans);
+  font-family: var(--mrc-font-texto);
   font-size: 0.75rem;
   font-weight: 500;
   letter-spacing: 0.22em;
@@ -204,7 +204,7 @@
 .menor { font-size: 0.9375rem; line-height: 1.65; }
 
 .nota-margen {
-  font-family: var(--mrc-font-sans);
+  font-family: var(--mrc-font-texto);
   font-size: 0.75rem;
   font-weight: 500;
   letter-spacing: 0.14em;
@@ -222,31 +222,89 @@
   margin: 0;
 }
 
-/* ---------- 4. Botones y enlaces ---------- */
+/* ---------- 3b. Campos de color ----------
+   El color no repinta la página: entra en piezas. Cada tono declara la
+   tinta con la que se lee, MEDIDA, no elegida a ojo:
+     crema sobre carmín 9.86 · cacao 7.77 · petróleo 5.86 · morado 5.28 ·
+     caramelo 4.59   ·   tinta sobre menta 8.29 · cielo 7.17
+   El chile da 4.36 con crema: no alcanza para texto corrido, así que
+   queda para display grande y acentos sin texto. */
+
+[data-campo] {
+  background: var(--campo);
+  color: var(--campo-tinta);
+  --campo-dura: var(--mrc-ed-tinta);
+}
+[data-campo='morado'] { --campo: var(--mrc-etiqueta-morado); --campo-tinta: var(--mrc-ed-papel); }
+[data-campo='carmin'] { --campo: var(--mrc-etiqueta-carmin); --campo-tinta: var(--mrc-ed-papel); }
+[data-campo='cacao'] { --campo: var(--mrc-etiqueta-cacao); --campo-tinta: var(--mrc-ed-papel); }
+[data-campo='petroleo'] { --campo: var(--mrc-etiqueta-petroleo); --campo-tinta: var(--mrc-ed-papel); }
+[data-campo='caramelo'] { --campo: var(--mrc-etiqueta-caramelo); --campo-tinta: var(--mrc-ed-papel); }
+[data-campo='menta'] { --campo: var(--mrc-etiqueta-menta); --campo-tinta: var(--mrc-ed-tinta); }
+[data-campo='cielo'] { --campo: var(--mrc-etiqueta-cielo); --campo-tinta: var(--mrc-ed-tinta); }
+[data-campo='chile'] { --campo: var(--mrc-etiqueta-chile); --campo-tinta: var(--mrc-ed-papel); }
+
+/* El arco: la envoltura hecha pieza de página. El producto se inclina y
+   se sale por arriba — de ahí sale el volumen, sin 3D. */
+.arco {
+  position: relative;
+  border-radius: 999px 999px 3px 3px;
+  border: 2px solid var(--campo-dura);
+  box-shadow: -6px 6px 0 0 var(--campo-dura);
+  display: grid;
+  place-items: end center;
+  overflow: visible;
+}
+.arco::before {
+  /* Textura del mismo tono, un paso más oscuro: profundidad sin sumar
+     colores nuevos. */
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0.16;
+  mix-blend-mode: multiply;
+  background: repeating-linear-gradient(118deg, var(--mrc-ed-tinta) 0 10px, transparent 10px 28px);
+}
+.arco img {
+  position: relative;
+  width: 76%;
+  height: auto;
+  display: block;
+  rotate: -6deg;
+  translate: 0 -14%;
+  filter: drop-shadow(0 20px 24px color-mix(in srgb, var(--mrc-ed-tinta) 45%, transparent));
+}
+
+/* ---------- 4. Botones y enlaces ----------
+   Contorno duro y sombra sólida desplazada; al pasar el cursor el botón
+   se hunde dentro de su propia sombra. */
 
 .cta {
   --alto-linea: 1.3em;
+  --cta-dura: var(--texto);
   position: relative;
   display: inline-flex;
   align-items: center;
   gap: 1.1rem;
   padding: 1.05rem 2.1rem;
-  border: 1px solid var(--texto);
+  border: 2px solid var(--cta-dura);
   border-radius: 999px;
+  box-shadow: -5px 5px 0 0 var(--cta-dura);
   overflow: hidden;
   text-decoration: none;
   color: var(--texto);
-  font-family: var(--mrc-font-sans);
+  font-family: var(--mrc-font-texto);
   font-size: 0.8125rem;
-  font-weight: 500;
-  letter-spacing: 0.14em;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   isolation: isolate;
 }
 .cta::before {
   content: '';
   position: absolute;
-  inset: -1px;
+  inset: -2px;
   z-index: -1;
   background: var(--texto);
   transform: translateY(101%);
@@ -381,7 +439,7 @@
   font-weight: 400;
 }
 .faq summary::-webkit-details-marker { display: none; }
-.faq summary::after { content: '+'; font-family: var(--mrc-font-sans); font-weight: 300; color: var(--tenue); }
+.faq summary::after { content: '+'; font-family: var(--mrc-font-texto); font-weight: 300; color: var(--tenue); }
 .faq[open] summary::after { content: '–'; }
 .faq p { padding: 0 0 1.4rem; max-width: 60ch; color: var(--tenue); line-height: 1.7; font-size: 1.0625rem; }
 
@@ -409,7 +467,7 @@
   border: 1px solid var(--cursor-color, var(--mrc-ed-tinta));
   display: grid;
   place-items: center;
-  font-family: var(--mrc-font-sans);
+  font-family: var(--mrc-font-texto);
   font-size: 0.5625rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -466,7 +524,7 @@ html.acoplado .barra::before { opacity: 1; }
 html.acoplado .barra-sello { opacity: 1; transform: none; }
 .barra-nav { display: flex; gap: 1.9rem; }
 .barra-nav a {
-  font-family: var(--mrc-font-sans);
+  font-family: var(--mrc-font-texto);
   font-size: 0.75rem;
   font-weight: 500;
   letter-spacing: 0.16em;
@@ -512,6 +570,7 @@ html.acoplado .barra-sello { opacity: 1; transform: none; }
     transition: transform 1.4s var(--ease-libro);
   }
 
+  .cta { transition: transform 0.22s var(--ease-tinta), box-shadow 0.22s var(--ease-tinta), color 0.3s; }
   .cta::before { transition: transform 0.6s var(--ease-tinta); }
   .cta-txt span { transition: transform 0.5s var(--ease-tinta); }
   .cta-flecha { transition: transform 0.5s var(--ease-tinta); }
@@ -520,6 +579,14 @@ html.acoplado .barra-sello { opacity: 1; transform: none; }
   .cta:hover .cta-flecha, .cta:focus-visible .cta-flecha { transform: translateX(0.35rem); }
   .cta:hover, .cta:focus-visible { color: var(--fondo); }
   .cta-solido:hover, .cta-solido:focus-visible { color: var(--texto); }
+  /* Se hunde en su propia sombra: el desplazamiento es exactamente el de
+     la sombra, así el botón cae en su lugar. */
+  .cta:hover, .cta:focus-visible { transform: translate(-5px, 5px); box-shadow: 0 0 0 0 var(--cta-dura); }
+
+  .arco { transition: transform 0.45s var(--ease-libro), box-shadow 0.45s var(--ease-libro); }
+  .arco img { transition: rotate 0.5s var(--ease-libro), translate 0.5s var(--ease-libro), scale 0.5s var(--ease-libro); }
+  .pieza:hover .arco { transform: translate(-3px, 3px); box-shadow: -3px 3px 0 0 var(--campo-dura); }
+  .pieza:hover .arco img { rotate: -2deg; translate: 0 -18%; scale: 1.04; }
 
   .enlace { transition: background-size 0.5s var(--ease-libro); }
   .enlace:hover, .enlace:focus-visible { background-size: 100% 1px; }

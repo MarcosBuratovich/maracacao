@@ -38,22 +38,32 @@ describe('fuentes', () => {
     expect(layout).toMatch(/rel="preload"[^>]*as="font"/)
     for (const f of [
       '/fonts/fraunces-variable.woff2', '/fonts/work-sans-variable.woff2',
-      '/fonts/cormorant-garamond.woff2', '/fonts/jost.woff2',
+      '/fonts/cormorant-garamond.woff2',
     ]) {
       expect(layout).toContain(f)
     }
   })
 
-  // Tipografía del sitio público: la del sello (2026-08-12).
-  it('el sitio declara Cormorant Garamond y Jost, self-hosteadas y con swap', () => {
+  // Tipografía del sitio público: Cormorant (la del sello) para display
+  // y Work Sans para el cuerpo — Jost salió por ilegible a tamaño chico
+  // (probada contra cuatro candidatas sobre los colores de marca).
+  it('el sitio declara Cormorant Garamond self-hosteada y con swap', () => {
     const sitio = readFileSync('src/styles/fuentes-sitio.css', 'utf8')
     expect(sitio).toContain("font-family: 'Cormorant Garamond'")
-    expect(sitio).toContain("font-family: 'Jost'")
+    // El comentario del archivo sí nombra a Jost al explicar por qué
+    // quedó afuera; lo que no puede haber es su @font-face.
+    expect(sitio).not.toContain("font-family: 'Jost'")
     const bloques = sitio.match(/@font-face\s*\{[^}]*\}/g) ?? []
-    expect(bloques.length).toBe(2)
+    expect(bloques.length).toBe(1)
     for (const b of bloques) {
       expect(b).toContain('font-display: swap')
       expect(b).toMatch(/url\('\/fonts\//)
     }
+  })
+
+  it('el cuerpo del sitio usa la tipografía de texto del sistema, no una propia', () => {
+    const css = readFileSync('src/styles/editorial.css', 'utf8')
+    expect(css).toContain('font-family: var(--mrc-font-texto)')
+    expect(css).not.toContain('--mrc-font-sans')
   })
 })

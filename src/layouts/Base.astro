@@ -3,8 +3,8 @@ interface Props {
   titulo: string
   /**
    * Qué familia tipográfica precargar. `identidad` es Fraunces + Work
-   * Sans (manual y presentación); `sitio` es Cormorant Garamond + Jost,
-   * las del sello (sitio público, 2026-08-12). Precargar las cuatro
+   * Sans (manual y presentación); `sitio` es Cormorant Garamond +
+   * Work Sans (sitio público, 2026-08-12). Precargar las cuatro
    * siempre costaría dos descargas inútiles por página.
    */
   fuentes?: 'identidad' | 'sitio'
@@ -13,7 +13,7 @@ const { titulo, fuentes = 'identidad' } = Astro.props
 
 const familias =
   fuentes === 'sitio'
-    ? ['/fonts/cormorant-garamond.woff2', '/fonts/jost.woff2']
+    ? ['/fonts/cormorant-garamond.woff2', '/fonts/work-sans-variable.woff2']
     : ['/fonts/fraunces-variable.woff2', '/fonts/work-sans-variable.woff2']
 ---
 <!doctype html>

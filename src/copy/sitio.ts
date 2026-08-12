@@ -82,6 +82,7 @@ export const sitio = {
         nombre: 'Barras',
         presentacion: '70 gramos · 70% cacao',
         precioDesde: 108,
+        campo: 'morado',
         imagen: 'linea-barras',
         imagenAlt: 'Barra Maracacao de mango con chile sobre una mesa de madera, con granos de cacao alrededor',
         bullets: [
@@ -94,6 +95,7 @@ export const sitio = {
         nombre: 'Gotas de chocolate',
         presentacion: '250 gramos · 70% cacao',
         precioDesde: 258,
+        campo: 'cacao',
         imagen: 'linea-gotas',
         imagenAlt: 'Bolsa de 250 gramos de gotas de chocolate Maracacao',
         bullets: [
@@ -105,6 +107,7 @@ export const sitio = {
       {
         nombre: 'Chocolate en polvo',
         presentacion: '250 gramos · Próximamente',
+        campo: 'petroleo',
         imagen: 'linea-polvo',
         imagenAlt: 'Etiqueta del chocolate en polvo de cardamomo',
         bullets: [
@@ -162,14 +165,14 @@ export const sitio = {
     intro: 'Ocho sabores para taza, hechos con cocoa natural, cocoa alcalina y pasta de cacao.',
     altPrefijo: 'Etiqueta del chocolate en polvo sabor',
     sabores: [
-      { archivo: 'etiqueta-naranja-jengibre', nombre: 'Naranja y jengibre' },
-      { archivo: 'etiqueta-canela', nombre: 'Canela' },
-      { archivo: 'etiqueta-limoncillo', nombre: 'Limoncillo' },
-      { archivo: 'etiqueta-chile', nombre: 'Chile' },
-      { archivo: 'etiqueta-menta', nombre: 'Menta' },
-      { archivo: 'etiqueta-cardamomo', nombre: 'Cardamomo' },
-      { archivo: 'etiqueta-cocoa-natural', nombre: 'Cocoa natural' },
-      { archivo: 'etiqueta-cocoa-alcalina', nombre: 'Cocoa alcalina' },
+      { archivo: 'etiqueta-naranja-jengibre', campo: 'morado', nombre: 'Naranja y jengibre' },
+      { archivo: 'etiqueta-canela', campo: 'carmin', nombre: 'Canela' },
+      { archivo: 'etiqueta-limoncillo', campo: 'menta', nombre: 'Limoncillo' },
+      { archivo: 'etiqueta-chile', campo: 'chile', nombre: 'Chile' },
+      { archivo: 'etiqueta-menta', campo: 'cielo', nombre: 'Menta' },
+      { archivo: 'etiqueta-cardamomo', campo: 'petroleo', nombre: 'Cardamomo' },
+      { archivo: 'etiqueta-cocoa-natural', campo: 'caramelo', nombre: 'Cocoa natural' },
+      { archivo: 'etiqueta-cocoa-alcalina', campo: 'cacao', nombre: 'Cocoa alcalina' },
     ] as const,
   },
 

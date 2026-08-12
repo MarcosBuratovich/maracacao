@@ -5,12 +5,15 @@ export const familias = {
   /**
    * Sitio público, 2026-08-12. La marca cambió de logo a un sello con
    * wordmark en serif clásica letterspaceada; Fraunces (soft/wonky) le
-   * peleaba. `sello` es la voz del logotipo replicada en la página;
-   * `sans` es geométrica —linaje Futura, el del modernismo gráfico
-   * mexicano— para datos, etiquetas y cuerpo corto.
+   * peleaba. `sello` es la voz del logotipo replicada en la página.
+   *
+   * Para el cuerpo el sitio usa `texto` (Work Sans). Se probaron cinco
+   * candidatas a tamaño real sobre los colores de marca: Jost resultó la
+   * menos legible (altura-x chica y formas geométricas cerradas) y Work
+   * Sans de las más claras — y además ya es la tipografía de texto que
+   * documenta el manual, así que sitio y manual hablan igual.
    */
   sello: "'Cormorant Garamond', Garamond, 'Times New Roman', serif",
-  sans: "'Jost', 'Futura', system-ui, sans-serif",
 } as const
 
 /** Valores de partida de los ejes variables. Ver §7 del spec. */
