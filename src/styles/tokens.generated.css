@@ -53,6 +53,12 @@
   --mrc-etiqueta-cielo: #7CAEB2;
   --mrc-etiqueta-caramelo: #976125;
   --mrc-etiqueta-petroleo: #136769;
+  --mrc-ed-tinta: #241609;
+  --mrc-ed-tintaMedia: #3A2614;
+  --mrc-ed-papel: #F8F0E5;
+  --mrc-ed-papelHueso: #EFE4D4;
+  --mrc-ed-humo: #C4B39D;
+  --mrc-ed-sepia: #6B513A;
   --mrc-rol-fondo-claro: #FAF3E0;
   --mrc-rol-fondo-oscuro: #3A4A30;
   --mrc-rol-fondo-profundo: #2A3522;
@@ -65,6 +71,8 @@
   --mrc-rol-contorno-ilustracion: #372915;
   --mrc-font-display: 'Fraunces Variable', Fraunces, Georgia, serif;
   --mrc-font-texto: 'Work Sans Variable', 'Work Sans', system-ui, sans-serif;
+  --mrc-font-sello: 'Cormorant Garamond', Garamond, 'Times New Roman', serif;
+  --mrc-font-sans: 'Jost', 'Futura', system-ui, sans-serif;
   --mrc-text-display-xl: 3.5rem;
   --mrc-text-display-l: 2.5rem;
   --mrc-text-titulo: 1.75rem;

@@ -9,6 +9,8 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { experimental_AstroContainer as AstroContainer } from 'astro/container'
 import { sitio } from '@/copy/sitio'
+import { editorial, etiqueta } from '@/tokens/color'
+import { customProperties } from '@/tokens/css'
 import Borrador from '@/pages/sitio.astro'
 import EnConstruccion from '@/pages/index.astro'
 import TazaEspuma from '@/components/sitio/TazaEspuma.astro'
@@ -50,14 +52,21 @@ describe('copy del borrador — registro y retro vigentes', () => {
 
   it('las 15 barras del catálogo están, sin inventar la 16', () => {
     expect(sitio.productos.barras).toHaveLength(15)
-    expect(sitio.productos.barras).toContain('Chocolate blanco con pistache')
+    expect(sitio.productos.barras.map((b) => b.nombre)).toContain('Chocolate blanco con pistache')
+  })
+
+  // El color dejó de ser fondo de sección y pasó a ser índice de sabor
+  // (rediseño 2026-08-12): cada barra apunta a un token `etiqueta` real.
+  it('cada sabor tiene un tono del sistema de etiquetas', () => {
+    const validos = Object.keys(etiqueta)
+    for (const b of sitio.productos.barras) expect(validos).toContain(b.tono)
   })
 })
 
 describe('la página /sitio (alta fidelidad, centro de información)', () => {
   it('renderiza el contenido real: barras, correo, catálogo, precios, Tabasco y punto de venta', async () => {
     const html = await container.renderToString(Borrador)
-    for (const barra of sitio.productos.barras) expect(html).toContain(barra)
+    for (const barra of sitio.productos.barras) expect(html).toContain(barra.nombre)
     expect(html).toContain(sitio.contacto.correo)
     expect(html).toContain(sitio.contacto.catalogoUrl)
     expect(html).toMatch(/\$\s?108/)
@@ -81,7 +90,7 @@ describe('la página /sitio (alta fidelidad, centro de información)', () => {
     expect(sitio.recetas.lista).toHaveLength(4)
     for (const r of sitio.recetas.lista) expect(html).toContain(r.titulo)
     expect(sitio.faq.items).toHaveLength(8)
-    expect(html.match(/<details class="faq-item"/g)).toHaveLength(8)
+    expect(html.match(/<details class="faq"/g)).toHaveLength(8)
     for (const paso of sitio.abc.catar.pasos) expect(html).toContain(paso.nombre)
   })
 
@@ -103,22 +112,78 @@ describe('la página /sitio (alta fidelidad, centro de información)', () => {
     const src = readFileSync('src/pages/sitio.astro', 'utf8')
     expect(src).not.toContain('components/brand/Mascota')
     expect(src).toContain('/sitio/personaje-sentado-t.webp')
-    expect(src).toContain('/sitio/personaje-molinillo-t.webp')
-    // El logo transparente solo sobre banda clara (el header es papel).
-    expect(src).toContain('/sitio/logo.svg')
   })
 
   it('el video del personaje respeta reduced-motion (se pausa y da controles)', () => {
-    const src = readFileSync('src/pages/sitio.astro', 'utf8')
+    const src = readFileSync('src/scripts/editorial.ts', 'utf8')
     expect(src).toContain("matchMedia('(prefers-reduced-motion: reduce)')")
     expect(src).toContain('video.pause()')
   })
 })
 
+/*
+ * Rediseño editorial (2026-08-12): canon de Van de Graaf, una sola tinta
+ * sobre un solo papel, y el wordmark del logo replicado en texto vivo
+ * con la tipografía del sello.
+ */
+describe('sistema editorial', () => {
+  const css = readFileSync('src/styles/editorial.css', 'utf8')
+
+  it('los colores del lienzo salen de tokens con prefijo propio', () => {
+    const props = customProperties()
+    for (const [nombre, hex] of Object.entries(editorial)) {
+      expect(props[`--mrc-ed-${nombre}`]).toBe(hex)
+    }
+    // `editorial.papel` y `fijos.papel` son colores distintos: sin el
+    // prefijo `ed-` el segundo pisaría al primero y rompería el manual.
+    expect(props['--mrc-papel']).not.toBe(editorial.papel)
+  })
+
+  it('el canon divide en nueve y el bloque de texto ocupa seis, con margen para notas', () => {
+    expect(css).toContain('grid-template-columns: repeat(9, minmax(0, 1fr))')
+    expect(css).toMatch(/\.bloque\s*\{\s*grid-column:\s*2\s*\/\s*8/)
+    expect(css).toMatch(/\.margen\s*\{\s*grid-column:\s*8\s*\/\s*10/)
+  })
+
+  it('el wordmark es texto vivo en la tipografía del sello, no una imagen', async () => {
+    const html = await container.renderToString(Borrador)
+    // Astro agrega su atributo de scope al <h1>, así que se compara el
+    // patrón, no el string exacto.
+    expect(html).toMatch(new RegExp(`<h1 class="monumento abre"[^>]*>${sitio.marca.wordmark}</h1>`))
+    expect(css).toMatch(/\.monumento\s*\{[^}]*--mrc-font-sello/)
+    // El tracking centrado necesita text-indent: con margen negativo el
+    // wordmark queda corrido (medido en vivo).
+    expect(css).toMatch(/\.monumento\s*\{[^}]*text-indent:\s*0\.18em/)
+  })
+
+  it('el sello va inline para tomar la tinta de su sección', async () => {
+    const html = await container.renderToString(Borrador)
+    expect(html).toContain('fill="currentColor"')
+    expect(html).not.toContain('/sitio/logo-t.png')
+  })
+
+  it('nada se esconde sin JS ni con reduced-motion', () => {
+    // Todo el movimiento vive bajo `html.js` + no-preference.
+    const ocultos = css.match(/\[data-revelar\]\s*\{\s*opacity:\s*0/g) ?? []
+    for (const regla of ocultos) expect(css).toContain(`html.js .ed ${regla.split('{')[0].trim()}`)
+    const media = css.indexOf('@media (prefers-reduced-motion: no-preference)')
+    expect(media).toBeGreaterThan(-1)
+    expect(css.indexOf('html.js .ed [data-revelar]')).toBeGreaterThan(media)
+  })
+
+  it('el cursor propio solo aparece con puntero fino y sin reduced-motion', () => {
+    const js = readFileSync('src/scripts/editorial.ts', 'utf8')
+    expect(js).toContain("matchMedia('(pointer: fine)')")
+    expect(js).toMatch(/if \(punteroFino && !quieto\)/)
+    expect(css).toContain('html.cursor-propio, html.cursor-propio * { cursor: none; }')
+  })
+})
+
 describe('la página en construcción en / (lo público mientras llega el dominio)', () => {
-  it('muestra las dos voces: el sello oficial y el personaje en movimiento, con catálogo y correo', async () => {
+  it('muestra las dos voces: el sello inline y el personaje en movimiento, con catálogo y correo', async () => {
     const html = await container.renderToString(EnConstruccion)
-    expect(html).toContain('/sitio/logo-maracacao.webp') // logo oficial (decisión 2026-08-12)
+    expect(html).toContain('fill="currentColor"') // el sello, inline, toma la tinta de su sección
+    expect(html).toContain(sitio.marca.wordmark)
     expect(html).toContain('/sitio/changuito-molinillo.mp4')
     expect(html).toContain(sitio.contacto.catalogoUrl)
     expect(html).toContain(sitio.contacto.correo)
@@ -134,10 +199,11 @@ describe('la página en construcción en / (lo público mientras llega el domini
     expect(html).not.toContain('href="/presentacion"')
   })
 
-  it('el video respeta reduced-motion', () => {
-    const src = readFileSync('src/pages/index.astro', 'utf8')
-    expect(src).toContain("matchMedia('(prefers-reduced-motion: reduce)')")
-    expect(src).toContain('video.pause()')
+  it('el video respeta reduced-motion (lo resuelve el módulo editorial)', () => {
+    expect(readFileSync('src/pages/index.astro', 'utf8')).toContain("import '@/scripts/editorial'")
+    const js = readFileSync('src/scripts/editorial.ts', 'utf8')
+    expect(js).toContain("matchMedia('(prefers-reduced-motion: reduce)')")
+    expect(js).toContain('video.pause()')
   })
 })
 

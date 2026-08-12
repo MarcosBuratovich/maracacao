@@ -1,191 +1,136 @@
 ---
 // src/pages/index.astro — Página EN CONSTRUCCIÓN.
-// Es lo que ve quien entre por el dominio mientras el sitio se termina.
-// La escena toma su energía de la foto real de las minis: envolturas de
-// colores regadas alrededor del changuito, flotando despacio. Los colores
-// son los MEDIDOS de los empaques (tokens --mrc-empaque-*, 2026-08-10).
-// La presentación vive en /presentacion, el manual en /manual y el
-// borrador en /sitio — sin enlaces desde acá: van por URL directa.
+// Lo que ve quien entra por el dominio mientras el sitio se termina.
+// Mismo sistema editorial que /sitio: el sello se estampa, el wordmark
+// abre su tracking en la tipografía del propio logotipo, y el canon
+// marca sus registros. El personaje aparece al final, chico y en
+// movimiento: la nota hecha a mano bajo la firma.
+//
+// El sitio completo vive en /sitio, la presentación en /presentacion y
+// el manual en /manual — sin enlaces desde acá: van por URL directa.
 import Base from '@/layouts/Base.astro'
+import selloRaw from '@/assets/brand/sello-mano.svg?raw'
 import { sitio } from '@/copy/sitio'
 import '@/styles/global.css'
-import '@/styles/landing.css'
+import '@/styles/editorial.css'
 
-// Las minis flotando: color del cuerpo, color de la etiqueta, tamaño,
-// posición, inclinación y fase de la animación. `chica: true` se oculta
-// en pantallas angostas para no amontonar.
-const envolturas = [
-  { cuerpo: 'etiqueta-morado', etiqueta: 'empaque-amarilloEtiqueta', tam: 6.0, top: 14, left: 10, rot: -12, fase: 0 },
-  { cuerpo: 'etiqueta-caramelo', etiqueta: 'empaque-amarilloEtiqueta', tam: 4.5, top: 66, left: 7, rot: 9, fase: 0.35, abajo: true },
-  { cuerpo: 'etiqueta-cielo', etiqueta: 'empaque-amarilloEtiqueta', tam: 5.2, top: 17, left: 84, rot: 11, fase: 0.6 },
-  { cuerpo: 'etiqueta-chile', etiqueta: 'empaque-amarilloEtiqueta', tam: 4.0, top: 72, left: 87, rot: -9, fase: 0.2, abajo: true },
-  { cuerpo: 'etiqueta-petroleo', etiqueta: 'empaque-amarilloEtiqueta', tam: 3.6, top: 42, left: 15, rot: 16, fase: 0.5, chica: true },
-  { cuerpo: 'empaque-amarilloEtiqueta', etiqueta: 'empaque-cremaPersonaje', tam: 3.8, top: 40, left: 81, rot: -16, fase: 0.8, chica: true },
-  { cuerpo: 'etiqueta-morado', etiqueta: 'empaque-amarilloEtiqueta', tam: 3.0, top: 86, left: 28, rot: 7, fase: 0.65, chica: true },
-  { cuerpo: 'etiqueta-caramelo', etiqueta: 'empaque-amarilloEtiqueta', tam: 3.4, top: 7, left: 66, rot: -7, fase: 0.45, chica: true },
-] as const
-
-// La cinta de arriba: los colores del anaquel, en orden de fiesta.
-const cinta = ['etiqueta-morado', 'etiqueta-chile', 'etiqueta-cielo', 'empaque-amarilloEtiqueta', 'etiqueta-petroleo', 'etiqueta-menta'] as const
+const sello = selloRaw.replace('<svg', '<svg aria-hidden="true" focusable="false"')
 ---
-<Base titulo={sitio.construccion.titulo}>
-  <main class="escena banda" data-fondo="cacao">
-    <div class="cinta" aria-hidden="true">
-      {cinta.map((c) => <span style={`background:var(--mrc-${c})`} />)}
-    </div>
+<Base titulo={sitio.construccion.titulo} fuentes="sitio">
+  <div class="ed" data-tono="tinta">
+    <main class="seccion portada">
+      <div class="registro"><span></span><span></span></div>
 
-    {envolturas.map((e) => (
-      <div
-        class={`envuelta${'chica' in e && e.chica ? ' envuelta-chica' : ''}${'abajo' in e && e.abajo ? ' envuelta-abajo' : ''}`}
-        style={`--cuerpo:var(--mrc-${e.cuerpo});--etiqueta:var(--mrc-${e.etiqueta});--tam:${e.tam}rem;--rot:${e.rot}deg;--fase:${e.fase};top:${e.top}%;left:${e.left}%`}
-        aria-hidden="true"
-      >
-        <span class="envuelta-etiqueta"></span>
-      </div>
-    ))}
+      <div class="portada-centro">
+        <div class="portada-sello sello estampa" set:html={sello} />
+        <p class="monumento abre">{sitio.marca.wordmark}</p>
+        <p class="marca portada-descriptor entra-suave" style="--retardo:900ms">
+          {sitio.marca.descriptor}
+        </p>
 
-    <div class="centro flex flex-col items-center gap-6 px-6 py-12 text-center">
-      {/* Las dos voces de la marca, tocándose: el sello profesional como
-          ancla y el changuito en video asomado como sticker en su esquina
-          ("juguetona pero profesional", decisión de Marcos 2026-08-12). */}
-      <div class="marca-doble entra">
-        <img
-          src="/sitio/logo-maracacao.webp"
-          alt={sitio.construccion.logoAlt}
-          class="marca-sello"
-          width="560"
-          height="560"
-        />
-        <figure class="video-personaje aro entra entra-2">
+        <hr class="regla portada-regla entra-suave" style="--retardo:1050ms" />
+
+        <h1 class="display portada-titulo entra-suave" style="--retardo:1150ms">
+          {sitio.construccion.encabezado}
+        </h1>
+        <p class="cuerpo tenue portada-sub entra-suave" style="--retardo:1250ms">
+          {sitio.construccion.sub}
+        </p>
+
+        <div class="portada-acciones entra-suave" style="--retardo:1350ms">
+          <a
+            class="cta cta-solido"
+            href={sitio.contacto.catalogoUrl}
+            target="_blank" rel="noopener"
+            data-cursor={sitio.cursor.abrir} data-iman
+          >
+            <span class="cta-txt"><span>{sitio.construccion.ctaCatalogo}</span><span>{sitio.construccion.ctaCatalogo}</span></span>
+            <span class="cta-flecha" aria-hidden="true">↗</span>
+          </a>
+          <a class="cta" href={`mailto:${sitio.contacto.correo}`} data-cursor={sitio.cursor.escribir} data-iman>
+            <span class="cta-txt"><span>{sitio.construccion.ctaCorreo}</span><span>{sitio.construccion.ctaCorreo}</span></span>
+            <span class="cta-flecha" aria-hidden="true">→</span>
+          </a>
+        </div>
+
+        <figure class="portada-personaje entra-suave" style="--retardo:1500ms">
           <video
             src="/sitio/changuito-molinillo.mp4"
             poster="/sitio/changuito-molinillo-poster.jpg"
-            muted
-            loop
-            playsinline
-            autoplay
-            preload="metadata"
+            muted loop playsinline autoplay preload="metadata"
             aria-label={sitio.construccion.videoAria}
           ></video>
         </figure>
-      </div>
 
-      <div class="entra entra-3">
-        <h1 class="b-titulo">{sitio.construccion.encabezado}</h1>
-        <p class="b-prosa mx-auto mt-4">{sitio.construccion.sub}</p>
+        <ul class="portada-meta marca entra-suave" style="--retardo:1600ms">
+          <li>{sitio.construccion.lugar}</li>
+          <li>{sitio.construccion.muyPronto}</li>
+        </ul>
       </div>
-
-      <div class="flex flex-wrap items-center justify-center gap-4 entra entra-4">
-        <a href={sitio.contacto.catalogoUrl} target="_blank" rel="noopener" class="boton boton-amarillo">
-          {sitio.construccion.ctaCatalogo}
-        </a>
-        <a href={`mailto:${sitio.contacto.correo}`} class="boton boton-fantasma">
-          {sitio.construccion.ctaCorreo}
-        </a>
-      </div>
-
-      <p class="b-menor entra entra-4" style="color:var(--mrc-crema)">
-        {sitio.construccion.lugar} · {sitio.construccion.muyPronto}
-      </p>
-    </div>
-  </main>
+    </main>
+  </div>
 </Base>
 
 <style>
-  .escena {
-    position: relative;
-    overflow: hidden;
-    min-height: 100vh;
-    min-height: 100dvh;
+  .portada {
+    min-height: 100svh;
     display: grid;
-    place-items: center;
+    place-content: center stretch;
+    overflow: hidden;
   }
-
-  .cinta {
-    position: absolute;
-    inset: 0 0 auto 0;
+  /* Ritmo ajustado para que la portada entre en una pantalla de 900 px
+     sin scroll (medido en vivo: con el ritmo del sitio se pasaba). */
+  .portada-centro { text-align: center; padding-block: clamp(2.5rem, 5vh, 4rem); }
+  /* El padding va solo en los bloques de texto: al sello y al video,
+     que tienen ancho fijo, los colapsaría (box-sizing border-box). */
+  .portada-centro > :not(.monumento, .portada-sello, .portada-personaje) {
+    padding-inline: clamp(1.25rem, 5.5vw, 5.5rem);
+  }
+  .portada-sello {
+    width: clamp(5rem, 9vw, 8rem);
+    margin: 0 auto clamp(1.5rem, 3.5vh, 2.5rem);
+  }
+  .portada-descriptor { margin-top: clamp(0.9rem, 2vh, 1.5rem); letter-spacing: 0.42em; }
+  .portada-regla {
+    width: min(90%, 30rem);
+    margin: clamp(1.5rem, 3.5vh, 2.25rem) auto 0;
+    padding: 0;
+  }
+  .portada-titulo { margin-top: clamp(1.5rem, 3.5vh, 2.25rem); }
+  .portada-sub { margin: 1rem auto 0; max-width: 44ch; }
+  .portada-acciones {
     display: flex;
-    height: 0.6rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: clamp(1.75rem, 3.5vh, 2.25rem);
   }
-  .cinta span { flex: 1; }
-
-  .centro { position: relative; max-width: 32rem; }
-
-  /* El sello profesional (imagen sobre su propio crema) con esquinas
-     redondeadas, y el changuito asomado sobre su esquina inferior derecha. */
-  .marca-doble { position: relative; }
-  .marca-sello {
-    display: block;
-    width: min(19rem, 74vw);
-    height: auto;
-    border-radius: 1.25rem;
-    box-shadow: 0 28px 56px -28px color-mix(in srgb, var(--mrc-verde-900) 85%, transparent);
+  .portada-personaje {
+    width: clamp(4rem, 6vw, 5.5rem);
+    margin: clamp(1.75rem, 3.5vh, 2.5rem) auto 0;
   }
-  .aro {
-    /* Esquina superior derecha: crema vacío — nunca sobre el wordmark. */
-    position: absolute;
-    right: -2.25rem;
-    top: -1.75rem;
-    width: min(8.5rem, 34vw);
-    rotate: 6deg;
-  }
-  .aro video {
+  .portada-personaje video {
     display: block;
     width: 100%;
     aspect-ratio: 1;
     object-fit: cover;
     border-radius: 999px;
-    border: 5px solid var(--mrc-crema);
-    box-shadow: 0 20px 40px -20px color-mix(in srgb, var(--mrc-verde-900) 85%, transparent);
+    border: 1px solid var(--linea);
   }
-
-  /* Las minis regadas, como en la foto real del cliente. */
-  .envuelta {
-    position: absolute;
-    width: var(--tam);
-    aspect-ratio: 1 / 1.12;
-    background: var(--cuerpo);
-    border-radius: calc(var(--tam) * 0.12);
-    rotate: var(--rot);
-    box-shadow: 0 14px 28px -16px color-mix(in srgb, var(--mrc-verde-900) 75%, transparent);
+  .portada-meta {
     display: flex;
-    align-items: flex-end;
+    flex-wrap: wrap;
     justify-content: center;
-    padding-bottom: calc(var(--tam) * 0.12);
+    gap: 0.4rem 2.5rem;
+    list-style: none;
+    margin: 1.5rem 0 0;
+    padding-inline: 1.25rem;
   }
-  .envuelta-etiqueta {
-    width: 62%;
-    height: calc(var(--tam) * 0.2);
-    background: var(--etiqueta);
-    border-radius: calc(var(--tam) * 0.05);
-  }
-
-  @media (max-width: 640px) {
-    .envuelta-chica { display: none; }
-    .envuelta { opacity: 0.9; }
-    /* En pantalla angosta el texto ocupa casi todo el ancho: las minis
-       de media altura se anclan a las esquinas de abajo. */
-    .envuelta-abajo { top: auto !important; bottom: 2.5%; }
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    @keyframes flotar {
-      0%, 100% { translate: 0 0; rotate: var(--rot); }
-      50% { translate: 0 -10px; rotate: calc(var(--rot) + 3deg); }
-    }
-    .envuelta {
-      animation: flotar calc(var(--mrc-dur-ambiental) * 1.6) var(--mrc-ease-spring) infinite;
-      animation-delay: calc(var(--mrc-dur-ambiental) * var(--fase) * -1);
-    }
+  @media (max-width: 900px) {
+    .portada-descriptor { letter-spacing: 0.3em; }
   }
 </style>
 
 <script>
-  // El video respeta reduced-motion: quieto, con controles y su póster.
-  const video = document.querySelector('.video-personaje video')
-  if (video instanceof HTMLVideoElement && matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    video.autoplay = false
-    video.controls = true
-    video.pause()
-  }
+  import '@/scripts/editorial'
 </script>

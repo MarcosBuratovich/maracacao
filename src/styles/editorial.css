@@ -1,0 +1,542 @@
+/* ============================================================
+   SISTEMA EDITORIAL — sitio público de Maracacao (2026-08-12)
+
+   Tesis: la marca es un SELLO hecho a mano. La página se construye
+   como un libro fino — canon de Van de Graaf, una sola tinta sobre un
+   solo papel, y la mano como marca recurrente. El color no lo pone el
+   lienzo: lo pone el producto. Los ocho tonos de las etiquetas son
+   ÍNDICE de sabor, nunca fondo de sección.
+
+   Reglas de la casa que siguen vigentes: ningún hex a mano (todo sale
+   de `tokens.generated.css`), ningún tiempo hardcodeado fuera de los
+   easings propios de esta capa, y `prefers-reduced-motion` APAGA.
+   ============================================================ */
+
+@import './fuentes-sitio.css';
+
+/* ---------- 1. Lienzo y tonos ---------- */
+
+.ed {
+  --ease-libro: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-tinta: cubic-bezier(0.7, 0, 0.2, 1);
+  background: var(--fondo);
+  color: var(--texto);
+  font-family: var(--mrc-font-sans);
+  font-weight: 300;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+[data-tono='papel'] {
+  --fondo: var(--mrc-ed-papel);
+  --texto: var(--mrc-ed-tinta);
+  --tenue: var(--mrc-ed-sepia);
+  --linea: color-mix(in srgb, var(--mrc-ed-tinta) 16%, transparent);
+  --grano: multiply;
+}
+[data-tono='hueso'] {
+  --fondo: var(--mrc-ed-papelHueso);
+  --texto: var(--mrc-ed-tinta);
+  --tenue: var(--mrc-ed-sepia);
+  --linea: color-mix(in srgb, var(--mrc-ed-tinta) 18%, transparent);
+  --grano: multiply;
+}
+[data-tono='tinta'] {
+  --fondo: var(--mrc-ed-tinta);
+  --texto: var(--mrc-ed-papel);
+  --tenue: var(--mrc-ed-humo);
+  --linea: color-mix(in srgb, var(--mrc-ed-papel) 20%, transparent);
+  --grano: screen;
+}
+
+/* Grano de papel: la textura que evita que el monocromo se sienta
+   frío. Un solo turbulence, muy bajo, sin costo de red. */
+.seccion {
+  position: relative;
+  background: var(--fondo);
+  color: var(--texto);
+}
+.seccion::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: var(--grano);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+.seccion > * { position: relative; }
+
+/* ---------- 2. Canon de Van de Graaf ----------
+   Nueve columnas. El bloque de texto ocupa 6 de 9 arrancando en la
+   segunda (1/9 de margen interior, 2/9 exterior): la proporción exacta
+   del canon. Ese margen exterior ancho no es aire perdido — es donde
+   viven las notas al margen, igual que en un libro. */
+
+.canon {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  column-gap: clamp(0.75rem, 1.4vw, 1.6rem);
+  padding-inline: clamp(1.25rem, 5.5vw, 5.5rem);
+  max-width: 1720px;
+  margin-inline: auto;
+}
+.bloque { grid-column: 2 / 8; }
+.margen { grid-column: 8 / 10; }
+.simetrico { grid-column: 2 / 9; }
+.pleno { grid-column: 1 / -1; }
+.mitad-i { grid-column: 2 / 5; }
+.mitad-d { grid-column: 5 / 10; }
+
+.aire { padding-block: clamp(5rem, 12vh, 11rem); }
+.aire-corto { padding-block: clamp(3.5rem, 7vh, 6rem); }
+
+@media (max-width: 900px) {
+  .canon { grid-template-columns: 1fr; column-gap: 0; }
+  .bloque, .margen, .simetrico, .pleno, .mitad-i, .mitad-d { grid-column: 1 / -1; }
+  .margen { margin-top: 1.5rem; }
+}
+
+/* Marcas de registro del canon: dos hairlines en los bordes del bloque
+   de texto. Muestran la construcción, como las marcas de imposición de
+   una imprenta. */
+.registro {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  column-gap: clamp(0.75rem, 1.4vw, 1.6rem);
+  padding-inline: clamp(1.25rem, 5.5vw, 5.5rem);
+  max-width: 1720px;
+  margin-inline: auto;
+}
+.registro span {
+  border-left: 1px solid var(--linea);
+  opacity: 0.55;
+}
+.registro span:nth-child(1) { grid-column: 2; }
+.registro span:nth-child(2) { grid-column: 8; }
+@media (max-width: 900px) { .registro { display: none; } }
+
+/* ---------- 3. Tipografía ---------- */
+
+/* El tracking agrega aire DESPUÉS de la última letra: en texto centrado
+   eso corre las letras media medida hacia la izquierda. `text-indent`
+   del mismo valor devuelve la simetría exacta (comprobado midiendo el
+   rango en vivo: margen negativo NO lo arregla, porque el espacio de
+   más vive dentro de la línea, no en la caja). */
+.wordmark {
+  font-family: var(--mrc-font-sello);
+  font-weight: 300;
+  letter-spacing: 0.2em;
+  text-indent: 0.2em;
+  line-height: 0.9;
+}
+
+/* Medido en vivo: MARACACAO con este tracking ocupa 8.0 veces el cuerpo.
+   A 11.8vw llega casi al borde sin cortarse; el tope en rem evita que se
+   pase en pantallas muy anchas. */
+.monumento {
+  font-family: var(--mrc-font-sello);
+  font-weight: 300;
+  font-size: min(11.8vw, 14rem);
+  line-height: 0.86;
+  letter-spacing: 0.18em;
+  text-indent: 0.18em;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.display {
+  font-family: var(--mrc-font-sello);
+  font-weight: 300;
+  font-size: clamp(2.3rem, 6vw, 5.2rem);
+  line-height: 1.02;
+  letter-spacing: -0.005em;
+  margin: 0;
+  text-wrap: balance;
+}
+
+.titulo {
+  font-family: var(--mrc-font-sello);
+  font-weight: 400;
+  font-size: clamp(1.6rem, 2.8vw, 2.6rem);
+  line-height: 1.08;
+  margin: 0;
+  text-wrap: balance;
+}
+
+.sub {
+  font-family: var(--mrc-font-sello);
+  font-weight: 400;
+  font-size: clamp(1.25rem, 1.7vw, 1.6rem);
+  line-height: 1.25;
+  margin: 0;
+}
+
+.marca {
+  font-family: var(--mrc-font-sans);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--tenue);
+  margin: 0;
+}
+
+.cuerpo {
+  font-size: clamp(1rem, 0.42vw + 0.9rem, 1.15rem);
+  line-height: 1.7;
+  font-weight: 300;
+  max-width: 62ch;
+  margin: 0;
+}
+.cuerpo + .cuerpo { margin-top: 1.1em; }
+.tenue { color: var(--tenue); }
+.menor { font-size: 0.875rem; line-height: 1.6; }
+
+.nota-margen {
+  font-family: var(--mrc-font-sans);
+  font-size: 0.6875rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--tenue);
+  line-height: 1.9;
+  border-top: 1px solid var(--linea);
+  padding-top: 0.75rem;
+}
+
+.regla {
+  height: 1px;
+  background: var(--linea);
+  border: 0;
+  margin: 0;
+}
+
+/* ---------- 4. Botones y enlaces ---------- */
+
+.cta {
+  --alto-linea: 1.15em;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 1.1rem;
+  padding: 1.05rem 2.1rem;
+  border: 1px solid var(--texto);
+  border-radius: 999px;
+  overflow: hidden;
+  text-decoration: none;
+  color: var(--texto);
+  font-family: var(--mrc-font-sans);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  isolation: isolate;
+}
+.cta::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  background: var(--texto);
+  transform: translateY(101%);
+}
+.cta-txt {
+  display: block;
+  height: var(--alto-linea);
+  overflow: hidden;
+}
+.cta-txt span {
+  display: block;
+  height: var(--alto-linea);
+}
+.cta-flecha { display: block; }
+
+.cta-solido { background: var(--texto); color: var(--fondo); }
+.cta-solido::before { background: var(--fondo); }
+
+/* Enlace con subrayado que se dibuja */
+.enlace {
+  color: inherit;
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-size: 0% 1px;
+  background-position: 0 100%;
+  padding-bottom: 0.15em;
+}
+
+/* ---------- 5. Índice de sabores (el color como dato) ---------- */
+
+.indice { display: flex; flex-wrap: wrap; gap: 0.4rem 2.2rem; }
+.sabor {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.65rem;
+  font-size: 0.95rem;
+  font-weight: 300;
+}
+.sabor::before {
+  content: '';
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--tono);
+  flex: none;
+  translate: 0 -0.1em;
+}
+
+.cinta {
+  display: flex;
+  gap: 3.5rem;
+  width: max-content;
+  padding-block: 1.15rem;
+}
+.cinta-marco {
+  overflow: hidden;
+  border-block: 1px solid var(--linea);
+  -webkit-mask-image: linear-gradient(90deg, transparent, var(--fondo) 8%, var(--fondo) 92%, transparent);
+  mask-image: linear-gradient(90deg, transparent, var(--fondo) 8%, var(--fondo) 92%, transparent);
+}
+.cinta .sabor { white-space: nowrap; }
+
+/* ---------- 6. Piezas ---------- */
+
+.sello { display: block; color: var(--texto); }
+.sello svg { display: block; width: 100%; height: auto; }
+
+.salto {
+  position: fixed;
+  top: -100%;
+  left: 1rem;
+  z-index: 95;
+  background: var(--mrc-ed-tinta);
+  color: var(--mrc-ed-papel);
+  padding: 0.7rem 1.2rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+.salto:focus-visible { top: 1rem; }
+
+:is(a, button, summary):focus-visible {
+  outline: 2px solid var(--texto);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+
+.ficha { border-top: 1px solid var(--linea); padding-top: 1.5rem; }
+.ficha-precio {
+  font-family: var(--mrc-font-sello);
+  font-size: 1.5rem;
+  font-weight: 400;
+}
+.lista-limpia { list-style: none; margin: 0; padding: 0; }
+.lista-limpia li {
+  font-size: 0.95rem;
+  line-height: 1.55;
+  padding: 0.55rem 0 0.55rem 1.1rem;
+  position: relative;
+  border-bottom: 1px solid var(--linea);
+}
+.lista-limpia li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 1.15em;
+  width: 0.35rem;
+  height: 1px;
+  background: var(--tenue);
+}
+
+.marco-foto { overflow: hidden; background: color-mix(in srgb, var(--texto) 8%, transparent); }
+.marco-foto img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+.paso { display: grid; grid-template-columns: 3.5rem 1fr; gap: 1.25rem; padding-block: 1.1rem; border-top: 1px solid var(--linea); }
+.paso-n { font-family: var(--mrc-font-sello); font-size: 1.75rem; line-height: 1; color: var(--tenue); }
+
+.faq { border-top: 1px solid var(--linea); }
+.faq summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 2rem;
+  padding: 1.35rem 0;
+  font-family: var(--mrc-font-sello);
+  font-size: clamp(1.15rem, 1.5vw, 1.4rem);
+  font-weight: 400;
+}
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: '+'; font-family: var(--mrc-font-sans); font-weight: 300; color: var(--tenue); }
+.faq[open] summary::after { content: '–'; }
+.faq p { padding: 0 0 1.4rem; max-width: 60ch; color: var(--tenue); line-height: 1.7; }
+
+/* ---------- 7. Cursor de sello ---------- */
+
+.cursor, .cursor-anillo {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 90;
+  pointer-events: none;
+  border-radius: 999px;
+  opacity: 0;
+}
+.cursor {
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  background: var(--cursor-color, var(--mrc-ed-tinta));
+}
+.cursor-anillo {
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  border: 1px solid var(--cursor-color, var(--mrc-ed-tinta));
+  display: grid;
+  place-items: center;
+  font-family: var(--mrc-font-sans);
+  font-size: 0.5625rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cursor-color, var(--mrc-ed-tinta));
+}
+.cursor-anillo b { font-weight: 400; opacity: 0; transition: opacity 0.25s; }
+/* El cursor nativo se apaga solo cuando el propio está activo (puntero
+   fino y sin reduced-motion): el script pone la clase. */
+html.cursor-propio, html.cursor-propio * { cursor: none; }
+
+/* ---------- 7b. Encabezado que se acopla ---------- */
+
+/* La barra toma la tinta de la sección que tiene debajo (lo resuelve
+   `editorial.ts`). Sobre las etiquetas de producto —que son fotos a todo
+   color— el texto solo no alcanza, así que al despegarse del hero
+   aparece un velo del color de esa misma sección. */
+.barra {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: 1.1rem clamp(1.25rem, 5.5vw, 5.5rem);
+  color: var(--barra-tinta, var(--mrc-ed-papel));
+  isolation: isolate;
+}
+.barra::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    var(--barra-velo, transparent),
+    color-mix(in srgb, var(--barra-velo, transparent) 70%, transparent) 62%,
+    transparent
+  );
+  opacity: 0;
+}
+html.acoplado .barra::before { opacity: 1; }
+.barra-marca {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  text-decoration: none;
+  color: inherit;
+}
+.barra-sello {
+  width: 1.9rem;
+  opacity: 0;
+  transform: scale(0.6);
+}
+html.acoplado .barra-sello { opacity: 1; transform: none; }
+.barra-nav { display: flex; gap: 1.9rem; }
+.barra-nav a {
+  font-family: var(--mrc-font-sans);
+  font-size: 0.6875rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: inherit;
+  text-decoration: none;
+  opacity: 0.75;
+}
+.barra-nav a:hover { opacity: 1; }
+@media (max-width: 900px) { .barra-nav { display: none; } }
+
+@media (prefers-reduced-motion: no-preference) {
+  .barra-sello { transition: opacity 0.6s var(--ease-libro, ease), transform 0.6s var(--ease-libro, ease); }
+  .barra-nav a { transition: opacity 0.3s; }
+  .barra::before { transition: opacity 0.5s ease; }
+  .barra { transition: color 0.4s ease; }
+}
+
+/* ---------- 8. Movimiento ---------- */
+
+@media (prefers-reduced-motion: no-preference) {
+  html.js .ed [data-revelar] { opacity: 0; }
+  html.js .ed [data-revelar].visto {
+    opacity: 1;
+    transition: opacity 1s var(--ease-libro);
+    transition-delay: var(--retardo, 0ms);
+  }
+
+  /* Líneas enmascaradas: el texto sube desde debajo de su propia caja. */
+  html.js .linea { display: block; overflow: hidden; }
+  html.js .linea-int { display: block; transform: translateY(105%); }
+  html.js .visto .linea-int {
+    transform: none;
+    transition: transform 0.95s var(--ease-libro);
+    transition-delay: calc(var(--i, 0) * 70ms + var(--retardo, 0ms));
+  }
+
+  /* Foto que se asienta */
+  html.js .marco-foto img { transform: scale(1.08); }
+  html.js .visto .marco-foto img,
+  html.js .marco-foto.visto img {
+    transform: none;
+    transition: transform 1.4s var(--ease-libro);
+  }
+
+  .cta::before { transition: transform 0.6s var(--ease-tinta); }
+  .cta-txt span { transition: transform 0.5s var(--ease-tinta); }
+  .cta-flecha { transition: transform 0.5s var(--ease-tinta); }
+  .cta:hover::before, .cta:focus-visible::before { transform: translateY(0); }
+  .cta:hover .cta-txt span, .cta:focus-visible .cta-txt span { transform: translateY(-100%); }
+  .cta:hover .cta-flecha, .cta:focus-visible .cta-flecha { transform: translateX(0.35rem); }
+  .cta:hover, .cta:focus-visible { color: var(--fondo); }
+  .cta-solido:hover, .cta-solido:focus-visible { color: var(--texto); }
+
+  .enlace { transition: background-size 0.5s var(--ease-libro); }
+  .enlace:hover, .enlace:focus-visible { background-size: 100% 1px; }
+
+  @keyframes correr { to { transform: translateX(-50%); } }
+  .cinta { animation: correr 46s linear infinite; }
+  .cinta-marco:hover .cinta { animation-play-state: paused; }
+
+  /* El sello se estampa: entra apenas más grande y se asienta. */
+  @keyframes estampar {
+    0% { opacity: 0; transform: scale(1.14); }
+    60% { opacity: 1; }
+    100% { opacity: 1; transform: scale(1); }
+  }
+  html.js .estampa { animation: estampar 1.1s var(--ease-libro) both; }
+
+  /* El wordmark abre su tracking, como un sello que se despliega. */
+  @keyframes abrir-tracking {
+    from { opacity: 0; letter-spacing: 0.42em; text-indent: 0.42em; }
+    to { opacity: 1; letter-spacing: 0.18em; text-indent: 0.18em; }
+  }
+  html.js .abre { animation: abrir-tracking 1.5s var(--ease-libro) 0.15s both; }
+
+  @keyframes subir-suave { from { opacity: 0; transform: translateY(1.25rem); } to { opacity: 1; transform: none; } }
+  html.js .entra-suave { animation: subir-suave 1s var(--ease-libro) both; animation-delay: var(--retardo, 0ms); }
+}
+
+/* Sin JS o con reduced-motion nada se esconde: las reglas de arriba
+   viven todas bajo `html.js` + `no-preference`. */

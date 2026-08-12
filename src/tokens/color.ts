@@ -76,6 +76,28 @@ export const etiqueta = {
   petroleo: '#136769', // cardamomo
 } as const
 
+/**
+ * SISTEMA EDITORIAL del sitio público (2026-08-12). Una sola tinta sobre
+ * un solo papel, medidos del logo oficial (`docs/referencias/logo-oficial.jpeg`:
+ * papel #F8F0E5, tinta del sello ≈ #503820 profundizada a #241609).
+ *
+ * La decisión de fondo: el LIENZO no lleva color; el color lo pone el
+ * producto. Los ocho tonos de `etiqueta` dejan de ser bandas de página y
+ * pasan a ser ÍNDICE — la marca de cada sabor. Así el color informa en
+ * vez de decorar, que era la queja real ("apagado, mal mezclado").
+ *
+ * Contrastes medidos: papel/tinta 15.57 · papel/tintaMedia 12.67 ·
+ * humo/tinta 8.61 · sepia/papel 6.49 · tinta/papelHueso 14.01 (todos AAA).
+ */
+export const editorial = {
+  tinta: '#241609',
+  tintaMedia: '#3A2614',
+  papel: '#F8F0E5',
+  papelHueso: '#EFE4D4',
+  humo: '#C4B39D',
+  sepia: '#6B513A',
+} as const
+
 export const roles = {
   'fondo-claro': fijos.papel,
   'fondo-oscuro': verde[700],
@@ -99,6 +121,12 @@ export const paresAprobados = [
   { frente: fijos.tinta, fondo: fijos.amarillo, uso: 'texto en botón amarillo', minimo: 'AAA' },
   { frente: fijos.papel, fondo: fijos.bordo, uso: 'texto en botón bordó', minimo: 'AA' },
   { frente: fijos.bordo, fondo: fijos.papel, uso: 'acento sobre banda clara', minimo: 'AA' },
+  // Sistema editorial del sitio público (2026-08-12).
+  { frente: editorial.papel, fondo: editorial.tinta, uso: 'texto sobre tinta', minimo: 'AAA' },
+  { frente: editorial.humo, fondo: editorial.tinta, uso: 'texto secundario sobre tinta', minimo: 'AAA' },
+  { frente: editorial.tinta, fondo: editorial.papel, uso: 'texto sobre papel', minimo: 'AAA' },
+  { frente: editorial.sepia, fondo: editorial.papel, uso: 'texto secundario sobre papel', minimo: 'AA' },
+  { frente: editorial.tinta, fondo: editorial.papelHueso, uso: 'texto sobre papel hueso', minimo: 'AAA' },
 ] as const satisfies ReadonlyArray<{
   frente: string; fondo: string; uso: string; minimo: NivelWcag
 }>
@@ -108,6 +136,11 @@ export const paresProhibidos = [
   { frente: tan[500], fondo: verde[500], razon: 'da 2.89, falla fuerte' },
 ] as const
 
+/**
+ * Los 36 del sistema de identidad (proyecto 1). `empaque`, `etiqueta` y
+ * `editorial` quedan afuera a propósito: son capas posteriores medidas
+ * del producto real y del logo nuevo, con su propia verificación.
+ */
 export function todosLosColores(): string[] {
   return [
     ...Object.values(verde), ...Object.values(tan),

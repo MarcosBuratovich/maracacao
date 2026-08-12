@@ -1,103 +1,102 @@
 // Copy del sitio público (src/pages/sitio.astro) y de la página en
-// construcción (src/pages/index.astro). Reglas vigentes: registro es-MX,
-// sin "mono"/"chango" (el personaje), sin carrito; los precios van como
-// NÚMEROS y se formatean con precioMXN (pregunta 11: sí se muestran).
-// Títulos CONCRETOS, sin juegos de palabras (retro de Marcos 2026-08-12:
-// "es un centro de información concreto"). Los textos largos son del
-// cliente (docs/respuestas-formulario.md), editados a voz de tú y con el
-// bloque de beneficios suavizado por el tema COFEPRIS (sin claims de
-// patologías ni prevención).
+// construcción (src/pages/index.astro).
+//
+// Reglas vigentes: registro es-MX; el personaje nunca se llama "mono";
+// sin carrito; títulos concretos, sin juegos de palabras; los precios
+// van como NÚMEROS y los formatea `precioMXN`. Los textos largos son
+// del cliente (docs/respuestas-formulario.md), editados a voz de tú,
+// con el bloque de beneficios en versión suavizada por COFEPRIS.
+//
+// `tono` en los sabores no es decoración: es el ÍNDICE de la familia de
+// sabor, con los colores medidos de las etiquetas reales (tokens
+// `etiqueta`). El color es dato, no fondo de sección.
 export const sitio = {
   titulo: 'Maracacao — Chocolate mexicano',
   skipLink: 'Ir al contenido',
 
+  marca: {
+    nombre: 'Maracacao',
+    wordmark: 'MARACACAO',
+    descriptor: 'Chocolate mexicano',
+    selloAlt: 'Sello de Maracacao: la huella de una mano dentro de un círculo, con la palma formada por granos de cacao',
+  },
+
   nav: {
     productos: 'Productos',
-    abc: 'El ABC del chocolate',
+    abc: 'El ABC',
     recetas: 'Recetas',
     quienes: 'Quiénes somos',
     negocios: 'Negocios',
-    faq: 'Preguntas frecuentes',
     contacto: 'Contacto',
   },
 
-  // Página en construcción — lo público mientras se termina el sitio.
-  construccion: {
-    titulo: 'Maracacao — Muy pronto',
-    overline: 'Chocolate mexicano',
-    encabezado: 'Estamos poniendo la mesa',
-    sub: 'La página de Maracacao está en construcción. Mientras tanto, el catálogo está abierto y el chocolate, disponible.',
-    ctaCatalogo: 'Ver el catálogo',
-    ctaCorreo: 'Escríbenos',
-    videoAria: 'El personaje de Maracacao batiendo chocolate con su molinillo',
-    logoAlt: 'Logotipo de Maracacao: la huella de una mano dentro de un círculo, con la palma formada por granos de cacao',
-    lugar: 'Encuéntranos en el Mercado de Coyoacán',
-    muyPronto: 'Muy pronto',
+  cursor: {
+    ver: 'Ver',
+    abrir: 'Abrir',
+    escribir: 'Escribir',
+    leer: 'Leer',
   },
 
   hero: {
-    titulo: 'Chocolate mexicano, de verdad',
-    sub: 'Solo cacao, esencias naturales y azúcar de caña. Sin químicos, saborizantes ni aditivos. Hecho en México, con cacao de Tabasco.',
-    ctaSabores: 'Ver los productos',
-    ctaCatalogo: 'Comprar en el catálogo',
-    imagenAlt: 'El personaje de Maracacao batiendo chocolate con su molinillo',
+    lugar: 'Coyoacán, Ciudad de México',
+    cacao: '70% cacao',
+    hecho: 'Hecho a mano',
+    bajar: 'Bajar',
+  },
+
+  manifiesto: {
+    marca: 'La marca',
+    frase: 'Solo cacao, esencias naturales y azúcar de caña.',
+    cuerpo:
+      'Sin químicos, sin saborizantes, sin aditivos. Cada barra lleva 70% de cacao para que el cacao sea el que hable, acompañado de frutas, chiles, hierbas y especias que cambian por completo lo que esperas de un chocolate.',
+    notaMargen: ['Cacao de Tabasco', 'Desde 2024'],
   },
 
   productos: {
     titulo: 'Nuestros productos',
-    intro: 'Todo parte de lo mismo: chocolate 70% cacao, para que el cacao sea siempre el protagonista.',
-    // Las tres líneas, con los textos del cliente condensados.
+    intro: 'Tres formas del mismo chocolate: para comer despacio, para cocinar y para beber.',
+    notaMargen: ['Barras 70 g', 'Gotas 250 g', 'Polvo 250 g'],
     lineas: [
       {
-        nombre: 'Barras 70% cacao',
-        presentacion: 'Barras de 70 g',
+        nombre: 'Barras',
+        presentacion: '70 gramos · 70% cacao',
         precioDesde: 108,
         bullets: [
           'El cacao al frente del sabor, con menos protagonismo del azúcar',
-          'Frutas, hierbas y especias que hacen de cada barra una experiencia distinta',
+          'Frutas, hierbas y especias: cada barra es una experiencia distinta',
           'Para comer despacio: catar, dejar fundir y disfrutar',
         ],
       },
       {
         nombre: 'Gotas de chocolate',
-        presentacion: 'Bolsas de 250 g',
+        presentacion: '250 gramos · 70% cacao',
         precioDesde: 258,
         bullets: [
-          'Chocolate 70% en porciones pequeñas, listas para usar',
-          'Para galletas, brownies, coberturas, o fundir en taza y frappé',
-          'Y para comer solitas, como botana',
+          'Porciones de unos 10 gramos, listas para usar',
+          'Para galletas, brownies y coberturas, o para fundir en taza y frappé',
+          'Y para comer solas, como botana',
         ],
       },
       {
         nombre: 'Chocolate en polvo',
-        presentacion: 'Próximamente',
+        presentacion: '250 gramos · Próximamente',
         bullets: [
-          'Cocoa natural, cocoa alcalina y pasta de cacao: cacao de verdad',
+          'Cocoa natural, cocoa alcalina y pasta de cacao',
           'Se integra fácil en bebidas calientes o frías',
           'También para licuados, repostería y postres',
         ],
       },
     ],
-    saboresTitulo: 'Los 15 sabores de barra',
-    // Sabores finales (formulario, pregunta 8: la de almendras no sale).
-    barras: [
-      'Naranja con jengibre', 'Chamoy', 'Mango con chile',
-      'Chocolate blanco con pistache', 'Sal de mar', 'Limoncillo',
-      'Tamarindo', 'Lima y chile', 'Cardamomo', 'Canela',
-      'Menta intensa', 'Fresas enchiladas', 'Piña con chile',
-      'Coriandro', 'Yerbabuena',
-    ],
-    // Fotos reales del catálogo, con sus precios reales.
     fotos: [
       {
         archivo: 'foto-barra-naranja-jengibre',
-        nombre: 'Barra naranja con jengibre',
+        nombre: 'Naranja con jengibre',
         alt: 'Barra Maracacao de naranja con jengibre en su envoltura morada, rodeada de naranjas',
         precio: 122,
       },
       {
         archivo: 'foto-barra-mango-chile',
-        nombre: 'Barra mango con chile',
+        nombre: 'Mango con chile',
         alt: 'Barra Maracacao de mango con chile en su envoltura roja, junto a mangos frescos',
         precio: 108,
       },
@@ -108,62 +107,86 @@ export const sitio = {
         precio: 118,
       },
     ] as const,
-    notaMinis: 'Las minis de 10 gramos van en paquete de seis, con sabores siempre distintos.',
-    polvo: {
-      titulo: 'La línea de chocolate en polvo',
-      nota: 'Próximamente',
-      // Las ocho etiquetas reales (docs/referencias/etiquetas/).
-      sabores: [
-        { archivo: 'etiqueta-naranja-jengibre', nombre: 'Naranja y jengibre' },
-        { archivo: 'etiqueta-canela', nombre: 'Canela' },
-        { archivo: 'etiqueta-limoncillo', nombre: 'Limoncillo' },
-        { archivo: 'etiqueta-chile', nombre: 'Chile' },
-        { archivo: 'etiqueta-menta', nombre: 'Menta' },
-        { archivo: 'etiqueta-cardamomo', nombre: 'Cardamomo' },
-        { archivo: 'etiqueta-cocoa-natural', nombre: 'Cocoa natural' },
-        { archivo: 'etiqueta-cocoa-alcalina', nombre: 'Cocoa alcalina' },
-      ] as const,
-      altPrefijo: 'Etiqueta del chocolate en polvo sabor',
-    },
-    tagline: 'Más cacao, ingredientes sencillos y muchas maneras de disfrutarlo.',
+    indiceTitulo: 'Los quince sabores',
+    indiceNota: 'Las minis de 10 gramos van en paquete de seis, con sabores siempre distintos.',
+    // tono = familia de sabor (clave de los tokens `etiqueta`).
+    barras: [
+      { nombre: 'Naranja con jengibre', tono: 'morado' },
+      { nombre: 'Canela', tono: 'carmin' },
+      { nombre: 'Cardamomo', tono: 'petroleo' },
+      { nombre: 'Coriandro', tono: 'petroleo' },
+      { nombre: 'Menta intensa', tono: 'cielo' },
+      { nombre: 'Yerbabuena', tono: 'cielo' },
+      { nombre: 'Limoncillo', tono: 'menta' },
+      { nombre: 'Mango con chile', tono: 'chile' },
+      { nombre: 'Piña con chile', tono: 'chile' },
+      { nombre: 'Lima y chile', tono: 'chile' },
+      { nombre: 'Fresas enchiladas', tono: 'chile' },
+      { nombre: 'Chamoy', tono: 'chile' },
+      { nombre: 'Tamarindo', tono: 'chile' },
+      { nombre: 'Sal de mar', tono: 'cacao' },
+      { nombre: 'Chocolate blanco con pistache', tono: 'caramelo' },
+    ] as const,
+  },
+
+  polvo: {
+    titulo: 'La línea de chocolate en polvo',
+    nota: 'Próximamente',
+    intro: 'Ocho sabores para taza, hechos con cocoa natural, cocoa alcalina y pasta de cacao.',
+    altPrefijo: 'Etiqueta del chocolate en polvo sabor',
+    sabores: [
+      { archivo: 'etiqueta-naranja-jengibre', nombre: 'Naranja y jengibre' },
+      { archivo: 'etiqueta-canela', nombre: 'Canela' },
+      { archivo: 'etiqueta-limoncillo', nombre: 'Limoncillo' },
+      { archivo: 'etiqueta-chile', nombre: 'Chile' },
+      { archivo: 'etiqueta-menta', nombre: 'Menta' },
+      { archivo: 'etiqueta-cardamomo', nombre: 'Cardamomo' },
+      { archivo: 'etiqueta-cocoa-natural', nombre: 'Cocoa natural' },
+      { archivo: 'etiqueta-cocoa-alcalina', nombre: 'Cocoa alcalina' },
+    ] as const,
   },
 
   abc: {
     titulo: 'El ABC del chocolate',
     intro: 'Lo básico para elegir y disfrutar un buen chocolate, contado sin tecnicismos.',
-    porcentaje: {
-      titulo: '¿Qué significa 70% cacao?',
-      cuerpo:
-        'Es la parte de la barra que viene del cacao. Un chocolate 70% conserva una proporción importante de sus componentes naturales y tiene, en general, menos azúcar: se aprecian mejor sus sabores y aromas, sin que el azúcar sea el protagonista. No se trata de que el chocolate sea más oscuro: se trata de que haya más cacao en cada bocado.',
-    },
-    aditivos: {
-      titulo: 'Por qué sin saborizantes ni aditivos',
-      cuerpo:
-        'Un buen chocolate no necesita esconderse detrás de una larga lista de ingredientes. Cuando el cacao es de calidad, su sabor, aroma y carácter hablan por sí mismos. Por eso preferimos recetas sencillas, con ingredientes reconocibles. Menos artificios. Más cacao. Más chocolate.',
-    },
-    beneficios: {
-      titulo: 'Lo que aporta el cacao',
-      cuerpo:
-        'El cacao es una fuente natural de antioxidantes, gracias a sus flavonoides, y aporta minerales como magnesio, hierro y cobre. Contribuye al bienestar y al buen ánimo, y es una deliciosa fuente de energía.',
-    },
+    notaMargen: ['Porcentaje', 'Cata', 'Ingredientes'],
+    bloques: [
+      {
+        titulo: '¿Qué significa 70% cacao?',
+        cuerpo:
+          'Es la parte de la barra que viene del cacao. Un chocolate 70% conserva una proporción importante de sus componentes naturales y tiene, en general, menos azúcar: se aprecian mejor sus sabores y aromas. No se trata de que el chocolate sea más oscuro, sino de que haya más cacao en cada bocado.',
+      },
+      {
+        titulo: 'Por qué sin saborizantes ni aditivos',
+        cuerpo:
+          'Un buen chocolate no necesita esconderse detrás de una larga lista de ingredientes. Cuando el cacao es de calidad, su sabor y su aroma hablan por sí mismos. Por eso preferimos recetas sencillas, con ingredientes reconocibles. Menos artificios. Más cacao.',
+      },
+      {
+        titulo: 'Lo que aporta el cacao',
+        cuerpo:
+          'El cacao es una fuente natural de antioxidantes, gracias a sus flavonoides, y aporta minerales como magnesio, hierro y cobre. Contribuye al bienestar y al buen ánimo, y es una deliciosa fuente de energía.',
+      },
+    ],
     catar: {
       titulo: 'Cómo catar un chocolate',
       pasos: [
         { nombre: 'Mirar', texto: 'Aspecto uniforme y, si está bien templado, una superficie lisa y ligeramente brillante.' },
         { nombre: 'Escuchar', texto: 'Al partirlo debe dar un "snap" limpio y seco.' },
-        { nombre: 'Oler', texto: 'Acércalo a la nariz: puede revelar aromas frutales, florales, tostados, especiados o de frutos secos.' },
-        { nombre: 'Dejar que se funda', texto: 'Un trozo sobre la lengua, sin masticar: el calor de la boca libera la manteca de cacao y sus aromas.' },
+        { nombre: 'Oler', texto: 'Acércalo a la nariz: puede revelar aromas frutales, florales, tostados o de frutos secos.' },
+        { nombre: 'Dejar que se funda', texto: 'Un trozo sobre la lengua, sin masticar. El calor de la boca libera la manteca de cacao y sus aromas.' },
         { nombre: 'Descubrir los sabores', texto: 'Observa qué aparece primero y qué viene después: acidez, dulzor, amargor, fruta, café, especias.' },
         { nombre: 'El final', texto: 'Después de tragarlo, el cacao deja una sensación larga, limpia y compleja, no solo dulzor.' },
       ],
     },
-    cita: '"El buen chocolate no se come de prisa: se mira, se escucha, se huele y se deja fundir."',
+    cita: 'El buen chocolate no se come de prisa: se mira, se escucha, se huele y se deja fundir.',
   },
 
   recetas: {
     titulo: 'Recetas',
     intro: 'Cuatro maneras de llevar el chocolate de la barra a la mesa, con las gotas y el chocolate en polvo.',
+    notaMargen: ['Taza', 'Frío', 'Postre'],
     videoAria: 'El personaje de Maracacao batiendo chocolate en una taza con su molinillo',
+    etiquetaTip: 'Tip Maracacao',
     lista: [
       {
         titulo: 'Chocolate caliente con jengibre y naranja',
@@ -194,15 +217,16 @@ export const sitio = {
         tip: 'El cardamomo hace que un postre sencillísimo sepa mucho más sofisticado.',
       },
     ],
-    etiquetaTip: 'Tip Maracacao:',
   },
 
   quienes: {
     titulo: 'Quiénes somos',
+    frase: 'Empezó en una cocina, probando combinaciones.',
     prosa:
-      'Maracacao nació en 2024, en una cocina, explorando combinaciones de frutas, chiles, hierbas y especias con chocolate de buen porcentaje de cacao. Somos un equipo que promueve el buen chocolate mexicano, con buenas prácticas ambientales y saborizado solo con ingredientes naturales.',
+      'Maracacao nació en 2024 explorando frutas, chiles, hierbas y especias con chocolate de buen porcentaje de cacao. Somos un equipo que promueve el buen chocolate mexicano, con buenas prácticas ambientales y saborizado solo con ingredientes naturales.',
     origen:
       'Nuestro chocolate se elabora en Tabasco, la zona cacaotera más grande del país, a partir de cacao cuidadosamente seleccionado. El proceso pone especial atención en la fermentación y el manejo del grano, para lograr un sabor profundo, equilibrado y aromático.',
+    notaMargen: ['2024', 'Tabasco', 'CDMX'],
     imagenAlt: 'El personaje de Maracacao sentado y sonriendo',
   },
 
@@ -216,7 +240,6 @@ export const sitio = {
 
   faq: {
     titulo: 'Preguntas frecuentes',
-    intro: 'Lo que más nos preguntan sobre el chocolate.',
     items: [
       { p: '¿Qué significa realmente 70% cacao?', r: 'Es la parte de la barra que procede del cacao: pasta, manteca y sólidos. Más porcentaje significa más cacao y menos protagonismo del azúcar.' },
       { p: '¿Un buen chocolate sabe solamente amargo?', r: 'No. Puede tener notas naturalmente frutales, florales, tostadas, de nueces, especias, café o caramelo.' },
@@ -231,15 +254,31 @@ export const sitio = {
 
   contacto: {
     titulo: 'Contacto',
+    invitacion: 'Escríbenos y te contamos qué hay disponible.',
     correo: 'maracacaomx@gmail.com',
+    puntoVentaEtiqueta: 'Punto de venta',
     puntoVenta: 'Mercado de Coyoacán · Malintzin s/n, Col. del Carmen, Coyoacán, CDMX',
-    catalogoNombre: 'Catálogo en línea',
+    catalogoEtiqueta: 'Catálogo en línea',
+    catalogoNombre: 'Ver el catálogo',
     catalogoUrl: 'https://chocolateria.pulpos.shop',
   },
 
   footer: {
-    leyenda: 'Maracacao · Chocolate mexicano',
-    nota: 'Hecho en México · Cacao de Tabasco',
+    lugar: 'Ciudad de México',
+    derechos: 'Maracacao · Chocolate mexicano',
+  },
+
+  // Página en construcción — lo público mientras se termina el sitio.
+  construccion: {
+    titulo: 'Maracacao — Muy pronto',
+    encabezado: 'Estamos poniendo la mesa',
+    sub: 'La página de Maracacao está en construcción. Mientras tanto, el catálogo está abierto y el chocolate, disponible.',
+    ctaCatalogo: 'Ver el catálogo',
+    ctaCorreo: 'Escríbenos',
+    videoAria: 'El personaje de Maracacao batiendo chocolate con su molinillo',
+    logoAlt: 'Sello de Maracacao: la huella de una mano dentro de un círculo, con la palma formada por granos de cacao',
+    lugar: 'Mercado de Coyoacán',
+    muyPronto: 'Muy pronto',
   },
 } as const
 

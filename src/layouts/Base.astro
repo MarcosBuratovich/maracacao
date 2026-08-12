@@ -1,14 +1,29 @@
 ---
-interface Props { titulo: string }
-const { titulo } = Astro.props
+interface Props {
+  titulo: string
+  /**
+   * Qué familia tipográfica precargar. `identidad` es Fraunces + Work
+   * Sans (manual y presentación); `sitio` es Cormorant Garamond + Jost,
+   * las del sello (sitio público, 2026-08-12). Precargar las cuatro
+   * siempre costaría dos descargas inútiles por página.
+   */
+  fuentes?: 'identidad' | 'sitio'
+}
+const { titulo, fuentes = 'identidad' } = Astro.props
+
+const familias =
+  fuentes === 'sitio'
+    ? ['/fonts/cormorant-garamond.woff2', '/fonts/jost.woff2']
+    : ['/fonts/fraunces-variable.woff2', '/fonts/work-sans-variable.woff2']
 ---
 <!doctype html>
 <html lang="es-MX">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="preload" href="/fonts/fraunces-variable.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="/fonts/work-sans-variable.woff2" as="font" type="font/woff2" crossorigin />
+    {familias.map((href) => (
+      <link rel="preload" href={href} as="font" type="font/woff2" crossorigin />
+    ))}
     {/* Sello circular del §8 ("favicon, avatar de redes"), generado con
         `pnpm favicon` desde el asset y el token verde-600. */}
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
