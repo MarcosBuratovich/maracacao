@@ -1,4 +1,4 @@
-import { verde, tan, rosa, fijos, roles, empaque, etiqueta, editorial, sabor } from './color'
+import { verde, tan, rosa, fijos, roles, empaque, etiqueta, editorial, sabor, marca, tintaSabor } from './color'
 import { familias, escala } from './type'
 import { duraciones, easings } from './motion'
 
@@ -15,6 +15,10 @@ export function customProperties(): Record<string, string> {
   // colores distintos y sin prefijo el segundo pisaría al primero,
   // rompiendo el manual y la presentación (que usan --mrc-papel).
   for (const [nombre, hex] of Object.entries(editorial)) props[`--mrc-ed-${nombre}`] = hex
+  // Rediseño 2026-08-13: mismo motivo, prefijo propio. `marca.crema` y
+  // `marca.amarillo` chocarían con `fijos.crema`/`fijos.amarillo`.
+  for (const [nombre, hex] of Object.entries(marca)) props[`--mrc-marca-${nombre}`] = hex
+  for (const [nombre, hex] of Object.entries(tintaSabor)) props[`--mrc-tinta-sabor-${nombre}`] = hex
   for (const [rol, hex] of Object.entries(roles)) props[`--mrc-rol-${rol}`] = hex
   for (const [nombre, valor] of Object.entries(familias)) props[`--mrc-font-${nombre}`] = valor
   for (const [nombre, valor] of Object.entries(escala)) props[`--mrc-text-${nombre}`] = valor

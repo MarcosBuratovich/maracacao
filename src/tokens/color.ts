@@ -125,6 +125,62 @@ export const sabor = {
   blancoConPistache: '#8D9B3E',
 } as const
 
+/**
+ * LA PALETA DEL REDISEÑO (2026-08-13) — del proyecto de Marcos en
+ * claude.ai/design (`docs/auditoria-diseno-v2.md`). El empaque es el
+ * sistema: crema y tinta son el papel y el café del sello, el rojo es el
+ * del personaje, el amarillo es el ticket cosido. Las bandas alternan
+ * secciones; `oscuro` es el piso del menú y de la banda de polvo.
+ *
+ * `textoSuave` NO es el #8A6F5A del canvas: ese daba 4.01 sobre crema
+ * (falla AA en 13.5px). Se oscureció a #7A604A = 5.01, el más cercano en
+ * calidez que pasa. `tintaImpreso` es la tinta que las envolturas claras
+ * usan de verdad (menta, limoncillo) — más honda que `tinta` y la que
+ * hace legibles los sabores claros (ver `tintaSabor`).
+ */
+export const marca = {
+  crema: '#F8ECDE',
+  tinta: '#4C2C16',
+  tintaImpreso: '#241505',
+  rojo: '#CB3C41',
+  rojoHover: '#B03338',
+  rojoHondo: '#7D0303',
+  amarillo: '#F4D261',
+  bandaCalida: '#F3E4CA',
+  bandaClara: '#FFF9EE',
+  oscuro: '#33190A',
+  textoSuave: '#7A604A',
+} as const
+
+/**
+ * QUÉ TINTA VA SOBRE CADA COLOR DE SABOR (medido 2026-08-13). El canvas
+ * ponía blanco fijo y siete sabores fallaban AA (menta 2.11, limoncillo
+ * 1.88…). Con blanco o `tintaImpreso` según el fondo, CATORCE de quince
+ * pasan AA para texto normal. La única excepción es hierbabuena: su
+ * mejor tinta da 4.41 — sobre hierbabuena solo va texto display (≥3.0),
+ * nunca cuerpo. El test de tokens fija todo esto.
+ */
+export const tintaSabor: Record<keyof typeof sabor, string> = {
+  jengibreYNaranja: '#FFFFFF', // 5.91
+  canela: '#FFFFFF', // 11.13
+  cardamomo: '#FFFFFF', // 6.62
+  coriandro: marca.tintaImpreso, // 4.74
+  mentaIntensa: marca.tintaImpreso, // 8.40
+  hierbabuena: marca.tintaImpreso, // 4.41 — SOLO display
+  limoncillo: marca.tintaImpreso, // 9.41
+  mangoConChile: '#FFFFFF', // 4.93
+  pinaConChile: marca.tintaImpreso, // 6.68
+  limaYChile: '#FFFFFF', // 6.26
+  fresasYChile: '#FFFFFF', // 6.36
+  chamoy: '#FFFFFF', // 4.93 (comparte color con mango)
+  tamarindo: marca.tintaImpreso, // 6.35
+  salDeMar: '#FFFFFF', // 7.53
+  blancoConPistache: marca.tintaImpreso, // 5.82
+} as const
+
+/** Sabores donde ninguna tinta llega a 4.5: texto display únicamente. */
+export const saboresSoloDisplay = ['hierbabuena'] as const
+
 export const roles = {
   'fondo-claro': fijos.papel,
   'fondo-oscuro': verde[700],
@@ -154,6 +210,20 @@ export const paresAprobados = [
   { frente: editorial.tinta, fondo: editorial.papel, uso: 'texto sobre papel', minimo: 'AAA' },
   { frente: editorial.sepia, fondo: editorial.papel, uso: 'texto secundario sobre papel', minimo: 'AA' },
   { frente: editorial.tinta, fondo: editorial.papelHueso, uso: 'texto sobre papel hueso', minimo: 'AAA' },
+  // Rediseño de marca (2026-08-13). Los pares texto-sobre-sabor viven en
+  // tintaSabor y su propio test (hierbabuena es display-only y acá no cabe).
+  { frente: marca.tinta, fondo: marca.crema, uso: 'texto sobre crema', minimo: 'AAA' },
+  { frente: marca.tinta, fondo: marca.bandaCalida, uso: 'texto sobre banda cálida', minimo: 'AAA' },
+  { frente: marca.tinta, fondo: marca.bandaClara, uso: 'texto sobre banda clara', minimo: 'AAA' },
+  { frente: marca.textoSuave, fondo: marca.crema, uso: 'texto secundario sobre crema', minimo: 'AA' },
+  { frente: '#FFFFFF', fondo: marca.rojo, uso: 'texto en botón rojo', minimo: 'AA' },
+  { frente: '#FFFFFF', fondo: marca.rojoHover, uso: 'texto en botón rojo (hover)', minimo: 'AA' },
+  { frente: marca.rojoHondo, fondo: marca.amarillo, uso: 'texto del ticket amarillo', minimo: 'AAA' },
+  { frente: marca.tinta, fondo: marca.amarillo, uso: 'texto tinta sobre amarillo', minimo: 'AAA' },
+  { frente: marca.amarillo, fondo: marca.oscuro, uso: 'acento amarillo sobre banda oscura', minimo: 'AAA' },
+  { frente: '#FFFFFF', fondo: marca.oscuro, uso: 'texto sobre banda oscura', minimo: 'AAA' },
+  { frente: marca.crema, fondo: marca.oscuro, uso: 'texto crema sobre banda oscura', minimo: 'AAA' },
+  { frente: marca.rojoHondo, fondo: marca.crema, uso: 'acento rojo hondo sobre crema', minimo: 'AAA' },
 ] as const satisfies ReadonlyArray<{
   frente: string; fondo: string; uso: string; minimo: NivelWcag
 }>

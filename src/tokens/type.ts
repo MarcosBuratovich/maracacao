@@ -14,6 +14,18 @@ export const familias = {
    * documenta el manual, así que sitio y manual hablan igual.
    */
   sello: "'Cormorant Garamond', Garamond, 'Times New Roman', serif",
+  /**
+   * Rediseño 2026-08-13 (claude.ai/design): las voces del EMPAQUE.
+   * `titular` = Bricolage Grotesque 700/800 (los H1/H2 del canvas);
+   * `serifMarca` = Trocchi, la serif real de los PDF (nombres de sabor,
+   * cuerpo); `mono` = Courier Prime, la de los ingredientes impresos;
+   * `mano` = Patrick Hand como sustituto de Bryndan Write, la letra a
+   * mano del impreso (pedir el TTF al diseñador para fidelidad total).
+   */
+  titular: "'Bricolage Grotesque', 'Work Sans Variable', system-ui, sans-serif",
+  serifMarca: "'Trocchi', Georgia, serif",
+  mono: "'Courier Prime', 'Courier New', monospace",
+  mano: "'Patrick Hand', 'Bryndan Write', 'Segoe Print', cursive",
 } as const
 
 /** Valores de partida de los ejes variables. Ver §7 del spec. */

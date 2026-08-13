@@ -4,17 +4,21 @@ interface Props {
   /**
    * Qué familia tipográfica precargar. `identidad` es Fraunces + Work
    * Sans (manual y presentación); `sitio` es Cormorant Garamond +
-   * Work Sans (sitio público, 2026-08-12). Precargar las cuatro
-   * siempre costaría dos descargas inútiles por página.
+   * Work Sans (sitio público, 2026-08-12); `marca` es Bricolage
+   * Grotesque + Trocchi (rediseño 2026-08-13 — Courier y Patrick Hand
+   * cargan sin precarga: aparecen bajo el pliegue). Precargar todas
+   * siempre costaría descargas inútiles por página.
    */
-  fuentes?: 'identidad' | 'sitio'
+  fuentes?: 'identidad' | 'sitio' | 'marca'
 }
 const { titulo, fuentes = 'identidad' } = Astro.props
 
 const familias =
-  fuentes === 'sitio'
-    ? ['/fonts/cormorant-garamond.woff2', '/fonts/work-sans-variable.woff2']
-    : ['/fonts/fraunces-variable.woff2', '/fonts/work-sans-variable.woff2']
+  fuentes === 'marca'
+    ? ['/fonts/bricolage-grotesque-variable.woff2', '/fonts/trocchi.woff2']
+    : fuentes === 'sitio'
+      ? ['/fonts/cormorant-garamond.woff2', '/fonts/work-sans-variable.woff2']
+      : ['/fonts/fraunces-variable.woff2', '/fonts/work-sans-variable.woff2']
 ---
 <!doctype html>
 <html lang="es-MX">
