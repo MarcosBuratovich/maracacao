@@ -42,6 +42,11 @@ if (menuBoton && menu) {
     menuBoton.setAttribute('aria-expanded', String(abierto))
     if (menuTexto) menuTexto.textContent = abierto ? 'Cerrar menú' : 'Abrir menú'
     document.body.style.overflow = abierto ? 'hidden' : ''
+    // El overlay no es una sección [data-tono], así que el cursor de
+    // sello conservaría la tinta anterior (invisible sobre el fondo
+    // oscuro): acá se le da la crema. Al cerrar, el próximo movimiento
+    // sobre una sección lo recalcula solo.
+    if (abierto) raiz.style.setProperty('--cursor-color', 'var(--mrc-marca-crema)')
     if (abierto) enlaces[0]?.focus()
   }
 

@@ -122,8 +122,14 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
             <a class="enlace-sabores" href="#sabores">{marca.hero.ctaSabores}</a>
           </div>
         </div>
+        {/* El lockup del sistema anterior, que a Marcos le gustaba: el
+            sello inline (vector, toma la tinta) y el wordmark como TEXTO
+            VIVO en la serif del logotipo — más grande y nítido que el
+            SVG calcado del logo completo. */}
         <div class="portada-logo">
-          <img src="/sitio/logo.svg" alt={marca.marca.selloAlt} width="400" height="400" />
+          <span class="portada-sello" set:html={sello} />
+          <p class="portada-wordmark">{marca.marca.wordmark}</p>
+          <p class="portada-lema mono">{marca.marca.descriptor}</p>
         </div>
       </div>
       <div class="portada-tira" data-parallax="0.045">
@@ -801,11 +807,10 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
   :global(html.js) .menu-personaje {
     display: block;
     position: absolute;
-    right: clamp(-30px, -2vw, 0px);
-    bottom: -12px;
-    height: min(34vh, 300px);
+    right: clamp(-20px, 1vw, 60px);
+    bottom: -16px;
+    height: min(54vh, 500px);
     width: auto;
-    opacity: 0.92;
     z-index: 0;
   }
   /* En pantallas chicas el personaje se repliega a la esquina para no
@@ -871,11 +876,37 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
     transition: border-color 0.2s;
   }
   .enlace-sabores:hover { border-color: var(--mrc-marca-rojo); }
-  .portada-logo { flex: 1 1 300px; display: flex; justify-content: center; }
-  .portada-logo img {
-    width: clamp(250px, 30vw, 400px);
+  .portada-logo {
+    flex: 1 1 300px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: clamp(14px, 1.6vw, 22px);
+    color: var(--mrc-marca-tinta);
+  }
+  .portada-sello { display: inline-flex; width: clamp(220px, 26vw, 340px); }
+  .portada-sello :global(svg) {
+    width: 100%;
     height: auto;
-    filter: drop-shadow(0 18px 38px rgb(76 44 22 / 0.22));
+    filter: drop-shadow(0 14px 30px rgb(76 44 22 / 0.2));
+  }
+  /* Centrar con tracking pide text-indent, no margen negativo (medido
+     en el sistema anterior). */
+  .portada-wordmark {
+    font-family: var(--mrc-font-sello);
+    font-weight: 500;
+    font-size: clamp(2.125rem, 3.6vw, 3.25rem);
+    letter-spacing: 0.18em;
+    text-indent: 0.18em;
+    line-height: 1;
+    margin: 0;
+  }
+  .portada-lema {
+    font-size: 0.75rem;
+    letter-spacing: 0.34em;
+    text-indent: 0.34em;
+    color: var(--mrc-marca-rojoHondo);
+    margin: 0;
   }
   .portada-tira { margin: clamp(12px, 2vw, 24px) -14px 0; will-change: transform; }
   /* El aire vertical vive DENTRO de la marquesina (que recorta): sin él,
@@ -1410,25 +1441,29 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
   /* ---------- Contacto ---------- */
   #contacto :global(.etiqueta-sabor) { color: var(--mrc-marca-rojoHondo); --chispa: var(--mrc-marca-rojo); }
   #contacto .titular { margin: 8px 0 14px; }
-  /* El formulario manda; el personaje lo acompaña a la derecha en
-     pantallas anchas y desaparece cuando estorba. */
+  /* Formulario contenido y el personaje con protagonismo real a la
+     derecha (retro de Marcos); en pantallas angostas el personaje se
+     oculta para no estorbar. */
   .contacto-zona {
     display: flex;
     align-items: flex-end;
-    gap: clamp(16px, 3vw, 44px);
+    justify-content: space-between;
+    gap: clamp(20px, 4vw, 64px);
   }
   .contacto-personaje {
     flex: none;
-    height: clamp(200px, 22vw, 280px);
+    height: clamp(300px, 34vw, 460px);
     width: auto;
+    margin-inline: auto;
+    filter: drop-shadow(0 16px 28px rgb(76 44 22 / 0.22));
     will-change: transform;
   }
-  @media (max-width: 760px) {
+  @media (max-width: 820px) {
     .contacto-personaje { display: none; }
   }
 
   .formulario {
-    flex: 1;
+    flex: 0 1 640px;
     min-width: 0;
     background: #fff;
     border: 1px solid rgb(76 44 22 / 0.18);
