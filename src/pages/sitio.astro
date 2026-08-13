@@ -129,7 +129,7 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
       <div class="portada-tira" data-parallax="0.045">
         {/* Carga inmediata: con lazy, las copias fuera de pantalla
             entraban tarde y se veían huecos en el bucle. */}
-        <Marquesina aria={marca.hero.marquesinaAria} dur="110s" rotacion={-3}>
+        <Marquesina aria={marca.hero.marquesinaAria} dur="140s" rotacion={-3}>
           {enMarquesina.map((s) => (
             <img
               class="tira-barra"
@@ -501,9 +501,11 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
       <div class="contenedor">
         <EtiquetaSabor texto={marca.contacto.kicker} />
         <h2 class="titular">{marca.contacto.titulo}</h2>
-        <div class="contacto-fila">
-          {/* Sin servidor detrás: el envío arma un mailto con los datos
-              y lo abre en el correo del visitante — la nota lo dice. */}
+        {/* El formulario entero primero, la información abajo en texto —
+            sin tarjetas (retro de Marcos). Sin servidor detrás: el envío
+            arma un mailto con los datos y lo abre en el correo del
+            visitante — la nota lo dice. */}
+        <div class="contacto-zona">
           <form
             class="formulario"
             method="post"
@@ -514,62 +516,69 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
             data-correo={marca.contacto.correo}
           >
             <h3 class="formulario-titulo">{marca.contacto.formulario.titulo}</h3>
-            <label>
-              <span>{marca.contacto.formulario.nombre}</span>
-              <input type="text" name="nombre" autocomplete="name" required />
-            </label>
-            <label>
-              <span>{marca.contacto.formulario.correo}</span>
-              <input type="email" name="correo" autocomplete="email" required />
-            </label>
-            <fieldset>
-              <legend>{marca.contacto.formulario.tipo}</legend>
-              {marca.contacto.formulario.tipoOpciones.map((op, i) => (
-                <label class="formulario-radio">
-                  <input type="radio" name="tipo" value={op.valor} checked={i === 0} />
-                  <span>{op.texto}</span>
-                </label>
-              ))}
-            </fieldset>
-            <label>
-              <span>{marca.contacto.formulario.mensaje}</span>
-              <textarea name="mensaje" rows="4" placeholder={marca.contacto.formulario.mensajeEjemplo} required></textarea>
-            </label>
-            <button class="formulario-enviar" type="submit" data-iman>{marca.contacto.formulario.enviar}</button>
-            <p class="formulario-nota suave">{marca.contacto.formulario.nota}</p>
-          </form>
-          <div class="puesto">
-            <p class="mono">{marca.contacto.puestoEtiqueta}</p>
-            <p class="puesto-titulo">{marca.contacto.puestoTitulo[0]}<br />{marca.contacto.puestoTitulo[1]}</p>
-            <div class="puesto-ticket">
-              <TicketPanel>
-                <p class="puesto-direccion">{marca.contacto.direccion[0]}<br />{marca.contacto.direccion[1]}</p>
-              </TicketPanel>
+            <div class="formulario-campos">
+              <label>
+                <span>{marca.contacto.formulario.nombre}</span>
+                <input type="text" name="nombre" autocomplete="name" required />
+              </label>
+              <label>
+                <span>{marca.contacto.formulario.correo}</span>
+                <input type="email" name="correo" autocomplete="email" required />
+              </label>
+              <fieldset>
+                <legend>{marca.contacto.formulario.tipo}</legend>
+                {marca.contacto.formulario.tipoOpciones.map((op, i) => (
+                  <label class="formulario-radio">
+                    <input type="radio" name="tipo" value={op.valor} checked={i === 0} />
+                    <span>{op.texto}</span>
+                  </label>
+                ))}
+              </fieldset>
+              <label class="campo-mensaje">
+                <span>{marca.contacto.formulario.mensaje}</span>
+                <textarea name="mensaje" rows="5" placeholder={marca.contacto.formulario.mensajeEjemplo} required></textarea>
+              </label>
             </div>
-            <img
-              class="puesto-personaje"
-              src="/sitio/personaje-molinillo-t.webp"
-              alt={marca.contacto.personajeAlt}
-              width="300"
-              height="323"
-              loading="lazy"
-              data-parallax="-0.05"
-            />
-          </div>
-          <div class="contacto-cartas">
-            <div class="contacto-carta">
-              <p class="mono carta-etiqueta">{marca.contacto.correoEtiqueta}</p>
-              <a class="carta-dato" href={`mailto:${marca.contacto.correo}`}>{marca.contacto.correo}</a>
-              <p class="carta-nota suave">{marca.contacto.correoNota}</p>
+            <div class="formulario-pie">
+              <button class="formulario-enviar" type="submit" data-iman>{marca.contacto.formulario.enviar}</button>
+              <p class="formulario-nota suave">{marca.contacto.formulario.nota}</p>
+            </div>
+          </form>
+          <img
+            class="contacto-personaje"
+            src="/sitio/personaje-molinillo-t.webp"
+            alt={marca.contacto.personajeAlt}
+            width="300"
+            height="323"
+            loading="lazy"
+            data-parallax="-0.05"
+          />
+        </div>
+
+        <div class="contacto-info">
+          <div class="info-bloque">
+            <p class="mono info-etiqueta">{marca.contacto.correoEtiqueta}</p>
+            <p class="info-dato">
+              <a href={`mailto:${marca.contacto.correo}`}>{marca.contacto.correo}</a>
               <button class="copiar" type="button" data-copiar={marca.contacto.correo} hidden>
                 <span data-copiar-texto>{marca.contacto.copiar}</span>
               </button>
-            </div>
-            <a class="contacto-carta carta-enlace" href={marca.contacto.catalogoUrl} target="_blank" rel="noopener">
-              <p class="mono carta-etiqueta">{marca.contacto.catalogoEtiqueta}</p>
-              <p class="carta-dato">{marca.contacto.catalogoNombre}<span class="sr-only"> (se abre en pestaña nueva)</span></p>
-              <p class="carta-nota suave">{marca.contacto.catalogoNota}</p>
-            </a>
+            </p>
+            <p class="info-nota suave">{marca.contacto.correoNota}</p>
+          </div>
+          <div class="info-bloque">
+            <p class="mono info-etiqueta">{marca.contacto.puestoEtiqueta}</p>
+            <p class="info-dato">{marca.contacto.puestoTitulo.join(' ')}</p>
+            <p class="info-nota suave">{marca.contacto.direccion[0]} · {marca.contacto.direccion[1]}</p>
+          </div>
+          <div class="info-bloque">
+            <p class="mono info-etiqueta">{marca.contacto.catalogoEtiqueta}</p>
+            <p class="info-dato">
+              <a href={marca.contacto.catalogoUrl} target="_blank" rel="noopener">
+                {marca.contacto.catalogoNombre}<span class="sr-only"> (se abre en pestaña nueva)</span>
+              </a>
+            </p>
+            <p class="info-nota suave">{marca.contacto.catalogoNota}</p>
           </div>
         </div>
       </div>
@@ -868,13 +877,15 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
     height: auto;
     filter: drop-shadow(0 18px 38px rgb(76 44 22 / 0.22));
   }
-  .portada-tira { margin: clamp(20px, 3vw, 40px) -14px 0; will-change: transform; }
-  .portada-tira :global(.marquesina) { padding-block: 14px; }
+  .portada-tira { margin: clamp(12px, 2vw, 24px) -14px 0; will-change: transform; }
+  /* El aire vertical vive DENTRO de la marquesina (que recorta): sin él,
+     la rotación y las sombras de las barras se decapitan abajo. */
+  .portada-tira :global(.marquesina) { padding-block: clamp(28px, 3vw, 46px); }
   .tira-barra {
-    width: clamp(104px, 11vw, 142px);
+    width: clamp(132px, 14vw, 196px);
     height: auto;
-    border-radius: 3px;
-    box-shadow: 0 10px 22px rgb(76 44 22 / 0.3);
+    border-radius: 4px;
+    box-shadow: 0 12px 26px rgb(76 44 22 / 0.32);
     transition: transform 0.25s ease-out;
   }
   .tira-barra:hover { transform: scale(1.05) rotate(2deg); }
@@ -957,15 +968,19 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
        sombra (26px de difuminado) viven DENTRO del scroller — si no,
        el overflow los decapita (retro de Marcos). */
     padding: 20px clamp(20px, calc(50vw - 530px), 56px) 36px;
+    /* En pantallas anchas entran las quince: que centren. `safe` vuelve
+       al inicio cuando hay scroll, para no cortar la primera. */
+    justify-content: safe center;
   }
   .anaquel-riel [role='radio'] {
     flex: none;
     scroll-snap-align: center;
     background: none;
     border: none;
-    padding: 0;
+    padding: 3px;
+    border-radius: 7px;
     cursor: pointer;
-    transition: transform 0.25s ease-out;
+    transition: transform 0.25s ease-out, box-shadow 0.25s ease-out;
   }
   .anaquel-riel [role='radio'] img {
     width: clamp(96px, 10vw, 126px);
@@ -975,7 +990,16 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
     display: block;
   }
   .anaquel-riel [role='radio']:hover { transform: translateY(-10px) scale(1.04); }
-  .anaquel-riel [role='radio'][aria-checked='true'] { transform: translateY(-8px) scale(1.06); }
+  /* La seleccionada se marca con un anillo en la TINTA de la banda
+     (contrasta siempre, porque la tinta se eligió contra este fondo) y
+     una sombra más honda. El outline queda libre para el foco. */
+  .anaquel-riel [role='radio'][aria-checked='true'] {
+    transform: translateY(-8px) scale(1.06);
+    box-shadow: 0 0 0 3px var(--texto);
+  }
+  .anaquel-riel [role='radio'][aria-checked='true'] img {
+    box-shadow: 0 18px 34px rgb(31 14 5 / 0.48);
+  }
   @media (prefers-reduced-motion: reduce) {
     .anaquel-riel [role='radio'], .tira-barra { transition: none; }
   }
@@ -1386,32 +1410,54 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
   /* ---------- Contacto ---------- */
   #contacto :global(.etiqueta-sabor) { color: var(--mrc-marca-rojoHondo); --chispa: var(--mrc-marca-rojo); }
   #contacto .titular { margin: 8px 0 14px; }
-  .contacto-fila {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: clamp(14px, 2vw, 24px);
-    align-items: stretch;
+  /* El formulario manda; el personaje lo acompaña a la derecha en
+     pantallas anchas y desaparece cuando estorba. */
+  .contacto-zona {
+    display: flex;
+    align-items: flex-end;
+    gap: clamp(16px, 3vw, 44px);
   }
-  @media (min-width: 980px) {
-    .contacto-fila { grid-template-columns: 1.25fr 1fr 1fr; }
+  .contacto-personaje {
+    flex: none;
+    height: clamp(200px, 22vw, 280px);
+    width: auto;
+    will-change: transform;
+  }
+  @media (max-width: 760px) {
+    .contacto-personaje { display: none; }
   }
 
   .formulario {
+    flex: 1;
+    min-width: 0;
     background: #fff;
     border: 1px solid rgb(76 44 22 / 0.18);
     border-radius: 10px;
-    padding: 22px 20px;
     box-shadow: 0 12px 28px rgb(76 44 22 / 0.16);
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 16px;
+    padding: clamp(22px, 3vw, 36px);
   }
   .formulario-titulo {
     font-family: var(--mrc-font-titular);
     font-weight: 700;
-    font-size: 1.15625rem;
+    font-size: 1.28125rem;
     letter-spacing: -0.01em;
     margin: 0;
+  }
+  .formulario-campos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 14px 20px;
+    align-items: start;
+  }
+  .campo-mensaje { grid-column: 1 / -1; }
+  .formulario-pie {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
   }
   .formulario label:not(.formulario-radio) { display: flex; flex-direction: column; gap: 6px; }
   .formulario label span, .formulario legend {
@@ -1477,81 +1523,43 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
   @media (prefers-reduced-motion: reduce) {
     .formulario-enviar, .formulario-enviar:hover, .formulario-enviar:active { transition: none; transform: none; }
   }
-  .puesto {
-    position: relative;
-    overflow: hidden;
-    border-radius: 10px;
-    padding: 24px 22px;
-    background: linear-gradient(
-      165deg,
-      color-mix(in srgb, var(--mrc-sabor-pinaConChile) 82%, white) 0%,
-      var(--mrc-sabor-pinaConChile) 45%,
-      color-mix(in srgb, var(--mrc-sabor-pinaConChile) 76%, black) 100%
-    );
-    color: var(--mrc-marca-tintaImpreso);
-    box-shadow: 0 16px 34px rgb(76 44 22 / 0.26);
+  /* La información, en texto sobre la banda — sin tarjetas. */
+  .contacto-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 18px clamp(24px, 4vw, 56px);
+    border-top: 1px solid rgb(76 44 22 / 0.25);
+    margin-top: clamp(24px, 3vw, 40px);
+    padding-top: clamp(18px, 2.5vw, 28px);
   }
-  .puesto > .mono { font-size: 0.65625rem; letter-spacing: 0.14em; margin: 0; opacity: 0.9; }
-  .puesto-titulo {
+  .info-etiqueta { font-size: 0.625rem; color: var(--mrc-marca-rojoHondo); margin: 0 0 6px; }
+  .info-dato {
     font-family: var(--mrc-font-titular);
-    font-weight: 800;
-    font-size: clamp(1.5rem, 2.4vw, 1.875rem);
-    line-height: 1.02;
-    letter-spacing: -0.01em;
-    margin: 8px 0 12px;
-  }
-  .puesto-ticket { max-width: 220px; position: relative; z-index: 1; }
-  .puesto-direccion { font-size: 0.78125rem; line-height: 1.45; margin: 0; }
-  .puesto-personaje {
-    position: absolute;
-    right: -6px;
-    bottom: -8px;
-    height: clamp(180px, 19vw, 240px);
-    width: auto;
-    will-change: transform;
-  }
-  .contacto-cartas { display: flex; flex-direction: column; gap: 12px; }
-  .contacto-carta {
-    flex: 1;
-    background: #fff;
-    border: 1px solid rgb(76 44 22 / 0.18);
-    border-radius: 10px;
-    padding: 16px;
+    font-weight: 600;
+    font-size: 1.0625rem;
+    margin: 0;
     display: flex;
-    flex-direction: column;
-    justify-content: center;
-    box-shadow: 0 2px 6px rgb(76 44 22 / 0.14);
-    text-decoration: none;
-    transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, border-color 0.2s;
-  }
-  .carta-enlace:hover { transform: translateY(-3px); box-shadow: 0 12px 26px rgb(76 44 22 / 0.2); border-color: var(--mrc-marca-rojo); }
-  .carta-etiqueta { font-size: 0.625rem; color: var(--mrc-marca-rojoHondo); margin: 0; }
-  .carta-dato {
-    font-family: var(--mrc-font-titular);
-    font-weight: 600;
-    font-size: 0.9375rem;
-    color: var(--mrc-marca-tinta);
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
     overflow-wrap: anywhere;
-    margin: 4px 0 0;
-    text-decoration: none;
   }
-  a.carta-dato:hover { color: var(--mrc-marca-rojoHondo); }
-  .carta-nota { font-size: 0.75rem; margin: 3px 0 0; }
+  .info-dato a { color: var(--mrc-marca-tinta); text-decoration: none; border-bottom: 2px solid var(--mrc-marca-amarillo); padding-bottom: 1px; transition: border-color 0.15s ease-out; }
+  .info-dato a:hover { border-bottom-color: var(--mrc-marca-rojo); }
+  .info-nota { font-size: 0.78125rem; margin: 6px 0 0; }
   .copiar {
-    align-self: flex-start;
-    margin-top: 10px;
     font-family: var(--mrc-font-titular);
     font-weight: 600;
-    font-size: 0.78125rem;
+    font-size: 0.71875rem;
     color: var(--mrc-marca-tinta);
     background: transparent;
-    border: 2px solid var(--mrc-marca-tinta);
-    border-radius: 6px;
-    padding: 6px 12px;
+    border: 2px solid rgb(76 44 22 / 0.45);
+    border-radius: 999px;
+    padding: 4px 12px;
     cursor: pointer;
-    transition: background 0.2s ease-out;
+    transition: background 0.2s ease-out, border-color 0.2s ease-out;
   }
-  .copiar:hover { background: rgb(76 44 22 / 0.08); }
+  .copiar:hover { background: rgb(76 44 22 / 0.08); border-color: var(--mrc-marca-tinta); }
 
   /* ---------- Pie ---------- */
   .pie { padding-bottom: 18px; box-shadow: inset 0 10px 20px rgb(31 14 5 / 0.15); }
