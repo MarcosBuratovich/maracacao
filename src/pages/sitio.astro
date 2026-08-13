@@ -170,7 +170,9 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
             </ul>
             <p class="panel-nota mono">{marca.postura.llevaNota}</p>
           </div>
-          <div class="panel panel-no" id="panel-no" role="tabpanel" aria-labelledby="tab-no" tabindex="0" data-panel hidden>
+          {/* Sin `hidden` en el HTML: sin JS los dos paneles se apilan
+              visibles; el script esconde el inactivo al tomar control. */}
+          <div class="panel panel-no" id="panel-no" role="tabpanel" aria-labelledby="tab-no" tabindex="0" data-panel>
             <ul class="panel-lista">
               {marca.postura.noLleva.map((item) => (
                 <li><span class="mano panel-marca" aria-hidden="true">✕</span><s>{item}</s></li>
@@ -451,7 +453,6 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
               aria-labelledby={`tab-${t.id}`}
               tabindex="0"
               data-panel
-              hidden={i !== 0}
               style={`--sabor:${colorSabor[t.clave]}`}
             >
               <div class="negocio-encabezado">
@@ -700,6 +701,7 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
     margin-top: auto;
     color: rgb(248 236 222 / 0.75);
   }
+  :global(html.js) .menu-lista, :global(html.js) .menu-pie { position: relative; z-index: 1; }
   :global(html.js) .menu-personaje {
     display: block;
     position: absolute;
@@ -708,6 +710,12 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
     height: min(34vh, 300px);
     width: auto;
     opacity: 0.92;
+    z-index: 0;
+  }
+  /* En pantallas chicas el personaje se repliega a la esquina para no
+     taparle el texto a «Catálogo en línea» ni al pie. */
+  @media (max-width: 640px) {
+    :global(html.js) .menu-personaje { height: min(20vh, 170px); opacity: 0.55; }
   }
   @media (prefers-reduced-motion: reduce) {
     :global(html.js) .menu, :global(html.js) .menu-lista a, .hamburguesa-linea { transition: none; }
@@ -843,6 +851,10 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
     overflow-x: auto;
     scroll-snap-type: x proximity;
     scrollbar-width: thin;
+    /* La barra de scroll se tiñe con la tinta de la banda: visible como
+       señal de que hay más (hallazgo de la auditoría), sin el gris crudo
+       del navegador cruzando el color del sabor. */
+    scrollbar-color: color-mix(in srgb, var(--texto) 45%, transparent) transparent;
     padding: 6px clamp(20px, calc(50vw - 530px), 56px) 14px;
   }
   .anaquel-riel [role='radio'] {
@@ -982,6 +994,7 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
     gap: 14px;
     overflow-x: auto;
     scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--texto) 45%, transparent) transparent;
     padding: 6px 2px;
     will-change: transform;
   }
@@ -1052,6 +1065,7 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
     overflow-x: auto;
     scroll-snap-type: x proximity;
     scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--texto) 45%, transparent) transparent;
     padding: 8px clamp(20px, calc(50vw - 530px), 56px) 20px;
   }
   .receta {
@@ -1133,7 +1147,10 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
     margin-top: 10px;
   }
   .nosotros-pie p { padding-bottom: 14px; margin: 0; font-size: 0.6875rem; }
-  .nosotros-pie img { height: 120px; width: auto; will-change: transform; }
+  /* Más grande que en el canvas (120px): retro previa de Marcos — los
+     personajes chicos «no viven». A 96px el trazo se empasta (medido);
+     acá va holgado. */
+  .nosotros-pie img { height: clamp(150px, 16vw, 190px); width: auto; will-change: transform; }
 
   /* ---------- Para negocios ---------- */
   .negocios {
@@ -1275,7 +1292,7 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
     position: absolute;
     right: -10px;
     bottom: -8px;
-    height: 135px;
+    height: clamp(150px, 15vw, 180px);
     width: auto;
     will-change: transform;
   }
