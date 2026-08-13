@@ -131,6 +131,8 @@ export const sitio = {
           cacao: '73% cacao',
           precio: 108,
           campo: 'petroleo',
+          // URL de la escena de Spline cuando esté publicada.
+          spline: undefined as string | undefined,
           alt: 'Barra Maracacao de mango con chile: envoltura color vino con el personaje haciendo malabares con mangos',
         },
         {
@@ -139,6 +141,7 @@ export const sitio = {
           cacao: '70% cacao',
           precio: 122,
           campo: 'caramelo',
+          spline: undefined as string | undefined,
           alt: 'Barra Maracacao de naranja con jengibre: envoltura morada con una ronda de personajes y rodajas de naranja',
         },
       ],

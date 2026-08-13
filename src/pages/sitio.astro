@@ -11,6 +11,7 @@
 // Garamond, comparada contra el logo real), y al salir del hero el
 // sello se acopla a la barra.
 import Base from '@/layouts/Base.astro'
+import VisorProducto from '@/components/sitio/VisorProducto.astro'
 import selloRaw from '@/assets/brand/sello-mano.svg?raw'
 import { sitio, precioMXN } from '@/copy/sitio'
 import '@/styles/global.css'
@@ -141,7 +142,16 @@ const tira = [...sitio.hero.tira, ...sitio.hero.tira]
             {sitio.productos.destacadas.items.map((b) => (
               <article class="pieza destacada">
                 <div class="arco destacada-arco" data-campo={b.campo}>
-                  <img src={`/sitio/packshot/${b.archivo}.webp`} alt={b.alt} loading="lazy" width="470" height="992" />
+                  {/* Envoltorio propio de la página: una clase pasada a un
+                      componente NO recibe el ámbito de sus estilos, así que
+                      el tamaño se fija acá. */}
+                  <div class="destacada-visor">
+                    <VisorProducto
+                      imagen={`/sitio/packshot/${b.archivo}.webp`}
+                      alt={b.alt}
+                      spline={b.spline}
+                    />
+                  </div>
                 </div>
                 <div class="destacada-pie">
                   <div>
@@ -440,8 +450,8 @@ const tira = [...sitio.hero.tira, ...sitio.hero.tira]
     padding-inline: clamp(1.25rem, 5.5vw, 5.5rem);
   }
   .hero-sello {
-    width: clamp(5.5rem, 11vw, 10rem);
-    margin: 0 auto clamp(1.75rem, 4vh, 3rem);
+    width: clamp(8rem, 15vw, 14rem);
+    margin: 0 auto clamp(1.5rem, 3.5vh, 2.5rem);
   }
   .hero-regla { margin-inline: auto; }
   .hero-descriptor { margin-top: clamp(1rem, 2.5vh, 1.75rem); letter-spacing: 0.42em; }
@@ -493,7 +503,7 @@ const tira = [...sitio.hero.tira, ...sitio.hero.tira]
      arriba y su base quede adentro: la barra mide 0.474 de ancho/alto,
      así que a 58% del arco su alto es 1.224 del ancho del arco. */
   .destacada-arco { aspect-ratio: 4 / 4.9; margin: 3.5rem 0.5rem 1.5rem 0.6rem; }
-  .destacada-arco img { width: 58%; translate: 0 -10%; rotate: -5deg; }
+  .destacada-visor { width: 52%; translate: 0 -9%; rotate: -5deg; }
   .destacada-pie {
     display: flex;
     align-items: baseline;

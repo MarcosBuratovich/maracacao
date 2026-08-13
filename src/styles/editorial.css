@@ -142,12 +142,13 @@
 }
 
 /* Medido en vivo: MARACACAO con este tracking ocupa 8.0 veces el cuerpo.
-   A 11.8vw llega casi al borde sin cortarse; el tope en rem evita que se
-   pase en pantallas muy anchas. */
+   Se bajó de 11.8vw a 9.6vw para que el wordmark deje de comerse el
+   ancho completo: el protagonista pasa a ser el sello, que es el que
+   cuenta la historia de la marca (hecho a mano). */
 .monumento {
   font-family: var(--mrc-font-sello);
   font-weight: 300;
-  font-size: min(11.8vw, 14rem);
+  font-size: min(9.6vw, 11.5rem);
   line-height: 0.86;
   letter-spacing: 0.18em;
   text-indent: 0.18em;
@@ -185,7 +186,7 @@
 .marca {
   font-family: var(--mrc-font-texto);
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--tenue);
@@ -206,7 +207,7 @@
 .nota-margen {
   font-family: var(--mrc-font-texto);
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--tenue);
@@ -275,6 +276,14 @@
   translate: 0 -14%;
   filter: drop-shadow(0 20px 24px color-mix(in srgb, var(--mrc-ed-tinta) 45%, transparent));
 }
+
+/* ---------- 3c. Visor de producto ----------
+   Hoy imagen, mañana escena de Spline en el mismo hueco. */
+
+.visor { position: relative; display: grid; place-items: center; }
+.visor > img { display: block; width: 100%; height: auto; }
+.visor-3d > img { display: none; }
+.visor-3d spline-viewer { display: block; width: 100%; aspect-ratio: 470 / 992; }
 
 /* ---------- 4. Botones y enlaces ----------
    Contorno duro y sombra sólida desplazada; al pasar el cursor el botón

@@ -1,0 +1,75 @@
+---
+// Visor de producto: hoy muestra la imagen fija; mañana, la escena 3D.
+//
+// Marcos está armando los modelos en Spline por separado. Este componente
+// deja el lugar preparado para que entrar sea pasar una prop, sin tocar
+// el layout ni volver a pensar proporciones.
+//
+// Reglas que respeta:
+// · Sin `spline`, NO se descarga nada externo. El visor de Spline pesa,
+//   y una página sin 3D no tiene por qué pagarlo.
+// · La escena se carga recién cuando la pieza entra en pantalla.
+// · Con `prefers-reduced-motion` no se carga el 3D: queda la imagen. Una
+//   escena que gira sola es exactamente lo que esa preferencia apaga.
+// · La imagen fija siempre está en el HTML: es el fallback si el visor
+//   falla, y es lo que ven los buscadores.
+interface Props {
+  imagen: string
+  alt: string
+  /** URL de la escena publicada en Spline (.splinecode). Opcional. */
+  spline?: string
+  ancho?: number
+  alto?: number
+  class?: string
+}
+const { imagen, alt, spline, ancho = 470, alto = 992, class: clase = '' } = Astro.props
+---
+<div class={`visor ${clase}`} data-spline={spline}>
+  <img src={imagen} alt={alt} width={ancho} height={alto} loading="lazy" />
+</div>
+
+{spline && (
+  <script is:inline define:vars={{ }}>
+    // Carga diferida del visor de Spline: una sola vez para toda la
+    // página, y solo si hay alguna pieza con escena que entre en
+    // pantalla. Con reduced-motion no se carga nunca.
+    ;(() => {
+      if (window.__splineListo) return
+      window.__splineListo = true
+      if (matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+      let cargando = false
+      const cargarLibreria = () =>
+        new Promise((listo, falla) => {
+          if (cargando) return listo()
+          cargando = true
+          const s = document.createElement('script')
+          s.type = 'module'
+          s.src = 'https://unpkg.com/@splinetool/viewer/build/spline-viewer.js'
+          s.onload = listo
+          s.onerror = falla
+          document.head.appendChild(s)
+        })
+
+      const observador = new IntersectionObserver(async (entradas) => {
+        for (const e of entradas) {
+          if (!e.isIntersecting) continue
+          const caja = e.target
+          observador.unobserve(caja)
+          try {
+            await cargarLibreria()
+            const visor = document.createElement('spline-viewer')
+            visor.setAttribute('url', caja.dataset.spline)
+            visor.setAttribute('loading-anim-type', 'none')
+            caja.appendChild(visor)
+            caja.classList.add('visor-3d')
+          } catch {
+            // Si el visor no carga, se queda la imagen. La página no se entera.
+          }
+        }
+      }, { rootMargin: '200px' })
+
+      for (const el of document.querySelectorAll('.visor[data-spline]')) observador.observe(el)
+    })()
+  </script>
+)}
