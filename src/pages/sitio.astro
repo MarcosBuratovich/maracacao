@@ -126,10 +126,11 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
             sello inline (vector, toma la tinta) y el wordmark como TEXTO
             VIVO en la serif del logotipo — más grande y nítido que el
             SVG calcado del logo completo. */}
+        {/* Sin el descriptor debajo: «Chocolate mexicano» ya vive en el
+            titular de al lado y en la cabecera — repetirlo era ruido. */}
         <div class="portada-logo">
           <span class="portada-sello" set:html={sello} />
           <p class="portada-wordmark">{marca.marca.wordmark}</p>
-          <p class="portada-lema mono">{marca.marca.descriptor}</p>
         </div>
       </div>
       <div class="portada-tira" data-parallax="0.045">
@@ -899,13 +900,6 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
     letter-spacing: 0.18em;
     text-indent: 0.18em;
     line-height: 1;
-    margin: 0;
-  }
-  .portada-lema {
-    font-size: 0.75rem;
-    letter-spacing: 0.34em;
-    text-indent: 0.34em;
-    color: var(--mrc-marca-rojoHondo);
     margin: 0;
   }
   .portada-tira { margin: clamp(12px, 2vw, 24px) -14px 0; will-change: transform; }
