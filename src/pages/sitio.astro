@@ -1,707 +1,1338 @@
 ---
-// src/pages/sitio.astro — El sitio público de Maracacao.
+// src/pages/sitio.astro — El sitio público de Maracacao, rediseñado.
 //
-// Sistema: `src/styles/editorial.css`. Canon de Van de Graaf a nueve
-// columnas (bloque de texto en 2/8, notas al margen en 8/10), una sola
-// tinta sobre un solo papel, y el color puesto por el producto: los
-// tonos de las etiquetas son índice de sabor, nunca fondo de sección.
+// Sistema: `src/styles/marca.css` — el empaque como sistema (diseño de
+// Marcos en claude.ai/design, 2026-08-13; auditoría y correcciones en
+// docs/auditoria-diseno-v2.md). La pieza firma es el anaquel: quince
+// barras reales, la banda toma el color del sabor elegido y la tinta la
+// pone `tintaSabor` (medida por sabor, nunca blanco fijo).
 //
-// El sello es la firma de la página: se estampa al cargar, el wordmark
-// abre su tracking en la tipografía del propio logotipo (Cormorant
-// Garamond, comparada contra el logo real), y al salir del hero el
-// sello se acopla a la barra.
+// Interacción en src/scripts/marca.ts: anaquel, menú, pestañas, cursor
+// de sello, imanes y parallax — todo mejora progresiva sobre una página
+// que sin JS se ve completa y quieta.
 import Base from '@/layouts/Base.astro'
+import ArcoTitulo from '@/components/marca/ArcoTitulo.astro'
+import BotonMarca from '@/components/marca/BotonMarca.astro'
+import EtiquetaSabor from '@/components/marca/EtiquetaSabor.astro'
+import Insignia from '@/components/marca/Insignia.astro'
+import Marquesina from '@/components/marca/Marquesina.astro'
+import TicketPanel from '@/components/marca/TicketPanel.astro'
 import VisorProducto from '@/components/sitio/VisorProducto.astro'
 import selloRaw from '@/assets/brand/sello-mano.svg?raw'
-import { sitio, precioMXN } from '@/copy/sitio'
+import { marca, precioMXN } from '@/copy/sitio-marca'
+import { sabores, gotas, paqueteSeis, polvo } from '@/copy/sabores'
+import { sabor as colorSabor, tintaSabor, marca as paletaMarca } from '@/tokens/color'
 import '@/styles/global.css'
-import '@/styles/editorial.css'
+import '@/styles/marca.css'
 
 const sello = selloRaw.replace('<svg', '<svg aria-hidden="true" focusable="false"')
 
-const nav = [
-  ['#productos', sitio.nav.productos],
-  ['#abc', sitio.nav.abc],
-  ['#recetas', sitio.nav.recetas],
-  ['#quienes', sitio.nav.quienes],
-  ['#negocios', sitio.nav.negocios],
-  ['#contacto', sitio.nav.contacto],
-] as const
+// La selección inicial del anaquel: canela (contraste AAA con blanco).
+const inicial = sabores.find((s) => s.slug === 'canela')!
 
-// La tira del hero se duplica para que el bucle no tenga costura.
-const tira = [...sitio.hero.tira, ...sitio.hero.tira]
+// Ocho barras para la marquesina del hero (el orden del canvas).
+const enMarquesina = [
+  'fresas-y-chile', 'limoncillo', 'sal-de-mar', 'pina-con-chile',
+  'cardamomo', 'tamarindo', 'hierbabuena', 'jengibre-y-naranja',
+].map((slug) => sabores.find((s) => s.slug === slug)!)
+
+// Datos que el script del anaquel necesita por sabor, con el precio ya
+// formateado y la tinta medida.
+const datosAnaquel = sabores.map((s) => ({
+  slug: s.slug,
+  orden: s.orden,
+  nombre: s.nombre,
+  cacao: s.cacao,
+  precio: precioMXN(s.precio),
+  ingredientes: s.ingredientes,
+  color: colorSabor[s.clave],
+  tinta: tintaSabor[s.clave],
+}))
+
+// La tinta de un sabor es blanca o la de impreso: con distinguir la
+// oscura alcanza (y el guard de hex a mano en páginas queda contento).
+const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== paletaMarca.tintaImpreso
 ---
-<Base titulo={sitio.titulo} fuentes="sitio">
-  <a href="#contenido" class="salto">{sitio.skipLink}</a>
+<Base titulo={marca.titulo} fuentes="marca">
+  <a href="#contenido" class="salto">{marca.skipLink}</a>
 
-  <div class="ed" data-tono="papel">
-    <header class="barra">
-      <a class="barra-marca" href="#contenido" aria-label={sitio.marca.nombre}>
-        <span class="barra-sello sello" set:html={sello} />
-        <span class="wordmark barra-nombre">{sitio.marca.wordmark}</span>
+  <header class="cabecera" data-tono="crema">
+    <div class="contenedor cabecera-fila">
+      <a class="lockup" href="#contenido" aria-label={marca.marca.nombre}>
+        <span class="lockup-sello" set:html={sello} />
+        <span>
+          <span class="lockup-nombre">{marca.marca.wordmark}</span>
+          <span class="lockup-descriptor mono">{marca.marca.descriptor}</span>
+        </span>
       </a>
-      <nav class="barra-nav" aria-label="Secciones">
-        {nav.map(([href, etiqueta]) => <a href={href}>{etiqueta}</a>)}
-      </nav>
-    </header>
+      <button
+        class="hamburguesa"
+        type="button"
+        aria-expanded="false"
+        aria-controls="menu-principal"
+        data-menu-boton
+      >
+        <span class="sr-only" data-menu-texto>{marca.nav.abrir}</span>
+        <span class="hamburguesa-linea" aria-hidden="true"></span>
+        <span class="hamburguesa-linea" aria-hidden="true"></span>
+        <span class="hamburguesa-linea" aria-hidden="true"></span>
+      </button>
+    </div>
+  </header>
 
-    <main id="contenido">
-      {/* ——— El sello ——— */}
-      <section class="seccion hero" data-tono="tinta">
-        <div class="registro registro-simetrico"><span></span><span></span></div>
-        {/* Fuera del canon a propósito: el wordmark es la pieza que se
-            come el ancho completo, de margen a margen. */}
-        <div class="hero-centro">
-          <div class="hero-sello sello estampa" set:html={sello} />
-          <h1 class="monumento abre">{sitio.marca.wordmark}</h1>
-          <p class="marca hero-descriptor entra-suave" style="--retardo:900ms">
-            {sitio.marca.descriptor}
-          </p>
-          <hr class="regla hero-regla entra-suave" style="--retardo:1050ms" />
-          <ul class="hero-meta marca entra-suave" style="--retardo:1150ms">
-            <li>{sitio.hero.lugar}</li>
-            <li>{sitio.hero.cacao}</li>
-            <li>{sitio.hero.hecho}</li>
-          </ul>
-        </div>
+  {/* Sin JS es una fila de enlaces bajo la cabecera; con JS, el overlay. */}
+  <nav id="menu-principal" class="menu" aria-label={marca.nav.etiqueta} data-menu>
+    <div class="menu-interior">
+      <ol class="menu-lista">
+        {marca.nav.items.map((item, i) => (
+          <li style={`--orden:${i}`}>
+            <a href={item.ancla} data-menu-enlace>
+              <span class="menu-numero mono" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+              {item.texto}
+            </a>
+          </li>
+        ))}
+        <li class="menu-catalogo" style={`--orden:${marca.nav.items.length}`}>
+          <a href={marca.contacto.catalogoUrl} target="_blank" rel="noopener" data-menu-enlace>
+            <span class="menu-numero mano" aria-hidden="true">↗</span>
+            {marca.nav.catalogo}<span class="sr-only"> (se abre en pestaña nueva)</span>
+          </a>
+        </li>
+      </ol>
+      <div class="menu-pie">
+        {marca.nav.pie.map((linea) => <span class="mono">{linea}</span>)}
+      </div>
+      <img class="menu-personaje flota" src="/sitio/personaje-sentado-t.webp" alt="" width="300" height="352" loading="lazy" />
+    </div>
+  </nav>
 
-        {/* El producto real llenando el pie del hero: las barras del
-            catálogo, en marcha lenta. */}
-        <div class="hero-tira entra-suave" style="--retardo:1400ms" role="img" aria-label={sitio.hero.tiraAria}>
-          <div class="hero-pista">
-            {tira.map((p) => (
-              <img
-                src={`/sitio/catalogo/${p.archivo}.webp`}
-                alt="" aria-hidden="true" loading="lazy"
-                width="450" height="600"
-              />
-            ))}
+  <main id="contenido">
+    {/* ——— 01 · Portada ——— */}
+    <section class="portada" data-tono="crema">
+      <div class="contenedor portada-fila">
+        <div class="portada-texto">
+          <h1 class="portada-titular">
+            {marca.hero.titular[0]}<br />
+            {marca.hero.titular[1].replace(',', '')}<span class="acento">,</span><br />
+            <span class="acento">{marca.hero.titular[2]}</span>
+          </h1>
+          <p class="portada-sub">{marca.hero.sub}</p>
+          <div class="portada-ctas">
+            <BotonMarca href={marca.contacto.catalogoUrl} externo>{marca.hero.ctaCatalogo}</BotonMarca>
+            <a class="enlace-sabores" href="#sabores">{marca.hero.ctaSabores}</a>
           </div>
         </div>
-        <span data-centinela></span>
-      </section>
-
-      {/* ——— Manifiesto ——— */}
-      <section class="seccion" data-tono="papel">
-        <div class="canon aire">
-          <div class="bloque">
-            <p class="marca" data-revelar>{sitio.manifiesto.marca}</p>
-            <h2 class="display manifiesto-frase" data-lineas data-revelar>{sitio.manifiesto.frase}</h2>
-            <p class="cuerpo manifiesto-cuerpo" data-revelar style="--retardo:180ms">{sitio.manifiesto.cuerpo}</p>
-          </div>
-          <aside class="margen nota-margen" data-revelar style="--retardo:260ms">
-            {sitio.manifiesto.notaMargen.map((n) => <div>{n}</div>)}
-          </aside>
-        </div>
-      </section>
-
-      {/* ——— Productos ——— */}
-      <section class="seccion" data-tono="papel" id="productos">
-        <div class="canon">
-          <div class="bloque">
-            <h2 class="display" data-lineas data-revelar>{sitio.productos.titulo}</h2>
-            <p class="cuerpo tenue prod-intro" data-revelar style="--retardo:150ms">{sitio.productos.intro}</p>
-          </div>
-          <aside class="margen nota-margen" data-revelar style="--retardo:220ms">
-            {sitio.productos.notaMargen.map((n) => <div>{n}</div>)}
-          </aside>
-
-          <div class="simetrico prod-lineas" data-revelar>
-            {sitio.productos.lineas.map((l) => (
-              <article class="ficha pieza">
-                <div class="arco ficha-arco" data-campo={l.campo}>
-                  <img
-                    src={`/sitio/catalogo/${l.imagen}.webp`}
-                    alt={l.imagenAlt}
-                    loading="lazy" width="480" height="640"
-                  />
-                </div>
-                <h3 class="sub ficha-nombre">{l.nombre}</h3>
-                <p class="marca ficha-pres">{l.presentacion}</p>
-                {'precioDesde' in l && l.precioDesde && (
-                  <p class="ficha-precio">{precioMXN(l.precioDesde)}</p>
-                )}
-                <ul class="lista-limpia">
-                  {l.bullets.map((b) => <li>{b}</li>)}
-                </ul>
-              </article>
-            ))}
-          </div>
-        </div>
-
-        {/* Las barras al frente: imagen de producto reconstruida, con
-            alfa, flotando sobre su campo de color. */}
-        <div class="canon aire-corto">
-          <div class="bloque">
-            <h3 class="titulo" data-revelar>{sitio.productos.destacadas.titulo}</h3>
-            <p class="cuerpo tenue destacadas-intro" data-revelar style="--retardo:120ms">
-              {sitio.productos.destacadas.intro}
-            </p>
-          </div>
-          <div class="simetrico destacadas" data-revelar style="--retardo:180ms">
-            {sitio.productos.destacadas.items.map((b) => (
-              <article class="pieza destacada">
-                <div class="arco destacada-arco" data-campo={b.campo}>
-                  {/* Envoltorio propio de la página: una clase pasada a un
-                      componente NO recibe el ámbito de sus estilos, así que
-                      el tamaño se fija acá. */}
-                  <div class="destacada-visor">
-                    <VisorProducto
-                      imagen={`/sitio/packshot/${b.archivo}.webp`}
-                      alt={b.alt}
-                      spline={b.spline}
-                    />
-                  </div>
-                </div>
-                <div class="destacada-pie">
-                  <div>
-                    <h4 class="sub">{b.nombre}</h4>
-                    <p class="marca destacada-cacao">{b.cacao} · 70 g</p>
-                  </div>
-                  <span class="ficha-precio">{precioMXN(b.precio)}</span>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-
-        <div class="canon prod-fotos">
-          {sitio.productos.fotos.map((f, i) => (
-            <figure class={`foto-${i + 1}`}>
-              <div class="marco-foto">
-                <img src={`/sitio/${f.archivo}.webp`} alt={f.alt} loading="lazy" width="883" height="1100" />
-              </div>
-              <figcaption class="foto-pie">
-                <span class="marca">{f.nombre}</span>
-                <span class="ficha-precio">{precioMXN(f.precio)}</span>
-              </figcaption>
-            </figure>
-          ))}
-        </div>
-
-        <div class="canon aire-corto">
-          <div class="bloque indice-cabeza">
-            <h3 class="titulo" data-revelar>{sitio.productos.indiceTitulo}</h3>
-          </div>
-          <p class="margen nota-margen" data-revelar>{sitio.productos.barras.length}</p>
-        </div>
-        <div class="cinta-marco">
-          <div class="cinta">
-            {[0, 1].map(() =>
-              sitio.productos.barras.map((s) => (
-                <span class="sabor" style={`--tono:var(--mrc-etiqueta-${s.tono})`}>{s.nombre}</span>
-              )),
-            )}
-          </div>
-        </div>
-        <div class="canon aire-corto">
-          <p class="bloque menor tenue">{sitio.productos.indiceNota}</p>
-        </div>
-      </section>
-
-      {/* ——— Chocolate en polvo: el color, contenido ——— */}
-      <section class="seccion" data-tono="tinta">
-        <div class="canon aire">
-          <div class="bloque">
-            <p class="chip-pronto" data-revelar>{sitio.polvo.nota}</p>
-            <h2 class="display" data-lineas data-revelar>{sitio.polvo.titulo}</h2>
-            <p class="cuerpo tenue polvo-intro" data-revelar style="--retardo:150ms">{sitio.polvo.intro}</p>
-          </div>
-          <div class="pleno polvo-grilla" data-revelar style="--retardo:220ms">
-            {sitio.polvo.sabores.map((s) => (
-              <figure class="pieza">
-                <div class="arco polvo-arco" data-campo={s.campo}>
-                  <img
-                    src={`/sitio/${s.archivo}.webp`}
-                    alt={`${sitio.polvo.altPrefijo} ${s.nombre}`}
-                    loading="lazy" width="468" height="900"
-                  />
-                </div>
-                <figcaption class="marca polvo-pie">{s.nombre}</figcaption>
-              </figure>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ——— El ABC ——— */}
-      <section class="seccion" data-tono="papel" id="abc">
-        <div class="canon aire">
-          <div class="bloque">
-            <h2 class="display" data-lineas data-revelar>{sitio.abc.titulo}</h2>
-            <p class="cuerpo tenue abc-intro" data-revelar style="--retardo:150ms">{sitio.abc.intro}</p>
-          </div>
-          <aside class="margen nota-margen" data-revelar style="--retardo:220ms">
-            {sitio.abc.notaMargen.map((n) => <div>{n}</div>)}
-          </aside>
-
-          <div class="mitad-i abc-textos" data-revelar>
-            {sitio.abc.bloques.map((b) => (
-              <article class="abc-bloque">
-                <h3 class="sub">{b.titulo}</h3>
-                <p class="cuerpo">{b.cuerpo}</p>
-              </article>
-            ))}
-          </div>
-
-          <div class="mitad-d abc-cata" data-revelar style="--retardo:180ms">
-            <h3 class="titulo abc-cata-titulo">{sitio.abc.catar.titulo}</h3>
-            <ol class="lista-limpia">
-              {sitio.abc.catar.pasos.map((p, i) => (
-                <li class="paso">
-                  <span class="paso-n">{String(i + 1).padStart(2, '0')}</span>
-                  <span>
-                    <span class="sub paso-nombre">{p.nombre}</span>
-                    <span class="menor tenue paso-texto">{p.texto}</span>
-                  </span>
-                </li>
-              ))}
-            </ol>
-          </div>
-
-          <blockquote class="simetrico cita" data-revelar>
-            <p class="display cita-texto">{sitio.abc.cita}</p>
-          </blockquote>
-        </div>
-      </section>
-
-      {/* ——— Recetas ——— */}
-      <section class="seccion" data-tono="hueso" id="recetas">
-        <div class="canon aire">
-          <div class="recetas-cabeza">
-            <h2 class="display" data-lineas data-revelar>{sitio.recetas.titulo}</h2>
-            <p class="cuerpo tenue recetas-intro" data-revelar style="--retardo:150ms">{sitio.recetas.intro}</p>
-          </div>
-          <figure class="recetas-personaje" data-revelar style="--retardo:220ms">
-            <img
-              src="/sitio/personaje-molinillo-t.webp"
-              alt={sitio.recetas.imagenAlt}
-              loading="lazy" width="460" height="814"
-            />
-          </figure>
-          <div class="recetas-grilla" data-revelar>
-            {sitio.recetas.lista.map((r) => (
-              <article class="receta">
-                <h3 class="titulo receta-titulo">{r.titulo}</h3>
-                <p class="marca receta-porcion">{r.porcion}</p>
-                <ul class="lista-limpia">
-                  {r.ingredientes.map((i) => <li>{i}</li>)}
-                </ul>
-                <p class="cuerpo receta-pasos">{r.pasos}</p>
-                <p class="menor receta-tip">
-                  <span class="marca receta-tip-etiqueta">{sitio.recetas.etiquetaTip}</span>
-                  {r.tip}
-                </p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ——— Quiénes somos ——— */}
-      <section class="seccion" data-tono="tinta" id="quienes">
-        <div class="canon aire">
-          <div class="quienes-texto">
-            <p class="marca" data-revelar>{sitio.quienes.titulo}</p>
-            <h2 class="display quienes-frase" data-lineas data-revelar>{sitio.quienes.frase}</h2>
-            <p class="cuerpo quienes-cuerpo" data-revelar style="--retardo:180ms">{sitio.quienes.prosa}</p>
-            <p class="cuerpo tenue" data-revelar style="--retardo:240ms">{sitio.quienes.origen}</p>
-          </div>
-          <aside class="quienes-margen" data-revelar style="--retardo:300ms">
-            <img
-              src="/sitio/personaje-sentado-t.webp"
-              alt={sitio.quienes.imagenAlt}
-              loading="lazy" width="560" height="991"
-            />
-            <div class="nota-margen">
-              {sitio.quienes.notaMargen.map((n) => <div>{n}</div>)}
-            </div>
-          </aside>
-        </div>
-      </section>
-
-      {/* ——— Negocios ——— */}
-      <section class="seccion" data-tono="papel" id="negocios">
-        <div class="canon aire">
-          <div class="bloque">
-            <h2 class="display" data-lineas data-revelar>{sitio.negocios.titulo}</h2>
-            <p class="cuerpo negocios-prosa" data-revelar style="--retardo:150ms">{sitio.negocios.prosa}</p>
-            <ul class="negocios-datos marca" data-revelar style="--retardo:200ms">
-              {sitio.negocios.fichasDatos.map((d) => <li>{d}</li>)}
-            </ul>
-            <p class="negocios-cta" data-revelar style="--retardo:260ms">
-              <a class="cta" href={`mailto:${sitio.contacto.correo}`} data-cursor={sitio.cursor.escribir} data-iman>
-                <span class="cta-txt"><span>{sitio.negocios.ctaFichas}</span><span>{sitio.negocios.ctaFichas}</span></span>
-                <span class="cta-flecha" aria-hidden="true">→</span>
-              </a>
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* ——— Preguntas frecuentes ——— */}
-      <section class="seccion" data-tono="hueso">
-        <div class="canon aire">
-          <div class="bloque">
-            <h2 class="display faq-titulo" data-lineas data-revelar>{sitio.faq.titulo}</h2>
-            <div data-revelar style="--retardo:150ms">
-              {sitio.faq.items.map((item) => (
-                <details class="faq">
-                  <summary>{item.p}</summary>
-                  <p>{item.r}</p>
-                </details>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ——— Contacto ——— */}
-      <section class="seccion" data-tono="tinta" id="contacto">
-        <div class="registro"><span></span><span></span></div>
-        <div class="canon aire contacto-canon">
-          <div class="simetrico contacto-centro">
-            <p class="marca" data-revelar>{sitio.contacto.titulo}</p>
-            <p class="display contacto-invitacion" data-lineas data-revelar>{sitio.contacto.invitacion}</p>
-            <a
-              class="wordmark contacto-correo"
-              href={`mailto:${sitio.contacto.correo}`}
-              data-cursor={sitio.cursor.escribir}
-              data-revelar style="--retardo:200ms"
-            >{sitio.contacto.correo}</a>
-
-            <div class="contacto-datos" data-revelar style="--retardo:280ms">
-              <div>
-                <p class="marca">{sitio.contacto.puntoVentaEtiqueta}</p>
-                <p class="menor contacto-dato">{sitio.contacto.puntoVenta}</p>
-              </div>
-              <div>
-                <p class="marca">{sitio.contacto.catalogoEtiqueta}</p>
-                <p class="contacto-dato">
-                  <a
-                    class="cta cta-contacto"
-                    href={sitio.contacto.catalogoUrl}
-                    target="_blank" rel="noopener"
-                    data-cursor={sitio.cursor.abrir} data-iman
-                  >
-                    <span class="cta-txt"><span>{sitio.contacto.catalogoNombre}</span><span>{sitio.contacto.catalogoNombre}</span></span>
-                    <span class="cta-flecha" aria-hidden="true">↗</span>
-                  </a>
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-    </main>
-
-    <footer class="seccion" data-tono="tinta">
-      <div class="canon pie">
-        <div class="pleno pie-fila">
-          <span class="sello pie-sello" set:html={sello} />
-          <span class="marca">{sitio.footer.derechos}</span>
-          <span class="marca">{sitio.footer.lugar}</span>
+        <div class="portada-logo">
+          <img src="/sitio/logo.svg" alt={marca.marca.selloAlt} width="400" height="400" />
         </div>
       </div>
-    </footer>
-  </div>
+      <div class="portada-tira" data-parallax="0.045">
+        <Marquesina aria={marca.hero.marquesinaAria} dur="34s" rotacion={-3}>
+          {enMarquesina.map((s) => (
+            <img
+              class="tira-barra"
+              src={`/sitio/marca/barra-${s.slug}-mini.webp`}
+              alt=""
+              width="380"
+              height="816"
+              loading="lazy"
+            />
+          ))}
+        </Marquesina>
+      </div>
+    </section>
+
+    {/* ——— 02 · Qué hay en una barra ——— */}
+    <section class="seccion" data-tono="calida">
+      <div class="contenedor postura">
+        <div>
+          <EtiquetaSabor texto={marca.postura.kicker} />
+          <h2 class="titular">{marca.postura.titulo}</h2>
+          <p class="postura-intro">{marca.postura.intro}</p>
+          <div class="chips">
+            {marca.postura.chips.map((chip) => <Insignia tono="cacao">{chip}</Insignia>)}
+          </div>
+        </div>
+        <div data-tabs>
+          <div class="conmutador" role="tablist" aria-label={marca.postura.titulo}>
+            <button type="button" role="tab" id="tab-si" aria-selected="true" aria-controls="panel-si" data-tab>
+              {marca.postura.tabSi}
+            </button>
+            <button type="button" role="tab" id="tab-no" aria-selected="false" aria-controls="panel-no" data-tab>
+              {marca.postura.tabNo}
+            </button>
+          </div>
+          <div class="panel panel-si" id="panel-si" role="tabpanel" aria-labelledby="tab-si" tabindex="0" data-panel>
+            <ul class="panel-lista">
+              {marca.postura.lleva.map((item) => (
+                <li><span class="mano panel-marca" aria-hidden="true">✓</span>{item}</li>
+              ))}
+            </ul>
+            <p class="panel-nota mono">{marca.postura.llevaNota}</p>
+          </div>
+          <div class="panel panel-no" id="panel-no" role="tabpanel" aria-labelledby="tab-no" tabindex="0" data-panel hidden>
+            <ul class="panel-lista">
+              {marca.postura.noLleva.map((item) => (
+                <li><span class="mano panel-marca" aria-hidden="true">✕</span><s>{item}</s></li>
+              ))}
+            </ul>
+            <p class="panel-cierre">{marca.postura.noLlevaCierre}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {/* ——— 03 · El anaquel de los quince ——— */}
+    <section id="sabores">
+      <div
+        class="anaquel"
+        data-tono="sabor"
+        data-anaquel-banda
+        style={`--fondo:${colorSabor[inicial.clave]};--texto:${tintaSabor[inicial.clave]}`}
+      >
+        <div class="contenedor anaquel-encabezado">
+          <EtiquetaSabor texto={marca.anaquel.kicker} />
+          <span class="mono" aria-hidden="true"><span data-anaquel-contador>{inicial.orden}</span>/15</span>
+        </div>
+        <div class="contenedor">
+          <h2 class="titular">{marca.anaquel.titulo}</h2>
+        </div>
+        <div class="anaquel-riel" role="radiogroup" aria-label={marca.anaquel.grupoAria} data-anaquel>
+          {sabores.map((s) => (
+            <button
+              type="button"
+              role="radio"
+              aria-checked={s.slug === inicial.slug ? 'true' : 'false'}
+              aria-label={s.nombre}
+              data-anaquel-radio={s.slug}
+              data-cursor="Ver"
+            >
+              <img
+                src={`/sitio/marca/barra-${s.slug}-mini.webp`}
+                alt=""
+                width="380"
+                height="816"
+                loading="lazy"
+              />
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div class="contenedor ficha-zona">
+        <article class="ficha" aria-live="polite">
+          <div class="ficha-fila">
+            <div class="ficha-envoltura">
+              <VisorProducto
+                imagen={`/sitio/marca/barra-${inicial.slug}.webp`}
+                alt={`${marca.anaquel.envolturaAltPrefijo} ${inicial.nombre}`}
+                ancho={754}
+                alto={1620}
+              />
+            </div>
+            <div class="ficha-datos">
+              <p class="mono ficha-orden">
+                {marca.anaquel.fichaEtiqueta} <span data-anaquel-orden>{inicial.orden}</span> {marca.anaquel.contadorDe}
+              </p>
+              <div class="ficha-nombre-fila">
+                <h3 class="ficha-nombre" data-anaquel-nombre>{inicial.nombre}</h3>
+                <p class="ficha-precio" data-anaquel-precio>{precioMXN(inicial.precio)}</p>
+              </div>
+              <div class="chips">
+                <Insignia tono="rojo"><span data-anaquel-cacao>{inicial.cacao}</span></Insignia>
+                <Insignia tono="cacao">{marca.anaquel.pesoInsignia}</Insignia>
+                <Insignia tono="amarillo">{marca.anaquel.manoInsignia}</Insignia>
+              </div>
+              <p class="ficha-ingredientes mono">
+                {marca.anaquel.ingredientesEtiqueta}: <span data-anaquel-ingredientes>{inicial.ingredientes}</span>.
+              </p>
+              <div class="ficha-ctas">
+                <BotonMarca href={marca.contacto.catalogoUrl} externo>{marca.anaquel.cta}</BotonMarca>
+                <p class="mano ficha-remate suave">{marca.anaquel.remate}</p>
+              </div>
+            </div>
+            <figure class="ficha-ilustracion">
+              <img
+                class="flota"
+                src={`/sitio/marca/ilustracion-${inicial.slug}.webp`}
+                alt={`${marca.anaquel.ilustracionAltPrefijo} ${inicial.nombre}`}
+                width="400"
+                height="450"
+                loading="lazy"
+                data-anaquel-ilustracion
+              />
+              <figcaption class="mano suave">{marca.anaquel.ilustracionCaption}</figcaption>
+            </figure>
+          </div>
+
+          <div class="ficha-extras">
+            <div class="extra-ticket">
+              <TicketPanel>
+                <p class="extra-titulo">{marca.minis.titulo} · {precioMXN(marca.minis.precio)}</p>
+                <p class="extra-cuerpo">{marca.minis.cuerpo}</p>
+                <p class="mano">{marca.minis.nota}</p>
+              </TicketPanel>
+            </div>
+            <div class="extra-carta">
+              <div class="extra-encabezado">
+                <h4>{marca.gotas.titulo}</h4>
+                <span class="mono extra-precio">{marca.gotas.desdeEtiqueta} {precioMXN(marca.gotas.precioDesde)}</span>
+              </div>
+              <p class="extra-cuerpo suave">{marca.gotas.cuerpo}</p>
+              <ul class="gotas-puntos" aria-label={`${marca.gotas.sabores} de gotas`}>
+                {gotas.map((g) => (
+                  <li>
+                    <span class="gota-punto" style={`background:${colorSabor[g.clave]}`} aria-hidden="true"></span>
+                    <span class="sr-only">{g.nombre}</span>
+                  </li>
+                ))}
+                <li class="mono gotas-cifra" aria-hidden="true">{marca.gotas.sabores}</li>
+              </ul>
+              <p class="mono extra-nota suave">{marca.gotas.notaPrecio}: {precioMXN(marca.gotas.precioJengibre)}</p>
+            </div>
+            <div class="extra-carta">
+              <div class="extra-encabezado">
+                <h4>{marca.polvoCard.titulo}</h4>
+                <span class="mono extra-chip">{marca.polvoCard.chip}</span>
+              </div>
+              <p class="extra-cuerpo suave">{marca.polvoCard.cuerpo}</p>
+              <p class="mono extra-lista">{polvo.map((p) => p.nombre.toLowerCase()).join(' · ')}</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    {/* ——— 04 · Chocolate para beber (próximamente) ——— */}
+    <section class="seccion" data-tono="oscuro">
+      <div class="contenedor polvo-fila">
+        <div class="polvo-texto">
+          <div class="polvo-encabezado">
+            <EtiquetaSabor texto={marca.polvo.kicker} />
+            <Insignia tono="amarillo">{marca.polvo.chip}</Insignia>
+          </div>
+          <h2 class="titular">{marca.polvo.titulo}</h2>
+          <p class="suave">{marca.polvo.cuerpo}</p>
+        </div>
+        <div class="polvo-riel" role="region" aria-label={marca.polvo.titulo} tabindex="0" data-parallax="0.05">
+          {polvo.map((p) => (
+            <img
+              src={`/sitio/${p.archivo}.webp`}
+              alt={`${marca.polvo.altPrefijo} ${p.nombre}`}
+              width="832"
+              height="1600"
+              loading="lazy"
+            />
+          ))}
+        </div>
+      </div>
+    </section>
+
+    {/* ——— 05 · Cómo catar ——— */}
+    <section id="catar" class="seccion" data-tono="crema">
+      <div class="contenedor">
+        <EtiquetaSabor texto={marca.catar.kicker} />
+        <h2 class="titular">{marca.catar.titulo}</h2>
+        <ol class="catar-pasos">
+          {marca.catar.pasos.map((paso, i) => (
+            <li class="paso" data-revelar style={`--orden:${i % 3}`}>
+              <span
+                class="paso-numero mano"
+                style={`background:${colorSabor[paso.clave]};color:${tintaSabor[paso.clave]}`}
+                aria-hidden="true"
+              >{i + 1}</span>
+              <p><b>{paso.nombre}.</b> {paso.texto}</p>
+            </li>
+          ))}
+        </ol>
+        <div class="catar-cita">
+          <TicketPanel>
+            <p class="cita-texto">“{marca.catar.cita}”</p>
+          </TicketPanel>
+        </div>
+        <div class="catar-notas">
+          <p><b class="nota-titulo">{marca.catar.porqueTitulo}</b> {marca.catar.porque}</p>
+          <p><b class="nota-titulo">{marca.catar.aporteTitulo}.</b> {marca.catar.aporte}</p>
+        </div>
+      </div>
+    </section>
+
+    {/* ——— 06 · Recetas ——— */}
+    <section id="recetas" class="seccion" data-tono="calida">
+      <div class="contenedor recetas-encabezado">
+        <EtiquetaSabor texto={marca.recetas.kicker} />
+        <span class="mano suave" aria-hidden="true">{marca.recetas.deslizaNota}</span>
+      </div>
+      <div class="contenedor"><h2 class="titular">{marca.recetas.titulo}</h2></div>
+      <div class="recetas-riel" role="region" aria-label={marca.recetas.listaAria} tabindex="0">
+        {marca.recetas.lista.map((r) => (
+          <article
+            class:list={['receta', tintaClara(r.clave) ? 'receta-clara' : 'receta-oscura']}
+            style={`--sabor:${colorSabor[r.clave]};--tinta:${tintaSabor[r.clave]}`}
+          >
+            <p class="mono receta-kicker">{r.kicker}</p>
+            <h3 class="receta-titulo">{r.titulo}</h3>
+            <p class="receta-resumen">{r.resumen}</p>
+            {'chipPolvo' in r && <p class="mono receta-chip">{r.chipPolvo}</p>}
+            <div class="receta-tip mano"><b>{marca.recetas.etiquetaTip}:</b> {r.tip}</div>
+            <details class="receta-completa">
+              <summary>{marca.recetas.verCompleta}</summary>
+              <ul>
+                {r.ingredientes.map((ing) => <li>{ing}</li>)}
+              </ul>
+              <p>{r.pasos}</p>
+            </details>
+          </article>
+        ))}
+      </div>
+    </section>
+
+    {/* ——— 07 · Nosotros ——— */}
+    <section id="nosotros" class="seccion" data-tono="crema">
+      <div class="contenedor nosotros">
+        <div>
+          <EtiquetaSabor texto={marca.nosotros.kicker} />
+          <h2 class="titular">{marca.nosotros.titulo}</h2>
+          {marca.nosotros.parrafos.map((p) => <p class="nosotros-parrafo">{p}</p>)}
+        </div>
+        <div>
+          <div class="nosotros-carta">
+            <b class="nota-titulo">{marca.nosotros.cacaoTitulo}</b> {marca.nosotros.cacao}
+          </div>
+          <div class="nosotros-pie">
+            <p class="mono suave">{marca.nosotros.datos.join(' · ')}</p>
+            <img
+              src="/sitio/personaje-sentado-t.webp"
+              alt={marca.nosotros.personajeAlt}
+              width="300"
+              height="352"
+              loading="lazy"
+              data-parallax="-0.06"
+            />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {/* ——— 08 · Para negocios ——— */}
+    <section id="negocios" class="seccion" data-tono="clara">
+      <div class="contenedor negocios">
+        <div data-tabs>
+          <EtiquetaSabor texto={marca.negocios.kicker} />
+          <h2 class="titular">{marca.negocios.titulo}</h2>
+          <p class="suave negocios-intro">{marca.negocios.intro}</p>
+          <div class="pestanas" role="tablist" aria-label={marca.negocios.titulo}>
+            {marca.negocios.tabs.map((t, i) => (
+              <button
+                type="button"
+                role="tab"
+                id={`tab-${t.id}`}
+                aria-selected={i === 0 ? 'true' : 'false'}
+                aria-controls={`panel-${t.id}`}
+                data-tab
+              >{t.etiqueta}</button>
+            ))}
+          </div>
+          <dl class="semaforo">
+            {marca.negocios.fichas.map((f) => (
+              <div class="semaforo-fila">
+                <dt>{f.dato}</dt>
+                <dd class="mono">{f.estado}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+        <div class="negocios-paneles">
+          {marca.negocios.tabs.map((t, i) => (
+            <div
+              class="negocio-panel"
+              id={`panel-${t.id}`}
+              role="tabpanel"
+              aria-labelledby={`tab-${t.id}`}
+              tabindex="0"
+              data-panel
+              hidden={i !== 0}
+              style={`--sabor:${colorSabor[t.clave]}`}
+            >
+              <div class="negocio-encabezado">
+                <h3>{t.titulo}</h3>
+                <span class="mono">{t.precio === null ? t.precioNota : `${t.precioNota} ${precioMXN(t.precio)}`}</span>
+              </div>
+              <p class="negocio-cuerpo">{t.cuerpo}</p>
+              <ul class="negocio-datos">
+                {t.datos.map((d) => (
+                  <li><span class="mano negocio-flecha" aria-hidden="true">→</span>{d}</li>
+                ))}
+              </ul>
+              <p class="mono negocio-correo">{marca.negocios.correoEtiqueta} {marca.negocios.correo}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    {/* ——— 09 · Preguntas frecuentes ——— */}
+    <section id="preguntas" class="seccion" data-tono="crema">
+      <div class="contenedor preguntas">
+        <EtiquetaSabor texto={marca.preguntas.kicker} />
+        <h2 class="titular">{marca.preguntas.titulo}</h2>
+        <div class="preguntas-lista">
+          {marca.preguntas.items.map((item) => (
+            <details class="pregunta">
+              <summary>
+                <h3>{item.p}</h3>
+                <span class="pregunta-mas mano" aria-hidden="true">+</span>
+              </summary>
+              <p class="suave">{item.r}</p>
+            </details>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    {/* ——— 10 · Contacto ——— */}
+    <section id="contacto" class="seccion" data-tono="calida">
+      <div class="contenedor">
+        <EtiquetaSabor texto={marca.contacto.kicker} />
+        <h2 class="titular">{marca.contacto.titulo}</h2>
+        <div class="contacto-fila">
+          <div class="puesto">
+            <p class="mono">{marca.contacto.puestoEtiqueta}</p>
+            <p class="puesto-titulo">{marca.contacto.puestoTitulo[0]}<br />{marca.contacto.puestoTitulo[1]}</p>
+            <div class="puesto-ticket">
+              <TicketPanel>
+                <p class="puesto-direccion">{marca.contacto.direccion[0]}<br />{marca.contacto.direccion[1]}</p>
+              </TicketPanel>
+            </div>
+            <img
+              class="puesto-personaje"
+              src="/sitio/personaje-molinillo-t.webp"
+              alt={marca.contacto.personajeAlt}
+              width="300"
+              height="323"
+              loading="lazy"
+              data-parallax="-0.05"
+            />
+          </div>
+          <div class="contacto-cartas">
+            <div class="contacto-carta">
+              <p class="mono carta-etiqueta">{marca.contacto.correoEtiqueta}</p>
+              <a class="carta-dato" href={`mailto:${marca.contacto.correo}`}>{marca.contacto.correo}</a>
+              <p class="carta-nota suave">{marca.contacto.correoNota}</p>
+              <button class="copiar" type="button" data-copiar={marca.contacto.correo} hidden>
+                <span data-copiar-texto>{marca.contacto.copiar}</span>
+              </button>
+            </div>
+            <a class="contacto-carta carta-enlace" href={marca.contacto.catalogoUrl} target="_blank" rel="noopener">
+              <p class="mono carta-etiqueta">{marca.contacto.catalogoEtiqueta}</p>
+              <p class="carta-dato">{marca.contacto.catalogoNombre}<span class="sr-only"> (se abre en pestaña nueva)</span></p>
+              <p class="carta-nota suave">{marca.contacto.catalogoNota}</p>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="pie" data-tono="rojo">
+    <div class="pie-marquesina">
+      <Marquesina aria={marca.footer.lema} dur="24s">
+        <span class="mono pie-lema">{marca.footer.lema} ·</span>
+        <span class="mono pie-lema">{marca.footer.lema} ·</span>
+      </Marquesina>
+    </div>
+    <div class="pie-centro">
+      <ArcoTitulo texto="MARACACAO" tamano={36} color="#fff" />
+      <img src="/sitio/marca/chocolate-mexicano.webp" alt={marca.footer.wordmarkAlt} width="160" height="48" loading="lazy" />
+      <p class="mono">{marca.footer.linea}</p>
+    </div>
+  </footer>
+
+  <script type="application/json" id="datos-anaquel" set:html={JSON.stringify(datosAnaquel)} />
+  <script>
+    import '@/scripts/marca'
+  </script>
 </Base>
 
 <style>
-  /* ——— Hero ——— */
-  .hero {
-    min-height: 100svh;
-    display: grid;
-    grid-template-rows: 1fr auto;
+  /* ---------- Cabecera y menú ---------- */
+  .cabecera {
+    position: sticky;
+    top: 0;
+    z-index: 130;
+    background: rgb(248 236 222 / 0.96);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid rgb(76 44 22 / 0.25);
+  }
+  .cabecera-fila {
+    display: flex;
     align-items: center;
-    position: relative;
-    overflow: hidden; /* el wordmark respira al borde, nunca desborda la página */
-  }
-  .hero-centro { padding-top: clamp(4rem, 9vh, 7rem); }
-
-  /* Tira de producto: fotos reales del catálogo, a paso lento. */
-  .hero-tira {
-    overflow: hidden;
-    padding-bottom: clamp(1.5rem, 4vh, 3rem);
-    -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
-    mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
-  }
-  .hero-pista {
-    display: flex;
-    gap: clamp(0.75rem, 1.4vw, 1.5rem);
-    width: max-content;
-  }
-  .hero-pista img {
-    display: block;
-    width: clamp(6.5rem, 10vw, 11rem);
-    aspect-ratio: 3 / 4;
-    object-fit: cover;
-    border-radius: 2px;
-    border: 1px solid var(--linea);
-  }
-  /* El centinela avisa cuándo el sello sale de pantalla; fuera de flujo
-     para no abrir una segunda fila en la grilla del hero. */
-  .hero > [data-centinela] { position: absolute; inset: auto 0 0 0; height: 1px; }
-  .hero-centro { text-align: center; }
-  /* El padding va SOLO en los bloques de texto: aplicárselo al sello,
-     que tiene ancho fijo y box-sizing border-box, lo colapsaba a cero
-     (visto en vivo: el sello desaparecía). */
-  .hero-centro > :is(.hero-descriptor, .hero-meta) {
-    padding-inline: clamp(1.25rem, 5.5vw, 5.5rem);
-  }
-  .hero-sello {
-    width: clamp(8rem, 15vw, 14rem);
-    margin: 0 auto clamp(1.5rem, 3.5vh, 2.5rem);
-  }
-  .hero-regla { margin-inline: auto; }
-  .hero-descriptor { margin-top: clamp(1rem, 2.5vh, 1.75rem); letter-spacing: 0.42em; }
-  .hero-regla { width: min(85%, 34rem); margin: clamp(1.75rem, 4vh, 2.75rem) auto 0; }
-  .hero-meta {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.5rem clamp(1.5rem, 4vw, 3.5rem);
-    list-style: none;
-    margin: 1.25rem 0 0;
-    padding: 0;
-  }
-
-  /* ——— Manifiesto ——— */
-  .manifiesto-frase { margin-top: 1.25rem; }
-  .manifiesto-cuerpo { margin-top: clamp(1.75rem, 3vw, 2.5rem); }
-
-  /* ——— Productos ——— */
-  .prod-intro { margin-top: 1.25rem; }
-  .prod-lineas {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-    gap: clamp(1.75rem, 3vw, 3rem);
-    margin-top: clamp(3rem, 6vw, 5rem);
-  }
-  /* El arco necesita aire arriba: el producto se sale por el borde
-     superior y la sombra dura cae a la izquierda. */
-  .ficha-arco { aspect-ratio: 3 / 4; margin: 2.5rem 0.4rem 1.5rem 0.5rem; }
-  .ficha-nombre { margin-top: 0; }
-  .ficha-pres { margin-top: 0.5rem; }
-  .ficha-precio { margin-top: 0.75rem; display: block; }
-  .prod-lineas .lista-limpia { margin-top: 1.25rem; }
-
-  /* Barras destacadas: el packshot tiene alfa, así que flota sobre el
-     campo en vez de ser un recuadro de foto. */
-  .destacadas-intro { margin-top: 1rem; }
-  .destacadas {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-    gap: clamp(2rem, 5vw, 4rem);
-    margin-top: clamp(2rem, 4vw, 3rem);
-  }
-  .destacada { margin: 0; }
-  /* Proporciones calculadas para que la barra rompa el arco SOLO por
-     arriba y su base quede adentro: la barra mide 0.474 de ancho/alto,
-     así que a 58% del arco su alto es 1.224 del ancho del arco. */
-  /* Proporciones calculadas para que la barra rompa el arco SOLO por
-     arriba y su base quede adentro: la barra mide 0.474 de ancho/alto,
-     así que a 58% del arco su alto es 1.224 del ancho del arco. */
-  .destacada-arco { aspect-ratio: 4 / 4.9; margin: 3.5rem 0.5rem 1.5rem 0.6rem; }
-  .destacada-visor { width: 52%; translate: 0 -9%; rotate: -5deg; }
-  .destacada-pie {
-    display: flex;
-    align-items: baseline;
     justify-content: space-between;
-    gap: 1rem;
-    border-top: 1px solid var(--linea);
-    padding-top: 1rem;
+    padding-block: 10px;
   }
-  .destacada-cacao { margin-top: 0.35rem; }
-  .destacada-pie .ficha-precio { margin: 0; }
-
-  .prod-fotos { margin-top: clamp(3.5rem, 8vw, 7rem); align-items: start; }
-  .prod-fotos figure { margin: 0; }
-  .foto-1 { grid-column: 1 / 5; }
-  .foto-2 { grid-column: 5 / 8; margin-top: clamp(2rem, 8vw, 7rem); }
-  .foto-3 { grid-column: 8 / 10; margin-top: clamp(1rem, 4vw, 3rem); }
-  .foto-1 .marco-foto { aspect-ratio: 4 / 5; }
-  .foto-2 .marco-foto { aspect-ratio: 3 / 4; }
-  .foto-3 .marco-foto { aspect-ratio: 1 / 1; }
-  .foto-pie {
+  .lockup {
     display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 1rem;
-    padding-top: 0.85rem;
-    border-top: 1px solid var(--linea);
-    margin-top: 0.85rem;
-  }
-  .foto-pie .ficha-precio { font-size: 1.15rem; margin: 0; }
-
-  /* ——— Polvo ——— */
-  .polvo-intro { margin-top: 1.25rem; }
-  .polvo-grilla {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: clamp(1rem, 2vw, 2rem);
-    margin-top: clamp(2.5rem, 5vw, 4.5rem);
-    /* Un punto más chica que las barras: es la línea que todavía no se
-       vende y no puede gritar más que el producto del mostrador. */
-    max-width: 62rem;
-    margin-inline: auto;
-  }
-  .chip-pronto {
-    display: inline-block;
-    border: 2px solid var(--texto);
-    border-radius: 999px;
-    padding: 0.4rem 1rem;
-    font-family: var(--mrc-font-texto);
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    margin-bottom: 1.25rem;
-  }
-  .polvo-grilla figure { margin: 0; }
-    /* Las etiquetas son mucho más angostas (0.52) que el arco: con el
-     ancho por defecto tapaban el campo de color entero. Arco más alto y
-     etiqueta más angosta para que el color respire alrededor. */
-  .polvo-arco { aspect-ratio: 3 / 4.5; margin: 2.25rem 0.4rem 1rem 0.5rem; }
-  .polvo-arco img { width: 68%; rotate: -4deg; translate: 0 -8%; }
-  .polvo-pie { margin-top: 0.85rem; }
-
-  /* ——— ABC ——— */
-  .abc-intro { margin-top: 1.25rem; }
-  .abc-textos { margin-top: clamp(2.5rem, 5vw, 4rem); display: flex; flex-direction: column; gap: clamp(2rem, 3vw, 3rem); }
-  .abc-bloque .cuerpo { margin-top: 0.85rem; }
-  .abc-cata { margin-top: clamp(2.5rem, 5vw, 4rem); }
-  .abc-cata-titulo { margin-bottom: 1.5rem; }
-  .abc-cata .lista-limpia li { border-bottom: 0; padding-left: 0; }
-  .abc-cata .lista-limpia li::before { content: none; }
-  .paso-nombre { display: block; }
-  .paso-texto { display: block; margin-top: 0.3rem; }
-  .cita {
-    margin: clamp(4rem, 9vw, 8rem) 0 0;
-    text-align: center;
-    border-top: 1px solid var(--linea);
-    padding-top: clamp(2.5rem, 5vw, 4rem);
-  }
-  .cita-texto { font-style: italic; max-width: 24ch; margin-inline: auto; }
-
-  /* ——— Recetas ——— */
-  .recetas-intro { margin-top: 1.25rem; }
-  /* El personaje sale de la columna de notas (2/9, demasiado angosta) y
-     toma tres columnas, acompañando TODA la sección: si solo ocupa la
-     fila del título, abre un hueco enorme antes de las recetas. */
-  .recetas-cabeza { grid-column: 2 / 7; grid-row: 1; }
-  .recetas-personaje { grid-column: 7 / 10; grid-row: 1 / 3; align-self: center; margin: 0; }
-  .recetas-personaje img { display: block; width: 100%; max-width: 19rem; margin-inline: auto; }
-  .recetas-grilla {
-    grid-column: 2 / 7;
-    grid-row: 2;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-    gap: clamp(2rem, 3.5vw, 3rem);
-    margin-top: clamp(2.5rem, 5vw, 4rem);
-  }
-  .receta { border-top: 1px solid var(--linea); padding-top: 1.5rem; }
-  .receta-titulo { font-size: clamp(1.35rem, 1.9vw, 1.75rem); }
-  .receta-porcion { margin-top: 0.5rem; }
-  .receta .lista-limpia { margin-top: 1.1rem; }
-  .receta-pasos { margin-top: 1.1rem; font-size: 0.95rem; }
-  .receta-tip { margin-top: 1rem; }
-  .receta-tip-etiqueta { display: block; margin-bottom: 0.3rem; }
-
-  /* ——— Quiénes somos ——— */
-  .quienes-frase { margin-top: 1.25rem; }
-  .quienes-cuerpo { margin-top: clamp(1.75rem, 3vw, 2.5rem); }
-  /* Cuatro columnas para el personaje: el texto cede a 2/6 y la figura
-     pasa a tener peso propio en la composición. */
-  .quienes-texto { grid-column: 2 / 6; }
-  .quienes-margen { grid-column: 6 / 10; align-self: center; }
-  .quienes-margen img { display: block; width: 100%; max-width: 22rem; margin: 0 auto 1.75rem; }
-  .quienes-margen .nota-margen { max-width: 22rem; margin-inline: auto; }
-
-  /* ——— Negocios ——— */
-  .negocios-prosa { margin-top: 1.25rem; }
-  .negocios-datos {
-    list-style: none;
-    margin: 2rem 0 0;
-    padding: 0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.6rem 1.75rem;
-  }
-  .negocios-datos li { border-bottom: 1px solid var(--linea); padding-bottom: 0.35rem; }
-  .negocios-cta { margin: clamp(2.25rem, 4vw, 3rem) 0 0; }
-
-  /* ——— FAQ ——— */
-  .faq-titulo { margin-bottom: clamp(2rem, 4vw, 3rem); }
-
-  /* ——— Contacto ——— */
-  .contacto-centro { text-align: center; }
-  .contacto-invitacion { margin-top: 1.25rem; }
-  .contacto-correo {
-    display: inline-block;
-    margin-top: clamp(2rem, 4vw, 3rem);
-    font-size: clamp(1.5rem, 4.2vw, 3.4rem);
-    letter-spacing: 0.06em;
-    text-indent: 0.06em;
-    color: inherit;
+    align-items: center;
+    gap: 10px;
     text-decoration: none;
-    border-bottom: 1px solid var(--linea);
-    padding-bottom: 0.2em;
-    word-break: break-word;
+    color: var(--mrc-marca-tinta);
   }
-  .contacto-datos {
+  .lockup-sello { display: inline-flex; width: 40px; }
+  .lockup-sello :global(svg) { width: 100%; height: auto; }
+  .lockup-nombre {
+    display: block;
+    font-family: var(--mrc-font-titular);
+    font-weight: 700;
+    font-size: 0.9375rem;
+    letter-spacing: 0.09em;
+    line-height: 1;
+  }
+  .lockup-descriptor {
+    display: block;
+    font-size: 0.5625rem;
+    letter-spacing: 0.22em;
+    color: var(--mrc-marca-rojoHondo);
+    margin-top: 3px;
+  }
+  .hamburguesa {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    width: 44px;
+    height: 44px;
+    margin-right: -8px;
+    background: none;
+    border: none;
+    cursor: pointer;
+  }
+  :global(html.js) .hamburguesa { display: flex; }
+  .hamburguesa-linea {
+    width: 22px;
+    height: 2.5px;
+    border-radius: 2px;
+    background: var(--mrc-marca-tinta);
+    transition: transform 0.3s ease-out, opacity 0.2s ease-out;
+  }
+  .hamburguesa[aria-expanded='true'] .hamburguesa-linea:nth-child(2) { transform: translateY(7.5px) rotate(45deg); }
+  .hamburguesa[aria-expanded='true'] .hamburguesa-linea:nth-child(3) { opacity: 0; }
+  .hamburguesa[aria-expanded='true'] .hamburguesa-linea:nth-child(4) { transform: translateY(-7.5px) rotate(-45deg); }
+
+  /* Con el menú abierto la cabecera flota sobre el overlay oscuro. */
+  :global(html.menu-abierto) .cabecera {
+    background: rgb(51 25 10 / 0.2);
+    backdrop-filter: blur(2px);
+    border-bottom-color: rgb(248 236 222 / 0.18);
+  }
+  :global(html.menu-abierto) .lockup { color: var(--mrc-marca-crema); }
+  :global(html.menu-abierto) .lockup-descriptor { color: var(--mrc-marca-amarillo); }
+  :global(html.menu-abierto) .hamburguesa-linea { background: var(--mrc-marca-crema); }
+
+  /* Sin JS: fila simple de enlaces. Con JS: overlay a pantalla completa. */
+  .menu { border-bottom: 1px solid rgb(76 44 22 / 0.25); background: var(--mrc-marca-bandaCalida); }
+  .menu-interior { max-width: 1100px; margin-inline: auto; padding: 10px clamp(20px, 5vw, 56px); }
+  .menu-lista {
+    list-style: none;
+    margin: 0;
+    padding: 0;
     display: flex;
     flex-wrap: wrap;
-    justify-content: center;
-    gap: clamp(2rem, 6vw, 5rem);
-    margin-top: clamp(3rem, 6vw, 5rem);
-    text-align: center;
+    gap: 4px 18px;
   }
-  .contacto-dato { margin-top: 0.75rem; max-width: 26ch; }
+  .menu-lista a {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    color: var(--mrc-marca-tinta);
+    text-decoration: none;
+    font-family: var(--mrc-font-titular);
+    font-weight: 600;
+    font-size: 0.9375rem;
+    padding-block: 4px;
+  }
+  .menu-numero { font-size: 0.6875rem; color: var(--mrc-marca-rojoHondo); }
+  .menu-pie { display: none; }
+  .menu-personaje { display: none; }
 
-  /* ——— Pie ——— */
-  .pie { padding-block: clamp(2.5rem, 5vw, 4rem); }
-  .pie-fila {
+  :global(html.js) .menu {
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    background: linear-gradient(172deg, var(--mrc-marca-oscuro) 0%, var(--mrc-marca-tinta) 62%, color-mix(in srgb, var(--mrc-marca-tinta) 82%, white) 100%);
+    border-bottom: none;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.35s ease-out, visibility 0.35s;
+    overflow: hidden;
+  }
+  :global(html.js) .menu.abierto { opacity: 1; visibility: visible; pointer-events: auto; }
+  :global(html.js) .menu-interior {
+    height: 100%;
+    box-sizing: border-box;
+    padding-top: 96px;
+    padding-bottom: 40px;
+    display: flex;
+    flex-direction: column;
+  }
+  :global(html.js) .menu-lista { flex-direction: column; gap: 2px; }
+  :global(html.js) .menu-lista a {
+    gap: 16px;
+    padding-block: 9px;
+    font-weight: 800;
+    font-size: clamp(1.6875rem, 4.8vh, 2.5rem);
+    letter-spacing: -0.01em;
+    color: var(--mrc-marca-crema);
+    opacity: 0;
+    transform: translateY(22px);
+    transition: opacity 0.4s ease-out calc(var(--orden) * 0.05s), transform 0.4s ease-out calc(var(--orden) * 0.05s), color 0.2s;
+  }
+  :global(html.js) .menu.abierto .menu-lista a { opacity: 1; transform: none; }
+  :global(html.js) .menu-lista a:hover { color: var(--mrc-marca-amarillo); }
+  :global(html.js) .menu-numero { font-size: 0.75rem; color: var(--mrc-marca-amarillo); }
+  :global(html.js) .menu-catalogo a { color: var(--mrc-marca-amarillo); }
+  :global(html.js) .menu-catalogo a:hover { color: #fff; }
+  :global(html.js) .menu-pie {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 28px;
+    margin-top: auto;
+    color: rgb(248 236 222 / 0.75);
+  }
+  :global(html.js) .menu-personaje {
+    display: block;
+    position: absolute;
+    right: clamp(-30px, -2vw, 0px);
+    bottom: -12px;
+    height: min(34vh, 300px);
+    width: auto;
+    opacity: 0.92;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :global(html.js) .menu, :global(html.js) .menu-lista a, .hamburguesa-linea { transition: none; }
+  }
+
+  /* ---------- Portada ---------- */
+  .portada { overflow: hidden; padding-bottom: clamp(40px, 6vw, 88px); }
+  .portada-fila {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: clamp(24px, 4vw, 48px);
+    padding-top: clamp(28px, 5vw, 72px);
+  }
+  .portada-texto { flex: 1 1 340px; min-width: 0; }
+  .portada-titular {
+    font-family: var(--mrc-font-titular);
+    font-weight: 800;
+    font-size: clamp(2.875rem, 7vw, 5.25rem);
+    line-height: 0.98;
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+  .acento { color: var(--mrc-marca-rojo); }
+  .portada-sub {
+    font-size: clamp(0.90625rem, 1.4vw, 1.0625rem);
+    line-height: 1.6;
+    max-width: 430px;
+    margin: 16px 0 0;
+  }
+  .portada-ctas {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 18px;
+    margin-top: 24px;
+  }
+  .enlace-sabores {
+    font-family: var(--mrc-font-titular);
+    font-weight: 600;
+    font-size: 0.9375rem;
+    color: var(--mrc-marca-tinta);
+    text-decoration: none;
+    border-bottom: 2px solid var(--mrc-marca-amarillo);
+    padding-bottom: 2px;
+    transition: border-color 0.2s;
+  }
+  .enlace-sabores:hover { border-color: var(--mrc-marca-rojo); }
+  .portada-logo { flex: 1 1 300px; display: flex; justify-content: center; }
+  .portada-logo img {
+    width: clamp(250px, 30vw, 400px);
+    height: auto;
+    filter: drop-shadow(0 18px 38px rgb(76 44 22 / 0.22));
+  }
+  .portada-tira { margin: clamp(20px, 3vw, 40px) -14px 0; will-change: transform; }
+  .portada-tira :global(.marquesina) { padding-block: 14px; }
+  .tira-barra {
+    width: clamp(104px, 11vw, 142px);
+    height: auto;
+    border-radius: 3px;
+    box-shadow: 0 10px 22px rgb(76 44 22 / 0.3);
+    transition: transform 0.25s ease-out;
+  }
+  .tira-barra:hover { transform: scale(1.05) rotate(2deg); }
+
+  /* ---------- Qué hay en una barra ---------- */
+  .postura {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: clamp(20px, 3.5vw, 48px);
+    align-items: start;
+  }
+  .postura :global(.etiqueta-sabor) { color: var(--mrc-marca-rojoHondo); --chispa: var(--mrc-marca-rojo); }
+  .postura .titular { margin: 8px 0 12px; }
+  .postura-intro { max-width: 420px; margin: 0 0 16px; line-height: 1.6; font-size: 0.90625rem; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .conmutador {
+    display: flex;
+    gap: 4px;
+    background: rgb(76 44 22 / 0.1);
+    border-radius: 6px;
+    padding: 4px;
+  }
+  .conmutador [role='tab'] {
+    flex: 1;
+    font-family: var(--mrc-font-titular);
+    font-weight: 600;
+    font-size: 0.84375rem;
+    padding: 10px 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--mrc-marca-tinta);
+    cursor: pointer;
+    transition: background 0.25s ease-out, color 0.25s ease-out;
+  }
+  #tab-si[aria-selected='true'] { background: var(--mrc-sabor-limaYChile); color: #fff; }
+  #tab-no[aria-selected='true'] { background: var(--mrc-marca-rojo); color: #fff; }
+  .panel {
+    border-radius: 10px;
+    padding: 22px;
+    margin-top: 14px;
+    min-height: 240px;
+    box-sizing: border-box;
+    box-shadow: 0 16px 34px rgb(76 44 22 / 0.26);
+    color: #fff;
+  }
+  .panel-si { background: var(--mrc-sabor-limaYChile); }
+  .panel-no { background: var(--mrc-marca-rojo); }
+  /* Sin JS los dos paneles se ven, apilados; el atributo hidden lo pone
+     el script al tomar el control. */
+  .panel[hidden] { display: none; }
+  .panel-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .panel-lista li { display: flex; gap: 10px; align-items: baseline; font-size: 0.9375rem; }
+  .panel-no .panel-lista li { font-size: 1rem; }
+  .panel-no s { text-decoration-thickness: 2px; }
+  .panel-marca { color: var(--mrc-marca-amarillo); flex: none; }
+  .panel-nota { font-size: 0.6875rem; letter-spacing: 0; line-height: 1.5; color: rgb(255 255 255 / 0.85); margin: 12px 0 0; }
+  .panel-cierre { font-size: 0.84375rem; line-height: 1.5; color: rgb(255 255 255 / 0.92); margin: 14px 0 0; }
+
+  /* ---------- El anaquel ---------- */
+  .anaquel { padding-block: clamp(40px, 6vw, 80px) clamp(56px, 7vw, 96px); position: relative; }
+  .anaquel :global(.etiqueta-sabor) { color: var(--texto); --chispa: var(--mrc-marca-amarillo); }
+  .anaquel-encabezado {
+    display: flex;
     justify-content: space-between;
-    gap: 1.5rem;
-    border-top: 1px solid var(--linea);
-    padding-top: 2rem;
+    align-items: baseline;
   }
-  .pie-sello { width: 2.25rem; }
-
-  /* ——— Barra ——— */
-  .barra-nombre { font-size: 0.9rem; letter-spacing: 0.3em; }
-
-  @media (max-width: 900px) {
-    /* Las clases propias no entran en la regla general del canon. */
-    .quienes-texto, .quienes-margen,
-    .recetas-cabeza, .recetas-personaje, .recetas-grilla {
-      grid-column: 1 / -1;
-      grid-row: auto;
-    }
-    .quienes-margen { margin-top: 2.5rem; }
-    .recetas-personaje { margin-top: 2rem; }
-    .foto-1, .foto-2, .foto-3 { grid-column: 1 / -1; margin-top: 0; }
-    .prod-fotos { row-gap: 2.5rem; }
-    .polvo-grilla { grid-template-columns: repeat(2, 1fr); }
-    .quienes-margen img { max-width: 9rem; }
-    .pie-fila { flex-direction: column; text-align: center; }
-    .hero-descriptor { letter-spacing: 0.3em; }
+  .anaquel .titular { margin: 6px 0 12px; }
+  .anaquel-riel {
+    display: flex;
+    gap: clamp(14px, 1.8vw, 22px);
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+    padding: 6px clamp(20px, calc(50vw - 530px), 56px) 14px;
+  }
+  .anaquel-riel [role='radio'] {
+    flex: none;
+    scroll-snap-align: center;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    transition: transform 0.25s ease-out;
+  }
+  .anaquel-riel [role='radio'] img {
+    width: clamp(96px, 10vw, 126px);
+    height: auto;
+    border-radius: 3px;
+    box-shadow: 0 14px 26px rgb(31 14 5 / 0.35);
+    display: block;
+  }
+  .anaquel-riel [role='radio']:hover { transform: translateY(-10px) scale(1.04); }
+  .anaquel-riel [role='radio'][aria-checked='true'] { transform: translateY(-8px) scale(1.06); }
+  @media (prefers-reduced-motion: reduce) {
+    .anaquel-riel [role='radio'], .tira-barra { transition: none; }
   }
 
-  @media (prefers-reduced-motion: no-preference) {
-    @keyframes desfilar { to { transform: translateX(-50%); } }
-    .hero-pista { animation: desfilar 90s linear infinite; }
-    .hero-tira:hover .hero-pista { animation-play-state: paused; }
-
-    .contacto-correo { transition: border-color 0.5s ease; }
-    .contacto-correo:hover { border-color: var(--texto); }
-
+  .ficha-zona { margin-top: -36px; position: relative; z-index: 2; padding-bottom: clamp(48px, 7vw, 96px); }
+  .ficha {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 18px 40px rgb(76 44 22 / 0.22);
+    padding: clamp(18px, 2.6vw, 32px);
   }
+  .ficha-fila { display: flex; flex-wrap: wrap; gap: clamp(16px, 2.5vw, 36px); align-items: center; }
+  .ficha-envoltura { flex: none; width: clamp(110px, 13vw, 164px); margin-inline: auto; }
+  .ficha-envoltura :global(img) {
+    width: 100%;
+    height: auto;
+    border-radius: 4px;
+    box-shadow: 0 12px 26px rgb(76 44 22 / 0.3);
+    transform: rotate(-2deg);
+    transition: transform 0.25s ease-out;
+  }
+  .ficha-envoltura:hover :global(img) { transform: rotate(0deg) scale(1.03); }
+  .ficha-datos { flex: 1 1 300px; min-width: 0; }
+  .ficha-orden { color: var(--mrc-marca-textoSuave); letter-spacing: 0.14em; margin: 0; text-transform: uppercase; }
+  .ficha-nombre-fila {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    margin-top: 4px;
+  }
+  .ficha-nombre { font-size: clamp(1.4375rem, 2.2vw, 1.875rem); font-weight: 400; margin: 0; }
+  .ficha-precio {
+    font-family: var(--mrc-font-titular);
+    font-weight: 700;
+    font-size: clamp(1rem, 1.6vw, 1.25rem);
+    color: var(--mrc-marca-rojo);
+    flex: none;
+    margin: 0;
+  }
+  .ficha-datos .chips { margin: 10px 0 12px; }
+  .ficha-ingredientes {
+    background: var(--mrc-marca-crema);
+    border: 1px solid rgb(76 44 22 / 0.25);
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 0.75rem;
+    letter-spacing: 0;
+    line-height: 1.5;
+    margin: 0;
+  }
+  .ficha-ctas { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; margin-top: 16px; }
+  .ficha-remate { font-size: 0.875rem; margin: 0; }
+  .ficha-ilustracion { flex: 0 1 190px; margin: 0 auto; text-align: center; }
+  .ficha-ilustracion img {
+    width: clamp(120px, 14vw, 180px);
+    height: auto;
+    filter: drop-shadow(0 8px 14px rgb(76 44 22 / 0.25));
+  }
+  .ficha-ilustracion figcaption { font-size: 0.78125rem; margin-top: 2px; }
+
+  .ficha-extras {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 18px;
+    border-top: 1px solid rgb(76 44 22 / 0.25);
+    padding-top: 16px;
+  }
+  .extra-ticket { flex: 2 1 320px; display: flex; }
+  .extra-ticket :global(.ticket) { width: 100%; }
+  .extra-titulo { font-family: var(--mrc-font-titular); font-weight: 700; font-size: 1rem; margin: 0; }
+  .extra-cuerpo { font-size: 0.84375rem; line-height: 1.5; margin: 4px 0 0; }
+  .extra-ticket .mano { font-size: 0.8125rem; margin: 6px 0 0; }
+  .extra-carta {
+    flex: 1 1 220px;
+    background: var(--mrc-marca-crema);
+    border: 1px solid rgb(76 44 22 / 0.25);
+    border-radius: 10px;
+    padding: 16px;
+    transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+  }
+  .extra-carta:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgb(76 44 22 / 0.18); }
+  .extra-encabezado { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .extra-encabezado h4 { font-family: var(--mrc-font-titular); font-weight: 700; font-size: 0.9375rem; margin: 0; }
+  .extra-precio { font-size: 0.71875rem; color: var(--mrc-marca-rojoHondo); flex: none; }
+  .extra-chip { font-size: 0.625rem; letter-spacing: 0.08em; color: var(--mrc-marca-rojoHondo); flex: none; }
+  .extra-nota { font-size: 0.65625rem; letter-spacing: 0.02em; margin: 8px 0 0; }
+  .gotas-puntos {
+    list-style: none;
+    display: flex;
+    gap: 5px;
+    align-items: center;
+    margin: 10px 0 0;
+    padding: 0;
+  }
+  .gota-punto { display: block; width: 12px; height: 12px; border-radius: 50%; }
+  .gotas-cifra { font-size: 0.65625rem; color: var(--mrc-marca-textoSuave); margin-left: 4px; }
+  .extra-lista { font-size: 0.65625rem; letter-spacing: 0.02em; line-height: 1.6; margin: 10px 0 0; }
+
+  /* ---------- Chocolate para beber ---------- */
+  .polvo-fila {
+    display: flex;
+    flex-wrap: wrap;
+    gap: clamp(20px, 3vw, 44px);
+    align-items: center;
+  }
+  .polvo-texto { flex: 1 1 300px; }
+  .polvo-texto :global(.etiqueta-sabor) { color: var(--mrc-marca-amarillo); --chispa: var(--mrc-marca-amarillo); }
+  .polvo-encabezado { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .polvo-texto .titular { margin: 10px 0 8px; }
+  .polvo-texto p { font-size: 0.84375rem; line-height: 1.6; margin: 0; }
+  .polvo-riel {
+    flex: 1 1 340px;
+    min-width: 0;
+    display: flex;
+    gap: 14px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    padding: 6px 2px;
+    will-change: transform;
+  }
+  .polvo-riel img {
+    width: clamp(110px, 12vw, 150px);
+    height: auto;
+    border-radius: 6px;
+    flex: none;
+    box-shadow: 0 10px 22px rgb(31 14 5 / 0.4);
+    transition: transform 0.25s ease-out;
+  }
+  .polvo-riel img:hover { transform: translateY(-6px) rotate(-1.5deg); }
+  .polvo-riel img:nth-child(even):hover { transform: translateY(-6px) rotate(1.5deg); }
+  @media (prefers-reduced-motion: reduce) { .polvo-riel img { transition: none; } }
+
+  /* ---------- Cómo catar ---------- */
+  #catar :global(.etiqueta-sabor) { color: var(--mrc-marca-rojoHondo); --chispa: var(--mrc-marca-rojo); }
+  #catar .titular { margin: 8px 0 20px; }
+  .catar-pasos {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+    gap: clamp(14px, 2vw, 28px) clamp(14px, 2vw, 28px);
+  }
+  .paso {
+    display: flex;
+    gap: 14px;
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px 16px;
+    box-shadow: 0 2px 6px rgb(76 44 22 / 0.14);
+    transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+  }
+  .paso:hover { transform: translateY(-3px); box-shadow: 0 10px 22px rgb(76 44 22 / 0.18); }
+  .paso-numero {
+    flex: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    font-size: 1.125rem;
+  }
+  .paso p { font-size: 0.875rem; line-height: 1.5; margin: 0; }
+  .paso b { color: var(--mrc-marca-rojoHondo); }
+  .catar-cita { max-width: 640px; margin: 20px auto 0; }
+  .cita-texto { font-size: 0.9375rem; line-height: 1.45; text-wrap: pretty; margin: 0; }
+  .catar-notas {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: clamp(14px, 2vw, 28px);
+    border-top: 1px solid rgb(76 44 22 / 0.25);
+    margin-top: 20px;
+    padding-top: 14px;
+  }
+  .catar-notas p { font-size: 0.8125rem; line-height: 1.55; margin: 0; max-width: 720px; }
+  .nota-titulo { color: var(--mrc-marca-rojoHondo); }
+
+  /* ---------- Recetas ---------- */
+  .recetas-encabezado { display: flex; justify-content: space-between; align-items: baseline; }
+  #recetas :global(.etiqueta-sabor) { color: var(--mrc-marca-rojoHondo); --chispa: var(--mrc-marca-rojo); }
+  #recetas .titular { margin: 6px 0 16px; }
+  .recetas-riel {
+    display: flex;
+    gap: clamp(14px, 1.6vw, 20px);
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+    padding: 8px clamp(20px, calc(50vw - 530px), 56px) 20px;
+  }
+  .receta {
+    flex: none;
+    width: min(280px, 80vw);
+    scroll-snap-align: start;
+    border-radius: 10px;
+    padding: 18px;
+    box-sizing: border-box;
+    box-shadow: 0 10px 24px rgb(76 44 22 / 0.24);
+    background: linear-gradient(
+      168deg,
+      color-mix(in srgb, var(--sabor) 85%, #fff) 0%,
+      var(--sabor) 40%,
+      color-mix(in srgb, var(--sabor) 78%, #000) 100%
+    );
+    color: var(--tinta);
+    transition: transform 0.25s ease-out, box-shadow 0.25s ease-out;
+  }
+  .receta:hover { transform: translateY(-6px); box-shadow: 0 20px 36px rgb(76 44 22 / 0.32); }
+  @media (prefers-reduced-motion: reduce) { .receta, .paso, .extra-carta { transition: none; } }
+  .receta-kicker { font-size: 0.65625rem; letter-spacing: 0.1em; opacity: 0.88; margin: 0; }
+  .receta-titulo {
+    font-family: var(--mrc-font-titular);
+    font-weight: 700;
+    font-size: 1.1875rem;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    margin: 8px 0 10px;
+  }
+  .receta-resumen { font-size: 0.8125rem; line-height: 1.5; margin: 0; opacity: 0.96; }
+  .receta-chip {
+    display: inline-block;
+    background: var(--mrc-marca-amarillo);
+    color: var(--mrc-marca-rojoHondo);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 0.6875rem;
+    letter-spacing: 0.06em;
+    margin: 12px 0 0;
+  }
+  .receta-clara .receta-tip { background: rgb(255 255 255 / 0.16); }
+  .receta-oscura .receta-tip { background: rgb(255 255 255 / 0.4); }
+  .receta-tip { border-radius: 6px; padding: 8px 10px; margin-top: 12px; font-size: 0.8125rem; }
+  .receta-completa { margin-top: 12px; font-size: 0.8125rem; }
+  .receta-completa summary {
+    cursor: pointer;
+    font-family: var(--mrc-font-titular);
+    font-weight: 600;
+    font-size: 0.8125rem;
+  }
+  .receta-completa ul { margin: 8px 0; padding-left: 18px; }
+  .receta-completa p { margin: 8px 0 0; line-height: 1.5; }
+
+  /* ---------- Nosotros ---------- */
+  .nosotros {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: clamp(20px, 3.5vw, 48px);
+    align-items: start;
+  }
+  #nosotros :global(.etiqueta-sabor) { color: var(--mrc-marca-rojoHondo); --chispa: var(--mrc-marca-rojo); }
+  #nosotros .titular { margin: 8px 0 14px; }
+  .nosotros-parrafo { font-size: 0.875rem; line-height: 1.65; margin: 0 0 12px; }
+  .nosotros-carta {
+    background: #fff;
+    border: 1px solid rgb(76 44 22 / 0.25);
+    border-radius: 10px;
+    padding: 16px 18px;
+    font-size: 0.84375rem;
+    line-height: 1.55;
+    box-shadow: 0 12px 28px rgb(76 44 22 / 0.16);
+  }
+  .nosotros-pie {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 10px;
+  }
+  .nosotros-pie p { padding-bottom: 14px; margin: 0; font-size: 0.6875rem; }
+  .nosotros-pie img { height: 120px; width: auto; will-change: transform; }
+
+  /* ---------- Para negocios ---------- */
+  .negocios {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: clamp(20px, 3.5vw, 48px);
+    align-items: start;
+  }
+  #negocios :global(.etiqueta-sabor) { color: var(--mrc-marca-rojoHondo); --chispa: var(--mrc-marca-rojo); }
+  #negocios .titular { margin: 8px 0 6px; }
+  .negocios-intro { font-size: 0.84375rem; margin: 0 0 10px; }
+  .pestanas { display: flex; gap: 4px; border-bottom: 1px solid rgb(76 44 22 / 0.25); }
+  .pestanas [role='tab'] {
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: var(--mrc-marca-tinta);
+    font-family: var(--mrc-font-serifMarca);
+    font-size: 0.9375rem;
+    padding: 8px 14px;
+    margin-bottom: -1px;
+    cursor: pointer;
+    transition: color 0.15s ease-out;
+  }
+  .pestanas [role='tab'][aria-selected='true'] {
+    border-bottom-color: var(--mrc-marca-rojo);
+    color: var(--mrc-marca-rojoHondo);
+  }
+  .semaforo { margin: 12px 0 0; }
+  .semaforo-fila {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: baseline;
+    padding-block: 5px;
+  }
+  .semaforo dt { font-size: 0.78125rem; }
+  .semaforo dd { margin: 0; font-size: 0.65625rem; color: var(--mrc-marca-textoSuave); text-align: right; }
+  .negocios-paneles { display: flex; flex-direction: column; gap: 12px; }
+  .negocio-panel {
+    background: linear-gradient(168deg, color-mix(in srgb, var(--sabor) 88%, #fff) 0%, var(--sabor) 45%, color-mix(in srgb, var(--sabor) 80%, #000) 100%);
+    color: #fff;
+    border-radius: 10px;
+    padding: 22px;
+    min-height: 230px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 16px 34px rgb(76 44 22 / 0.26);
+  }
+  .negocio-panel[hidden] { display: none; }
+  .negocio-encabezado { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .negocio-encabezado h3 {
+    font-family: var(--mrc-font-titular);
+    font-weight: 700;
+    font-size: 1.15625rem;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+  .negocio-encabezado .mono { font-size: 0.71875rem; color: rgb(255 255 255 / 0.88); flex: none; }
+  .negocio-cuerpo { font-size: 0.84375rem; line-height: 1.55; color: rgb(255 255 255 / 0.95); margin: 8px 0 12px; }
+  .negocio-datos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .negocio-datos li { display: flex; gap: 9px; align-items: baseline; font-size: 0.78125rem; line-height: 1.45; }
+  .negocio-flecha { color: var(--mrc-marca-amarillo); flex: none; }
+  .negocio-correo {
+    background: rgb(0 0 0 / 0.25);
+    border-radius: 6px;
+    padding: 10px 13px;
+    margin: 14px 0 0;
+    font-size: 0.71875rem;
+    letter-spacing: 0.02em;
+  }
+
+  /* ---------- Preguntas ---------- */
+  .preguntas { max-width: 780px; }
+  #preguntas :global(.etiqueta-sabor) { color: var(--mrc-marca-rojoHondo); --chispa: var(--mrc-marca-rojo); }
+  #preguntas .titular { margin: 8px 0 12px; }
+  .pregunta { border-top: 1px solid rgb(76 44 22 / 0.25); }
+  .pregunta summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 13px 8px;
+    cursor: pointer;
+    border-radius: 6px;
+    list-style: none;
+    transition: background 0.2s;
+  }
+  .pregunta summary::-webkit-details-marker { display: none; }
+  .pregunta summary:hover { background: rgb(244 210 97 / 0.28); }
+  .pregunta h3 {
+    font-family: var(--mrc-font-titular);
+    font-weight: 600;
+    font-size: 0.90625rem;
+    margin: 0;
+    display: inline;
+  }
+  .pregunta-mas { font-size: 1.1875rem; color: var(--mrc-marca-rojoHondo); flex: none; transition: transform 0.25s ease-out; }
+  .pregunta[open] .pregunta-mas { transform: rotate(45deg); }
+  @media (prefers-reduced-motion: reduce) { .pregunta-mas { transition: none; } }
+  .pregunta > p { font-size: 0.84375rem; line-height: 1.55; padding: 0 32px 14px 8px; margin: 0; }
+
+  /* ---------- Contacto ---------- */
+  #contacto :global(.etiqueta-sabor) { color: var(--mrc-marca-rojoHondo); --chispa: var(--mrc-marca-rojo); }
+  #contacto .titular { margin: 8px 0 14px; }
+  .contacto-fila {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: clamp(14px, 2vw, 24px);
+    align-items: stretch;
+  }
+  .puesto {
+    position: relative;
+    overflow: hidden;
+    border-radius: 10px;
+    padding: 24px 22px;
+    background: linear-gradient(
+      165deg,
+      color-mix(in srgb, var(--mrc-sabor-pinaConChile) 82%, white) 0%,
+      var(--mrc-sabor-pinaConChile) 45%,
+      color-mix(in srgb, var(--mrc-sabor-pinaConChile) 76%, black) 100%
+    );
+    color: var(--mrc-marca-tintaImpreso);
+    box-shadow: 0 16px 34px rgb(76 44 22 / 0.26);
+  }
+  .puesto > .mono { font-size: 0.65625rem; letter-spacing: 0.14em; margin: 0; opacity: 0.9; }
+  .puesto-titulo {
+    font-family: var(--mrc-font-titular);
+    font-weight: 800;
+    font-size: clamp(1.5rem, 2.4vw, 1.875rem);
+    line-height: 1.02;
+    letter-spacing: -0.01em;
+    margin: 8px 0 12px;
+  }
+  .puesto-ticket { max-width: 220px; position: relative; z-index: 1; }
+  .puesto-direccion { font-size: 0.78125rem; line-height: 1.45; margin: 0; }
+  .puesto-personaje {
+    position: absolute;
+    right: -10px;
+    bottom: -8px;
+    height: 135px;
+    width: auto;
+    will-change: transform;
+  }
+  .contacto-cartas { display: flex; flex-direction: column; gap: 12px; }
+  .contacto-carta {
+    flex: 1;
+    background: #fff;
+    border: 1px solid rgb(76 44 22 / 0.18);
+    border-radius: 10px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgb(76 44 22 / 0.14);
+    text-decoration: none;
+    transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, border-color 0.2s;
+  }
+  .carta-enlace:hover { transform: translateY(-3px); box-shadow: 0 12px 26px rgb(76 44 22 / 0.2); border-color: var(--mrc-marca-rojo); }
+  .carta-etiqueta { font-size: 0.625rem; color: var(--mrc-marca-rojoHondo); margin: 0; }
+  .carta-dato {
+    font-family: var(--mrc-font-titular);
+    font-weight: 600;
+    font-size: 0.9375rem;
+    color: var(--mrc-marca-tinta);
+    overflow-wrap: anywhere;
+    margin: 4px 0 0;
+    text-decoration: none;
+  }
+  a.carta-dato:hover { color: var(--mrc-marca-rojoHondo); }
+  .carta-nota { font-size: 0.75rem; margin: 3px 0 0; }
+  .copiar {
+    align-self: flex-start;
+    margin-top: 10px;
+    font-family: var(--mrc-font-titular);
+    font-weight: 600;
+    font-size: 0.78125rem;
+    color: var(--mrc-marca-tinta);
+    background: transparent;
+    border: 2px solid var(--mrc-marca-tinta);
+    border-radius: 6px;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: background 0.2s ease-out;
+  }
+  .copiar:hover { background: rgb(76 44 22 / 0.08); }
+
+  /* ---------- Pie ---------- */
+  .pie { padding-bottom: 22px; box-shadow: inset 0 10px 20px rgb(31 14 5 / 0.15); }
+  .pie-marquesina { border-bottom: 1px solid rgb(248 236 222 / 0.4); }
+  .pie-lema { color: #fff; font-size: 0.71875rem; letter-spacing: 0.08em; white-space: nowrap; padding-block: 9px; display: inline-block; }
+  .pie-centro {
+    padding: 22px 20px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+  }
+  .pie-centro img { width: 160px; height: auto; }
+  .pie-centro .mono { font-size: 0.65625rem; letter-spacing: 0.1em; color: #fff; margin: 4px 0 0; }
 </style>
-
-<script>
-  import '@/scripts/editorial'
-</script>

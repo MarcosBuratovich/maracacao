@@ -7,7 +7,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { marca } from '@/copy/marca'
+import { marca } from '@/copy/sitio-marca'
 import { sabores, gotas, polvo } from '@/copy/sabores'
 import { sabor } from '@/tokens/color'
 

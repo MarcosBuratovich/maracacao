@@ -1,0 +1,40 @@
+---
+// Marquesina infinita: el contenido se duplica para el loop y la copia
+// va aria-hidden (en el canvas la copia repetía los alt y un lector
+// anunciaba barras dobles). Solo corre con html.js + sin
+// reduced-motion (regla en marca.css); sin JS queda quieta y completa.
+interface Props {
+  /** Descripción para lectores; con ella el conjunto es role="img". */
+  aria?: string
+  /** Duración del loop, p. ej. '34s'. */
+  dur?: string
+  /** Rotación del conjunto en grados (el hero usa -3). */
+  rotacion?: number
+}
+const { aria, dur = '34s', rotacion = 0 } = Astro.props
+---
+<div
+  class="marquesina"
+  role={aria ? 'img' : undefined}
+  aria-label={aria}
+  style={rotacion ? `transform:rotate(${rotacion}deg)` : undefined}
+>
+  <div class="marquesina-pista" style={`--marquesina-dur:${dur}`}>
+    <div class="tramo"><slot /></div>
+    <div class="tramo" aria-hidden="true"><slot /></div>
+  </div>
+</div>
+
+<style>
+  .marquesina { overflow: hidden; }
+  .marquesina-pista {
+    display: flex;
+    width: max-content;
+    gap: var(--marquesina-gap, clamp(12px, 1.6vw, 20px));
+  }
+  .tramo {
+    display: flex;
+    gap: var(--marquesina-gap, clamp(12px, 1.6vw, 20px));
+    align-items: center;
+  }
+</style>

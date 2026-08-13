@@ -9,6 +9,8 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { experimental_AstroContainer as AstroContainer } from 'astro/container'
 import { sitio } from '@/copy/sitio'
+import { marca } from '@/copy/sitio-marca'
+import { sabores } from '@/copy/sabores'
 import { editorial, etiqueta } from '@/tokens/color'
 import { customProperties } from '@/tokens/css'
 import Borrador from '@/pages/sitio.astro'
@@ -63,35 +65,48 @@ describe('copy del borrador — registro y retro vigentes', () => {
   })
 })
 
-describe('la página /sitio (alta fidelidad, centro de información)', () => {
-  it('renderiza el contenido real: barras, correo, catálogo, precios, Tabasco y punto de venta', async () => {
+describe('la página /sitio (rediseño de marca, 2026-08-13)', () => {
+  it('renderiza el contenido real: los 15 sabores, correo, catálogo, precios, Tabasco y punto de venta', async () => {
     const html = await container.renderToString(Borrador)
-    for (const barra of sitio.productos.barras) expect(html).toContain(barra.nombre)
-    expect(html).toContain(sitio.contacto.correo)
-    expect(html).toContain(sitio.contacto.catalogoUrl)
+    // Los quince están presentes: en el anaquel cada barra es un radio
+    // con su nombre como aria-label.
+    for (const s of sabores) expect(html).toContain(`aria-label="${s.nombre}"`)
+    expect(html).toContain(marca.contacto.correo)
+    expect(html).toContain(marca.contacto.catalogoUrl)
     expect(html).toMatch(/\$\s?108/)
     expect(html).toContain('Tabasco')
-    expect(html).toContain(sitio.contacto.puntoVenta)
+    expect(html).toContain(marca.contacto.direccion[0])
   })
 
   it('títulos concretos, sin juegos de palabras: cada sección lleva su nombre', async () => {
     const html = await container.renderToString(Borrador)
     for (const titulo of [
-      sitio.productos.titulo, sitio.abc.titulo, sitio.recetas.titulo,
-      sitio.quienes.titulo, sitio.negocios.titulo, sitio.faq.titulo,
-      sitio.contacto.titulo,
+      marca.postura.titulo, marca.anaquel.titulo, marca.polvo.titulo,
+      marca.catar.titulo, marca.recetas.titulo, marca.nosotros.titulo,
+      marca.negocios.titulo, marca.preguntas.titulo, marca.contacto.titulo,
     ]) {
       expect(html).toContain(titulo)
     }
   })
 
-  it('las 4 recetas del cliente y las 8 preguntas frecuentes están completas', async () => {
+  it('las 4 recetas del cliente (completas y expandibles) y las 8 preguntas están', async () => {
     const html = await container.renderToString(Borrador)
-    expect(sitio.recetas.lista).toHaveLength(4)
-    for (const r of sitio.recetas.lista) expect(html).toContain(r.titulo)
-    expect(sitio.faq.items).toHaveLength(8)
-    expect(html.match(/<details class="faq"/g)).toHaveLength(8)
-    for (const paso of sitio.abc.catar.pasos) expect(html).toContain(paso.nombre)
+    expect(marca.recetas.lista).toHaveLength(4)
+    for (const r of marca.recetas.lista) {
+      expect(html).toContain(r.titulo)
+      // La receta completa del cliente viaja entera, no solo el resumen.
+      for (const ing of r.ingredientes) expect(html).toContain(ing)
+    }
+    expect(html.match(/<details class="receta-completa"/g)).toHaveLength(4)
+    expect(marca.preguntas.items).toHaveLength(8)
+    expect(html.match(/<details class="pregunta"/g)).toHaveLength(8)
+    for (const paso of marca.catar.pasos) expect(html).toContain(paso.nombre)
+  })
+
+  it('la ficha del anaquel arranca en canela y la banda trae su color y su tinta medida', async () => {
+    const html = await container.renderToString(Borrador)
+    expect(html).toContain('aria-checked="true" aria-label="Canela"')
+    expect(html).toMatch(/data-anaquel-banda[^>]*--fondo:#7D0303;--texto:#FFFFFF/)
   })
 
   it('sin marcas de maqueta: ni aviso de borrador ni chips de pendiente', async () => {
@@ -145,15 +160,12 @@ describe('sistema editorial', () => {
     expect(css).toMatch(/\.margen\s*\{\s*grid-column:\s*8\s*\/\s*10/)
   })
 
-  it('el wordmark es texto vivo en la tipografía del sello, no una imagen', async () => {
+  it('el wordmark es texto vivo, no una imagen (lockup y arco del pie)', async () => {
     const html = await container.renderToString(Borrador)
-    // Astro agrega su atributo de scope al <h1>, así que se compara el
-    // patrón, no el string exacto.
-    expect(html).toMatch(new RegExp(`<h1 class="monumento abre"[^>]*>${sitio.marca.wordmark}</h1>`))
-    expect(css).toMatch(/\.monumento\s*\{[^}]*--mrc-font-sello/)
-    // El tracking centrado necesita text-indent: con margen negativo el
-    // wordmark queda corrido (medido en vivo).
-    expect(css).toMatch(/\.monumento\s*\{[^}]*text-indent:\s*0\.18em/)
+    // En el rediseño el wordmark vive dos veces como texto: el lockup de
+    // la cabecera y el arco del pie (letra a letra, calculado en build).
+    expect(html).toMatch(new RegExp(`class="lockup-nombre"[^>]*>${marca.marca.wordmark}<`))
+    expect(html).toMatch(/class="arco"[^>]*aria-label="MARACACAO"/)
   })
 
   it('el sello va inline para tomar la tinta de su sección', async () => {

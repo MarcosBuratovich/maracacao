@@ -1,0 +1,224 @@
+/* Sistema visual del sitio rediseñado (2026-08-13).
+
+   El diseño es de Marcos (claude.ai/design); la auditoría que este CSS
+   respeta está en docs/auditoria-diseno-v2.md. Principios que no se
+   negocian y que el canvas no traía:
+
+   · La tinta sobre el color de un sabor NUNCA es blanco fijo: la pone
+     `--mrc-tinta-sabor-*` (medida por sabor; hierbabuena solo display).
+   · Nada se esconde sin JS: lo animable parte visible y solo `html.js`
+     lo prepara para animar.
+   · `prefers-reduced-motion` APAGA (marquesinas, floats, parallax,
+     scroll suave) — no atenúa.
+   · Todo control es nativo y el foco se ve: focus-visible global.
+
+   Los estilos de cada pieza viven scoped en su componente .astro; acá
+   va lo compartido: fundaciones, tonos de sección, tipografía base,
+   utilidades y la capa de movimiento. */
+
+@import './fuentes-marca.css';
+
+/* ---------- Fundaciones ---------- */
+
+html { scrollbar-gutter: stable; }
+
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+
+body {
+  margin: 0;
+  background: var(--mrc-marca-crema);
+  color: var(--mrc-marca-tinta);
+  font-family: var(--mrc-font-serifMarca);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--mrc-marca-amarillo);
+  color: var(--mrc-marca-tinta);
+}
+
+/* Foco visible siempre, con color según el piso. */
+:focus-visible {
+  outline: 3px solid var(--mrc-marca-tinta);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+[data-tono='oscuro'] :focus-visible,
+[data-tono='sabor'] :focus-visible {
+  outline-color: var(--mrc-marca-amarillo);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.salto {
+  position: absolute;
+  left: 1rem;
+  top: -4rem;
+  z-index: 200;
+  padding: 0.6rem 1rem;
+  background: var(--mrc-marca-tinta);
+  color: var(--mrc-marca-crema);
+  font-family: var(--mrc-font-titular);
+  font-size: 0.9375rem;
+  text-decoration: none;
+  border-radius: 6px;
+  transition: top 0.2s ease-out;
+}
+.salto:focus-visible { top: 1rem; }
+
+/* ---------- Tonos de sección ----------
+   Cada sección declara su piso; --fondo/--texto alimentan además al
+   cursor y la barra adaptativa (scripts/marca.ts). El tono `sabor` lo
+   pintan variables inline que el anaquel actualiza por selección. */
+
+[data-tono] { background: var(--fondo); color: var(--texto); }
+[data-tono='crema'] { --fondo: var(--mrc-marca-crema); --texto: var(--mrc-marca-tinta); --suave: var(--mrc-marca-textoSuave); }
+[data-tono='calida'] {
+  --fondo: var(--mrc-marca-bandaCalida); --texto: var(--mrc-marca-tinta); --suave: var(--mrc-marca-textoSuave);
+  box-shadow: inset 0 1px 0 rgb(76 44 22 / 0.12), inset 0 -1px 0 rgb(76 44 22 / 0.12);
+}
+[data-tono='clara'] {
+  --fondo: var(--mrc-marca-bandaClara); --texto: var(--mrc-marca-tinta); --suave: var(--mrc-marca-textoSuave);
+  box-shadow: inset 0 1px 0 rgb(76 44 22 / 0.12), inset 0 -1px 0 rgb(76 44 22 / 0.12);
+}
+[data-tono='oscuro'] {
+  --fondo: var(--mrc-marca-oscuro); --texto: #ffffff; --suave: rgb(248 236 222 / 0.85);
+  background: linear-gradient(172deg, #5a3316 0%, var(--mrc-marca-tinta) 45%, var(--mrc-marca-oscuro) 100%);
+}
+[data-tono='sabor'] {
+  /* Valores por defecto = canela (la selección inicial del anaquel). */
+  --fondo: var(--mrc-sabor-canela);
+  --texto: var(--mrc-tinta-sabor-canela);
+  --suave: var(--texto);
+  transition: background 0.45s ease-out;
+}
+[data-tono='rojo'] {
+  --fondo: var(--mrc-marca-rojo); --texto: #ffffff; --suave: rgb(255 255 255 / 0.92);
+  background: linear-gradient(172deg, #d8494e 0%, var(--mrc-marca-rojo) 40%, #9e2a2f 100%);
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-tono='sabor'] { transition: none; }
+}
+
+/* ---------- Contenedor y secciones ---------- */
+
+.contenedor {
+  max-width: 1100px;
+  margin-inline: auto;
+  padding-inline: clamp(20px, 5vw, 56px);
+}
+
+.seccion { padding-block: clamp(48px, 7vw, 96px); }
+[id] { scroll-margin-top: 76px; }
+
+/* ---------- Tipografía compartida ---------- */
+
+.titular {
+  font-family: var(--mrc-font-titular);
+  font-weight: 700;
+  font-size: clamp(1.4375rem, 2.6vw, 2rem);
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  margin: 0;
+  text-wrap: balance;
+}
+
+.mono {
+  font-family: var(--mrc-font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+}
+
+.mano { font-family: var(--mrc-font-mano); }
+
+.suave { color: var(--suave, var(--mrc-marca-textoSuave)); }
+
+/* ---------- Capa de movimiento ----------
+   Todo lo que se mueve queda quieto por defecto; `html.js` +
+   no-preference lo activan. La marquesina duplica su contenido para el
+   loop: la copia va aria-hidden y el loop solo corre si hay JS que
+   pueda pausarlo — sin JS las piezas simplemente se ven estáticas. */
+
+@keyframes marquesina {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@keyframes flotar {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html.js .marquesina-pista { animation: marquesina var(--marquesina-dur, 34s) linear infinite; }
+  html.js .flota { animation: flotar 5.5s ease-in-out infinite; }
+}
+
+/* Cursor de sello (transferido del sistema editorial): un punto firme y
+   un anillo que persigue con retardo, tomando la tinta de la sección
+   que pisa. Solo puntero fino + sin reduced-motion; lo crea marca.ts. */
+@media (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  html.cursor-propio, html.cursor-propio a, html.cursor-propio button,
+  html.cursor-propio summary, html.cursor-propio [role='radio'] { cursor: none; }
+  .cursor {
+    position: fixed;
+    left: 0; top: 0;
+    z-index: 300;
+    width: 10px; height: 10px;
+    margin: -5px 0 0 -5px;
+    border-radius: 50%;
+    background: var(--cursor-color, var(--mrc-marca-tinta));
+    pointer-events: none;
+    opacity: 0;
+  }
+  .cursor-anillo {
+    position: fixed;
+    left: 0; top: 0;
+    z-index: 299;
+    width: 44px; height: 44px;
+    margin: -22px 0 0 -22px;
+    border: 1.5px solid var(--cursor-color, var(--mrc-marca-tinta));
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: background 0.2s ease-out;
+  }
+  .cursor-anillo b {
+    font-family: var(--mrc-font-titular);
+    font-weight: 600;
+    font-size: 0.625rem;
+    letter-spacing: 0.08em;
+    color: var(--cursor-color, var(--mrc-marca-tinta));
+    opacity: 0;
+    transition: opacity 0.2s ease-out;
+  }
+}
+
+/* Revelado al entrar en pantalla (transferido del sistema editorial):
+   sin JS o con reduced-motion no hay estado oculto. */
+html.js [data-revelar] {
+  opacity: 0;
+  transform: translateY(18px);
+}
+html.js [data-revelar].visto {
+  opacity: 1;
+  transform: none;
+  transition: opacity 0.6s ease-out, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: calc(var(--orden, 0) * 70ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  html.js [data-revelar] { opacity: 1; transform: none; transition: none; }
+}

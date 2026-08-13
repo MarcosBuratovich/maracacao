@@ -1,0 +1,22 @@
+---
+// Insignia pequeña (Badge del canvas). El tono amarillo lleva texto en
+// rojo hondo (7.55 AAA) — el rojo de acento sobre amarillo falla AA.
+interface Props { tono?: 'rojo' | 'amarillo' | 'cacao' }
+const { tono = 'rojo' } = Astro.props
+---
+<span class:list={['insignia', tono]}><slot /></span>
+
+<style>
+  .insignia {
+    display: inline-block;
+    font-family: var(--mrc-font-serifMarca);
+    font-size: 0.75rem;
+    padding: 3px 10px;
+    border-radius: 999px;
+    line-height: 1.4;
+    white-space: nowrap;
+  }
+  .rojo { background: var(--mrc-marca-rojo); color: #fff; }
+  .amarillo { background: var(--mrc-marca-amarillo); color: var(--mrc-marca-rojoHondo); }
+  .cacao { background: var(--mrc-marca-tinta); color: #fff; }
+</style>

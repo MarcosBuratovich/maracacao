@@ -1,0 +1,47 @@
+---
+// Kicker de sección al estilo de las etiquetas: ✦ TEXTO ✦ en versales
+// espaciadas con las chispas DIBUJADAS (tres barritas rotadas), nunca
+// unicode — regla del sistema. El color del texto lo hereda de
+// currentColor; el de las chispas lo pone `--chispa` (amarillo por
+// defecto). El texto compensa el tracking final con translateX, la
+// lección del wordmark centrado.
+interface Props { texto: string }
+const { texto } = Astro.props
+---
+<span class="etiqueta-sabor">
+  <span class="chispa" aria-hidden="true"><i></i><i></i><i></i></span>
+  <span class="texto">{texto}</span>
+  <span class="chispa" aria-hidden="true"><i></i><i></i><i></i></span>
+</span>
+
+<style>
+  .etiqueta-sabor {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    font-family: var(--mrc-font-mano);
+    font-size: 0.8125rem;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+  }
+  .texto { transform: translateX(0.175em); }
+  .chispa {
+    position: relative;
+    width: 14px;
+    height: 14px;
+    flex: none;
+  }
+  .chispa i {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 2.5px;
+    height: 9px;
+    border-radius: 2px;
+    background: var(--chispa, var(--mrc-marca-amarillo));
+  }
+  .chispa i:nth-child(1) { transform: translate(-50%, -50%) rotate(0deg); }
+  .chispa i:nth-child(2) { transform: translate(-50%, -50%) rotate(60deg); }
+  .chispa i:nth-child(3) { transform: translate(-50%, -50%) rotate(120deg); }
+</style>

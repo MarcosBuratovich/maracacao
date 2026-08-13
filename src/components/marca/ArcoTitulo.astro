@@ -1,0 +1,50 @@
+---
+// El MARACACAO en arco de las etiquetas, letra a letra como en el
+// impreso (±53° con caída potencial 1.6 — la matemática exacta del
+// componente ArchTitle del canvas). Acá se calcula en BUILD: al
+// navegador llegan spans ya transformados, cero JS.
+interface Props {
+  texto?: string
+  /** Tamaño de letra en px (el arco escala con él). */
+  tamano?: number
+  color?: string
+  rotacionMax?: number
+  profundidad?: number
+}
+const {
+  texto = 'MARACACAO',
+  tamano = 36,
+  color = 'currentColor',
+  rotacionMax = 53,
+  profundidad = 0.8,
+} = Astro.props
+
+const letras = [...texto]
+const n = letras.length
+const piezas = letras.map((letra, i) => {
+  const t = n === 1 ? 0 : (i / (n - 1)) * 2 - 1 // -1 … 1
+  return {
+    letra,
+    rot: (t * rotacionMax).toFixed(1),
+    y: (Math.abs(t) ** 1.6 * tamano * profundidad).toFixed(1),
+  }
+})
+---
+<span class="arco" role="img" aria-label={texto} style={`font-size:${tamano}px;color:${color}`}>
+  {piezas.map((p) => (
+    <span aria-hidden="true" style={`transform:translateY(${p.y}px) rotate(${p.rot}deg)`}>{p.letra}</span>
+  ))}
+</span>
+
+<style>
+  .arco {
+    display: flex;
+    justify-content: center;
+    font-family: var(--mrc-font-mano);
+    line-height: 1;
+  }
+  .arco > span {
+    display: inline-block;
+    margin: 0 0.045em;
+  }
+</style>

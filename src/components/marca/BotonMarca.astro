@@ -1,0 +1,61 @@
+---
+// El botón de la marca: sombra dura color vino (#7C2024, del canvas)
+// que crece al acercarse y se aplasta al presionar. Siempre es un <a>
+// — en el canvas «Ver catálogo» era un <button> con window.open y eso
+// es navegación disfrazada (sin clic medio, sin copiar enlace).
+// `data-iman` lo engancha al imán de scripts/marca.ts.
+interface Props {
+  href: string
+  variante?: 'primario' | 'secundario'
+  externo?: boolean
+}
+const { href, variante = 'primario', externo = false } = Astro.props
+---
+<a
+  class:list={['boton', variante]}
+  href={href}
+  target={externo ? '_blank' : undefined}
+  rel={externo ? 'noopener' : undefined}
+  data-iman
+>
+  <slot />{externo && <span class="sr-only"> (se abre en pestaña nueva)</span>}
+</a>
+
+<style>
+  .boton {
+    display: inline-block;
+    font-family: var(--mrc-font-serifMarca);
+    font-size: 1.0625rem;
+    line-height: 1.2;
+    text-decoration: none;
+    padding: 13px 28px;
+    border-radius: 6px;
+    transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, background 0.2s ease-out;
+  }
+  .primario {
+    background: var(--mrc-marca-rojo);
+    color: #fff;
+    box-shadow: 0 5px 0 0 #7c2024, 0 14px 22px rgb(76 44 22 / 0.3);
+  }
+  .primario:hover {
+    background: var(--mrc-marca-rojoHover);
+    transform: translateY(-2px);
+    box-shadow: 0 7px 0 0 #7c2024, 0 18px 26px rgb(76 44 22 / 0.32);
+  }
+  .primario:active {
+    transform: translateY(3px);
+    box-shadow: 0 2px 0 0 #7c2024, 0 8px 14px rgb(76 44 22 / 0.24);
+  }
+  .secundario {
+    background: transparent;
+    color: var(--mrc-marca-tinta);
+    border: 2px solid var(--mrc-marca-tinta);
+    box-shadow: 0 5px 0 0 var(--mrc-marca-tinta);
+  }
+  .secundario:hover { transform: translateY(-2px); box-shadow: 0 7px 0 0 var(--mrc-marca-tinta); }
+  .secundario:active { transform: translateY(3px); box-shadow: 0 2px 0 0 var(--mrc-marca-tinta); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .boton, .boton:hover, .boton:active { transition: none; transform: none; }
+  }
+</style>

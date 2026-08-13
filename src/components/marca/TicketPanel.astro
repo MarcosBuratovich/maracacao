@@ -1,0 +1,29 @@
+---
+// El ticket amarillo cosido del empaque, con el PNG real del impreso
+// estirado al 100 %. El texto va en rojo HONDO, no en el rojo de
+// acento: sobre el amarillo el acento da 3.34 (falla AA) y el hondo
+// 7.55 (AAA) — corrección de la auditoría sobre el canvas.
+//
+// El ancho lo decide el padre envolviendo el componente (nunca por
+// prop de clase: la clase scoped de la página no llega — trampa
+// documentada dos veces en este repo).
+---
+<div class="ticket"><slot /></div>
+
+<style>
+  .ticket {
+    position: relative;
+    min-height: 4rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 18px 26px;
+    box-sizing: border-box;
+    font-family: var(--mrc-font-serifMarca);
+    color: var(--mrc-marca-rojoHondo);
+    background-image: url('/sitio/marca/ticket-amarillo.webp');
+    background-size: 100% 100%;
+  }
+</style>
