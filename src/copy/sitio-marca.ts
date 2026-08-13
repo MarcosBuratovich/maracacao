@@ -286,6 +286,25 @@ export const marca = {
     catalogoUrl: 'https://chocolateria.pulpos.shop',
     catalogoNota: 'Precios públicos en pesos mexicanos.',
     personajeAlt: 'El personaje de Maracacao batiendo chocolate con su molinillo',
+    // El formulario no tiene servidor detrás: arma el mensaje y lo abre
+    // en el correo del visitante, listo para mandarse al de la marca.
+    // La nota lo dice sin rodeos — nada de fingir un «enviado».
+    formulario: {
+      titulo: 'Escríbenos',
+      nombre: 'Tu nombre',
+      correo: 'Tu correo',
+      tipo: '¿Qué tipo de contacto es?',
+      tipoOpciones: [
+        { valor: 'personal', texto: 'Compra personal' },
+        { valor: 'negocio', texto: 'Para mi negocio (cafetería, panadería, repostería)' },
+      ],
+      mensaje: 'Tu mensaje',
+      mensajeEjemplo: 'Cuéntanos qué necesitas: pedidos, mayoreo, regalos, dudas…',
+      enviar: 'Enviar mensaje',
+      nota: 'Al enviar se abre tu aplicación de correo con el mensaje listo para maracacaomx@gmail.com.',
+      asuntoPersonal: 'Mensaje desde el sitio — compra personal',
+      asuntoNegocio: 'Mensaje desde el sitio — negocio',
+    },
   },
 
   footer: {
@@ -293,6 +312,20 @@ export const marca = {
     lema: 'Más cacao, ingredientes sencillos y muchas maneras de disfrutarlo',
     wordmarkAlt: 'Chocolate mexicano, escrito a mano como en la envoltura',
     linea: 'CACAO 70% · COYOACÁN · CDMX',
+    seccionesTitulo: 'Secciones',
+    productosTitulo: 'Productos',
+    contactoTitulo: 'Contacto',
+    legalesTitulo: 'Legales',
+    productos: [
+      { ancla: '#sabores', texto: 'Barras 70 g' },
+      { ancla: '#sabores', texto: 'Gotas de chocolate 250 g' },
+      { ancla: '#polvo', texto: 'Chocolate en polvo (próximamente)' },
+    ],
+    // Las páginas legales todavía no existen: van sin enlace, marcadas,
+    // para que la estructura ya esté y activarlas sea poner el href.
+    legales: ['Aviso de privacidad', 'Términos y condiciones'],
+    legalesNota: 'En preparación',
+    derechos: 'Maracacao · Chocolate mexicano · Hecho a mano en México',
   },
 } as const
 

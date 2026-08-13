@@ -30,11 +30,11 @@ const sello = selloRaw.replace('<svg', '<svg aria-hidden="true" focusable="false
 // La selección inicial del anaquel: canela (contraste AAA con blanco).
 const inicial = sabores.find((s) => s.slug === 'canela')!
 
-// Ocho barras para la marquesina del hero (el orden del canvas).
-const enMarquesina = [
-  'fresas-y-chile', 'limoncillo', 'sal-de-mar', 'pina-con-chile',
-  'cardamomo', 'tamarindo', 'hierbabuena', 'jengibre-y-naranja',
-].map((slug) => sabores.find((s) => s.slug === slug)!)
+// La marquesina del hero lleva los QUINCE sabores, dos veces por tramo:
+// con ocho, en pantallas muy anchas el tramo quedaba más angosto que la
+// ventana y el bucle mostraba su costura (retro de Marcos). Con 30
+// piezas el tramo mide ~4800px — cubre hasta un ultrawide.
+const enMarquesina = [...sabores, ...sabores]
 
 // Datos que el script del anaquel necesita por sabor, con el precio ya
 // formateado y la tinta medida.
@@ -127,15 +127,17 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
         </div>
       </div>
       <div class="portada-tira" data-parallax="0.045">
-        <Marquesina aria={marca.hero.marquesinaAria} dur="34s" rotacion={-3}>
+        {/* Carga inmediata: con lazy, las copias fuera de pantalla
+            entraban tarde y se veían huecos en el bucle. */}
+        <Marquesina aria={marca.hero.marquesinaAria} dur="110s" rotacion={-3}>
           {enMarquesina.map((s) => (
             <img
               class="tira-barra"
               src={`/sitio/marca/barra-${s.slug}-mini.webp`}
               alt=""
               width="380"
-              height="816"
-              loading="lazy"
+              height="815"
+              loading="eager"
             />
           ))}
         </Marquesina>
@@ -306,12 +308,13 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
     </section>
 
     {/* ——— 04 · Chocolate para beber (próximamente) ——— */}
-    <section class="seccion" data-tono="oscuro">
+    <section id="polvo" class="seccion" data-tono="oscuro">
       <div class="contenedor polvo-fila">
         <div class="polvo-texto">
           <div class="polvo-encabezado">
             <EtiquetaSabor texto={marca.polvo.kicker} />
-            <Insignia tono="amarillo">{marca.polvo.chip}</Insignia>
+            <span class="sello-pronto mano" aria-hidden="true">{marca.polvo.chip}</span>
+            <span class="sr-only">{marca.polvo.chip}</span>
           </div>
           <h2 class="titular">{marca.polvo.titulo}</h2>
           <p class="suave">{marca.polvo.cuerpo}</p>
@@ -418,8 +421,10 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
 
     {/* ——— 08 · Para negocios ——— */}
     <section id="negocios" class="seccion" data-tono="clara">
-      <div class="contenedor negocios">
-        <div data-tabs>
+      {/* data-tabs va en el CONTENEDOR: pestañas y paneles viven en
+          columnas distintas, y el script los busca dentro del grupo. */}
+      <div class="contenedor negocios" data-tabs>
+        <div>
           <EtiquetaSabor texto={marca.negocios.kicker} />
           <h2 class="titular">{marca.negocios.titulo}</h2>
           <p class="suave negocios-intro">{marca.negocios.intro}</p>
@@ -497,6 +502,42 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
         <EtiquetaSabor texto={marca.contacto.kicker} />
         <h2 class="titular">{marca.contacto.titulo}</h2>
         <div class="contacto-fila">
+          {/* Sin servidor detrás: el envío arma un mailto con los datos
+              y lo abre en el correo del visitante — la nota lo dice. */}
+          <form
+            class="formulario"
+            method="post"
+            action={`mailto:${marca.contacto.correo}`}
+            data-formulario
+            data-asunto-personal={marca.contacto.formulario.asuntoPersonal}
+            data-asunto-negocio={marca.contacto.formulario.asuntoNegocio}
+            data-correo={marca.contacto.correo}
+          >
+            <h3 class="formulario-titulo">{marca.contacto.formulario.titulo}</h3>
+            <label>
+              <span>{marca.contacto.formulario.nombre}</span>
+              <input type="text" name="nombre" autocomplete="name" required />
+            </label>
+            <label>
+              <span>{marca.contacto.formulario.correo}</span>
+              <input type="email" name="correo" autocomplete="email" required />
+            </label>
+            <fieldset>
+              <legend>{marca.contacto.formulario.tipo}</legend>
+              {marca.contacto.formulario.tipoOpciones.map((op, i) => (
+                <label class="formulario-radio">
+                  <input type="radio" name="tipo" value={op.valor} checked={i === 0} />
+                  <span>{op.texto}</span>
+                </label>
+              ))}
+            </fieldset>
+            <label>
+              <span>{marca.contacto.formulario.mensaje}</span>
+              <textarea name="mensaje" rows="4" placeholder={marca.contacto.formulario.mensajeEjemplo} required></textarea>
+            </label>
+            <button class="formulario-enviar" type="submit" data-iman>{marca.contacto.formulario.enviar}</button>
+            <p class="formulario-nota suave">{marca.contacto.formulario.nota}</p>
+          </form>
           <div class="puesto">
             <p class="mono">{marca.contacto.puestoEtiqueta}</p>
             <p class="puesto-titulo">{marca.contacto.puestoTitulo[0]}<br />{marca.contacto.puestoTitulo[1]}</p>
@@ -542,10 +583,56 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
         <span class="mono pie-lema">{marca.footer.lema} ·</span>
       </Marquesina>
     </div>
-    <div class="pie-centro">
-      <ArcoTitulo texto="MARACACAO" tamano={36} color="#fff" />
-      <img src="/sitio/marca/chocolate-mexicano.webp" alt={marca.footer.wordmarkAlt} width="160" height="48" loading="lazy" />
-      <p class="mono">{marca.footer.linea}</p>
+    <div class="contenedor pie-cuerpo">
+      <div class="pie-marca">
+        <ArcoTitulo texto="MARACACAO" tamano={58} color="#fff" />
+        <img src="/sitio/marca/chocolate-mexicano.webp" alt={marca.footer.wordmarkAlt} width="230" height="69" loading="lazy" />
+        <p class="mono pie-linea">{marca.footer.linea}</p>
+      </div>
+      <nav class="pie-columnas" aria-label="Mapa del sitio">
+        <div>
+          <p class="pie-titulo mano">{marca.footer.seccionesTitulo}</p>
+          <ul>
+            {marca.nav.items.map((item) => (
+              <li><a href={item.ancla}>{item.texto}</a></li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <p class="pie-titulo mano">{marca.footer.productosTitulo}</p>
+          <ul>
+            {marca.footer.productos.map((p) => (
+              <li><a href={p.ancla}>{p.texto}</a></li>
+            ))}
+            <li>
+              <a href={marca.contacto.catalogoUrl} target="_blank" rel="noopener">
+                {marca.nav.catalogo}<span class="sr-only"> (se abre en pestaña nueva)</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+        <div>
+          <p class="pie-titulo mano">{marca.footer.contactoTitulo}</p>
+          <ul>
+            <li><a href={`mailto:${marca.contacto.correo}`}>{marca.contacto.correo}</a></li>
+            <li><a href="#contacto">{marca.contacto.puestoTitulo.join(' ')}</a></li>
+            <li><span class="pie-suelto">{marca.contacto.direccion[1]}</span></li>
+          </ul>
+        </div>
+        <div>
+          <p class="pie-titulo mano">{marca.footer.legalesTitulo}</p>
+          <ul>
+            {/* Sin href a propósito: las páginas legales no existen
+                todavía — la estructura queda lista para enchufarlas. */}
+            {marca.footer.legales.map((l) => (
+              <li><span class="pie-suelto">{l} <em>({marca.footer.legalesNota.toLowerCase()})</em></span></li>
+            ))}
+          </ul>
+        </div>
+      </nav>
+    </div>
+    <div class="contenedor pie-remate">
+      <p class="mono">{marca.footer.derechos}</p>
     </div>
   </footer>
 
@@ -722,13 +809,24 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
   }
 
   /* ---------- Portada ---------- */
-  .portada { overflow: hidden; padding-bottom: clamp(40px, 6vw, 88px); }
+  /* Ocupa la ventana completa (menos la cabecera): el texto centra en el
+     espacio libre y la marquesina se apoya abajo. */
+  .portada {
+    overflow: hidden;
+    min-height: calc(100svh - 64px);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding-bottom: clamp(24px, 3vw, 48px);
+  }
   .portada-fila {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: clamp(24px, 4vw, 48px);
     padding-top: clamp(28px, 5vw, 72px);
+    flex: 1;
+    align-content: center;
   }
   .portada-texto { flex: 1 1 340px; min-width: 0; }
   .portada-titular {
@@ -855,7 +953,10 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
        señal de que hay más (hallazgo de la auditoría), sin el gris crudo
        del navegador cruzando el color del sabor. */
     scrollbar-color: color-mix(in srgb, var(--texto) 45%, transparent) transparent;
-    padding: 6px clamp(20px, calc(50vw - 530px), 56px) 14px;
+    /* Aire vertical generoso: el lift de la selección (-10px) y la
+       sombra (26px de difuminado) viven DENTRO del scroller — si no,
+       el overflow los decapita (retro de Marcos). */
+    padding: 20px clamp(20px, calc(50vw - 530px), 56px) 36px;
   }
   .anaquel-riel [role='radio'] {
     flex: none;
@@ -984,7 +1085,29 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
   }
   .polvo-texto { flex: 1 1 300px; }
   .polvo-texto :global(.etiqueta-sabor) { color: var(--mrc-marca-amarillo); --chispa: var(--mrc-marca-amarillo); }
-  .polvo-encabezado { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .polvo-encabezado { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; }
+  /* «Próximamente» como sello estampado, no como chip apretado: borde
+     cosido (como el ticket), inclinado y con aire. */
+  .sello-pronto {
+    position: relative;
+    display: inline-block;
+    padding: 10px 20px;
+    font-size: 1.0625rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--mrc-marca-amarillo);
+    border: 2px solid var(--mrc-marca-amarillo);
+    border-radius: 4px;
+    transform: rotate(-4deg);
+  }
+  .sello-pronto::after {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border: 1.5px dashed var(--mrc-marca-amarillo);
+    border-radius: 2px;
+    opacity: 0.75;
+  }
   .polvo-texto .titular { margin: 10px 0 8px; }
   .polvo-texto p { font-size: 0.84375rem; line-height: 1.6; margin: 0; }
   .polvo-riel {
@@ -1061,19 +1184,24 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
   #recetas .titular { margin: 6px 0 16px; }
   .recetas-riel {
     display: flex;
-    gap: clamp(14px, 1.6vw, 20px);
+    gap: clamp(16px, 1.8vw, 24px);
     overflow-x: auto;
     scroll-snap-type: x proximity;
     scrollbar-width: thin;
     scrollbar-color: color-mix(in srgb, var(--texto) 45%, transparent) transparent;
     padding: 8px clamp(20px, calc(50vw - 530px), 56px) 20px;
+    /* Cuando las cuatro caben, la fila centra; si no, `safe` la vuelve
+       alineada al inicio para que el scroll no corte la primera. */
+    justify-content: safe center;
   }
   .receta {
     flex: none;
-    width: min(280px, 80vw);
+    width: min(330px, 84vw);
     scroll-snap-align: start;
     border-radius: 10px;
-    padding: 18px;
+    padding: 24px 22px;
+    display: flex;
+    flex-direction: column;
     box-sizing: border-box;
     box-shadow: 0 10px 24px rgb(76 44 22 / 0.24);
     background: linear-gradient(
@@ -1091,12 +1219,13 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
   .receta-titulo {
     font-family: var(--mrc-font-titular);
     font-weight: 700;
-    font-size: 1.1875rem;
-    line-height: 1.15;
+    font-size: 1.28125rem;
+    line-height: 1.18;
     letter-spacing: -0.01em;
-    margin: 8px 0 10px;
+    margin: 10px 0 12px;
+    text-wrap: balance;
   }
-  .receta-resumen { font-size: 0.8125rem; line-height: 1.5; margin: 0; opacity: 0.96; }
+  .receta-resumen { font-size: 0.84375rem; line-height: 1.6; margin: 0 0 auto; opacity: 0.96; }
   .receta-chip {
     display: inline-block;
     background: var(--mrc-marca-amarillo);
@@ -1109,8 +1238,8 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
   }
   .receta-clara .receta-tip { background: rgb(255 255 255 / 0.16); }
   .receta-oscura .receta-tip { background: rgb(255 255 255 / 0.4); }
-  .receta-tip { border-radius: 6px; padding: 8px 10px; margin-top: 12px; font-size: 0.8125rem; }
-  .receta-completa { margin-top: 12px; font-size: 0.8125rem; }
+  .receta-tip { border-radius: 6px; padding: 10px 12px; margin-top: 16px; font-size: 0.84375rem; line-height: 1.45; }
+  .receta-completa { margin-top: 14px; font-size: 0.8125rem; }
   .receta-completa summary {
     cursor: pointer;
     font-family: var(--mrc-font-titular);
@@ -1263,6 +1392,91 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
     gap: clamp(14px, 2vw, 24px);
     align-items: stretch;
   }
+  @media (min-width: 980px) {
+    .contacto-fila { grid-template-columns: 1.25fr 1fr 1fr; }
+  }
+
+  .formulario {
+    background: #fff;
+    border: 1px solid rgb(76 44 22 / 0.18);
+    border-radius: 10px;
+    padding: 22px 20px;
+    box-shadow: 0 12px 28px rgb(76 44 22 / 0.16);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .formulario-titulo {
+    font-family: var(--mrc-font-titular);
+    font-weight: 700;
+    font-size: 1.15625rem;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+  .formulario label:not(.formulario-radio) { display: flex; flex-direction: column; gap: 6px; }
+  .formulario label span, .formulario legend {
+    font-family: var(--mrc-font-titular);
+    font-weight: 600;
+    font-size: 0.8125rem;
+  }
+  .formulario input[type='text'],
+  .formulario input[type='email'],
+  .formulario textarea {
+    font-family: var(--mrc-font-serifMarca);
+    font-size: 0.9375rem;
+    color: var(--mrc-marca-tinta);
+    background: var(--mrc-marca-crema);
+    border: 2px solid rgb(76 44 22 / 0.35);
+    border-radius: 6px;
+    padding: 9px 12px;
+    transition: border-color 0.15s ease-out;
+  }
+  .formulario textarea { resize: vertical; min-height: 92px; }
+  .formulario input:focus-visible, .formulario textarea:focus-visible {
+    outline: none;
+    border-color: var(--mrc-marca-rojo);
+  }
+  .formulario fieldset {
+    border: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .formulario legend { padding: 0; margin-bottom: 8px; }
+  .formulario-radio {
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    font-size: 0.84375rem;
+    cursor: pointer;
+  }
+  .formulario-radio input { accent-color: var(--mrc-marca-rojo); }
+  .formulario-enviar {
+    align-self: flex-start;
+    font-family: var(--mrc-font-serifMarca);
+    font-size: 1rem;
+    line-height: 1.2;
+    color: #fff;
+    background: var(--mrc-marca-rojo);
+    border: none;
+    border-radius: 6px;
+    padding: 12px 26px;
+    cursor: pointer;
+    box-shadow: 0 5px 0 0 color-mix(in srgb, var(--mrc-marca-rojoHondo) 70%, var(--mrc-marca-rojo));
+    transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, background 0.2s ease-out;
+  }
+  .formulario-enviar:hover {
+    background: var(--mrc-marca-rojoHover);
+    transform: translateY(-2px);
+    box-shadow: 0 7px 0 0 color-mix(in srgb, var(--mrc-marca-rojoHondo) 70%, var(--mrc-marca-rojo));
+  }
+  .formulario-enviar:active { transform: translateY(3px); box-shadow: 0 2px 0 0 color-mix(in srgb, var(--mrc-marca-rojoHondo) 70%, var(--mrc-marca-rojo)); }
+  .formulario-nota { font-size: 0.71875rem; line-height: 1.5; margin: 0; }
+  @media (prefers-reduced-motion: reduce) {
+    .formulario-enviar, .formulario-enviar:hover, .formulario-enviar:active { transition: none; transform: none; }
+  }
   .puesto {
     position: relative;
     overflow: hidden;
@@ -1290,9 +1504,9 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
   .puesto-direccion { font-size: 0.78125rem; line-height: 1.45; margin: 0; }
   .puesto-personaje {
     position: absolute;
-    right: -10px;
+    right: -6px;
     bottom: -8px;
-    height: clamp(150px, 15vw, 180px);
+    height: clamp(180px, 19vw, 240px);
     width: auto;
     will-change: transform;
   }
@@ -1340,16 +1554,53 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
   .copiar:hover { background: rgb(76 44 22 / 0.08); }
 
   /* ---------- Pie ---------- */
-  .pie { padding-bottom: 22px; box-shadow: inset 0 10px 20px rgb(31 14 5 / 0.15); }
+  .pie { padding-bottom: 18px; box-shadow: inset 0 10px 20px rgb(31 14 5 / 0.15); }
   .pie-marquesina { border-bottom: 1px solid rgb(248 236 222 / 0.4); }
   .pie-lema { color: #fff; font-size: 0.71875rem; letter-spacing: 0.08em; white-space: nowrap; padding-block: 9px; display: inline-block; }
-  .pie-centro {
-    padding: 22px 20px 0;
+  .pie-cuerpo {
+    display: flex;
+    flex-wrap: wrap;
+    gap: clamp(28px, 4vw, 64px);
+    align-items: flex-start;
+    padding-block: clamp(32px, 4vw, 56px) clamp(24px, 3vw, 40px);
+  }
+  .pie-marca {
+    flex: 1 1 300px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 7px;
+    gap: 10px;
   }
-  .pie-centro img { width: 160px; height: auto; }
-  .pie-centro .mono { font-size: 0.65625rem; letter-spacing: 0.1em; color: #fff; margin: 4px 0 0; }
+  .pie-marca img { width: min(230px, 60vw); height: auto; }
+  .pie-linea { font-size: 0.65625rem; letter-spacing: 0.1em; color: #fff; margin: 6px 0 0; }
+  .pie-columnas {
+    flex: 2 1 480px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: clamp(18px, 2.5vw, 32px);
+  }
+  .pie-titulo {
+    font-size: 0.9375rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--mrc-marca-amarillo);
+    margin: 0 0 10px;
+  }
+  .pie-columnas ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+  .pie-columnas a {
+    color: #fff;
+    text-decoration: none;
+    font-size: 0.84375rem;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.15s ease-out;
+    overflow-wrap: anywhere;
+  }
+  .pie-columnas a:hover { border-bottom-color: var(--mrc-marca-amarillo); }
+  .pie-suelto { color: rgb(255 255 255 / 0.92); font-size: 0.84375rem; }
+  .pie-suelto em { font-style: normal; font-size: 0.71875rem; color: rgb(255 255 255 / 0.75); }
+  .pie-remate {
+    border-top: 1px solid rgb(248 236 222 / 0.35);
+    padding-top: 14px;
+  }
+  .pie-remate .mono { font-size: 0.65625rem; letter-spacing: 0.1em; color: #fff; margin: 0; }
 </style>

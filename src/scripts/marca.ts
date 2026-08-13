@@ -181,6 +181,30 @@ for (const boton of document.querySelectorAll<HTMLButtonElement>('[data-copiar]'
   })
 }
 
+/* ---------- 4b. Formulario de contacto ----------
+   Sin servidor: el envío arma un mailto con asunto y cuerpo ya
+   escritos y lo abre en el correo del visitante. Sin JS, el action
+   mailto del form hace lo propio (más crudo, pero funciona). */
+
+const formulario = document.querySelector<HTMLFormElement>('[data-formulario]')
+if (formulario) {
+  formulario.addEventListener('submit', (e) => {
+    e.preventDefault()
+    const datos = new FormData(formulario)
+    const esNegocio = datos.get('tipo') === 'negocio'
+    const asunto = esNegocio
+      ? formulario.dataset.asuntoNegocio ?? ''
+      : formulario.dataset.asuntoPersonal ?? ''
+    const cuerpo = [
+      `Nombre: ${datos.get('nombre')}`,
+      `Correo: ${datos.get('correo')}`,
+      '',
+      String(datos.get('mensaje') ?? ''),
+    ].join('\n')
+    location.href = `mailto:${formulario.dataset.correo}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`
+  })
+}
+
 /* ---------- 5. Revelado al entrar en pantalla ---------- */
 
 const observador = new IntersectionObserver(
