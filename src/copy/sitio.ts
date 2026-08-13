@@ -123,10 +123,10 @@ export const sitio = {
     // mango dice 73% y la de naranja y jengibre, 70%.
     destacadas: {
       titulo: 'Las barras',
-      intro: 'Setenta gramos, envueltas de a una. Estas dos son las que más salen.',
+      intro: 'Setenta gramos, envueltas de a una. Girá la barra para ver el dorso.',
       items: [
         {
-          archivo: 'mango-chile',
+          archivo: 'mango-con-chile',
           nombre: 'Mango con chile',
           cacao: '73% cacao',
           precio: 108,
@@ -134,12 +134,12 @@ export const sitio = {
           alt: 'Barra Maracacao de mango con chile: envoltura color vino con el personaje haciendo malabares con mangos',
         },
         {
-          archivo: 'naranja-jengibre',
-          nombre: 'Naranja con jengibre',
+          archivo: 'jengibre-y-naranja',
+          nombre: 'Jengibre y naranja',
           cacao: '70% cacao',
           precio: 122,
           campo: 'caramelo',
-          alt: 'Barra Maracacao de naranja con jengibre: envoltura morada con una ronda de personajes y rodajas de naranja',
+          alt: 'Barra Maracacao de jengibre y naranja: envoltura morada con una ronda de personajes y rodajas de naranja',
         },
       ],
     },

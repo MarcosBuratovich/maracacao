@@ -276,6 +276,96 @@
   filter: drop-shadow(0 20px 24px color-mix(in srgb, var(--mrc-ed-tinta) 45%, transparent));
 }
 
+/* ---------- 3c. La barra en 3D ----------
+   Seis caras y perspectiva: profundidad real, sin librería. El grosor
+   sale de la proporción del producto — una barra de 70 g mide unos
+   7.5 × 14.5 × 1 cm, así que el canto es ~13% del ancho del frente. */
+
+/* Las medidas se expresan en unidades de contenedor (cqw): así la caja
+   se arma sola a cualquier tamaño sin cuentas en píxeles. Ancho = 100cqw,
+   alto = 171.76cqw (la proporción 1041×1788 del arte), grosor = 13cqw. */
+.barra3d {
+  /* Ancho propio: la clase que pase la página NO recibe su atributo de
+     scope dentro del componente, así que el tamaño lo fija el envoltorio
+     y la barra siempre lo llena. */
+  width: 100%;
+  --grosor: 13cqw;
+  --medio-alto: 85.88cqw;   /* la mitad de 171.76 */
+  --giro-x: -8deg;
+  --giro-y: -22deg;
+  container-type: inline-size;
+  position: relative;
+  aspect-ratio: 1041 / 1788;
+  perspective: 1400px;
+}
+.barra3d-caja {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transform: rotateX(var(--giro-x)) rotateY(var(--giro-y));
+}
+.barra3d-cara {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 1px;
+}
+.barra3d-frente,
+.barra3d-dorso { object-fit: cover; }
+.barra3d-frente { transform: translateZ(calc(var(--grosor) / 2)); }
+/* El dorso mira hacia afuera: media vuelta y otra vez medio grosor. */
+.barra3d-dorso { transform: rotateY(180deg) translateZ(calc(var(--grosor) / 2)); }
+
+/* Los cantos llevan el color exacto del diseño, con la luz que
+   corresponde a cada cara. */
+.barra3d-izq,
+.barra3d-der {
+  width: var(--grosor);
+  left: calc(50% - var(--grosor) / 2);
+}
+.barra3d-der {
+  transform: rotateY(90deg) translateZ(50cqw);
+  background: color-mix(in srgb, var(--tinta-sabor) 84%, var(--mrc-ed-tinta));
+}
+.barra3d-izq {
+  transform: rotateY(-90deg) translateZ(50cqw);
+  background: color-mix(in srgb, var(--tinta-sabor) 68%, var(--mrc-ed-tinta));
+}
+.barra3d-arriba,
+.barra3d-abajo {
+  height: var(--grosor);
+  top: calc(50% - var(--grosor) / 2);
+}
+.barra3d-arriba {
+  transform: rotateX(90deg) translateZ(var(--medio-alto));
+  background: color-mix(in srgb, var(--tinta-sabor) 78%, white);
+}
+.barra3d-abajo {
+  transform: rotateX(-90deg) translateZ(var(--medio-alto));
+  background: color-mix(in srgb, var(--tinta-sabor) 60%, var(--mrc-ed-tinta));
+}
+.barra3d-sombra {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  bottom: -6%;
+  height: 8%;
+  border-radius: 999px;
+  background: radial-gradient(
+    ellipse at center,
+    color-mix(in srgb, var(--mrc-ed-tinta) 38%, transparent),
+    transparent 72%
+  );
+  filter: blur(10px);
+}
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+
 /* ---------- 4. Botones y enlaces ----------
    Contorno duro y sombra sólida desplazada; al pasar el cursor el botón
    se hunde dentro de su propia sombra. */

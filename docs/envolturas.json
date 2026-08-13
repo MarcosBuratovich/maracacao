@@ -1,0 +1,107 @@
+{
+  "chamoy": {
+    "color": "#CB3C41",
+    "ancho": 2082,
+    "alto": 1788,
+    "cacao": null,
+    "ingredientes": "Licor de cacao, manteca de cacao, azúcar, lecitina de soya, chamoy. Chocolate 70% cacao y chamoy 70 g."
+  },
+  "hierbabuena": {
+    "color": "#6F8473",
+    "ancho": 2082,
+    "alto": 1788,
+    "cacao": "70%",
+    "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural."
+  },
+  "sal-de-mar": {
+    "color": "#6F4380",
+    "ancho": 2082,
+    "alto": 1788,
+    "cacao": "70%",
+    "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, sal de mar."
+  },
+  "limoncillo": {
+    "color": "#97C8A8",
+    "ancho": 2010,
+    "alto": 1714,
+    "cacao": "70%",
+    "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural."
+  },
+  "canela": {
+    "color": "#7D0303",
+    "ancho": 2082,
+    "alto": 1788,
+    "cacao": "70%",
+    "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural."
+  },
+  "pina-con-chile": {
+    "color": "#E18B22",
+    "ancho": 2082,
+    "alto": 1788,
+    "cacao": "73%",
+    "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, piña con chile."
+  },
+  "fresas-y-chile": {
+    "color": "#B42B18",
+    "ancho": 2082,
+    "alto": 1788,
+    "cacao": "70%",
+    "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, fresas, esencia natural de mandarina y chile chipotle."
+  },
+  "tamarindo": {
+    "color": "#E77F44",
+    "ancho": 2082,
+    "alto": 1788,
+    "cacao": "70%",
+    "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, tamarindo con chile."
+  },
+  "cardamomo": {
+    "color": "#11676A",
+    "ancho": 2082,
+    "alto": 1788,
+    "cacao": "70%",
+    "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya,cardamomo."
+  },
+  "mango-con-chile": {
+    "color": "#CB3C41",
+    "ancho": 2082,
+    "alto": 1788,
+    "cacao": "73%",
+    "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, mango con chile."
+  },
+  "menta-intensa": {
+    "color": "#7BBBD9",
+    "ancho": 2010,
+    "alto": 1714,
+    "cacao": "70%",
+    "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural."
+  },
+  "lima-y-chile": {
+    "color": "#1A6E43",
+    "ancho": 2082,
+    "alto": 1788,
+    "cacao": "70%",
+    "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, chiles ahumados, esencia natural."
+  },
+  "coriandro": {
+    "color": "#C07038",
+    "ancho": 2082,
+    "alto": 1788,
+    "cacao": "70%",
+    "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural."
+  },
+  "jengibre-y-naranja": {
+    "color": "#7E4CB1",
+    "ancho": 2082,
+    "alto": 1788,
+    "cacao": "70%",
+    "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural y jengibre."
+  },
+  "blanco-con-pistache": {
+    "color": "#8D9B3E",
+    "ancho": 2082,
+    "alto": 1788,
+    "cacao": null,
+    "ingredientes": "Manteca de cacao, leche en polvo, azúcar, lecitina de soya, pistaches. Chocolate blanco y pistaches 70 g."
+  }
+}

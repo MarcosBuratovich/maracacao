@@ -98,6 +98,33 @@ export const editorial = {
   sepia: '#6B513A',
 } as const
 
+/**
+ * LOS QUINCE COLORES DE ENVOLTURA, exactos (2026-08-12). Ya no son
+ * medidos de una foto: salen de los PDF de diseño del propio cliente
+ * (`scripts/extrae-envolturas.py`), con los textos en vectorial y las
+ * ilustraciones a 300-550 ppi. Un color por sabor — esta es la paleta
+ * viva de la marca, la que el audit de color venía pidiendo.
+ *
+ * Ojo: chamoy y mango con chile comparten color en el diseño original.
+ */
+export const sabor = {
+  jengibreYNaranja: '#7E4CB1',
+  canela: '#7D0303',
+  cardamomo: '#11676A',
+  coriandro: '#C07038',
+  mentaIntensa: '#7BBBD9',
+  hierbabuena: '#6F8473',
+  limoncillo: '#97C8A8',
+  mangoConChile: '#CB3C41',
+  pinaConChile: '#E18B22',
+  limaYChile: '#1A6E43',
+  fresasYChile: '#B42B18',
+  chamoy: '#CB3C41',
+  tamarindo: '#E77F44',
+  salDeMar: '#6F4380',
+  blancoConPistache: '#8D9B3E',
+} as const
+
 export const roles = {
   'fondo-claro': fijos.papel,
   'fondo-oscuro': verde[700],

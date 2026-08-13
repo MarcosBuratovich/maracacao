@@ -1,4 +1,4 @@
-import { verde, tan, rosa, fijos, roles, empaque, etiqueta, editorial } from './color'
+import { verde, tan, rosa, fijos, roles, empaque, etiqueta, editorial, sabor } from './color'
 import { familias, escala } from './type'
 import { duraciones, easings } from './motion'
 
@@ -10,6 +10,7 @@ export function customProperties(): Record<string, string> {
   for (const [nombre, hex] of Object.entries(fijos)) props[`--mrc-${nombre}`] = hex
   for (const [nombre, hex] of Object.entries(empaque)) props[`--mrc-empaque-${nombre}`] = hex
   for (const [nombre, hex] of Object.entries(etiqueta)) props[`--mrc-etiqueta-${nombre}`] = hex
+  for (const [nombre, hex] of Object.entries(sabor)) props[`--mrc-sabor-${nombre}`] = hex
   // Prefijo `ed-` obligatorio: `editorial.papel` y `fijos.papel` son
   // colores distintos y sin prefijo el segundo pisaría al primero,
   // rompiendo el manual y la presentación (que usan --mrc-papel).

@@ -215,6 +215,51 @@ if (barra) {
   ajustarBarra()
 }
 
+/* ---------- 5c. Las barras 3D giran con el scroll ----------
+   El giro sigue la posición de la barra en la pantalla: entra mostrando
+   el canto y termina de frente. Con reduced-motion no se registra nada y
+   quedan en su pose fija de CSS, que es como se ve un producto en foto. */
+
+const barras = [...document.querySelectorAll<HTMLElement>('[data-barra3d]')]
+if (barras.length && !quieto) {
+  let pedido = false
+
+  const girar = () => {
+    pedido = false
+    for (const b of barras) {
+      const caja = b.getBoundingClientRect()
+      if (caja.bottom < -200 || caja.top > innerHeight + 200) continue
+      // 0 = recién entra por abajo, 1 = ya salió por arriba
+      const t = 1 - (caja.top + caja.height / 2) / (innerHeight + caja.height)
+      // ±32°: más que eso y la barra se pone de canto y deja de leerse
+      // como producto.
+      b.style.setProperty('--giro-y', `${((0.5 - t) * 64).toFixed(2)}deg`)
+      b.style.setProperty('--giro-x', `${(-7 + (0.5 - t) * 6).toFixed(2)}deg`)
+    }
+  }
+
+  addEventListener('scroll', () => {
+    if (pedido) return
+    pedido = true
+    requestAnimationFrame(girar)
+  }, { passive: true })
+  girar()
+
+  // Con puntero fino, el mouse manda mientras esté encima.
+  if (punteroFino) {
+    for (const b of barras) {
+      b.addEventListener('pointermove', (e) => {
+        const caja = b.getBoundingClientRect()
+        const dx = (e.clientX - (caja.left + caja.width / 2)) / caja.width
+        const dy = (e.clientY - (caja.top + caja.height / 2)) / caja.height
+        b.style.setProperty('--giro-y', `${(dx * 52).toFixed(2)}deg`)
+        b.style.setProperty('--giro-x', `${(-dy * 20).toFixed(2)}deg`)
+      })
+      b.addEventListener('pointerleave', girar)
+    }
+  }
+}
+
 /* ---------- 6. Video del personaje ---------- */
 
 const video = document.querySelector('video')
