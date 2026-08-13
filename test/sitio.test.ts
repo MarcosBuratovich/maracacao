@@ -160,12 +160,14 @@ describe('sistema editorial', () => {
     expect(css).toMatch(/\.margen\s*\{\s*grid-column:\s*8\s*\/\s*10/)
   })
 
-  it('el wordmark es texto vivo, no una imagen (lockup y arco del pie)', async () => {
+  it('el wordmark es texto vivo, no una imagen (cabecera, hero y pie)', async () => {
     const html = await container.renderToString(Borrador)
-    // En el rediseño el wordmark vive dos veces como texto: el lockup de
-    // la cabecera y el arco del pie (letra a letra, calculado en build).
+    // El wordmark vive tres veces como texto: cabecera, lockup del hero
+    // y pie — nunca como imagen (el arco a mano del pie se reemplazó por
+    // el lockup vectorial, retro de Marcos 2026-08-13).
     expect(html).toMatch(new RegExp(`class="lockup-nombre"[^>]*>${marca.marca.wordmark}<`))
-    expect(html).toMatch(/class="arco"[^>]*aria-label="MARACACAO"/)
+    expect(html).toMatch(new RegExp(`class="portada-wordmark"[^>]*>${marca.marca.wordmark}<`))
+    expect(html).toMatch(new RegExp(`class="pie-wordmark"[^>]*>${marca.marca.wordmark}<`))
   })
 
   it('el sello va inline para tomar la tinta de su sección', async () => {

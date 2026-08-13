@@ -11,7 +11,6 @@
 // de sello, imanes y parallax — todo mejora progresiva sobre una página
 // que sin JS se ve completa y quieta.
 import Base from '@/layouts/Base.astro'
-import ArcoTitulo from '@/components/marca/ArcoTitulo.astro'
 import BotonMarca from '@/components/marca/BotonMarca.astro'
 import EtiquetaSabor from '@/components/marca/EtiquetaSabor.astro'
 import Insignia from '@/components/marca/Insignia.astro'
@@ -603,9 +602,12 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
       </Marquesina>
     </div>
     <div class="contenedor pie-cuerpo">
+      {/* El lockup vectorial de verdad (retro de Marcos): el arco a mano
+          imitaba la envoltura, pero el logo es el sello. En blanco sobre
+          el rojo del pie. */}
       <div class="pie-marca">
-        <ArcoTitulo texto="MARACACAO" tamano={58} color="#fff" />
-        <img src="/sitio/marca/chocolate-mexicano.webp" alt={marca.footer.wordmarkAlt} width="230" height="69" loading="lazy" />
+        <span class="pie-sello" set:html={sello} />
+        <p class="pie-wordmark">{marca.marca.wordmark}</p>
         <p class="mono pie-linea">{marca.footer.linea}</p>
       </div>
       <nav class="pie-columnas" aria-label="Mapa del sitio">
@@ -1609,9 +1611,20 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
+    color: #fff;
   }
-  .pie-marca img { width: min(230px, 60vw); height: auto; }
+  .pie-sello { display: inline-flex; width: min(170px, 44vw); }
+  .pie-sello :global(svg) { width: 100%; height: auto; }
+  .pie-wordmark {
+    font-family: var(--mrc-font-sello);
+    font-weight: 500;
+    font-size: clamp(1.75rem, 2.6vw, 2.375rem);
+    letter-spacing: 0.18em;
+    text-indent: 0.18em;
+    line-height: 1;
+    margin: 0;
+  }
   .pie-linea { font-size: 0.65625rem; letter-spacing: 0.1em; color: #fff; margin: 6px 0 0; }
   .pie-columnas {
     flex: 2 1 480px;
