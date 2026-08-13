@@ -17,6 +17,8 @@ interface DatoSabor {
   ingredientes: string
   color: string
   tinta: string
+  /** Página del producto en el catálogo (o la categoría de barras). */
+  url: string
 }
 
 const raiz = document.documentElement
@@ -122,6 +124,7 @@ if (datosCrudos && anaquel) {
   const ingredientes = campo('[data-anaquel-ingredientes]')
   const envoltura = campo<HTMLImageElement>('.ficha-envoltura img')
   const ilustracion = campo<HTMLImageElement>('[data-anaquel-ilustracion]')
+  const cta = campo<HTMLAnchorElement>('.ficha-ctas a')
 
   const elige = (slug: string, enfoca = false) => {
     const d = porSlug.get(slug)
@@ -149,6 +152,8 @@ if (datosCrudos && anaquel) {
       ilustracion.src = `/sitio/marca/ilustracion-${d.slug}.webp`
       ilustracion.alt = `Ilustración de la envoltura de ${d.nombre}`
     }
+    // «Ver en el catálogo» apunta al producto del sabor elegido.
+    if (cta) cta.href = d.url
   }
 
   radios.forEach((r, i) => {

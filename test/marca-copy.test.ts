@@ -126,6 +126,20 @@ describe('sabores — fuente única sincronizada con el arte de imprenta', () =>
       expect(s.precio).toBe(s.slug === 'jengibre-y-naranja' ? 122 : 108)
     }
   })
+
+  it('el enlace al catálogo es por producto; solo faltan los 4 sin alta (2026-08-13)', () => {
+    // Cosechado del propio catálogo: naranja-jengibre (la barra), mango,
+    // chamoy y blanco NO existen como producto todavía — caen a la
+    // categoría. Si el cliente los da de alta, actualizar sabores.ts.
+    const sinProducto = ['jengibre-y-naranja', 'mango-con-chile', 'chamoy', 'blanco-con-pistache']
+    for (const s of sabores) {
+      if (sinProducto.includes(s.slug)) {
+        expect(s.catalogo).toBeNull()
+      } else {
+        expect(s.catalogo).toMatch(/^https:\/\/chocolateria\.pulpos\.shop\/product\/[a-z0-9]+$/)
+      }
+    }
+  })
 })
 
 describe('gotas y polvo', () => {

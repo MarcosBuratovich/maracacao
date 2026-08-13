@@ -20,7 +20,7 @@ import TicketPanel from '@/components/marca/TicketPanel.astro'
 import VisorProducto from '@/components/sitio/VisorProducto.astro'
 import selloRaw from '@/assets/brand/sello-mano.svg?raw'
 import { marca, precioMXN } from '@/copy/sitio-marca'
-import { sabores, gotas, paqueteSeis, polvo } from '@/copy/sabores'
+import { sabores, gotas, paqueteSeis, polvo, urlCatalogoBarras } from '@/copy/sabores'
 import { sabor as colorSabor, tintaSabor, marca as paletaMarca } from '@/tokens/color'
 import '@/styles/global.css'
 import '@/styles/marca.css'
@@ -47,6 +47,9 @@ const datosAnaquel = sabores.map((s) => ({
   ingredientes: s.ingredientes,
   color: colorSabor[s.clave],
   tinta: tintaSabor[s.clave],
+  // La página del producto; las barras que aún no existen en el
+  // catálogo caen a la categoría de barras.
+  url: s.catalogo ?? urlCatalogoBarras,
 }))
 
 // La tinta de un sabor es blanca o la de impreso: con distinguir la
@@ -258,7 +261,7 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
                 {marca.anaquel.ingredientesEtiqueta}: <span data-anaquel-ingredientes>{inicial.ingredientes}</span>.
               </p>
               <div class="ficha-ctas">
-                <BotonMarca href={marca.contacto.catalogoUrl} externo>{marca.anaquel.cta}</BotonMarca>
+                <BotonMarca href={inicial.catalogo ?? urlCatalogoBarras} externo>{marca.anaquel.cta}</BotonMarca>
                 <p class="mano ficha-remate suave">{marca.anaquel.remate}</p>
               </div>
             </div>

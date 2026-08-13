@@ -30,24 +30,38 @@ export interface Sabor {
   cacao: string
   precio: number
   ingredientes: string
+  /**
+   * Página del producto en el catálogo (ids cosechados del propio
+   * catálogo, 2026-08-13). `null` = la barra NO existe como producto en
+   * pulpos.shop hoy (naranja-jengibre solo está como bolsa de gotas;
+   * mango, chamoy y blanco no aparecen) — esas caen a
+   * `urlCatalogoBarras`. Si el cliente las da de alta, va el id acá.
+   */
+  catalogo: string | null
 }
 
+/** La categoría de barras del catálogo, ordenada por más vendidas. */
+export const urlCatalogoBarras =
+  'https://chocolateria.pulpos.shop/products?c=cmbrdybsb01o3ckpojgkdphjh&s=bestSellers'
+
+const producto = (id: string) => `https://chocolateria.pulpos.shop/product/${id}`
+
 export const sabores: readonly Sabor[] = [
-  { orden: 1, slug: 'jengibre-y-naranja', clave: 'jengibreYNaranja', nombre: 'Jengibre y naranja', cacao: 'Cacao 70%', precio: 122, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural y jengibre' },
-  { orden: 2, slug: 'menta-intensa', clave: 'mentaIntensa', nombre: 'Menta intensa', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural' },
-  { orden: 3, slug: 'limoncillo', clave: 'limoncillo', nombre: 'Limoncillo', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural' },
-  { orden: 4, slug: 'lima-y-chile', clave: 'limaYChile', nombre: 'Lima y chile', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, chiles ahumados, esencia natural' },
-  { orden: 5, slug: 'coriandro', clave: 'coriandro', nombre: 'Coriandro', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural' },
-  { orden: 6, slug: 'fresas-y-chile', clave: 'fresasYChile', nombre: 'Fresas y chile', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, fresas, esencia natural de mandarina y chile chipotle' },
-  { orden: 7, slug: 'hierbabuena', clave: 'hierbabuena', nombre: 'Hierbabuena', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural' },
-  { orden: 8, slug: 'canela', clave: 'canela', nombre: 'Canela', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural' },
-  { orden: 9, slug: 'sal-de-mar', clave: 'salDeMar', nombre: 'Sal de mar', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, sal de mar' },
-  { orden: 10, slug: 'tamarindo', clave: 'tamarindo', nombre: 'Tamarindo con chile', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, tamarindo con chile' },
-  { orden: 11, slug: 'pina-con-chile', clave: 'pinaConChile', nombre: 'Piña con chile', cacao: 'Cacao 73%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, piña con chile' },
-  { orden: 12, slug: 'cardamomo', clave: 'cardamomo', nombre: 'Cardamomo', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, cardamomo' },
-  { orden: 13, slug: 'blanco-con-pistache', clave: 'blancoConPistache', nombre: 'Blanco con pistache', cacao: 'Chocolate blanco', precio: 108, ingredientes: 'Manteca de cacao, leche en polvo, azúcar, lecitina de soya, pistaches' },
-  { orden: 14, slug: 'mango-con-chile', clave: 'mangoConChile', nombre: 'Mango con chile', cacao: 'Cacao 73%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, mango con chile' },
-  { orden: 15, slug: 'chamoy', clave: 'chamoy', nombre: 'Chamoy', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, manteca de cacao, azúcar, lecitina de soya, chamoy' },
+  { orden: 1, slug: 'jengibre-y-naranja', clave: 'jengibreYNaranja', nombre: 'Jengibre y naranja', cacao: 'Cacao 70%', precio: 122, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural y jengibre', catalogo: null },
+  { orden: 2, slug: 'menta-intensa', clave: 'mentaIntensa', nombre: 'Menta intensa', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural', catalogo: producto('cm2nojzhq000nvz0mmtsi6800') },
+  { orden: 3, slug: 'limoncillo', clave: 'limoncillo', nombre: 'Limoncillo', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural', catalogo: producto('cm2rxaju500c91ngg2mu4v4h2') },
+  { orden: 4, slug: 'lima-y-chile', clave: 'limaYChile', nombre: 'Lima y chile', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, chiles ahumados, esencia natural', catalogo: producto('cm2nolh8t00aq145fx80bvy6l') },
+  { orden: 5, slug: 'coriandro', clave: 'coriandro', nombre: 'Coriandro', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural', catalogo: producto('cm2rx6zwv000ssl4kt6nzr9gc') },
+  { orden: 6, slug: 'fresas-y-chile', clave: 'fresasYChile', nombre: 'Fresas y chile', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, fresas, esencia natural de mandarina y chile chipotle', catalogo: producto('cm2rx9x2y003vsl4kr0wlxcpq') },
+  { orden: 7, slug: 'hierbabuena', clave: 'hierbabuena', nombre: 'Hierbabuena', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural', catalogo: producto('cmcf6crlb02yjgexdoxvcwuvs') },
+  { orden: 8, slug: 'canela', clave: 'canela', nombre: 'Canela', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural', catalogo: producto('cmccepnd403es13pcu2jmmyxf') },
+  { orden: 9, slug: 'sal-de-mar', clave: 'salDeMar', nombre: 'Sal de mar', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, sal de mar', catalogo: producto('cmcnofnzl02o3tzxx9slblmuc') },
+  { orden: 10, slug: 'tamarindo', clave: 'tamarindo', nombre: 'Tamarindo con chile', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, tamarindo con chile', catalogo: producto('cmcnogojx05eujzgzz2tochyc') },
+  { orden: 11, slug: 'pina-con-chile', clave: 'pinaConChile', nombre: 'Piña con chile', cacao: 'Cacao 73%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, piña con chile', catalogo: producto('cmgu5lmw00ft4563yncetf7xa') },
+  { orden: 12, slug: 'cardamomo', clave: 'cardamomo', nombre: 'Cardamomo', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, cardamomo', catalogo: producto('cmqzcygiu0og3cbzjtbyhaa6p') },
+  { orden: 13, slug: 'blanco-con-pistache', clave: 'blancoConPistache', nombre: 'Blanco con pistache', cacao: 'Chocolate blanco', precio: 108, ingredientes: 'Manteca de cacao, leche en polvo, azúcar, lecitina de soya, pistaches', catalogo: null },
+  { orden: 14, slug: 'mango-con-chile', clave: 'mangoConChile', nombre: 'Mango con chile', cacao: 'Cacao 73%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, mango con chile', catalogo: null },
+  { orden: 15, slug: 'chamoy', clave: 'chamoy', nombre: 'Chamoy', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, manteca de cacao, azúcar, lecitina de soya, chamoy', catalogo: null },
 ] as const
 
 /**
