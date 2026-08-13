@@ -76,9 +76,19 @@ describe('sabores — fuente única sincronizada con el arte de imprenta', () =>
     expect(crudo.startsWith(normaliza(s.ingredientes))).toBe(true)
   })
 
-  it.each([...sabores])('el cacao de $nombre coincide con lo impreso', (s) => {
+  // El cliente cerró el conflicto 70 vs 73 (2026-08-13, WhatsApp: «hay
+  // que sostenerlo en 70%»): la línea entera se declara 70% aunque las
+  // envolturas de mango y piña impriman 73 — el empaque es lo que él
+  // planea corregir. Si el JSON deja de decir 73, la excepción sobra y
+  // este test lo va a avisar.
+  const decididos70 = ['mango-con-chile', 'pina-con-chile']
+
+  it.each([...sabores])('el cacao de $nombre sale de lo impreso (salvo la decisión del cliente)', (s) => {
     const impreso = json[s.slug].cacao
-    if (impreso !== null) {
+    if (decididos70.includes(s.slug)) {
+      expect(impreso).toBe('73%') // lo impreso sigue diciendo 73…
+      expect(s.cacao).toBe('Cacao 70%') // …y el sitio muestra la decisión
+    } else if (impreso !== null) {
       expect(s.cacao).toBe(`Cacao ${impreso}`)
     }
     // chamoy y blanco vienen null en el JSON (el dato vive en la línea
@@ -86,11 +96,6 @@ describe('sabores — fuente única sincronizada con el arte de imprenta', () =>
     // chocolate oscuro.
     else if (s.slug === 'chamoy') expect(s.cacao).toBe('Cacao 70%')
     else expect(s.cacao).toBe('Chocolate blanco')
-  })
-
-  it('mango y piña muestran el 73% impreso (conflicto abierto con el cliente)', () => {
-    expect(sabores.find((s) => s.slug === 'mango-con-chile')?.cacao).toBe('Cacao 73%')
-    expect(sabores.find((s) => s.slug === 'pina-con-chile')?.cacao).toBe('Cacao 73%')
   })
 
   it('los nombres son los IMPRESOS en la envoltura (decisión 2026-08-13)', () => {

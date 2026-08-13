@@ -11,11 +11,13 @@ import { sabor } from '@/tokens/color'
  *
  * Ingredientes y % de cacao: leídos del arte de imprenta
  * (docs/envolturas.json, extraído por scripts/extrae-envolturas.py); un
- * test verifica que estas strings no se desvíen del JSON. Mango y piña
- * dicen 73% impreso aunque el cliente declaró «todos 70%» — se muestra
- * lo impreso hasta que el cliente resuelva el conflicto. Chamoy trae el
- * porcentaje dentro de la línea combinada («Chocolate 70% cacao y
- * chamoy»), por eso el JSON lo tiene en null pero acá va 70%.
+ * test verifica que estas strings no se desvíen del JSON. EXCEPCIÓN
+ * decidida por el cliente (2026-08-13, WhatsApp: «hay que sostenerlo en
+ * 70%»): mango y piña van como 70% AUNQUE su envoltura impresa diga 73%
+ * — la línea entera se declara 70% y el empaque es lo que el cliente
+ * planea corregir. Chamoy trae el porcentaje dentro de la línea
+ * combinada («Chocolate 70% cacao y chamoy»), por eso el JSON lo tiene
+ * en null pero acá va 70%.
  *
  * `orden` es la numeración impresa de la serie (1–15).
  * Precios del catálogo público (pulpos.shop): todas $108 salvo jengibre
@@ -57,10 +59,10 @@ export const sabores: readonly Sabor[] = [
   { orden: 8, slug: 'canela', clave: 'canela', nombre: 'Canela', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural', catalogo: producto('cmccepnd403es13pcu2jmmyxf') },
   { orden: 9, slug: 'sal-de-mar', clave: 'salDeMar', nombre: 'Sal de mar', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, sal de mar', catalogo: producto('cmcnofnzl02o3tzxx9slblmuc') },
   { orden: 10, slug: 'tamarindo', clave: 'tamarindo', nombre: 'Tamarindo con chile', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, tamarindo con chile', catalogo: producto('cmcnogojx05eujzgzz2tochyc') },
-  { orden: 11, slug: 'pina-con-chile', clave: 'pinaConChile', nombre: 'Piña con chile', cacao: 'Cacao 73%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, piña con chile', catalogo: producto('cmgu5lmw00ft4563yncetf7xa') },
+  { orden: 11, slug: 'pina-con-chile', clave: 'pinaConChile', nombre: 'Piña con chile', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, piña con chile', catalogo: producto('cmgu5lmw00ft4563yncetf7xa') },
   { orden: 12, slug: 'cardamomo', clave: 'cardamomo', nombre: 'Cardamomo', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, cardamomo', catalogo: producto('cmqzcygiu0og3cbzjtbyhaa6p') },
   { orden: 13, slug: 'blanco-con-pistache', clave: 'blancoConPistache', nombre: 'Blanco con pistache', cacao: 'Chocolate blanco', precio: 108, ingredientes: 'Manteca de cacao, leche en polvo, azúcar, lecitina de soya, pistaches', catalogo: null },
-  { orden: 14, slug: 'mango-con-chile', clave: 'mangoConChile', nombre: 'Mango con chile', cacao: 'Cacao 73%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, mango con chile', catalogo: null },
+  { orden: 14, slug: 'mango-con-chile', clave: 'mangoConChile', nombre: 'Mango con chile', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, mango con chile', catalogo: null },
   { orden: 15, slug: 'chamoy', clave: 'chamoy', nombre: 'Chamoy', cacao: 'Cacao 70%', precio: 108, ingredientes: 'Licor de cacao, manteca de cacao, azúcar, lecitina de soya, chamoy', catalogo: null },
 ] as const
 

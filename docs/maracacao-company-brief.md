@@ -91,7 +91,7 @@ The table below merges three sources: the flavour names and prices come from the
 | Sal de mar | Sea salt | 70% | $108 | `#6F4380` purple |
 | Chocolate blanco con pistache | White chocolate with pistachio | white — no cacao solids | $108 | `#8D9B3E` olive |
 
-Two notes on that table. **Mango con chile and chamoy share the same wrapper colour** (`#CB3C41`) in the original design — that is what the artwork says, not an extraction error. And **the client stated that all fifteen bars are 70%**, but the printed wrappers for mango con chile and piña con chile both read 73%. That contradiction is unresolved and listed in §12.
+Two notes on that table. **Mango con chile and chamoy share the same wrapper colour** (`#CB3C41`) in the original design — that is what the artwork says, not an extraction error. And the cacao percentage conflict is **resolved**: the printed wrappers for mango con chile and piña con chile read 73%, but the client decided (2026-08-13, in writing) to **hold the whole line at 70%** — published content says 70% and the packaging is what they plan to correct.
 
 A sixteenth flavour, almond, appeared in the first questionnaire. The client has since confirmed it was dropped: *"We're not putting out the almond one. Let's work with the fifteen."*
 
@@ -345,7 +345,7 @@ Everything still blocking a complete picture of the company. Items marked **conf
 
 | # | Item | Status |
 |---|---|---|
-| 1 | **conflict** — Cacao percentage | The client states all fifteen bars are 70%. The printed wrappers for mango con chile and piña con chile both read **73%**. Someone has to say which is authoritative — this affects packaging, technical sheets, and every published product listing |
+| 1 | ~~conflict~~ — Cacao percentage | **RESOLVED 2026-08-13**: the client decided the whole line is declared **70%**; the 73% printed on mango and piña wrappers is a packaging error they plan to correct |
 | 2 | **conflict** — Spearmint naming | The catalogue lists this flavour as *yerbabuena*; the wrapper artwork spells it *hierbabuena*. Both are valid Spanish for the same herb, but the brand should settle on one spelling |
 | 3 | **conflict** — Chamoy percentage | The wrapper's ingredient line reads "70% cacao chocolate and chamoy, 70 g" but carries no standalone percentage mark like the others. Worth confirming it's labelled consistently |
 | 4 | WhatsApp number | Not supplied. Question asked twice, unanswered |
