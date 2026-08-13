@@ -220,10 +220,43 @@ describe('la página en construcción en / (lo público mientras llega el domini
     expect(html).not.toContain('href="/presentacion"')
   })
 
-  it('carga el módulo editorial, que apaga el movimiento bajo reduced-motion', () => {
-    expect(readFileSync('src/pages/index.astro', 'utf8')).toContain("import '@/scripts/editorial'")
-    const js = readFileSync('src/scripts/editorial.ts', 'utf8')
+  it('carga el módulo de marca, que apaga el movimiento bajo reduced-motion', () => {
+    // Rediseño 2026-08-13: la construcción vive en el sistema de marca,
+    // igual que /sitio — misma identidad para quien entra por el dominio.
+    expect(readFileSync('src/pages/index.astro', 'utf8')).toContain("import '@/scripts/marca'")
+    const js = readFileSync('src/scripts/marca.ts', 'utf8')
     expect(js).toContain("matchMedia('(prefers-reduced-motion: reduce)')")
+  })
+})
+
+describe('el candado de cortesía (2026-08-13)', () => {
+  it('las páginas privadas lo piden; la construcción, no', () => {
+    for (const pagina of [
+      'src/pages/sitio.astro',
+      'src/pages/presentacion.astro',
+      'src/pages/manual/index.astro',
+      'src/pages/manual/[...slug].astro',
+    ]) {
+      expect(readFileSync(pagina, 'utf8')).toMatch(/<Base [^>]*candado/)
+    }
+    expect(readFileSync('src/pages/index.astro', 'utf8')).not.toMatch(/<Base [^>]*candado/)
+  })
+
+  it('cerrado por defecto y sin la contraseña en claro', async () => {
+    const html = await container.renderToString(Borrador)
+    // El formulario del candado está, con el hash como única llave.
+    expect(html).toContain('data-candado')
+    expect(html).toMatch(/data-llave="[0-9a-f]{64}"/)
+    // La regla que esconde el contenido sin llave viaja en el HTML.
+    expect(html).toContain('html:not(.acceso)')
+    // En el layout no hay contraseña en claro: solo el SHA-256.
+    const base = readFileSync('src/layouts/Base.astro', 'utf8')
+    expect(base).toMatch(/LLAVE_SHA256 = '[0-9a-f]{64}'/)
+  })
+
+  it('la construcción no lleva candado en su HTML', async () => {
+    const html = await container.renderToString(EnConstruccion)
+    expect(html).not.toContain('data-candado')
   })
 })
 

@@ -1,128 +1,180 @@
 ---
-// src/pages/index.astro — Página EN CONSTRUCCIÓN.
-// Lo que ve quien entra por el dominio mientras el sitio se termina.
-// Mismo sistema editorial que /sitio: el sello se estampa, el wordmark
-// abre su tracking en la tipografía del propio logotipo, y el canon
-// marca sus registros (simétricos acá, como el sello).
+// src/pages/index.astro — Página EN CONSTRUCCIÓN, en el sistema de
+// MARCA (rediseño 2026-08-13): lo que ve quien entra por el dominio es
+// la misma identidad que va a encontrar cuando el sitio salga — lockup
+// vectorial, sello «Muy pronto» estampado, el personaje del molinillo
+// en grande y la marquesina de barras reales al pie.
 //
-// Sin juegos de palabras: dice lo que pasa. El personaje va estático y
-// recortado — el video del cliente trae fondo blanco y sobre la tinta
-// se ve como un parche.
+// Es la ÚNICA página sin candado: lo público mientras se termina.
 import Base from '@/layouts/Base.astro'
+import BotonMarca from '@/components/marca/BotonMarca.astro'
+import Marquesina from '@/components/marca/Marquesina.astro'
 import selloRaw from '@/assets/brand/sello-mano.svg?raw'
-import { sitio } from '@/copy/sitio'
+import { marca } from '@/copy/sitio-marca'
+import { sabores } from '@/copy/sabores'
 import '@/styles/global.css'
-import '@/styles/editorial.css'
+import '@/styles/marca.css'
 
 const sello = selloRaw.replace('<svg', '<svg aria-hidden="true" focusable="false"')
+
+// La misma tira del hero del sitio: quince sabores dos veces por tramo
+// para que el bucle no muestre costura ni en ultrawide.
+const enMarquesina = [...sabores, ...sabores]
 ---
-<Base titulo={sitio.construccion.titulo} fuentes="sitio">
-  <div class="ed" data-tono="tinta">
-    <main class="seccion portada">
-      <div class="registro registro-simetrico"><span></span><span></span></div>
+<Base titulo={marca.construccion.titulo} fuentes="marca">
+  <main class="obra" data-tono="crema">
+    <div class="obra-centro">
+      <span class="obra-sello" set:html={sello} />
+      <p class="obra-wordmark">{marca.marca.wordmark}</p>
 
-      <div class="portada-centro">
-        <div class="portada-sello sello estampa" set:html={sello} />
-        <p class="monumento abre">{sitio.marca.wordmark}</p>
-        <p class="marca portada-descriptor entra-suave" style="--retardo:900ms">
-          {sitio.marca.descriptor}
-        </p>
+      <span class="obra-pronto mano" aria-hidden="true">{marca.construccion.muyPronto}</span>
+      <span class="sr-only">{marca.construccion.muyPronto}</span>
 
-        <hr class="regla portada-regla entra-suave" style="--retardo:1050ms" />
+      <h1 class="obra-titulo">{marca.construccion.encabezado}</h1>
+      <p class="obra-sub">{marca.construccion.sub}</p>
 
-        <h1 class="display portada-titulo entra-suave" style="--retardo:1150ms">
-          {sitio.construccion.encabezado}
-        </h1>
-        <p class="cuerpo tenue portada-sub entra-suave" style="--retardo:1250ms">
-          {sitio.construccion.sub}
-        </p>
-
-        <div class="portada-acciones entra-suave" style="--retardo:1350ms">
-          <a
-            class="cta cta-solido"
-            href={sitio.contacto.catalogoUrl}
-            target="_blank" rel="noopener"
-            data-cursor={sitio.cursor.abrir} data-iman
-          >
-            <span class="cta-txt"><span>{sitio.construccion.ctaCatalogo}</span><span>{sitio.construccion.ctaCatalogo}</span></span>
-            <span class="cta-flecha" aria-hidden="true">↗</span>
-          </a>
-          <a class="cta" href={`mailto:${sitio.contacto.correo}`} data-cursor={sitio.cursor.escribir} data-iman>
-            <span class="cta-txt"><span>{sitio.construccion.ctaCorreo}</span><span>{sitio.construccion.ctaCorreo}</span></span>
-            <span class="cta-flecha" aria-hidden="true">→</span>
-          </a>
-        </div>
-
-        <figure class="portada-personaje entra-suave" style="--retardo:1500ms">
-          <img
-            src="/sitio/personaje-molinillo-t.webp"
-            alt={sitio.construccion.personajeAlt}
-            width="460" height="814"
-          />
-        </figure>
-
-        <ul class="portada-meta marca entra-suave" style="--retardo:1600ms">
-          <li>{sitio.construccion.lugar}</li>
-          <li>{sitio.construccion.muyPronto}</li>
-        </ul>
+      <div class="obra-acciones">
+        <BotonMarca href={marca.contacto.catalogoUrl} externo>{marca.construccion.ctaCatalogo}</BotonMarca>
+        <a class="obra-correo" href={`mailto:${marca.contacto.correo}`}>{marca.construccion.ctaCorreo}</a>
       </div>
-    </main>
-  </div>
+
+      <div class="obra-firma">
+        <img
+          src="/sitio/personaje-molinillo-t.webp"
+          alt={marca.construccion.personajeAlt}
+          width="460"
+          height="814"
+        />
+        <p class="mono">{marca.construccion.lugar}</p>
+      </div>
+    </div>
+
+    <div class="obra-tira">
+      <Marquesina aria={marca.hero.marquesinaAria} dur="140s" rotacion={-3}>
+        {enMarquesina.map((s) => (
+          <img
+            class="obra-barra"
+            src={`/sitio/marca/barra-${s.slug}-mini.webp`}
+            alt=""
+            width="380"
+            height="815"
+            loading="eager"
+          />
+        ))}
+      </Marquesina>
+    </div>
+  </main>
 </Base>
 
 <style>
-  .portada {
+  .obra {
     min-height: 100svh;
-    display: grid;
-    place-content: center stretch;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
     overflow: hidden;
   }
-  /* Ritmo ajustado para que la portada entre en una pantalla de 900 px
-     sin scroll (medido en vivo: con el ritmo del sitio se pasaba). */
-  .portada-centro { text-align: center; padding-block: clamp(2rem, 4vh, 3rem); }
-  /* El padding va solo en los bloques de texto: al sello y al personaje,
-     que tienen ancho fijo, los colapsaría (box-sizing border-box). */
-  .portada-centro > :not(.monumento, .portada-sello, .portada-personaje) {
-    padding-inline: clamp(1.25rem, 5.5vw, 5.5rem);
-  }
-  .portada-sello {
-    width: clamp(4.5rem, 8vw, 7rem);
-    margin: 0 auto clamp(1.25rem, 3vh, 2rem);
-  }
-  .portada-descriptor { margin-top: clamp(0.9rem, 2vh, 1.5rem); letter-spacing: 0.42em; }
-  .portada-regla {
-    width: min(90%, 30rem);
-    margin: clamp(1.5rem, 3.5vh, 2.25rem) auto 0;
-    padding: 0;
-  }
-  .portada-titulo { margin-top: clamp(1.5rem, 3.5vh, 2.25rem); }
-  .portada-sub { margin: 1rem auto 0; max-width: 56ch; }
-  .portada-acciones {
+  .obra-centro {
+    flex: 1;
     display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: clamp(2rem, 5vh, 3.5rem) clamp(1.25rem, 5vw, 3rem) clamp(1rem, 2vh, 1.5rem);
+  }
+  .obra-sello { display: inline-flex; width: clamp(120px, 15vw, 190px); }
+  .obra-sello :global(svg) { width: 100%; height: auto; }
+  .obra-wordmark {
+    font-family: var(--mrc-font-sello);
+    font-weight: 500;
+    font-size: clamp(1.75rem, 3vw, 2.625rem);
+    letter-spacing: 0.18em;
+    text-indent: 0.18em;
+    line-height: 1;
+    margin: clamp(10px, 1.6vh, 16px) 0 0;
+  }
+  /* El sello estampado del sistema (mismo mecanismo que el PRÓXIMAMENTE
+     del sitio), acá en rojo sobre crema. */
+  .obra-pronto {
+    position: relative;
+    display: inline-block;
+    padding: 8px 18px;
+    margin-top: clamp(18px, 3vh, 28px);
+    font-size: 1rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--mrc-marca-rojo);
+    border: 2px solid var(--mrc-marca-rojo);
+    border-radius: 4px;
+    transform: rotate(-4deg);
+  }
+  .obra-pronto::after {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border: 1.5px dashed var(--mrc-marca-rojo);
+    border-radius: 2px;
+    opacity: 0.75;
+  }
+  .obra-titulo {
+    font-family: var(--mrc-font-titular);
+    font-weight: 800;
+    font-size: clamp(2.25rem, 5.2vw, 4rem);
+    letter-spacing: -0.02em;
+    line-height: 1.02;
+    margin: clamp(16px, 2.6vh, 24px) 0 0;
+    text-wrap: balance;
+  }
+  .obra-sub {
+    font-size: clamp(0.90625rem, 1.3vw, 1.0625rem);
+    line-height: 1.6;
+    max-width: 46ch;
+    margin: 14px 0 0;
+  }
+  .obra-acciones {
+    display: flex;
+    align-items: center;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 1rem;
-    margin-top: clamp(1.75rem, 3.5vh, 2.25rem);
+    gap: 18px;
+    margin-top: clamp(20px, 3.2vh, 30px);
   }
-  .portada-personaje {
-    width: clamp(4.5rem, 6vw, 6rem);
-    margin: clamp(1.25rem, 2.5vh, 1.75rem) auto 0;
+  .obra-correo {
+    font-family: var(--mrc-font-titular);
+    font-weight: 600;
+    font-size: 0.9375rem;
+    color: var(--mrc-marca-tinta);
+    text-decoration: none;
+    border-bottom: 2px solid var(--mrc-marca-amarillo);
+    padding-bottom: 2px;
+    transition: border-color 0.2s;
   }
-  .portada-personaje img { display: block; width: 100%; height: auto; }
-  .portada-meta {
+  .obra-correo:hover { border-color: var(--mrc-marca-rojo); }
+  .obra-firma {
     display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.4rem 2.5rem;
-    list-style: none;
-    margin: 1.25rem 0 0;
-    padding-inline: 1.25rem;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    margin-top: clamp(16px, 3vh, 26px);
   }
-  @media (max-width: 900px) {
-    .portada-descriptor { letter-spacing: 0.3em; }
+  .obra-firma img {
+    width: clamp(110px, 13vh, 170px);
+    height: auto;
+    filter: drop-shadow(0 10px 18px rgb(76 44 22 / 0.2));
+  }
+  .obra-firma .mono { color: var(--mrc-marca-textoSuave); margin: 0; }
+
+  .obra-tira { margin-inline: -14px; }
+  .obra-tira :global(.marquesina) { padding-block: clamp(24px, 3vw, 40px); }
+  .obra-barra {
+    width: clamp(110px, 11vw, 160px);
+    height: auto;
+    border-radius: 4px;
+    box-shadow: 0 12px 26px rgb(76 44 22 / 0.32);
   }
 </style>
 
 <script>
-  import '@/scripts/editorial'
+  import '@/scripts/marca'
 </script>

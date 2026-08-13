@@ -17,7 +17,7 @@ import '@/styles/global.css'
 
 const indice = (await getCollection('manual')).sort((a, b) => a.data.orden - b.data.orden)
 ---
-<Base titulo={copy.tituloPortada}>
+<Base titulo={copy.tituloPortada} candado>
   <div style="background:var(--mrc-papel);color:var(--mrc-tinta);font-family:var(--mrc-font-texto)" class="min-h-screen">
     {/* LockupHeader resuelve su propio contraste sobre banda clara — ver
         el comentario original en LockupHeader.astro (Task 17). */}

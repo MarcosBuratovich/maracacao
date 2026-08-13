@@ -55,7 +55,7 @@ const datosAnaquel = sabores.map((s) => ({
 // oscura alcanza (y el guard de hex a mano en páginas queda contento).
 const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== paletaMarca.tintaImpreso
 ---
-<Base titulo={marca.titulo} fuentes="marca">
+<Base titulo={marca.titulo} fuentes="marca" candado>
   <a href="#contenido" class="salto">{marca.skipLink}</a>
 
   <header class="cabecera" data-tono="crema">
@@ -890,6 +890,11 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
     gap: clamp(14px, 1.6vw, 22px);
     color: var(--mrc-marca-tinta);
   }
+  /* En móvil el lockup se va: el titular ya dice la marca y la pantalla
+     no da para los dos (retro de Marcos). */
+  @media (max-width: 760px) {
+    .portada-logo { display: none; }
+  }
   .portada-sello { display: inline-flex; width: clamp(220px, 26vw, 340px); }
   .portada-sello :global(svg) {
     width: 100%;
@@ -1043,6 +1048,11 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
   }
   .ficha-fila { display: flex; flex-wrap: wrap; gap: clamp(16px, 2.5vw, 36px); align-items: center; }
   .ficha-envoltura { flex: none; width: clamp(110px, 13vw, 164px); margin-inline: auto; }
+  /* En móvil la envoltura grande sobra: la barra ya se ve seleccionada
+     en el anaquel de arriba (retro de Marcos). */
+  @media (max-width: 640px) {
+    .ficha-envoltura { display: none; }
+  }
   .ficha-envoltura :global(img) {
     width: 100%;
     height: auto;
@@ -1250,7 +1260,7 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
   }
   .receta {
     flex: none;
-    width: min(330px, 84vw);
+    width: min(330px, 76vw);
     scroll-snap-align: start;
     border-radius: 10px;
     padding: 24px 22px;
@@ -1268,6 +1278,9 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
     transition: transform 0.25s ease-out, box-shadow 0.25s ease-out;
   }
   .receta:hover { transform: translateY(-6px); box-shadow: 0 20px 36px rgb(76 44 22 / 0.32); }
+  @media (max-width: 640px) {
+    .receta { padding: 18px 16px; }
+  }
   @media (prefers-reduced-motion: reduce) { .receta, .paso, .extra-carta { transition: none; } }
   .receta-kicker { font-size: 0.65625rem; letter-spacing: 0.1em; opacity: 0.88; margin: 0; }
   .receta-titulo {

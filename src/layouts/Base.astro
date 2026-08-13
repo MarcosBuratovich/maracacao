@@ -10,8 +10,19 @@ interface Props {
    * siempre costaría descargas inútiles por página.
    */
   fuentes?: 'identidad' | 'sitio' | 'marca'
+  /**
+   * Candado de cortesía (2026-08-13): tapa la página con una pantalla
+   * de contraseña mientras el sitio no es público. En el código vive
+   * solo el SHA-256 — la contraseña se comparte aparte. OJO: esto es
+   * una tranca para que nadie llegue de casualidad, NO seguridad real
+   * (el sitio es estático y el HTML viaja igual); si algún día hace
+   * falta de verdad, es SSR o protección del hosting.
+   */
+  candado?: boolean
 }
-const { titulo, fuentes = 'identidad' } = Astro.props
+const { titulo, fuentes = 'identidad', candado = false } = Astro.props
+
+const LLAVE_SHA256 = 'edbf06dc247173ed729266aeff93df5d791076a460fe562496bef1ec69f39963'
 
 const familias =
   fuentes === 'marca'
@@ -32,8 +43,123 @@ const familias =
         `pnpm favicon` desde el asset y el token verde-600. */}
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>{titulo}</title>
+    {candado && (
+      <script is:inline define:vars={{ LLAVE_SHA256 }}>
+        // Antes del primer pintado: si la llave ya está guardada, se
+        // abre sin mostrar el candado (sin parpadeo).
+        try {
+          if (localStorage.getItem('mrc-llave') === LLAVE_SHA256) {
+            document.documentElement.classList.add('acceso')
+          }
+        } catch {}
+      </script>
+    )}
   </head>
   <body>
+    {candado && (
+      <div class="candado">
+        <form class="candado-carta" data-candado data-llave={LLAVE_SHA256}>
+          <p class="candado-titulo">Página privada</p>
+          <p class="candado-texto">
+            Esta parte del sitio todavía no es pública. Si tienes la
+            contraseña, adelante.
+          </p>
+          <label class="candado-campo">
+            <span>Contraseña</span>
+            <input type="password" name="llave" autocomplete="current-password" required />
+          </label>
+          <button type="submit">Entrar</button>
+          <p class="candado-error" data-candado-error hidden>Esa no es. Inténtalo de nuevo.</p>
+        </form>
+      </div>
+      <style is:global>
+        /* Cerrado por defecto: sin JS o sin llave, solo se ve el candado. */
+        html:not(.acceso) body > :not(.candado) { display: none !important; }
+        html.acceso .candado { display: none; }
+        .candado {
+          position: fixed;
+          inset: 0;
+          z-index: 9999;
+          display: grid;
+          place-items: center;
+          background: var(--mrc-marca-crema, #f8ecde);
+          padding: 24px;
+        }
+        .candado-carta {
+          width: min(380px, 92vw);
+          background: #fff;
+          border: 1px solid rgb(76 44 22 / 0.2);
+          border-radius: 10px;
+          box-shadow: 0 16px 36px rgb(76 44 22 / 0.18);
+          padding: 28px 26px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          color: var(--mrc-marca-tinta, #4c2c16);
+          font-family: var(--mrc-font-serifMarca, Georgia, serif);
+        }
+        .candado-titulo {
+          font-family: var(--mrc-font-titular, system-ui, sans-serif);
+          font-weight: 700;
+          font-size: 1.25rem;
+          margin: 0;
+        }
+        .candado-texto { font-size: 0.875rem; line-height: 1.55; margin: 0; }
+        .candado-campo { display: flex; flex-direction: column; gap: 6px; }
+        .candado-campo span {
+          font-family: var(--mrc-font-titular, system-ui, sans-serif);
+          font-weight: 600;
+          font-size: 0.8125rem;
+        }
+        .candado-campo input {
+          font-size: 1rem;
+          padding: 9px 12px;
+          border: 2px solid rgb(76 44 22 / 0.35);
+          border-radius: 6px;
+          background: var(--mrc-marca-crema, #f8ecde);
+          color: inherit;
+        }
+        .candado-campo input:focus-visible {
+          outline: none;
+          border-color: var(--mrc-marca-rojo, #cb3c41);
+        }
+        .candado-carta button {
+          align-self: flex-start;
+          font-family: var(--mrc-font-serifMarca, Georgia, serif);
+          font-size: 1rem;
+          color: #fff;
+          background: var(--mrc-marca-rojo, #cb3c41);
+          border: none;
+          border-radius: 6px;
+          padding: 10px 24px;
+          cursor: pointer;
+          box-shadow: 0 4px 0 0 #7c2024;
+        }
+        .candado-carta button:active { transform: translateY(2px); box-shadow: 0 2px 0 0 #7c2024; }
+        .candado-error { color: var(--mrc-marca-rojoHondo, #7d0303); font-size: 0.8125rem; margin: 0; }
+      </style>
+      <script is:inline>
+        ;(() => {
+          const forma = document.querySelector('[data-candado]')
+          if (!forma) return
+          forma.addEventListener('submit', async (e) => {
+            e.preventDefault()
+            const valor = new FormData(forma).get('llave') ?? ''
+            const datos = new TextEncoder().encode(String(valor))
+            const hash = [...new Uint8Array(await crypto.subtle.digest('SHA-256', datos))]
+              .map((b) => b.toString(16).padStart(2, '0'))
+              .join('')
+            if (hash === forma.dataset.llave) {
+              try { localStorage.setItem('mrc-llave', hash) } catch {}
+              document.documentElement.classList.add('acceso')
+            } else {
+              const error = forma.querySelector('[data-candado-error]')
+              if (error) error.hidden = false
+            }
+          })
+        })()
+      </script>
+    )}
     <slot />
   </body>
 </html>

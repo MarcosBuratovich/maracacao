@@ -26,7 +26,7 @@ import '@/styles/landing.css'
 const v = landing.firmas.variantes
 const rampas = { verde: Object.values(verde), tan: Object.values(tan), rosa: Object.values(rosa) }
 ---
-<Base titulo={landing.titulo}>
+<Base titulo={landing.titulo} candado>
   {/* La clase `js` se agrega inline y ANTES del primer paint: el estado
       oculto del revelado por scroll solo existe bajo html.js (landing.css),
       así que sin JS la página queda entera y visible. */}

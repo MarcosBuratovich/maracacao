@@ -307,6 +307,19 @@ export const marca = {
     },
   },
 
+  // Página en construcción — lo público mientras el sitio no sale.
+  // Sin juegos de palabras: dice lo que pasa (retro de Marcos, vigente).
+  construccion: {
+    titulo: 'Maracacao — Sitio en construcción',
+    encabezado: 'Sitio en construcción',
+    sub: 'Estamos armando la página. Mientras tanto, el catálogo está abierto y el chocolate, disponible.',
+    ctaCatalogo: 'Ver el catálogo',
+    ctaCorreo: 'Escríbenos',
+    lugar: 'Mercado de Coyoacán · CDMX',
+    muyPronto: 'Muy pronto',
+    personajeAlt: 'El personaje de Maracacao batiendo chocolate con su molinillo',
+  },
+
   footer: {
     // El lema es la frase textual del cliente (formulario, pregunta 11b).
     lema: 'Más cacao, ingredientes sencillos y muchas maneras de disfrutarlo',

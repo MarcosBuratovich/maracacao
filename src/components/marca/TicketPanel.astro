@@ -19,7 +19,10 @@
     align-items: center;
     justify-content: center;
     text-align: center;
-    padding: 18px 26px;
+    /* El borde cosido del PNG se estira con el panel: el padding escala
+       con el ancho (%) para que el texto nunca pise la puntada — en
+       móvil el ticket crece a lo alto y con padding fijo desbordaba. */
+    padding: clamp(26px, 12%, 46px) clamp(26px, 9%, 44px);
     box-sizing: border-box;
     font-family: var(--mrc-font-serifMarca);
     color: var(--mrc-marca-rojoHondo);
