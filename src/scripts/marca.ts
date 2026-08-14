@@ -126,9 +126,16 @@ if (datosCrudos && anaquel) {
   const ilustracion = campo<HTMLImageElement>('[data-anaquel-ilustracion]')
   const cta = campo<HTMLAnchorElement>('.ficha-ctas a')
 
+  let slugActual =
+    radios.find((r) => r.getAttribute('aria-checked') === 'true')?.dataset.anaquelRadio ?? 'canela'
+  // El visor 3D se engancha acá cuando termina de cargar (sección 3c).
+  let visorElige: ((slug: string) => void) | null = null
+
   const elige = (slug: string, enfoca = false) => {
     const d = porSlug.get(slug)
     if (!d) return
+    slugActual = slug
+    visorElige?.(slug)
     radios.forEach((r) => {
       const es = r.dataset.anaquelRadio === slug
       r.setAttribute('aria-checked', String(es))
@@ -171,6 +178,79 @@ if (datosCrudos && anaquel) {
 
   // Tabindex rotatorio inicial (solo la seleccionada entra por Tab).
   radios.forEach((r) => { r.tabIndex = r.getAttribute('aria-checked') === 'true' ? 0 : -1 })
+
+  /* ---------- 3c. La barra en 3D ----------
+     El modelo de Marcos (Blender): UN solo GLB para los quince sabores.
+     Al elegir en el anaquel se le cambia la textura del material
+     «Label» por el pliego de imprenta del sabor. El visor
+     (model-viewer, self-hosteado) se carga recién cuando la ficha entra
+     en pantalla; sin JS o con reduced-motion queda la imagen fija. */
+
+  interface VisorModelo extends HTMLElement {
+    model?: {
+      materials: Array<{
+        name: string
+        pbrMetallicRoughness: { baseColorTexture: { setTexture(t: unknown): void } }
+      }>
+    }
+    createTexture(uri: string): Promise<unknown>
+  }
+
+  const visor = document.querySelector<HTMLElement>('[data-visor3d]')
+  if (visor && !quieto) {
+    const observador3d = new IntersectionObserver(
+      async ([entrada]) => {
+        if (!entrada.isIntersecting) return
+        observador3d.disconnect()
+        try {
+          await new Promise<void>((listo, falla) => {
+            const s = document.createElement('script')
+            s.type = 'module'
+            s.src = '/vendor/model-viewer.min.js'
+            s.onload = () => listo()
+            s.onerror = () => falla(new Error('model-viewer no cargó'))
+            document.head.appendChild(s)
+          })
+          await customElements.whenDefined('model-viewer')
+
+          const mv = document.createElement('model-viewer') as unknown as VisorModelo
+          mv.setAttribute('src', visor.dataset.glb ?? '')
+          mv.setAttribute('alt', 'La barra en tres dimensiones; arrastra para girarla')
+          mv.setAttribute('camera-controls', '')
+          mv.setAttribute('disable-zoom', '')
+          mv.setAttribute('auto-rotate', '')
+          mv.setAttribute('rotation-per-second', '16deg')
+          mv.setAttribute('camera-orbit', '12deg 78deg 82%')
+          mv.setAttribute('shadow-intensity', '0.8')
+          mv.setAttribute('exposure', '1.1')
+          mv.setAttribute('interaction-prompt', 'none')
+
+          const texturas = new Map<string, unknown>()
+          const aplica = async (slug: string) => {
+            if (!mv.model) return
+            let tex = texturas.get(slug)
+            if (!tex) {
+              tex = await mv.createTexture(`/sitio/marca/pliego-${slug}.webp`)
+              texturas.set(slug, tex)
+            }
+            const label = mv.model.materials.find((m) => m.name === 'Label')
+            label?.pbrMetallicRoughness.baseColorTexture.setTexture(tex)
+          }
+
+          mv.addEventListener('load', () => {
+            void aplica(slugActual)
+            visor.classList.add('con-3d')
+            visorElige = (slug) => { void aplica(slug) }
+          })
+          visor.appendChild(mv)
+        } catch {
+          /* Si el visor no carga, se queda la imagen. La página no se entera. */
+        }
+      },
+      { rootMargin: '250px' },
+    )
+    observador3d.observe(visor)
+  }
 }
 
 /* ---------- 4. Copiar correo ---------- */

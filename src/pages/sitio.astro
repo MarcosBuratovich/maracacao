@@ -16,7 +16,6 @@ import EtiquetaSabor from '@/components/marca/EtiquetaSabor.astro'
 import Insignia from '@/components/marca/Insignia.astro'
 import Marquesina from '@/components/marca/Marquesina.astro'
 import TicketPanel from '@/components/marca/TicketPanel.astro'
-import VisorProducto from '@/components/sitio/VisorProducto.astro'
 import selloRaw from '@/assets/brand/sello-mano.svg?raw'
 import { marca, precioMXN } from '@/copy/sitio-marca'
 import { sabores, gotas, paqueteSeis, polvo, urlCatalogoBarras } from '@/copy/sabores'
@@ -235,12 +234,17 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
       <div class="contenedor ficha-zona">
         <article class="ficha" aria-live="polite">
           <div class="ficha-fila">
-            <div class="ficha-envoltura">
-              <VisorProducto
-                imagen={`/sitio/marca/barra-${inicial.slug}.webp`}
+            {/* La barra 3D de Marcos (Blender): un solo GLB para los 15
+                sabores — marca.ts le cambia la textura del pliego al
+                elegir. La imagen es el fallback y lo único que hay sin
+                JS o con reduced-motion. */}
+            <div class="ficha-envoltura" data-visor3d data-glb="/sitio/marca/barra.glb">
+              <img
+                src={`/sitio/marca/barra-${inicial.slug}.webp`}
                 alt={`${marca.anaquel.envolturaAltPrefijo} ${inicial.nombre}`}
-                ancho={754}
-                alto={1620}
+                width="754"
+                height="1617"
+                loading="lazy"
               />
             </div>
             <div class="ficha-datos">
@@ -1047,7 +1051,17 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
     padding: clamp(18px, 2.6vw, 32px);
   }
   .ficha-fila { display: flex; flex-wrap: wrap; gap: clamp(16px, 2.5vw, 36px); align-items: center; }
-  .ficha-envoltura { flex: none; width: clamp(110px, 13vw, 164px); margin-inline: auto; }
+  /* Más ancho que en el canvas: con el visor 3D adentro, a 164px no se
+     podía ni agarrar la barra para girarla. */
+  .ficha-envoltura { flex: none; width: clamp(150px, 17vw, 215px); margin-inline: auto; position: relative; }
+  .ficha-envoltura :global(model-viewer) {
+    width: 100%;
+    aspect-ratio: 754 / 1617;
+    display: block;
+    --poster-color: transparent;
+  }
+  /* Cuando el 3D carga, la imagen se retira y el visor ocupa su caja. */
+  .ficha-envoltura.con-3d > img { display: none; }
   /* En móvil la envoltura grande sobra: la barra ya se ve seleccionada
      en el anaquel de arriba (retro de Marcos). */
   @media (max-width: 640px) {

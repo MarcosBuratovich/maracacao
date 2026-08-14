@@ -113,17 +113,25 @@ describe('sabores — fuente única sincronizada con el arte de imprenta', () =>
     for (const s of sabores) expect(sabor).toHaveProperty(s.clave)
   })
 
-  it('los assets de cada sabor existen (barra, mini e ilustración)', () => {
+  it('los assets de cada sabor existen (barra, mini, ilustración y pliego 3D)', () => {
     for (const s of sabores) {
       for (const archivo of [
         `public/sitio/marca/barra-${s.slug}.webp`,
         `public/sitio/marca/barra-${s.slug}-mini.webp`,
         `public/sitio/marca/ilustracion-${s.slug}.webp`,
         `public/sitio/envoltura/${s.slug}-frente.webp`,
+        `public/sitio/marca/pliego-${s.slug}.webp`,
       ]) {
         expect(() => readFileSync(archivo)).not.toThrow()
       }
     }
+  })
+
+  it('el visor 3D tiene su modelo y su librería self-hosteados', () => {
+    // Un solo GLB (el modelo de Marcos, optimizado) + model-viewer local:
+    // el 3D no depende de ningún CDN externo.
+    expect(readFileSync('public/sitio/marca/barra.glb').length).toBeLessThan(600 * 1024)
+    expect(readFileSync('public/vendor/model-viewer.min.js').length).toBeGreaterThan(100 * 1024)
   })
 
   it('precios del catálogo: jengibre y naranja 122, el resto 108', () => {
