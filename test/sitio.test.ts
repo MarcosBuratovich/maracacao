@@ -229,6 +229,32 @@ describe('la página en construcción en / (lo público mientras llega el domini
   })
 })
 
+describe('el catálogo inmersivo de barras (/barras, 2026-08-14)', () => {
+  it('una pantalla por sabor, con su color, su tinta y sus datos de ficha técnica', async () => {
+    const { default: Barras } = await import('@/pages/barras.astro')
+    const html = await container.renderToString(Barras)
+    for (const s of sabores) {
+      expect(html).toContain(`id="${s.slug}"`)
+      expect(html).toContain(s.nombre)
+    }
+    // Los datos duros de la ficha técnica oficial (docx 2026-08-14).
+    expect(html).toContain(marca.catalogoBarras.alergenos)
+    expect(html).toContain(marca.catalogoBarras.conservacion)
+    // El selector de miniaturas trae los quince saltos.
+    expect(html.match(/data-salto=/g)).toHaveLength(15)
+    // Candado puesto: la página no es pública todavía.
+    expect(html).toContain('data-candado')
+  })
+
+  it('el snap es firme en desktop y suave en móvil, sin secuestrar el scroll', () => {
+    const src = readFileSync('src/pages/barras.astro', 'utf8')
+    expect(src).toContain('scroll-snap-type: y proximity')
+    expect(src).toMatch(/min-width: 761px.*\n.*scroll-snap-type: y mandatory/)
+    // Nada de fullPage ni wheel hijack: el scroll es del visitante.
+    expect(src).not.toMatch(/addEventListener\(['"]wheel/)
+  })
+})
+
 describe('el candado de cortesía (2026-08-13)', () => {
   it('las páginas privadas lo piden; la construcción, no', () => {
     for (const pagina of [

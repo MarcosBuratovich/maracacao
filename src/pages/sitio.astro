@@ -204,7 +204,10 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
       >
         <div class="contenedor anaquel-encabezado">
           <EtiquetaSabor texto={marca.anaquel.kicker} />
-          <span class="mono" aria-hidden="true"><span data-anaquel-contador>{inicial.orden}</span>/15</span>
+          <span class="anaquel-derecha">
+            <a class="anaquel-todas" href={marca.catalogoBarras.ruta}>{marca.anaquel.verTodas}</a>
+            <span class="mono" aria-hidden="true"><span data-anaquel-contador>{inicial.orden}</span>/15</span>
+          </span>
         </div>
         <div class="contenedor">
           <h2 class="titular">{marca.anaquel.titulo}</h2>
@@ -992,6 +995,17 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
     justify-content: space-between;
     align-items: baseline;
   }
+  .anaquel-derecha { display: flex; align-items: baseline; gap: 18px; }
+  .anaquel-todas {
+    font-family: var(--mrc-font-titular);
+    font-weight: 600;
+    font-size: 0.84375rem;
+    color: var(--texto);
+    text-decoration: none;
+    border-bottom: 2px solid var(--mrc-marca-amarillo);
+    padding-bottom: 2px;
+  }
+  .anaquel-todas:hover { border-bottom-color: var(--texto); }
   .anaquel .titular { margin: 6px 0 12px; }
   .anaquel-riel {
     display: flex;

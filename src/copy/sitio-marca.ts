@@ -82,6 +82,7 @@ export const marca = {
     ilustracionCaption: 'El personaje de la etiqueta',
     ilustracionAltPrefijo: 'Ilustración de la envoltura de',
     envolturaAltPrefijo: 'Envoltura de',
+    verTodas: 'Ver el catálogo completo →',
   },
 
   minis: {
@@ -204,10 +205,11 @@ export const marca = {
     correo: 'maracacaomx@gmail.com',
     // Semáforo honesto de datos técnicos (rescatado de las opciones del
     // canvas): qué existe hoy y qué sigue en preparación.
+    // La ficha técnica llegó (2026-08-14): el semáforo ya no promete.
     fichas: [
       { dato: 'Ingredientes y % de cacao', estado: 'disponibles por sabor' },
-      { dato: 'Alérgenos', estado: 'visibles en el empaque' },
-      { dato: 'Tabla nutrimental y vida de anaquel', estado: 'en preparación' },
+      { dato: 'Alérgenos', estado: 'confirmados en ficha técnica' },
+      { dato: 'Tabla nutrimental y vida de anaquel', estado: 'disponibles en ficha técnica' },
     ],
     tabs: [
       {
@@ -235,7 +237,7 @@ export const marca = {
         datos: [
           'Envueltas de a una, con el porcentaje de cacao impreso por sabor',
           'Ingredientes disponibles por sabor',
-          'Todas llevan lecitina de soya; el blanco, además, leche y pistaches',
+          'Contienen soya; pueden llevar trazas de leche y frutos de cáscara',
         ],
       },
       {
@@ -262,7 +264,8 @@ export const marca = {
       { p: '¿Dónde puedo comprar?', r: 'En el Mercado de Coyoacán (Malintzin s/n, Col. del Carmen) y en nuestro catálogo en línea, con precios públicos en pesos.' },
       { p: '¿Qué significa realmente 70% cacao?', r: 'Es la parte de la barra que procede del cacao: licor y manteca. Más porcentaje significa más cacao y menos protagonismo del azúcar.' },
       { p: '¿Qué azúcar usan?', r: 'Azúcar de caña. Y menos de la que esperas: con 70% cacao, el azúcar no es la protagonista.' },
-      { p: '¿Qué alérgenos tienen?', r: 'Todas las barras contienen lecitina de soya. El blanco con pistache contiene además leche en polvo y pistaches.' },
+      // Alérgenos según la ficha técnica oficial del cliente (2026-08-14).
+      { p: '¿Qué alérgenos tienen?', r: 'Todas las barras contienen soya y pueden contener trazas de leche y frutos de cáscara. El blanco con pistache contiene además leche en polvo y pistaches.' },
       { p: '¿Por qué se derrite en la boca?', r: 'La manteca de cacao se funde cerca de la temperatura corporal. Por eso un buen chocolate cambia tanto cuando dejas de masticarlo y permites que se funda.' },
       { p: '¿Cómo guardo mi chocolate?', r: 'En un lugar fresco y seco, lejos del sol y de olores fuertes. El refrigerador, en general, no es su amigo.' },
       { p: '¿Y la capa blanca que a veces aparece?', r: 'Es el bloom: no significa que el chocolate esté echado a perder. Suele deberse a cambios de temperatura o humedad.' },
@@ -307,6 +310,31 @@ export const marca = {
     },
   },
 
+  // El catálogo inmersivo de barras (/barras): una pantalla por sabor,
+  // referencia bennett-tea.com traducida al sistema — scroll con snap
+  // (nunca secuestrado), la barra 3D fija cambiando de pliego, y los
+  // datos DUROS de la ficha técnica oficial (docx 2026-08-14) en las
+  // columnas donde la referencia pone notas de cata.
+  catalogoBarras: {
+    titulo: 'Maracacao — Las 15 barras',
+    encabezado: 'Las 15 barras',
+    ruta: '/barras',
+    rutaVolver: '/sitio',
+    volver: 'Volver al sitio',
+    serie: 'Barra n.º',
+    de15: 'de 15',
+    colIngredientes: 'Ingredientes',
+    colAlergenos: 'Alérgenos',
+    colConservacion: 'Conservación',
+    alergenos: 'Contiene soya. Puede contener trazas de leche y frutos de cáscara.',
+    alergenosBlanco: 'Contiene soya, leche en polvo y pistaches.',
+    conservacion: 'Lugar fresco y seco, de 16 a 20 °C, lejos del sol y de olores fuertes.',
+    vida: 'Vida de anaquel: dos años.',
+    cta: 'Ver en el catálogo en línea',
+    selectorAria: 'Elige un sabor del catálogo',
+    visorAlt: 'La barra en tres dimensiones; arrastra para girarla',
+  },
+
   // Página en construcción — lo público mientras el sitio no sale.
   // Sin juegos de palabras: dice lo que pasa (retro de Marcos, vigente).
   construccion: {
@@ -330,7 +358,7 @@ export const marca = {
     contactoTitulo: 'Contacto',
     legalesTitulo: 'Legales',
     productos: [
-      { ancla: '#sabores', texto: 'Barras 70 g' },
+      { ancla: '/barras', texto: 'Barras 70 g — catálogo completo' },
       { ancla: '#sabores', texto: 'Gotas de chocolate 250 g' },
       { ancla: '#polvo', texto: 'Chocolate en polvo (próximamente)' },
     ],

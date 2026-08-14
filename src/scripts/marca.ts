@@ -27,6 +27,80 @@ raiz.classList.add('js')
 const quieto = matchMedia('(prefers-reduced-motion: reduce)').matches
 const punteroFino = matchMedia('(pointer: fine)').matches
 
+/* ---------- La barra 3D (compartida) ----------
+   El modelo de Marcos (Blender): UN solo GLB para los quince sabores —
+   cambiarle la textura del material «Label» por el pliego de imprenta
+   del sabor es cambiar de barra. La usan la ficha del anaquel (/sitio)
+   y el catálogo inmersivo (/barras). model-viewer va self-hosteado y
+   se carga una sola vez. */
+
+interface VisorModelo extends HTMLElement {
+  model?: {
+    materials: Array<{
+      name: string
+      pbrMetallicRoughness: { baseColorTexture: { setTexture(t: unknown): void } }
+    }>
+  }
+  createTexture(uri: string): Promise<unknown>
+}
+
+declare global {
+  interface Window { __mvCargando?: Promise<void> }
+}
+
+function cargarModelViewer(): Promise<void> {
+  window.__mvCargando ??= new Promise<void>((listo, falla) => {
+    const s = document.createElement('script')
+    s.type = 'module'
+    s.src = '/vendor/model-viewer.min.js'
+    s.onload = () => listo()
+    s.onerror = () => falla(new Error('model-viewer no cargó'))
+    document.head.appendChild(s)
+  })
+  return window.__mvCargando
+}
+
+/** Monta el visor en `caja` y resuelve con la función que cambia el
+ *  pliego. Rechaza si la librería o el modelo no cargan — la imagen
+ *  fija queda y la página no se entera. */
+async function montarBarra3D(caja: HTMLElement, alt: string): Promise<(slug: string) => void> {
+  await cargarModelViewer()
+  await customElements.whenDefined('model-viewer')
+
+  const mv = document.createElement('model-viewer') as unknown as VisorModelo
+  mv.setAttribute('src', caja.dataset.glb ?? '')
+  mv.setAttribute('alt', alt)
+  mv.setAttribute('camera-controls', '')
+  mv.setAttribute('disable-zoom', '')
+  mv.setAttribute('auto-rotate', '')
+  mv.setAttribute('rotation-per-second', '16deg')
+  mv.setAttribute('camera-orbit', '12deg 78deg 82%')
+  mv.setAttribute('shadow-intensity', '0.8')
+  mv.setAttribute('exposure', '1.1')
+  mv.setAttribute('interaction-prompt', 'none')
+
+  const texturas = new Map<string, unknown>()
+  const aplica = async (slug: string) => {
+    if (!mv.model) return
+    let tex = texturas.get(slug)
+    if (!tex) {
+      tex = await mv.createTexture(`/sitio/marca/pliego-${slug}.webp`)
+      texturas.set(slug, tex)
+    }
+    const label = mv.model.materials.find((m) => m.name === 'Label')
+    label?.pbrMetallicRoughness.baseColorTexture.setTexture(tex)
+  }
+
+  const cargado = new Promise<void>((listo, falla) => {
+    mv.addEventListener('load', () => listo(), { once: true })
+    mv.addEventListener('error', () => falla(new Error('el modelo no cargó')), { once: true })
+  })
+  caja.appendChild(mv)
+  await cargado
+  caja.classList.add('con-3d')
+  return (slug) => { void aplica(slug) }
+}
+
 /* ---------- 1. Menú overlay ---------- */
 
 const menuBoton = document.querySelector<HTMLButtonElement>('[data-menu-boton]')
@@ -179,22 +253,7 @@ if (datosCrudos && anaquel) {
   // Tabindex rotatorio inicial (solo la seleccionada entra por Tab).
   radios.forEach((r) => { r.tabIndex = r.getAttribute('aria-checked') === 'true' ? 0 : -1 })
 
-  /* ---------- 3c. La barra en 3D ----------
-     El modelo de Marcos (Blender): UN solo GLB para los quince sabores.
-     Al elegir en el anaquel se le cambia la textura del material
-     «Label» por el pliego de imprenta del sabor. El visor
-     (model-viewer, self-hosteado) se carga recién cuando la ficha entra
-     en pantalla; sin JS o con reduced-motion queda la imagen fija. */
-
-  interface VisorModelo extends HTMLElement {
-    model?: {
-      materials: Array<{
-        name: string
-        pbrMetallicRoughness: { baseColorTexture: { setTexture(t: unknown): void } }
-      }>
-    }
-    createTexture(uri: string): Promise<unknown>
-  }
+  /* ---------- 3c. La barra 3D en la ficha del anaquel ---------- */
 
   const visor = document.querySelector<HTMLElement>('[data-visor3d]')
   if (visor && !quieto) {
@@ -203,46 +262,9 @@ if (datosCrudos && anaquel) {
         if (!entrada.isIntersecting) return
         observador3d.disconnect()
         try {
-          await new Promise<void>((listo, falla) => {
-            const s = document.createElement('script')
-            s.type = 'module'
-            s.src = '/vendor/model-viewer.min.js'
-            s.onload = () => listo()
-            s.onerror = () => falla(new Error('model-viewer no cargó'))
-            document.head.appendChild(s)
-          })
-          await customElements.whenDefined('model-viewer')
-
-          const mv = document.createElement('model-viewer') as unknown as VisorModelo
-          mv.setAttribute('src', visor.dataset.glb ?? '')
-          mv.setAttribute('alt', 'La barra en tres dimensiones; arrastra para girarla')
-          mv.setAttribute('camera-controls', '')
-          mv.setAttribute('disable-zoom', '')
-          mv.setAttribute('auto-rotate', '')
-          mv.setAttribute('rotation-per-second', '16deg')
-          mv.setAttribute('camera-orbit', '12deg 78deg 82%')
-          mv.setAttribute('shadow-intensity', '0.8')
-          mv.setAttribute('exposure', '1.1')
-          mv.setAttribute('interaction-prompt', 'none')
-
-          const texturas = new Map<string, unknown>()
-          const aplica = async (slug: string) => {
-            if (!mv.model) return
-            let tex = texturas.get(slug)
-            if (!tex) {
-              tex = await mv.createTexture(`/sitio/marca/pliego-${slug}.webp`)
-              texturas.set(slug, tex)
-            }
-            const label = mv.model.materials.find((m) => m.name === 'Label')
-            label?.pbrMetallicRoughness.baseColorTexture.setTexture(tex)
-          }
-
-          mv.addEventListener('load', () => {
-            void aplica(slugActual)
-            visor.classList.add('con-3d')
-            visorElige = (slug) => { void aplica(slug) }
-          })
-          visor.appendChild(mv)
+          const aplica = await montarBarra3D(visor, 'La barra en tres dimensiones; arrastra para girarla')
+          aplica(slugActual)
+          visorElige = aplica
         } catch {
           /* Si el visor no carga, se queda la imagen. La página no se entera. */
         }
@@ -250,6 +272,60 @@ if (datosCrudos && anaquel) {
       { rootMargin: '250px' },
     )
     observador3d.observe(visor)
+  }
+}
+
+/* ---------- 3d. El catálogo inmersivo de barras (/barras) ----------
+   Una pantalla por sabor con scroll-snap (nunca secuestrado). El
+   observador marca el sabor activo: pinta el selector, actualiza el
+   hash (#canela es compartible) y le cambia el pliego a la única
+   instancia 3D fija. El selector de miniaturas salta a cualquier
+   sabor. */
+
+const catalogo = document.querySelector<HTMLElement>('[data-catalogo]')
+if (catalogo) {
+  const espectros = [...catalogo.querySelectorAll<HTMLElement>('[data-espectro]')]
+  const saltos = [...document.querySelectorAll<HTMLButtonElement>('[data-salto]')]
+  let aplicar3d: ((slug: string) => void) | null = null
+  let slugActivo = location.hash.replace('#', '') || espectros[0]?.id || ''
+
+  const marcaActivo = (slug: string) => {
+    if (!slug || slug === slugActivo) return
+    slugActivo = slug
+    saltos.forEach((b) => {
+      b.setAttribute('aria-current', b.dataset.salto === slug ? 'true' : 'false')
+    })
+    history.replaceState(null, '', `#${slug}`)
+    aplicar3d?.(slug)
+  }
+
+  const observadorActivo = new IntersectionObserver(
+    (entradas) => {
+      for (const e of entradas) {
+        if (e.isIntersecting) marcaActivo((e.target as HTMLElement).id)
+      }
+    },
+    { threshold: 0.55 },
+  )
+  espectros.forEach((s) => observadorActivo.observe(s))
+
+  saltos.forEach((b) => {
+    b.addEventListener('click', () => {
+      document.getElementById(b.dataset.salto ?? '')?.scrollIntoView({
+        behavior: quieto ? 'auto' : 'smooth',
+      })
+    })
+  })
+
+  const cajaVisor = document.querySelector<HTMLElement>('[data-catalogo-visor]')
+  if (cajaVisor && !quieto) {
+    void montarBarra3D(cajaVisor, cajaVisor.dataset.alt ?? '')
+      .then((aplica) => {
+        aplicar3d = aplica
+        raiz.classList.add('catalogo-3d')
+        aplica(slugActivo)
+      })
+      .catch(() => { /* quedan los packshots por sección */ })
   }
 }
 
