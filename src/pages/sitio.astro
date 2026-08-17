@@ -53,6 +53,10 @@ const datosAnaquel = sabores.map((s) => ({
 // La tinta de un sabor es blanca o la de impreso: con distinguir la
 // oscura alcanza (y el guard de hex a mano en páginas queda contento).
 const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== paletaMarca.tintaImpreso
+
+// Turnstile (Cloudflare) solo si la clave pública está configurada en
+// el build — sin clave, las capas honeypot + tiempo siguen activas.
+const claveTurnstile = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY as string | undefined
 ---
 <Base titulo={marca.titulo} fuentes="marca" candado>
   <a href="#contenido" class="salto">{marca.skipLink}</a>
@@ -534,6 +538,15 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
             data-correo={marca.contacto.correo}
           >
             <h3 class="formulario-titulo">{marca.contacto.formulario.titulo}</h3>
+            {/* Honeypot y marca de tiempo: capas anti-bots que la función
+                /api/contacto verifica. Invisibles para humanos. */}
+            <div class="campo-trampa" aria-hidden="true">
+              <label>
+                {marca.contacto.formulario.trampa}
+                <input type="text" name="apellido" tabindex="-1" autocomplete="off" />
+              </label>
+            </div>
+            <input type="hidden" name="inicio" value="" />
             <div class="formulario-campos">
               <label>
                 <span>{marca.contacto.formulario.nombre}</span>
@@ -557,10 +570,17 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
                 <textarea name="mensaje" rows="5" placeholder={marca.contacto.formulario.mensajeEjemplo} required></textarea>
               </label>
             </div>
+            {claveTurnstile && (
+              <div class="cf-turnstile" data-sitekey={claveTurnstile}></div>
+            )}
             <div class="formulario-pie">
-              <button class="formulario-enviar" type="submit" data-iman>{marca.contacto.formulario.enviar}</button>
+              <button class="formulario-enviar" type="submit" data-iman>
+                <span data-formulario-boton>{marca.contacto.formulario.enviar}</span>
+              </button>
               <p class="formulario-nota suave">{marca.contacto.formulario.nota}</p>
             </div>
+            <p class="formulario-exito" data-formulario-exito hidden>{marca.contacto.formulario.exito}</p>
+            <p class="formulario-nota suave" data-formulario-aviso hidden>{marca.contacto.formulario.aviso}</p>
           </form>
           <img
             class="contacto-personaje"
@@ -672,6 +692,9 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
     </div>
   </footer>
 
+  {claveTurnstile && (
+    <script is:inline src="https://challenges.cloudflare.com/turnstile/api.js" async defer></script>
+  )}
   <script type="application/json" id="datos-anaquel" set:html={JSON.stringify(datosAnaquel)} />
   <script>
     import '@/scripts/marca'
@@ -1595,6 +1618,22 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
   }
   .formulario-enviar:active { transform: translateY(3px); box-shadow: 0 2px 0 0 color-mix(in srgb, var(--mrc-marca-rojoHondo) 70%, var(--mrc-marca-rojo)); }
   .formulario-nota { font-size: 0.71875rem; line-height: 1.5; margin: 0; }
+  .formulario-exito {
+    font-family: var(--mrc-font-titular);
+    font-weight: 600;
+    font-size: 0.9375rem;
+    color: var(--mrc-sabor-limaYChile);
+    margin: 0;
+  }
+  /* El honeypot vive fuera de la pantalla, no en display:none: algunos
+     bots saltan lo invisible por CSS pero no lo desplazado. */
+  .campo-trampa {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
   @media (prefers-reduced-motion: reduce) {
     .formulario-enviar, .formulario-enviar:hover, .formulario-enviar:active { transition: none; transform: none; }
   }

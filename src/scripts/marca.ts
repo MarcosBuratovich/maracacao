@@ -348,15 +348,25 @@ for (const boton of document.querySelectorAll<HTMLButtonElement>('[data-copiar]'
 }
 
 /* ---------- 4b. Formulario de contacto ----------
-   Sin servidor: el envío arma un mailto con asunto y cuerpo ya
-   escritos y lo abre en el correo del visitante. Sin JS, el action
-   mailto del form hace lo propio (más crudo, pero funciona). */
+   Primera opción: POST a /api/contacto (función de Vercel que envía el
+   correo por Resend, con honeypot + trampa de tiempo + Turnstile
+   opcional). Si la función no está configurada o falla, el respaldo es
+   el mailto de siempre. Sin JS, el action mailto del form hace lo
+   propio (más crudo, pero funciona). */
 
 const formulario = document.querySelector<HTMLFormElement>('[data-formulario]')
 if (formulario) {
-  formulario.addEventListener('submit', (e) => {
-    e.preventDefault()
-    const datos = new FormData(formulario)
+  // La trampa de tiempo arranca cuando la página carga.
+  const inicio = formulario.querySelector<HTMLInputElement>('[name="inicio"]')
+  if (inicio) inicio.value = String(Date.now())
+
+  const botonTexto = formulario.querySelector<HTMLElement>('[data-formulario-boton]')
+  const exito = formulario.querySelector<HTMLElement>('[data-formulario-exito]')
+  const aviso = formulario.querySelector<HTMLElement>('[data-formulario-aviso]')
+  const boton = formulario.querySelector<HTMLButtonElement>('button[type="submit"]')
+  const textoOriginal = botonTexto?.textContent ?? ''
+
+  const abreMailto = (datos: FormData) => {
     const esNegocio = datos.get('tipo') === 'negocio'
     const asunto = esNegocio
       ? formulario.dataset.asuntoNegocio ?? ''
@@ -368,6 +378,45 @@ if (formulario) {
       String(datos.get('mensaje') ?? ''),
     ].join('\n')
     location.href = `mailto:${formulario.dataset.correo}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`
+  }
+
+  formulario.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const datos = new FormData(formulario)
+    if (aviso) aviso.hidden = true
+    if (boton) boton.disabled = true
+    if (botonTexto) botonTexto.textContent = 'Enviando…'
+    try {
+      const respuesta = await fetch('/api/contacto', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombre: datos.get('nombre'),
+          correo: datos.get('correo'),
+          tipo: datos.get('tipo'),
+          mensaje: datos.get('mensaje'),
+          apellido: datos.get('apellido'),
+          inicio: Number(datos.get('inicio')),
+          turnstile: datos.get('cf-turnstile-response'),
+        }),
+      })
+      if (respuesta.ok) {
+        formulario.reset()
+        if (inicio) inicio.value = String(Date.now())
+        if (exito) exito.hidden = false
+        return
+      }
+      // 503 = función sin configurar; cualquier otro fallo también cae
+      // al respaldo para que el mensaje nunca se pierda.
+      if (aviso) aviso.hidden = false
+      abreMailto(datos)
+    } catch {
+      if (aviso) aviso.hidden = false
+      abreMailto(datos)
+    } finally {
+      if (boton) boton.disabled = false
+      if (botonTexto) botonTexto.textContent = textoOriginal
+    }
   })
 }
 

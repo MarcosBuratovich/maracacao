@@ -263,6 +263,27 @@ describe('el catálogo inmersivo de barras (DESCONTINUADO 2026-08-17, vive en _b
   })
 })
 
+describe('el formulario con envío real (2026-08-17)', () => {
+  it('la función de Vercel existe, con sus capas anti-bots', () => {
+    const fn = readFileSync('api/contacto.ts', 'utf8')
+    expect(fn).toContain('RESEND_API_KEY')
+    expect(fn).toContain('apellido') // capa 1: honeypot
+    expect(fn).toContain('4000') // capa 2: trampa de tiempo
+    expect(fn).toContain('ORIGENES_PERMITIDOS') // capa 3: origen
+    expect(fn).toContain('TURNSTILE_SECRET') // capa 4: opcional
+    // La clave nunca viaja en el código: solo por variable de entorno.
+    expect(fn).not.toMatch(/re_[A-Za-z0-9]{20,}/)
+  })
+
+  it('el form arma las trampas y conserva el respaldo mailto', async () => {
+    const html = await container.renderToString(Borrador)
+    expect(html).toContain('name="apellido"')
+    expect(html).toContain('name="inicio"')
+    expect(html).toContain('action="mailto:')
+    expect(html).toContain('data-formulario-exito')
+  })
+})
+
 describe('el candado de cortesía (2026-08-13)', () => {
   it('las páginas privadas lo piden; la construcción, no', () => {
     for (const pagina of [

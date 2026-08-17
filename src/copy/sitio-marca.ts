@@ -312,7 +312,13 @@ export const marca = {
       mensaje: 'Tu mensaje',
       mensajeEjemplo: 'Cuéntanos qué necesitas: pedidos, mayoreo, regalos, dudas…',
       enviar: 'Enviar mensaje',
-      nota: 'Al enviar se abre tu aplicación de correo con el mensaje listo para maracacaomx@gmail.com.',
+      enviando: 'Enviando…',
+      nota: 'Te respondemos al correo que nos dejes.',
+      exito: '¡Mensaje enviado! Te respondemos pronto.',
+      // Si el envío en línea falla, el respaldo es el mailto de siempre.
+      aviso: 'No se pudo enviar en línea: se abre tu aplicación de correo con el mensaje listo.',
+      // El honeypot: invisible para humanos, irresistible para bots.
+      trampa: 'Apellido (no llenar)',
       asuntoPersonal: 'Mensaje desde el sitio — compra personal',
       asuntoNegocio: 'Mensaje desde el sitio — negocio',
     },
