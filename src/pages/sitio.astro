@@ -576,11 +576,30 @@ const claveTurnstile = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY as string | und
             <div class="formulario-pie">
               <button class="formulario-enviar" type="submit" data-iman>
                 <span data-formulario-boton>{marca.contacto.formulario.enviar}</span>
+                <span class="puntos" aria-hidden="true"><i></i><i></i><i></i></span>
               </button>
               <p class="formulario-nota suave">{marca.contacto.formulario.nota}</p>
             </div>
-            <p class="formulario-exito" data-formulario-exito hidden>{marca.contacto.formulario.exito}</p>
-            <p class="formulario-nota suave" data-formulario-aviso hidden>{marca.contacto.formulario.aviso}</p>
+
+            {/* El éxito llega como sello de goma: el ticket cosido se
+                estampa sobre el formulario y las chispas de la marca
+                revientan en las esquinas. */}
+            <div class="formulario-exito" data-formulario-exito hidden tabindex="-1" role="status">
+              <div class="exito-ticket">
+                <TicketPanel>
+                  <p class="exito-titulo mano">{marca.contacto.formulario.exitoTitulo}</p>
+                  <p class="exito-sub">{marca.contacto.formulario.exitoSub}</p>
+                </TicketPanel>
+                <span class="exito-chispa a" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="exito-chispa b" aria-hidden="true"><i></i><i></i><i></i></span>
+              </div>
+              <button class="exito-otra" type="button" data-formulario-otra>
+                {marca.contacto.formulario.otraVez}
+              </button>
+            </div>
+            <p class="formulario-nota suave formulario-aviso" data-formulario-aviso hidden role="status">
+              {marca.contacto.formulario.aviso}
+            </p>
           </form>
           <img
             class="contacto-personaje"
@@ -1618,12 +1637,101 @@ const claveTurnstile = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY as string | und
   }
   .formulario-enviar:active { transform: translateY(3px); box-shadow: 0 2px 0 0 color-mix(in srgb, var(--mrc-marca-rojoHondo) 70%, var(--mrc-marca-rojo)); }
   .formulario-nota { font-size: 0.71875rem; line-height: 1.5; margin: 0; }
-  .formulario-exito {
+
+  /* ---------- Estados del formulario ----------
+     data-estado en el <form>: '' (normal) · 'enviando' · 'enviado'. */
+
+  /* Enviando: el botón muestra los tres puntos que respiran. */
+  .puntos { display: none; gap: 3px; margin-left: 6px; }
+  .puntos i {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: currentColor;
+    display: inline-block;
+  }
+  .formulario[data-estado='enviando'] .puntos { display: inline-flex; }
+  @media (prefers-reduced-motion: no-preference) {
+    .formulario[data-estado='enviando'] .puntos i { animation: respira 0.9s ease-in-out infinite; }
+    .formulario[data-estado='enviando'] .puntos i:nth-child(2) { animation-delay: 0.15s; }
+    .formulario[data-estado='enviando'] .puntos i:nth-child(3) { animation-delay: 0.3s; }
+  }
+  @keyframes respira {
+    0%, 100% { opacity: 0.25; transform: translateY(0); }
+    50% { opacity: 1; transform: translateY(-2px); }
+  }
+
+  /* Enviado: los campos se retiran y el ticket se estampa. */
+  .formulario[data-estado='enviado'] .formulario-campos,
+  .formulario[data-estado='enviado'] .formulario-pie { display: none; }
+  .formulario-exito { outline: none; }
+  .exito-ticket { position: relative; max-width: 380px; margin-inline: auto; }
+  .exito-titulo { font-size: 1.375rem; letter-spacing: 0.04em; margin: 0 0 4px; }
+  .exito-sub { font-size: 0.84375rem; line-height: 1.5; margin: 0; }
+  @media (prefers-reduced-motion: no-preference) {
+    .formulario[data-estado='enviado'] .exito-ticket {
+      animation: estampa 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+    }
+  }
+  @keyframes estampa {
+    from { opacity: 0; transform: scale(1.5) rotate(4deg); }
+    55% { opacity: 1; transform: scale(0.95) rotate(-2.5deg); }
+    to { opacity: 1; transform: scale(1) rotate(-2deg); }
+  }
+  .formulario[data-estado='enviado'] .exito-ticket { transform: rotate(-2deg); }
+
+  /* Las chispas de la marca revientan en las esquinas del ticket. */
+  .exito-chispa {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+  }
+  .exito-chispa.a { top: -10px; left: -12px; }
+  .exito-chispa.b { bottom: -8px; right: -14px; }
+  .exito-chispa i {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 3px;
+    height: 12px;
+    border-radius: 2px;
+    background: var(--mrc-marca-rojo);
+  }
+  .exito-chispa i:nth-child(1) { transform: translate(-50%, -50%) rotate(0deg); }
+  .exito-chispa i:nth-child(2) { transform: translate(-50%, -50%) rotate(60deg); }
+  .exito-chispa i:nth-child(3) { transform: translate(-50%, -50%) rotate(120deg); }
+  @media (prefers-reduced-motion: no-preference) {
+    .formulario[data-estado='enviado'] .exito-chispa {
+      animation: revienta 0.55s cubic-bezier(0.2, 1.6, 0.4, 1) 0.28s both;
+    }
+    .formulario[data-estado='enviado'] .exito-chispa.b { animation-delay: 0.38s; }
+  }
+  @keyframes revienta {
+    from { opacity: 0; transform: scale(0) rotate(-40deg); }
+    to { opacity: 1; transform: scale(1) rotate(0deg); }
+  }
+  .exito-otra {
+    display: block;
+    margin: 16px auto 0;
     font-family: var(--mrc-font-titular);
     font-weight: 600;
-    font-size: 0.9375rem;
-    color: var(--mrc-sabor-limaYChile);
-    margin: 0;
+    font-size: 0.84375rem;
+    color: var(--mrc-marca-tinta);
+    background: none;
+    border: none;
+    border-bottom: 2px solid var(--mrc-marca-amarillo);
+    padding: 0 0 2px;
+    cursor: pointer;
+  }
+  .exito-otra:hover { border-bottom-color: var(--mrc-marca-rojo); }
+
+  /* El aviso (respaldo mailto) entra deslizándose. */
+  @media (prefers-reduced-motion: no-preference) {
+    .formulario-aviso:not([hidden]) { animation: asoma 0.35s ease-out both; }
+  }
+  @keyframes asoma {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: none; }
   }
   /* El honeypot vive fuera de la pantalla, no en display:none: algunos
      bots saltan lo invisible por CSS pero no lo desplazado. */

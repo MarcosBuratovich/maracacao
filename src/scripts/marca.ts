@@ -380,12 +380,20 @@ if (formulario) {
     location.href = `mailto:${formulario.dataset.correo}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`
   }
 
+  const otra = formulario.querySelector<HTMLButtonElement>('[data-formulario-otra]')
+  otra?.addEventListener('click', () => {
+    formulario.dataset.estado = ''
+    if (exito) exito.hidden = true
+    formulario.querySelector<HTMLInputElement>('[name="nombre"]')?.focus()
+  })
+
   formulario.addEventListener('submit', async (e) => {
     e.preventDefault()
     const datos = new FormData(formulario)
     if (aviso) aviso.hidden = true
     if (boton) boton.disabled = true
-    if (botonTexto) botonTexto.textContent = 'Enviando…'
+    formulario.dataset.estado = 'enviando'
+    if (botonTexto) botonTexto.textContent = 'Enviando'
     try {
       const respuesta = await fetch('/api/contacto', {
         method: 'POST',
@@ -403,17 +411,26 @@ if (formulario) {
       if (respuesta.ok) {
         formulario.reset()
         if (inicio) inicio.value = String(Date.now())
-        if (exito) exito.hidden = false
+        formulario.dataset.estado = 'enviado'
+        if (exito) {
+          exito.hidden = false
+          // El foco viaja al sello: el lector de pantalla lo anuncia y
+          // el teclado queda sobre «Enviar otro mensaje».
+          exito.focus()
+        }
         return
       }
       // 503 = función sin configurar; cualquier otro fallo también cae
       // al respaldo para que el mensaje nunca se pierda.
+      formulario.dataset.estado = ''
       if (aviso) aviso.hidden = false
       abreMailto(datos)
     } catch {
+      formulario.dataset.estado = ''
       if (aviso) aviso.hidden = false
       abreMailto(datos)
     } finally {
+      if (formulario.dataset.estado !== 'enviado') formulario.dataset.estado = ''
       if (boton) boton.disabled = false
       if (botonTexto) botonTexto.textContent = textoOriginal
     }

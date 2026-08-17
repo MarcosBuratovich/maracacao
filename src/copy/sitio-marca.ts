@@ -312,9 +312,11 @@ export const marca = {
       mensaje: 'Tu mensaje',
       mensajeEjemplo: 'Cuéntanos qué necesitas: pedidos, mayoreo, regalos, dudas…',
       enviar: 'Enviar mensaje',
-      enviando: 'Enviando…',
+      enviando: 'Enviando',
       nota: 'Te respondemos al correo que nos dejes.',
-      exito: '¡Mensaje enviado! Te respondemos pronto.',
+      exitoTitulo: '¡Mensaje enviado!',
+      exitoSub: 'Te respondemos pronto al correo que dejaste.',
+      otraVez: 'Enviar otro mensaje',
       // Si el envío en línea falla, el respaldo es el mailto de siempre.
       aviso: 'No se pudo enviar en línea: se abre tu aplicación de correo con el mensaje listo.',
       // El honeypot: invisible para humanos, irresistible para bots.
