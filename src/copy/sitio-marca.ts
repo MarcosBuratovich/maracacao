@@ -224,6 +224,7 @@ export const marca = {
           '6 sabores: jengibre y naranja, hierbabuena, canela, menta, limoncillo y lima y chile',
           'Para galletas, brownies, panes, ganaches y coberturas',
           'También se comen solas, como botana',
+          'Vida de anaquel de dos años; no requieren refrigeración',
         ],
       },
       {
@@ -238,6 +239,7 @@ export const marca = {
           'Envueltas de a una, con el porcentaje de cacao impreso por sabor',
           'Ingredientes disponibles por sabor',
           'Contienen soya; pueden llevar trazas de leche y frutos de cáscara',
+          'Vida de anaquel de dos años; no requieren refrigeración',
         ],
       },
       {
@@ -249,6 +251,7 @@ export const marca = {
         clave: 'salDeMar',
         cuerpo: 'Ocho variedades para la taza, hechas con cocoa natural, cocoa alcalina y pasta de cacao.',
         datos: [
+          'Presentaciones de 250 g y 1 kg',
           'Se disuelve en bebidas frías o calientes',
           'También para licuados, repostería y postres',
           'Aún no está a la venta: escríbenos si te interesa',
@@ -267,7 +270,7 @@ export const marca = {
       // Alérgenos según la ficha técnica oficial del cliente (2026-08-14).
       { p: '¿Qué alérgenos tienen?', r: 'Todas las barras contienen soya y pueden contener trazas de leche y frutos de cáscara. El blanco con pistache contiene además leche en polvo y pistaches.' },
       { p: '¿Por qué se derrite en la boca?', r: 'La manteca de cacao se funde cerca de la temperatura corporal. Por eso un buen chocolate cambia tanto cuando dejas de masticarlo y permites que se funda.' },
-      { p: '¿Cómo guardo mi chocolate?', r: 'En un lugar fresco y seco, lejos del sol y de olores fuertes. El refrigerador, en general, no es su amigo.' },
+      { p: '¿Cómo guardo mi chocolate?', r: 'En un lugar fresco y seco (lo ideal: entre 16 y 20 °C), lejos del sol y de olores fuertes. El refrigerador, en general, no es su amigo.' },
       { p: '¿Y la capa blanca que a veces aparece?', r: 'Es el bloom: no significa que el chocolate esté echado a perder. Suele deberse a cambios de temperatura o humedad.' },
       { p: '¿Envíos, mayoreo o regalos?', r: 'Escríbenos a maracacaomx@gmail.com y lo resolvemos contigo.' },
     ],
@@ -284,6 +287,11 @@ export const marca = {
     correoNota: 'Pedidos, mayoreo, regalos y dudas.',
     copiar: 'Copiar correo',
     copiado: '¡Copiado!',
+    // De la ficha técnica oficial (2026-08-17): «redes sociales:
+    // @maracacaomx». Sin enlace hasta confirmar en qué red viven.
+    redesEtiqueta: 'REDES',
+    redes: '@maracacaomx',
+    redesNota: 'Búscanos en redes sociales.',
     catalogoEtiqueta: 'CATÁLOGO EN LÍNEA',
     catalogoNombre: 'chocolateria.pulpos.shop',
     catalogoUrl: 'https://chocolateria.pulpos.shop',

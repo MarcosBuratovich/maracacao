@@ -596,6 +596,11 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
             </p>
             <p class="info-nota suave">{marca.contacto.catalogoNota}</p>
           </div>
+          <div class="info-bloque">
+            <p class="mono info-etiqueta">{marca.contacto.redesEtiqueta}</p>
+            <p class="info-dato">{marca.contacto.redes}</p>
+            <p class="info-nota suave">{marca.contacto.redesNota}</p>
+          </div>
         </div>
       </div>
     </section>
@@ -645,6 +650,7 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
             <li><a href={`mailto:${marca.contacto.correo}`}>{marca.contacto.correo}</a></li>
             <li><a href="#contacto">{marca.contacto.puestoTitulo.join(' ')}</a></li>
             <li><span class="pie-suelto">{marca.contacto.direccion[1]}</span></li>
+            <li><span class="pie-suelto">{marca.contacto.redes}</span></li>
           </ul>
         </div>
         <div>
