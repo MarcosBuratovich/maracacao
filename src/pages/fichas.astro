@@ -1,0 +1,386 @@
+---
+// src/pages/fichas.astro — El generador de fichas técnicas en línea.
+//
+// La herramienta para el cliente: escribe el contenido, la ficha se
+// arma en vivo con la plantilla oficial (src/fichas/plantilla.ts — la
+// misma de pnpm fichas) y «Descargar PDF» imprime el iframe de la vista
+// previa: como el navegador es Chromium, el PDF sale IDÉNTICO al del
+// generador local, con las fuentes servidas por el propio sitio.
+//
+// Tras el candado, como todo lo privado. El borrador vive en
+// localStorage para que nada se pierda entre visitas.
+import Base from '@/layouts/Base.astro'
+import selloRaw from '@/assets/brand/sello-mano.svg?raw'
+import { marca } from '@/copy/sitio-marca'
+import { fichasBase } from '@/fichas/base'
+import { bloquesATexto } from '@/fichas/plantilla'
+import '@/styles/global.css'
+import '@/styles/marca.css'
+
+const sello = selloRaw.replace('<svg', '<svg aria-hidden="true" focusable="false"')
+const copy = marca.generadorFichas
+
+// El formulario arranca precargado con la ficha de barras: el cliente
+// ve la convención escrita en un ejemplo real y edita desde ahí.
+const inicial = fichasBase[0]
+---
+<Base titulo={copy.titulo} fuentes="marca" candado>
+  <header class="cinta">
+    <a class="cinta-marca" href={marca.catalogoBarras.rutaVolver} aria-label={marca.catalogoBarras.volver}>
+      <span class="cinta-sello" set:html={sello} />
+      <span>
+        <span class="cinta-nombre">{marca.marca.wordmark}</span>
+        <span class="cinta-volver mono">← {marca.catalogoBarras.volver}</span>
+      </span>
+    </a>
+    <p class="cinta-titulo mano">{copy.encabezado}</p>
+  </header>
+
+  <main class="taller" data-generador>
+    <section class="panel" aria-label={copy.encabezado}>
+      <p class="taller-intro">{copy.intro}</p>
+      <noscript><p class="taller-intro"><b>{copy.sinJs}</b></p></noscript>
+
+      <label class="campo">
+        <span>{copy.empezarDesde}</span>
+        <select data-base data-confirmar={copy.confirmarCambio}>
+          {copy.opciones.map((o) => <option value={o.valor}>{o.texto}</option>)}
+        </select>
+      </label>
+
+      <label class="campo">
+        <span>{copy.producto}</span>
+        <input type="text" name="producto" value={inicial.producto} />
+      </label>
+      <label class="campo">
+        <span>{copy.denominacion}</span>
+        <input type="text" name="denominacion" value={inicial.denominacion} />
+      </label>
+
+      <fieldset class="campo-grupo">
+        <legend>{copy.metaTitulo}</legend>
+        {[0, 1, 2, 3].map((i) => (
+          <div class="meta-fila">
+            <input type="text" data-meta-etiqueta aria-label={copy.metaEtiqueta} value={inicial.meta[i]?.[0] ?? ''} />
+            <input type="text" data-meta-valor aria-label={copy.metaValor} value={inicial.meta[i]?.[1] ?? ''} />
+          </div>
+        ))}
+      </fieldset>
+
+      <fieldset class="campo-grupo">
+        <legend>{copy.seccionesTitulo}</legend>
+        <p class="ayuda suave">{copy.ayuda}</p>
+        <div data-secciones>
+          {inicial.secciones.map((s) => (
+            <div class="seccion-editor" data-seccion>
+              <div class="seccion-cabeza">
+                <input type="text" data-seccion-titulo aria-label={copy.seccionTitulo} value={s.titulo} />
+                <button type="button" data-mover="-1" aria-label={copy.subir}>↑</button>
+                <button type="button" data-mover="1" aria-label={copy.bajar}>↓</button>
+                <button type="button" data-quitar aria-label={copy.quitar}>✕</button>
+              </div>
+              <textarea data-seccion-texto rows="5" aria-label={copy.seccionTexto}>{bloquesATexto(s.bloques)}</textarea>
+            </div>
+          ))}
+        </div>
+        <button class="agregar" type="button" data-agregar>{copy.agregar}</button>
+      </fieldset>
+
+      <p class="ayuda suave">{copy.borrador}</p>
+    </section>
+
+    <section class="vista">
+      <div class="vista-marco">
+        <iframe title={copy.vistaAria} data-vista></iframe>
+      </div>
+      <div class="vista-pie">
+        <button class="descargar" type="button" data-descargar>{copy.descargar}</button>
+        <p class="ayuda suave">{copy.descargarNota}</p>
+      </div>
+    </section>
+  </main>
+
+  <template data-plantilla-seccion>
+    <div class="seccion-editor" data-seccion>
+      <div class="seccion-cabeza">
+        <input type="text" data-seccion-titulo aria-label={copy.seccionTitulo} value="" />
+        <button type="button" data-mover="-1" aria-label={copy.subir}>↑</button>
+        <button type="button" data-mover="1" aria-label={copy.bajar}>↓</button>
+        <button type="button" data-quitar aria-label={copy.quitar}>✕</button>
+      </div>
+      <textarea data-seccion-texto rows="5" aria-label={copy.seccionTexto}></textarea>
+    </div>
+  </template>
+
+  <script>
+    import '@/scripts/marca'
+    import selloCrudo from '@/assets/brand/sello-mano.svg?raw'
+    import { fichaHtml, textoABloques, bloquesATexto, type Ficha } from '@/fichas/plantilla'
+    import { fichasBase } from '@/fichas/base'
+    import { marca as paleta } from '@/tokens/color'
+
+    const sello = selloCrudo.replace('<svg', '<svg aria-hidden="true"')
+    const taller = document.querySelector<HTMLElement>('[data-generador]')
+
+    if (taller) {
+      const $ = <T extends HTMLElement>(sel: string) => taller.querySelector<T>(sel)!
+      const vista = $('[data-vista]') as unknown as HTMLIFrameElement
+      const contSecciones = $('[data-secciones]')
+      const plantillaSeccion = document.querySelector<HTMLTemplateElement>('[data-plantilla-seccion]')!
+      const LLAVE = 'mrc-ficha-borrador'
+
+      interface Borrador {
+        producto: string
+        denominacion: string
+        meta: Array<[string, string]>
+        secciones: Array<{ titulo: string; texto: string }>
+      }
+
+      const lee = (): Borrador => ({
+        producto: $<HTMLInputElement>('[name="producto"]').value,
+        denominacion: $<HTMLInputElement>('[name="denominacion"]').value,
+        meta: [...taller.querySelectorAll('.meta-fila')].map((f) => [
+          f.querySelector<HTMLInputElement>('[data-meta-etiqueta]')!.value,
+          f.querySelector<HTMLInputElement>('[data-meta-valor]')!.value,
+        ]),
+        secciones: [...contSecciones.querySelectorAll('[data-seccion]')].map((s) => ({
+          titulo: s.querySelector<HTMLInputElement>('[data-seccion-titulo]')!.value,
+          texto: s.querySelector<HTMLTextAreaElement>('[data-seccion-texto]')!.value,
+        })),
+      })
+
+      const escribe = (b: Borrador) => {
+        $<HTMLInputElement>('[name="producto"]').value = b.producto
+        $<HTMLInputElement>('[name="denominacion"]').value = b.denominacion
+        ;[...taller.querySelectorAll('.meta-fila')].forEach((f, i) => {
+          f.querySelector<HTMLInputElement>('[data-meta-etiqueta]')!.value = b.meta[i]?.[0] ?? ''
+          f.querySelector<HTMLInputElement>('[data-meta-valor]')!.value = b.meta[i]?.[1] ?? ''
+        })
+        contSecciones.replaceChildren()
+        for (const s of b.secciones) agregaSeccion(s.titulo, s.texto)
+      }
+
+      const agregaSeccion = (titulo = '', texto = '') => {
+        const nodo = plantillaSeccion.content.firstElementChild!.cloneNode(true) as HTMLElement
+        nodo.querySelector<HTMLInputElement>('[data-seccion-titulo]')!.value = titulo
+        nodo.querySelector<HTMLTextAreaElement>('[data-seccion-texto]')!.value = texto
+        contSecciones.appendChild(nodo)
+      }
+
+      const aFicha = (b: Borrador): Ficha => ({
+        archivo: 'ficha',
+        producto: b.producto,
+        denominacion: b.denominacion,
+        acento: paleta.rojoHondo,
+        meta: b.meta.filter(([k, v]) => k.trim() && v.trim()),
+        secciones: b.secciones
+          .filter((s) => s.titulo.trim())
+          .map((s) => ({ titulo: s.titulo, bloques: textoABloques(s.texto) })),
+      })
+
+      let temporizador: ReturnType<typeof setTimeout> | undefined
+      const actualiza = () => {
+        const borrador = lee()
+        vista.srcdoc = fichaHtml(aFicha(borrador), '/fonts', sello)
+        try { localStorage.setItem(LLAVE, JSON.stringify(borrador)) } catch {}
+      }
+      const pideActualizar = () => {
+        clearTimeout(temporizador)
+        temporizador = setTimeout(actualiza, 350)
+      }
+
+      taller.addEventListener('input', pideActualizar)
+      taller.addEventListener('click', (e) => {
+        const boton = (e.target as HTMLElement).closest('button')
+        if (!boton) return
+        if (boton.dataset.agregar !== undefined) agregaSeccion()
+        const seccion = boton.closest<HTMLElement>('[data-seccion]')
+        if (seccion && boton.dataset.quitar !== undefined) seccion.remove()
+        if (seccion && boton.dataset.mover) {
+          const delta = Number(boton.dataset.mover)
+          const vecino = delta < 0 ? seccion.previousElementSibling : seccion.nextElementSibling
+          if (vecino) {
+            if (delta < 0) contSecciones.insertBefore(seccion, vecino)
+            else contSecciones.insertBefore(vecino, seccion)
+          }
+        }
+        pideActualizar()
+      })
+
+      const desdeBase = (ficha: (typeof fichasBase)[number]): Borrador => ({
+        producto: ficha.producto,
+        denominacion: ficha.denominacion,
+        meta: [...ficha.meta],
+        secciones: ficha.secciones.map((s) => ({ titulo: s.titulo, texto: bloquesATexto(s.bloques) })),
+      })
+
+      $<HTMLSelectElement>('[data-base]').addEventListener('change', function () {
+        // Cambiar de base pisa lo escrito: se avisa antes.
+        if (!confirm(this.dataset.confirmar ?? '')) return
+        const valor = this.value
+        const vacia: Borrador = {
+          producto: '',
+          denominacion: '',
+          meta: [['Marca', 'Maracacao'], ['', ''], ['', ''], ['', '']],
+          secciones: [{ titulo: '', texto: '' }],
+        }
+        const elegida =
+          valor === 'barras' ? desdeBase(fichasBase[0])
+          : valor === 'polvo' ? desdeBase(fichasBase[1])
+          : vacia
+        escribe(elegida)
+        actualiza()
+      })
+
+      $('[data-descargar]').addEventListener('click', () => {
+        vista.contentWindow?.print()
+      })
+
+      // Arranque: el borrador guardado gana; si no hay, la base de barras.
+      try {
+        const guardado = localStorage.getItem(LLAVE)
+        if (guardado) escribe(JSON.parse(guardado) as Borrador)
+      } catch {}
+      actualiza()
+    }
+  </script>
+</Base>
+
+<style>
+  .cinta {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px clamp(16px, 3vw, 32px);
+    background: var(--mrc-marca-crema);
+    border-bottom: 1px solid rgb(76 44 22 / 0.25);
+  }
+  .cinta-marca { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--mrc-marca-tinta); }
+  .cinta-sello { display: inline-flex; width: 34px; }
+  .cinta-sello :global(svg) { width: 100%; height: auto; }
+  .cinta-nombre { display: block; font-family: var(--mrc-font-titular); font-weight: 700; font-size: 0.8125rem; letter-spacing: 0.09em; line-height: 1; }
+  .cinta-volver { display: block; font-size: 0.5625rem; margin-top: 3px; color: var(--mrc-marca-rojoHondo); }
+  .cinta-titulo { font-size: 1rem; letter-spacing: 0.18em; text-transform: uppercase; margin: 0; }
+
+  .taller {
+    display: grid;
+    grid-template-columns: minmax(340px, 460px) 1fr;
+    gap: clamp(16px, 2.5vw, 32px);
+    padding: clamp(16px, 2.5vw, 32px);
+    max-width: 1400px;
+    margin-inline: auto;
+    align-items: start;
+  }
+  @media (max-width: 900px) {
+    .taller { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: #fff;
+    border: 1px solid rgb(76 44 22 / 0.18);
+    border-radius: 10px;
+    box-shadow: 0 12px 28px rgb(76 44 22 / 0.14);
+    padding: clamp(18px, 2.4vw, 26px);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .taller-intro { font-size: 0.875rem; line-height: 1.55; margin: 0; }
+
+  .campo { display: flex; flex-direction: column; gap: 6px; }
+  .campo > span, .campo-grupo legend {
+    font-family: var(--mrc-font-titular);
+    font-weight: 600;
+    font-size: 0.8125rem;
+  }
+  .campo input, .campo select, .meta-fila input,
+  .seccion-editor input, .seccion-editor textarea {
+    font-family: var(--mrc-font-serifMarca);
+    font-size: 0.9375rem;
+    color: var(--mrc-marca-tinta);
+    background: var(--mrc-marca-crema);
+    border: 2px solid rgb(76 44 22 / 0.35);
+    border-radius: 6px;
+    padding: 8px 11px;
+  }
+  .campo input:focus-visible, .campo select:focus-visible, .meta-fila input:focus-visible,
+  .seccion-editor input:focus-visible, .seccion-editor textarea:focus-visible {
+    outline: none;
+    border-color: var(--mrc-marca-rojo);
+  }
+  .campo-grupo { border: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .campo-grupo legend { padding: 0; margin-bottom: 4px; }
+  .ayuda { font-size: 0.71875rem; line-height: 1.5; margin: 0; }
+  .meta-fila { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; }
+
+  .seccion-editor {
+    border: 1px solid rgb(76 44 22 / 0.2);
+    border-radius: 8px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 10px;
+    background: rgb(248 236 222 / 0.4);
+  }
+  .seccion-cabeza { display: flex; gap: 6px; }
+  .seccion-cabeza input { flex: 1; min-width: 0; font-weight: 600; }
+  .seccion-cabeza button {
+    flex: none;
+    width: 34px;
+    border: 2px solid rgb(76 44 22 / 0.35);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--mrc-marca-tinta);
+    cursor: pointer;
+    font-size: 0.875rem;
+  }
+  .seccion-cabeza button:hover { border-color: var(--mrc-marca-tinta); }
+  .seccion-editor textarea { resize: vertical; font-size: 0.84375rem; line-height: 1.5; }
+
+  .agregar, .descargar {
+    align-self: flex-start;
+    font-family: var(--mrc-font-titular);
+    font-weight: 600;
+    font-size: 0.84375rem;
+    color: var(--mrc-marca-tinta);
+    background: transparent;
+    border: 2px solid var(--mrc-marca-tinta);
+    border-radius: 6px;
+    padding: 8px 16px;
+    cursor: pointer;
+  }
+  .agregar:hover, .descargar:hover { background: rgb(76 44 22 / 0.08); }
+
+  .vista { position: sticky; top: 76px; }
+  .vista-marco {
+    background: rgb(76 44 22 / 0.12);
+    border-radius: 10px;
+    padding: clamp(10px, 1.4vw, 20px);
+  }
+  .vista-marco iframe {
+    width: 100%;
+    aspect-ratio: 8.5 / 11;
+    border: none;
+    border-radius: 4px;
+    background: #fff;
+    box-shadow: 0 14px 34px rgb(31 14 5 / 0.25);
+    display: block;
+  }
+  .vista-pie {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 12px;
+  }
+  .descargar {
+    background: var(--mrc-marca-rojo);
+    border-color: var(--mrc-marca-rojo);
+    color: #fff;
+    box-shadow: 0 4px 0 0 color-mix(in srgb, var(--mrc-marca-rojoHondo) 70%, var(--mrc-marca-rojo));
+  }
+  .descargar:hover { background: var(--mrc-marca-rojoHover); border-color: var(--mrc-marca-rojoHover); }
+</style>

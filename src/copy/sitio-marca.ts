@@ -351,6 +351,40 @@ export const marca = {
     visorAlt: 'La barra en tres dimensiones; arrastra para girarla',
   },
 
+  // El generador de fichas técnicas (/fichas): la herramienta para que
+  // el cliente escriba el contenido y la ficha salga con el formato de
+  // marca — imprime el navegador (mismo Chromium que pnpm fichas).
+  generadorFichas: {
+    titulo: 'Maracacao — Generador de fichas técnicas',
+    encabezado: 'Generador de fichas',
+    intro: 'Escribe el contenido a la izquierda: la ficha se arma sola con el formato de la marca. Cuando esté lista, descárgala en PDF.',
+    empezarDesde: '¿Desde dónde empezamos?',
+    opciones: [
+      { valor: 'barras', texto: 'Chocolate 70% (barras y gotas)' },
+      { valor: 'polvo', texto: 'Chocolate en polvo' },
+      { valor: 'vacia', texto: 'Ficha vacía' },
+    ],
+    confirmarCambio: 'Esto reemplaza lo que escribiste hasta ahora. ¿Continuamos?',
+    producto: 'Producto',
+    denominacion: 'Denominación',
+    metaTitulo: 'Datos de cabecera',
+    metaEtiqueta: 'Etiqueta',
+    metaValor: 'Valor',
+    seccionesTitulo: 'Secciones',
+    seccionTitulo: 'Título de la sección',
+    seccionTexto: 'Contenido',
+    ayuda: 'Cómo escribir: una línea en blanco separa párrafos · las líneas que empiezan con «- » se vuelven lista · las líneas con «|» se vuelven tabla (la primera es el encabezado).',
+    agregar: 'Agregar sección',
+    subir: 'Subir sección',
+    bajar: 'Bajar sección',
+    quitar: 'Quitar sección',
+    descargar: 'Descargar PDF',
+    descargarNota: 'En el diálogo elige «Guardar como PDF» con los márgenes predeterminados.',
+    vistaAria: 'Vista previa de la ficha',
+    borrador: 'Tu borrador se guarda solo, en este navegador.',
+    sinJs: 'Esta herramienta necesita JavaScript para armar la vista previa y el PDF.',
+  },
+
   // Página en construcción — lo público mientras el sitio no sale.
   // Sin juegos de palabras: dice lo que pasa (retro de Marcos, vigente).
   construccion: {
