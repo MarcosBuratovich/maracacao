@@ -358,7 +358,7 @@ export const marca = {
     contactoTitulo: 'Contacto',
     legalesTitulo: 'Legales',
     productos: [
-      { ancla: '/barras', texto: 'Barras 70 g — catálogo completo' },
+      { ancla: '#sabores', texto: 'Barras 70 g' },
       { ancla: '#sabores', texto: 'Gotas de chocolate 250 g' },
       { ancla: '#polvo', texto: 'Chocolate en polvo (próximamente)' },
     ],
