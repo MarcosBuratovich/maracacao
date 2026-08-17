@@ -72,12 +72,12 @@ async function montarBarra3D(caja: HTMLElement, alt: string): Promise<(slug: str
   mv.setAttribute('alt', alt)
   mv.setAttribute('camera-controls', '')
   mv.setAttribute('disable-zoom', '')
-  mv.setAttribute('auto-rotate', '')
-  mv.setAttribute('rotation-per-second', '16deg')
-  mv.setAttribute('camera-orbit', '12deg 78deg 82%')
+  // Sin auto-rotate (retro de Marcos: mareaba y recortaba); la barra
+  // arranca de frente y el visitante la gira si quiere — model-viewer
+  // muestra su pista de arrastre tras un momento de quietud.
+  mv.setAttribute('camera-orbit', '188deg 82deg 105%')
   mv.setAttribute('shadow-intensity', '0.8')
   mv.setAttribute('exposure', '1.1')
-  mv.setAttribute('interaction-prompt', 'none')
 
   const texturas = new Map<string, unknown>()
   const aplica = async (slug: string) => {

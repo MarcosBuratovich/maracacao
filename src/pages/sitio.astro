@@ -119,7 +119,9 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
           </h1>
           <p class="portada-sub">{marca.hero.sub}</p>
           <div class="portada-ctas">
-            <BotonMarca href={marca.contacto.catalogoUrl} externo>{marca.hero.ctaCatalogo}</BotonMarca>
+            {/* A la categoría de barras por más vendidas (pedido de
+                Marcos), no a la portada general del catálogo. */}
+            <BotonMarca href={urlCatalogoBarras} externo>{marca.hero.ctaCatalogo}</BotonMarca>
             <a class="enlace-sabores" href="#sabores">{marca.hero.ctaSabores}</a>
           </div>
         </div>
@@ -1060,11 +1062,14 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
     padding: clamp(18px, 2.6vw, 32px);
   }
   .ficha-fila { display: flex; flex-wrap: wrap; gap: clamp(16px, 2.5vw, 36px); align-items: center; }
-  /* Más ancho que en el canvas: con el visor 3D adentro, a 164px no se
-     podía ni agarrar la barra para girarla. */
-  .ficha-envoltura { flex: none; width: clamp(150px, 17vw, 215px); margin-inline: auto; position: relative; }
+  /* Más ancho que en el canvas: con el visor 3D adentro, a 164px la
+     barra se veía chica y recortada (retro de Marcos). */
+  .ficha-envoltura { flex: none; width: clamp(180px, 21vw, 255px); margin-inline: auto; position: relative; }
   .ficha-envoltura :global(model-viewer) {
     width: 100%;
+    /* model-viewer trae height:150px de fábrica y le gana al
+       aspect-ratio: el height explícito es obligatorio. */
+    height: auto;
     aspect-ratio: 754 / 1617;
     display: block;
     --poster-color: transparent;
