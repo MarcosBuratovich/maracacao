@@ -232,7 +232,6 @@ function bloqueHtml(b: Bloque): string {
 }
 
 function fichaHtml(f: Ficha): string {
-  const hoy = new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })
   return `<!doctype html>
 <html lang="es-MX">
 <head>
@@ -302,8 +301,8 @@ function fichaHtml(f: Ficha): string {
         .join('')}
     </main>
     <footer>
-      <span>MARACACAO · AHUATEPEC, MORELOS, MÉXICO · maracacaomx@gmail.com</span>
-      <span>${hoy}</span>
+      <span>maracacaomx@gmail.com</span>
+      <span>@maracacaomx</span>
     </footer>
   </div>
 </body>
