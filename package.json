@@ -14,7 +14,8 @@
     "typecheck": "astro check",
     "tokens": "tsx scripts/emit-tokens.ts",
     "rig-spec": "tsx scripts/emit-rig-spec.ts",
-    "favicon": "tsx scripts/emit-favicon.ts"
+    "favicon": "tsx scripts/emit-favicon.ts",
+    "fichas": "tsx scripts/genera-fichas.ts"
   },
   "dependencies": {
     "@astrojs/mdx": "^7.0.5",
