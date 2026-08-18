@@ -1,12 +1,9 @@
 /* La plantilla de las fichas técnicas — compartida.
  *
- * La usan dos consumidores con el MISMO resultado (ambos renderizan
- * con Chromium):
- *   · scripts/genera-fichas.ts — los PDF oficiales (pnpm fichas)
- *   · src/pages/fichas.astro  — el generador en línea para el cliente
- *
- * Sin dependencias de Node: este módulo corre también en el navegador.
- * Las rutas de fuentes y el SVG del sello entran por parámetro.
+ * La consume scripts/genera-fichas.ts (pnpm fichas → docs/fichas/*.pdf).
+ * El generador en línea /fichas que también la usaba se eliminó
+ * (2026-08-18, decisión de Marcos): el cliente recibe una plantilla
+ * Word — ver scripts/genera-plantilla-docx.py.
  */
 import { marca } from '@/tokens/color'
 
@@ -31,42 +28,6 @@ export interface Ficha {
 
 export const p = (texto: string): Bloque => ({ tipo: 'parrafo', texto })
 export const li = (...items: string[]): Bloque => ({ tipo: 'lista', items })
-
-/* ---------- Texto editable ⇄ bloques ----------
- * La convención que escribe el cliente en el generador:
- *   · línea en blanco separa párrafos
- *   · líneas que empiezan con «- » forman una lista
- *   · líneas con « | » forman una tabla (la primera es el encabezado)
- */
-
-export function bloquesATexto(bloques: Bloque[]): string {
-  return bloques
-    .map((b) => {
-      if (b.tipo === 'parrafo') return b.texto
-      if (b.tipo === 'lista') return b.items.map((i) => `- ${i}`).join('\n')
-      return [b.encabezados, ...b.filas].map((f) => f.join(' | ')).join('\n')
-    })
-    .join('\n\n')
-}
-
-export function textoABloques(texto: string): Bloque[] {
-  const bloques: Bloque[] = []
-  const trozos = texto.replace(/\r/g, '').split(/\n{2,}/)
-  for (const trozo of trozos) {
-    const lineas = trozo.split('\n').map((l) => l.trim()).filter(Boolean)
-    if (lineas.length === 0) continue
-    if (lineas.every((l) => l.startsWith('- '))) {
-      bloques.push({ tipo: 'lista', items: lineas.map((l) => l.slice(2).trim()) })
-    } else if (lineas.length > 1 && lineas.every((l) => l.includes('|'))) {
-      const filas = lineas.map((l) => l.split('|').map((c) => c.trim()))
-      bloques.push({ tipo: 'tabla', encabezados: filas[0], filas: filas.slice(1) })
-    } else {
-      // Un párrafo por trozo: las líneas sueltas se unen con espacio.
-      bloques.push({ tipo: 'parrafo', texto: lineas.join(' ') })
-    }
-  }
-  return bloques
-}
 
 /* ---------- Render ---------- */
 
