@@ -9,8 +9,10 @@ import { fichaHtml } from '@/fichas/plantilla'
 import { fichasBase } from '@/fichas/base'
 
 describe('la plantilla de fichas', () => {
-  it('las dos fichas oficiales existen y rinden documento completo', () => {
-    expect(fichasBase).toHaveLength(2)
+  it('las cuatro fichas oficiales existen y rinden documento completo', () => {
+    // barras/gotas · chocolate en polvo (corregida 2026-08-19) · cocoa
+    // natural · cocoa alcalina (especificaciones industriales B2B).
+    expect(fichasBase).toHaveLength(4)
     for (const ficha of fichasBase) {
       const html = fichaHtml(ficha, '/fonts', '<svg></svg>')
       expect(html).toContain('MARACACAO')

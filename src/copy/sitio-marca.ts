@@ -187,8 +187,10 @@ export const marca = {
   nosotros: {
     kicker: 'NOSOTROS',
     titulo: 'Empezó en una cocina',
+    // Primer párrafo en la redacción del propio cliente (WhatsApp,
+    // 2026-08-17): «Empezamos a explorar… en nuestra propia cocina».
     parrafos: [
-      'En 2024 empezamos a explorar combinaciones de sabores, aromas y frutas — y, por supuesto, chocolate con un buen porcentaje de cacao. De esa cocina salió Maracacao: chocolates 70% cacao donde el cacao siempre es el protagonista, acompañado de frutas, chiles, hierbas y esencias naturales.',
+      'Empezamos a explorar combinaciones de sabores, aromas y frutas en nuestra propia cocina. De ahí salió Maracacao: chocolates 70% cacao donde el cacao siempre es el protagonista, acompañado de frutas, chiles, hierbas y esencias naturales.',
       'Somos un equipo de trabajo unido por el interés de promover buen chocolate mexicano: hecho con buenas prácticas ambientales, respetando la integridad del cacao y saborizado únicamente con ingredientes naturales.',
     ],
     cacaoTitulo: 'El cacao.',
@@ -211,11 +213,28 @@ export const marca = {
       { dato: 'Alérgenos', estado: 'confirmados en ficha técnica' },
       { dato: 'Tabla nutrimental y vida de anaquel', estado: 'disponibles en ficha técnica' },
     ],
+    // Enumeración y orden del propio cliente (WhatsApp, 2026-08-17):
+    // «chocolate en polvo», «chocolate en gotas», «chocolate en barras»,
+    // en ese orden.
     tabs: [
       {
+        id: 'polvo',
+        etiqueta: 'Chocolate en polvo',
+        titulo: 'Chocolate en polvo · 250 g y 1 kg',
+        precioNota: 'próximamente',
+        precio: null,
+        clave: 'salDeMar',
+        cuerpo: 'Ocho variedades para la taza, hechas con cocoa natural, cocoa alcalina y pasta de cacao.',
+        datos: [
+          'Se disuelve en bebidas frías o calientes',
+          'También para licuados, repostería y postres',
+          'Aún no está a la venta: escríbenos si te interesa',
+        ],
+      },
+      {
         id: 'gotas',
-        etiqueta: 'Gotas',
-        titulo: 'Gotas de chocolate · 250 g',
+        etiqueta: 'Chocolate en gotas',
+        titulo: 'Chocolate en gotas · 250 g',
         precioNota: 'desde',
         precio: 258,
         clave: 'cardamomo',
@@ -229,8 +248,8 @@ export const marca = {
       },
       {
         id: 'barras',
-        etiqueta: 'Barras',
-        titulo: 'Barras · 70 g',
+        etiqueta: 'Chocolate en barras',
+        titulo: 'Chocolate en barras · 70 g',
         precioNota: 'desde',
         precio: 108,
         clave: 'canela',
@@ -240,21 +259,6 @@ export const marca = {
           'Ingredientes disponibles por sabor',
           'Contienen soya; pueden llevar trazas de leche y frutos de cáscara',
           'Vida de anaquel de dos años; no requieren refrigeración',
-        ],
-      },
-      {
-        id: 'polvo',
-        etiqueta: 'Polvo',
-        titulo: 'En polvo · 250 g',
-        precioNota: 'próximamente',
-        precio: null,
-        clave: 'salDeMar',
-        cuerpo: 'Ocho variedades para la taza, hechas con cocoa natural, cocoa alcalina y pasta de cacao.',
-        datos: [
-          'Presentaciones de 250 g y 1 kg',
-          'Se disuelve en bebidas frías o calientes',
-          'También para licuados, repostería y postres',
-          'Aún no está a la venta: escríbenos si te interesa',
         ],
       },
     ],

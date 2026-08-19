@@ -145,11 +145,13 @@ export const fichasBase: Ficha[] = [
             tipo: 'tabla',
             encabezados: ['Nutrimento', 'Cantidad'],
             filas: [
-              ['Contenido energético', '395 kcal / 1,654 kJ'],
+              // Corregido con el docx (1) del cliente, 2026-08-19: la
+              // versión anterior decía 395 kcal/1,654 kJ y 2.2 mg trans.
+              ['Contenido energético', '396 kcal / 1,672 kJ'],
               ['Proteínas', '6.0 g'],
               ['Grasas totales', '7.8 g'],
               ['Grasas saturadas', '4.5 g'],
-              ['Grasas trans', '2.2 mg'],
+              ['Grasas trans', '0 mg'],
               ['Hidratos de carbono disponibles', '75.4 g'],
               ['Azúcares', '70.6 g'],
               ['Azúcares añadidos', '70.6 g'],
@@ -176,6 +178,225 @@ export const fichasBase: Ficha[] = [
         titulo: 'Conservación y control',
         bloques: [
           p('Mantener el envase bien cerrado, en lugar fresco y seco, protegido de humedad, sol directo, fuentes de calor y olores fuertes. Lote y consumo preferente: identificados en el envase. La formulación y la información nutrimental por 100 g son las mismas para ambas presentaciones.'),
+        ],
+      },
+    ],
+  },
+  {
+    archivo: 'ficha-tecnica-cocoa-natural',
+    producto: 'Cocoa natural',
+    denominacion: 'Sólidos 100% de cacao en polvo — especificación COCOAMX2604',
+    acento: marca.tinta,
+    meta: [
+      ['Marca', 'Maracacao'],
+      ['Código', 'COCOAMX2604'],
+      ['Presentaciones', '250 g · 1 kg'],
+      ['Vida de anaquel', '24 meses en condiciones sugeridas'],
+    ],
+    secciones: [
+      {
+        titulo: 'Descripción general',
+        bloques: [
+          p('Sólidos 100% de cacao que presentan la apariencia de un polvo muy fino y liso, libre de manchas o cualquier otro material extraño. El color es café, sin colorantes, conservantes ni aditivos.'),
+        ],
+      },
+      {
+        titulo: 'Uso previsto y almacenamiento',
+        bloques: [
+          p('Uso industrial, como materia prima en la elaboración de chocolates, confitería y afines. Almacenar en lugar seco, fresco, libre de sustancias contaminantes y en su envase original sellado.'),
+        ],
+      },
+      {
+        titulo: 'Parámetros fisicoquímicos',
+        bloques: [
+          {
+            tipo: 'tabla',
+            encabezados: ['Parámetro', 'Límites', 'Resultado'],
+            filas: [
+              ['Humedad (g/100 g)', 'máx 5', '3'],
+              ['Cenizas (g/100 g)', 'máx 8.5', '7'],
+              ['Grasas totales (g/100 g)', '10–12', '12'],
+              ['pH (sol. 1%)', '5–6', '5'],
+              ['Finura (%)', 'mín 88', '88'],
+              ['Sedimentación (%)', 'máx 2', '2'],
+            ],
+          },
+          p('Ensayos según NOM-116-SSA1-1994, NMX-F-NORMEX-2020, NMX-F-615-NORMEX-2018, NOM-F-412-S-1981 y NOM-186-SSA1/SCFI-2013.'),
+        ],
+      },
+      {
+        titulo: 'Parámetros microbiológicos',
+        bloques: [
+          {
+            tipo: 'tabla',
+            encabezados: ['Parámetro', 'Límite', 'Resultado'],
+            filas: [
+              ['E. coli (NMP/g)', 'ausente', 'ausente'],
+              ['Salmonella spp. (UFC/25 g)', 'ausente', 'ausente'],
+              ['Hongos (UFC/g)', 'máx 10', '< 10'],
+              ['Levaduras (UFC/g)', 'máx 10', '< 10'],
+              ['Coliformes totales (UFC/g)', 'máx 10', '< 10'],
+              ['Mesófilos aerobios (UFC/g)', 'máx 10,000', '< 1,000'],
+            ],
+          },
+          p('Métodos: NOM-210-SSA1-2014, NOM-111-SSA1-1994, NOM-113-SSA1-1994 y NOM-092-SSA1-1994.'),
+        ],
+      },
+      {
+        titulo: 'Características sensoriales',
+        bloques: [
+          li(
+            'Apariencia: polvo fino.',
+            'Color: café.',
+            'Sabor y olor: característicos a cacao.',
+          ),
+        ],
+      },
+      {
+        titulo: 'Otros análisis (NOM-186-SSA1/SCFI-2013)',
+        bloques: [
+          {
+            tipo: 'tabla',
+            encabezados: ['Parámetro', 'Límite', 'Resultado'],
+            filas: [
+              ['Plomo (mg/kg)', '1', '< LOQ'],
+              ['Arsénico (mg/kg)', '1', '< LOQ'],
+              ['Aflatoxinas (µg/kg)', '15', '< LOQ'],
+              ['Insectos y fragmentos', 'según norma', 'ausente'],
+              ['Pelos de roedor', 'según norma', 'ausente'],
+            ],
+          },
+        ],
+      },
+      {
+        titulo: 'Declaración nutrimental',
+        bloques: [
+          p('Por 100 g de producto:'),
+          {
+            tipo: 'tabla',
+            encabezados: ['Nutrimento', 'Cantidad'],
+            filas: [
+              ['Contenido energético', '284 kcal / 1,193 kJ'],
+              ['Proteínas', '26 g'],
+              ['Grasas totales', '12 g'],
+              ['Grasas saturadas', '4 g'],
+              ['Grasas trans', '0 mg'],
+              ['Hidratos de carbono disponibles', '18 g'],
+              ['Azúcares / añadidos', '0 g'],
+              ['Fibra dietética', '34 g'],
+              ['Sodio', '7 mg'],
+            ],
+          },
+          p('VNR (NOM-051-SCFI/SSA1-2010): calcio 25% · hierro 230% · potasio 2,220 mg.'),
+        ],
+      },
+    ],
+  },
+  {
+    archivo: 'ficha-tecnica-cocoa-alcalina',
+    producto: 'Cocoa alcalina',
+    denominacion: 'Sólidos de cacao alcalinizados en polvo — especificación COCMX2604',
+    acento: marca.tinta,
+    meta: [
+      ['Marca', 'Maracacao'],
+      ['Código', 'COCMX2604'],
+      ['Presentaciones', '250 g · 1 kg'],
+      ['Vida de anaquel', '24 meses en condiciones sugeridas'],
+    ],
+    secciones: [
+      {
+        titulo: 'Descripción general',
+        bloques: [
+          p('Sólidos de cacao en polvo sometidos a un proceso de alcalinización con carbonato de potasio, que reduce la acidez natural del cacao y le brinda mejor solubilidad y un color más oscuro. Polvo fino, libre de grumos o material extraño, de color café y sin conservadores, con el sabor característico del cacao, libre de impurezas y de olores o sabores extraños.'),
+        ],
+      },
+      {
+        titulo: 'Uso previsto y almacenamiento',
+        bloques: [
+          p('Uso industrial, como materia prima en la elaboración de chocolates, confitería y afines. Almacenar en lugar seco, fresco, libre de sustancias contaminantes y en su envase original sellado.'),
+        ],
+      },
+      {
+        titulo: 'Parámetros fisicoquímicos',
+        bloques: [
+          {
+            tipo: 'tabla',
+            encabezados: ['Parámetro', 'Límites', 'Resultado'],
+            filas: [
+              ['Humedad (%)', 'máx 5', '2'],
+              ['Cenizas (%)', 'máx 7', '7'],
+              ['pH (sol. 1%)', '7.0–8.5', '7.5'],
+              ['Finura (%)', 'mín 88', '88'],
+              ['Sedimentación (%)', 'máx 2', '2'],
+            ],
+          },
+          p('Ensayos según NOM-116-SSA1-1994, NMX-F-NORMEX-2020, NOM-F-412-S-1981 y NOM-186-SSA1/SCFI-2013.'),
+        ],
+      },
+      {
+        titulo: 'Parámetros microbiológicos',
+        bloques: [
+          {
+            tipo: 'tabla',
+            encabezados: ['Parámetro', 'Límite', 'Resultado'],
+            filas: [
+              ['E. coli (NMP/g)', 'ausente', 'ausente'],
+              ['Salmonella spp. (UFC/25 g)', 'ausente', 'ausente'],
+              ['Hongos (UFC/g)', 'máx 10', '< 10'],
+              ['Levaduras (UFC/g)', 'máx 10', '< 10'],
+              ['Coliformes totales (UFC/g)', 'máx 10', '< 10'],
+              ['Mesófilos aerobios (UFC/g)', 'máx 1,000', '< 1,000'],
+            ],
+          },
+          p('Métodos: NOM-210-SSA1-2014, NOM-111-SSA1-1994, NOM-113-SSA1-1994 y NOM-092-SSA1-1994.'),
+        ],
+      },
+      {
+        titulo: 'Características sensoriales',
+        bloques: [
+          li(
+            'Apariencia: polvo fino.',
+            'Color: café.',
+            'Sabor y olor: característicos a cacao.',
+          ),
+        ],
+      },
+      {
+        titulo: 'Otros análisis (NOM-186-SSA1/SCFI-2013)',
+        bloques: [
+          {
+            tipo: 'tabla',
+            encabezados: ['Parámetro', 'Límite', 'Resultado'],
+            filas: [
+              ['Plomo (mg/kg)', '1', '< LOQ'],
+              ['Arsénico (mg/kg)', '1', '< LOQ'],
+              ['Aflatoxinas (µg/kg)', '15', 'negativo'],
+              ['Insectos y fragmentos', 'según norma', 'negativo'],
+              ['Pelos y excretas de roedor', 'según norma', 'negativo'],
+            ],
+          },
+        ],
+      },
+      {
+        titulo: 'Declaración nutrimental',
+        bloques: [
+          p('Por 100 g de producto:'),
+          {
+            tipo: 'tabla',
+            encabezados: ['Nutrimento', 'Cantidad'],
+            filas: [
+              ['Contenido energético', '262 kcal / 1,102 kJ'],
+              ['Proteínas', '22 g'],
+              ['Grasas totales', '11 g'],
+              ['Grasas saturadas', '7 g'],
+              ['Grasas trans', '14 mg'],
+              ['Hidratos de carbono disponibles', '20 g'],
+              ['Azúcares / añadidos', '0 g'],
+              ['Fibra dietética', '32 g'],
+              ['Sodio', '189 mg'],
+            ],
+          },
+          p('VNR (NOM-051-SCFI/SSA1-2010): calcio 25% · hierro 220% · potasio 2,480 mg.'),
         ],
       },
     ],
