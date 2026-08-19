@@ -23,6 +23,42 @@
                  U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215;
 }
 
+/* FALLBACKS MÉTRICOS (SEO/CWV, 2026-08-19). Con font-display: swap el
+   texto pinta primero en la fuente local y salta al llegar la woff2;
+   sin métricas ajustadas ese salto es CLS medible en los H1 y el
+   cuerpo. Cada cara «respaldo» toma la local de la pila y la ajusta a
+   las métricas de la webfont (size-adjust = ancho promedio ponderado
+   es-MX; verticales de hhea entre el ajuste). Calculado con
+   fontTools contra Liberation Sans/Serif (clones métricos de Arial y
+   Times New Roman); Bricolage medida en wght 700, el rango de los
+   titulares. Si cambia una woff2, recalcular. */
+@font-face {
+  font-family: 'Bricolage respaldo';
+  src: local('Arial'), local('Liberation Sans'), local('Arimo'), local('Helvetica');
+  size-adjust: 98.47%;
+  ascent-override: 94.44%;
+  descent-override: 27.42%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Trocchi respaldo';
+  src: local('Times New Roman'), local('Liberation Serif'), local('Tinos');
+  size-adjust: 123.86%;
+  ascent-override: 82.2%;
+  descent-override: 22.71%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Cormorant respaldo';
+  src: local('Times New Roman'), local('Liberation Serif'), local('Tinos');
+  size-adjust: 96.35%;
+  ascent-override: 95.9%;
+  descent-override: 29.79%;
+  line-gap-override: 0%;
+}
+
 @font-face {
   font-family: 'Bricolage Grotesque';
   src: url('/fonts/bricolage-grotesque-variable.woff2') format('woff2');

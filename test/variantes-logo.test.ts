@@ -201,7 +201,7 @@ describe('IsotipoSuelto', () => {
 
   it('lleva un aria-label propio, distinto del logo completo', async () => {
     const html = await container.renderToString(IsotipoSuelto)
-    expect(html).toContain('aria-label="Mono de Maracacao"')
+    expect(html).toContain('aria-label="La mascota de Maracacao"')
   })
 })
 

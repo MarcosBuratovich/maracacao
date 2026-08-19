@@ -12,6 +12,7 @@ import Marquesina from '@/components/marca/Marquesina.astro'
 import selloRaw from '@/assets/brand/sello-mano.svg?raw'
 import { marca } from '@/copy/sitio-marca'
 import { sabores } from '@/copy/sabores'
+import { esquemaNegocio, origenCanonico } from '@/seo/esquema'
 import '@/styles/global.css'
 import '@/styles/marca.css'
 
@@ -21,7 +22,13 @@ const sello = selloRaw.replace('<svg', '<svg aria-hidden="true" focusable="false
 // para que el bucle no muestre costura ni en ultrawide.
 const enMarquesina = [...sabores, ...sabores]
 ---
-<Base titulo={marca.construccion.titulo} fuentes="marca">
+<Base
+  titulo={marca.construccion.titulo}
+  fuentes="marca"
+  descripcion={marca.descripcionConstruccion}
+  ruta="/"
+  esquema={esquemaNegocio(origenCanonico(Astro.site))}
+>
   <main class="obra" data-tono="crema">
     <div class="obra-centro">
       <span class="obra-sello" set:html={sello} />
@@ -41,9 +48,12 @@ const enMarquesina = [...sabores, ...sabores]
       <div class="obra-firma">
         <img
           src="/sitio/personaje-molinillo-t.webp"
+          srcset="/sitio/personaje-molinillo-t-340.webp 340w, /sitio/personaje-molinillo-t.webp 460w"
+          sizes="170px"
           alt={marca.construccion.personajeAlt}
           width="460"
           height="814"
+          fetchpriority="high"
         />
         <p class="mono">{marca.construccion.lugar}</p>
       </div>
@@ -59,6 +69,8 @@ const enMarquesina = [...sabores, ...sabores]
             width="380"
             height="815"
             loading="eager"
+            fetchpriority="low"
+            decoding="async"
           />
         ))}
       </Marquesina>
@@ -104,8 +116,10 @@ const enMarquesina = [...sabores, ...sabores]
     font-size: 1rem;
     letter-spacing: 0.18em;
     text-transform: uppercase;
-    color: var(--mrc-marca-rojo);
-    border: 2px solid var(--mrc-marca-rojo);
+    /* rojoHondo, no rojo: a 16px sobre crema, el rojo se queda en 4.23
+       de contraste (Lighthouse); el hondo pasa AA sobrado. */
+    color: var(--mrc-marca-rojoHondo);
+    border: 2px solid var(--mrc-marca-rojoHondo);
     border-radius: 4px;
     transform: rotate(-4deg);
   }
@@ -113,7 +127,7 @@ const enMarquesina = [...sabores, ...sabores]
     content: '';
     position: absolute;
     inset: 3px;
-    border: 1.5px dashed var(--mrc-marca-rojo);
+    border: 1.5px dashed var(--mrc-marca-rojoHondo);
     border-radius: 2px;
     opacity: 0.75;
   }

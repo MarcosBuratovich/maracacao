@@ -112,9 +112,9 @@
   --mrc-rol-contorno-ilustracion: #372915;
   --mrc-font-display: 'Fraunces Variable', Fraunces, Georgia, serif;
   --mrc-font-texto: 'Work Sans Variable', 'Work Sans', system-ui, sans-serif;
-  --mrc-font-sello: 'Cormorant Garamond', Garamond, 'Times New Roman', serif;
-  --mrc-font-titular: 'Bricolage Grotesque', 'Work Sans Variable', system-ui, sans-serif;
-  --mrc-font-serifMarca: 'Trocchi', Georgia, serif;
+  --mrc-font-sello: 'Cormorant Garamond', 'Cormorant respaldo', Garamond, 'Times New Roman', serif;
+  --mrc-font-titular: 'Bricolage Grotesque', 'Bricolage respaldo', 'Work Sans Variable', system-ui, sans-serif;
+  --mrc-font-serifMarca: 'Trocchi', 'Trocchi respaldo', Georgia, serif;
   --mrc-font-mono: 'Courier Prime', 'Courier New', monospace;
   --mrc-font-mano: 'Patrick Hand', 'Bryndan Write', 'Segoe Print', cursive;
   --mrc-text-display-xl: 3.5rem;

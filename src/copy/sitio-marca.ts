@@ -11,7 +11,17 @@
 // Los datos de producto (nombres, ingredientes, %, precios) NO viven
 // acá: salen de src/copy/sabores.ts, la fuente única.
 export const marca = {
-  titulo: 'Maracacao — Chocolate mexicano, 70% cacao',
+  // SEO (2026-08-19, auditoría): en /sitio la categoría va primero —
+  // ahí se pelea búsqueda no-marca («chocolate mexicano», «Coyoacán»).
+  // Al lanzar, este título y description pasan con el contenido a /.
+  titulo: 'Chocolate mexicano 70% cacao en Coyoacán | Maracacao',
+  // Descriptions es-MX ≤155 caracteres, con las búsquedas reales en
+  // mente (chocolate artesanal cdmx, 70% cacao, Coyoacán, gotas
+  // repostería). El polvo no se menciona: aún no está a la venta.
+  descripcion:
+    'Barras 70% cacao con 15 sabores mexicanos —chiles, frutas, hierbas— y gotas para repostería. Encuéntranos en el Mercado de Coyoacán o ve el catálogo.',
+  descripcionConstruccion:
+    'Chocolate artesanal mexicano, 70% cacao, en el Mercado de Coyoacán, CDMX. La página está en camino; mientras tanto, ve el catálogo o escríbenos.',
   skipLink: 'Ir al contenido',
 
   marca: {
@@ -358,7 +368,10 @@ export const marca = {
   // Página en construcción — lo público mientras el sitio no sale.
   // Sin juegos de palabras: dice lo que pasa (retro de Marcos, vigente).
   construccion: {
-    titulo: 'Maracacao — Sitio en construcción',
+    // El título trabaja la marca y la categoría, no el estado: durante
+    // la preventa casi toda la búsqueda es «maracacao», y «sitio en
+    // construcción» no lo busca nadie. El estado lo dice la página.
+    titulo: 'Maracacao — Chocolate mexicano 70% cacao',
     encabezado: 'Sitio en construcción',
     sub: 'Estamos armando la página. Mientras tanto, el catálogo está abierto y el chocolate, disponible.',
     ctaCatalogo: 'Ver el catálogo',
@@ -366,6 +379,16 @@ export const marca = {
     lugar: 'Mercado de Coyoacán · CDMX',
     muyPronto: 'Muy pronto',
     personajeAlt: 'El personaje de Maracacao batiendo chocolate con su molinillo',
+  },
+
+  // Página 404 — sin candado (los 404 no se indexan) y con una sola
+  // salida honesta: el inicio.
+  noEncontrada: {
+    titulo: 'Página no encontrada — Maracacao',
+    encabezado: 'Esta página no existe',
+    sub: 'Puede que el enlace esté mal escrito o que la página ya no viva aquí.',
+    cta: 'Volver al inicio',
+    rutaInicio: '/',
   },
 
   footer: {

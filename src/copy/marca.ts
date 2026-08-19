@@ -6,7 +6,7 @@ export const copy = {
   // personaje, ya establecido como aria-label del propio SVG de origen
   // (ver mascota.svg / mascota-reducida.svg). Deliberadamente distinto de
   // `logoAria`: acá no hay "logo", hay una ilustración de apoyo.
-  mascotaAria: 'Mono de Maracacao',
+  mascotaAria: 'La mascota de Maracacao',
   navSabores: 'Sabores',
   navOrigen: 'Origen',
   navTienda: 'Tienda',

@@ -95,7 +95,7 @@ describe('<Mascota rive /> — render real de la isla (B3)', () => {
     // que el SSR la produce, no que se hidrata).
     expect(html).toContain('astro-island')
     expect(html).toContain('role="img"')
-    expect(html).toContain('aria-label="Mono de Maracacao"')
+    expect(html).toContain('aria-label="La mascota de Maracacao"')
 
     // "Parte del fallback": en SSR el efecto que decide `permitido` (y por
     // lo tanto `riveLoaded`) nunca corre, igual que en el primer paint real

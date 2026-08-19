@@ -20,6 +20,7 @@ import selloRaw from '@/assets/brand/sello-mano.svg?raw'
 import { marca, precioMXN } from '@/copy/sitio-marca'
 import { sabores, gotas, paqueteSeis, polvo, urlCatalogoBarras } from '@/copy/sabores'
 import { sabor as colorSabor, tintaSabor, marca as paletaMarca } from '@/tokens/color'
+import { esquemaNegocio, esquemaPreguntas, esquemaBarras, origenCanonico } from '@/seo/esquema'
 import '@/styles/global.css'
 import '@/styles/marca.css'
 
@@ -57,8 +58,21 @@ const tintaClara = (clave: keyof typeof tintaSabor) => tintaSabor[clave] !== pal
 // Turnstile (Cloudflare) solo si la clave pública está configurada en
 // el build — sin clave, las capas honeypot + tiempo siguen activas.
 const claveTurnstile = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY as string | undefined
+
+// JSON-LD: el negocio, las preguntas reales y las 15 barras. Hoy la
+// página va noindex por el candado; al lanzar, esto ya queda listo.
+const origen = origenCanonico(Astro.site)
+const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(origen)]
 ---
-<Base titulo={marca.titulo} fuentes="marca" candado>
+<Base
+  titulo={marca.titulo}
+  fuentes="marca"
+  candado
+  descripcion={marca.descripcion}
+  ruta="/sitio"
+  esquema={esquema}
+  cormorantMedia="(min-width: 761px)"
+>
   <a href="#contenido" class="salto">{marca.skipLink}</a>
 
   <header class="cabecera" data-tono="crema">
@@ -152,6 +166,8 @@ const claveTurnstile = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY as string | und
               width="380"
               height="815"
               loading="eager"
+              fetchpriority="low"
+              decoding="async"
             />
           ))}
         </Marquesina>
@@ -256,27 +272,34 @@ const claveTurnstile = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY as string | und
                 loading="lazy"
               />
             </div>
-            <div class="ficha-datos">
-              <p class="mono ficha-orden">
-                {marca.anaquel.fichaEtiqueta} <span data-anaquel-orden>{inicial.orden}</span> {marca.anaquel.contadorDe}
-              </p>
-              <div class="ficha-nombre-fila">
-                <h3 class="ficha-nombre" data-anaquel-nombre>{inicial.nombre}</h3>
-                <p class="ficha-precio" data-anaquel-precio>{precioMXN(inicial.precio)}</p>
+            {/* SEO (2026-08-19): las QUINCE fichas se renderizan en
+                build — nombre, precio e ingredientes de cada sabor son
+                texto indexable, no un swap de JS. Sin `hidden` en el
+                HTML (regla no-JS: sin script se apilan las quince);
+                marca.ts esconde las inactivas al tomar control. */}
+            {datosAnaquel.map((d) => (
+              <div class="ficha-datos" data-ficha-de={d.slug}>
+                <p class="mono ficha-orden">
+                  {marca.anaquel.fichaEtiqueta} {d.orden} {marca.anaquel.contadorDe}
+                </p>
+                <div class="ficha-nombre-fila">
+                  <h3 class="ficha-nombre">{d.nombre}</h3>
+                  <p class="ficha-precio">{d.precio}</p>
+                </div>
+                <div class="chips">
+                  <Insignia tono="rojo">{d.cacao}</Insignia>
+                  <Insignia tono="cacao">{marca.anaquel.pesoInsignia}</Insignia>
+                  <Insignia tono="amarillo">{marca.anaquel.manoInsignia}</Insignia>
+                </div>
+                <p class="ficha-ingredientes mono">
+                  {marca.anaquel.ingredientesEtiqueta}: {d.ingredientes}.
+                </p>
+                <div class="ficha-ctas">
+                  <BotonMarca href={d.url} externo>{marca.anaquel.cta}</BotonMarca>
+                  <p class="mano ficha-remate suave">{marca.anaquel.remate}</p>
+                </div>
               </div>
-              <div class="chips">
-                <Insignia tono="rojo"><span data-anaquel-cacao>{inicial.cacao}</span></Insignia>
-                <Insignia tono="cacao">{marca.anaquel.pesoInsignia}</Insignia>
-                <Insignia tono="amarillo">{marca.anaquel.manoInsignia}</Insignia>
-              </div>
-              <p class="ficha-ingredientes mono">
-                {marca.anaquel.ingredientesEtiqueta}: <span data-anaquel-ingredientes>{inicial.ingredientes}</span>.
-              </p>
-              <div class="ficha-ctas">
-                <BotonMarca href={inicial.catalogo ?? urlCatalogoBarras} externo>{marca.anaquel.cta}</BotonMarca>
-                <p class="mano ficha-remate suave">{marca.anaquel.remate}</p>
-              </div>
-            </div>
+            ))}
             <figure class="ficha-ilustracion">
               <img
                 class="flota"

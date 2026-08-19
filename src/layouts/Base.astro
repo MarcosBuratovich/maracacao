@@ -1,6 +1,21 @@
 ---
+import { origenCanonico } from '@/seo/esquema'
+
 interface Props {
   titulo: string
+  /**
+   * SEO (2026-08-19). `descripcion` alimenta la meta description y el
+   * Open Graph; `ruta` arma el canonical absoluto sobre maracacao.mx;
+   * `ogImagen` es la tarjeta social (1200×630, ruta absoluta desde /).
+   * Las páginas con `candado` van SIEMPRE noindex: mientras estén
+   * cerradas no deben aparecer en buscadores — y al quitar el candado
+   * para el lanzamiento, la indexación se abre sola.
+   */
+  descripcion?: string
+  ruta?: string
+  ogImagen?: string
+  /** Datos estructurados JSON-LD (objeto o lista de src/seo/esquema.ts). */
+  esquema?: unknown
   /**
    * Qué familia tipográfica precargar. `identidad` es Fraunces + Work
    * Sans (manual y presentación); `sitio` es Cormorant Garamond +
@@ -19,30 +34,78 @@ interface Props {
    * falta de verdad, es SSR o protección del hosting.
    */
   candado?: boolean
+  /**
+   * Media query para el preload de Cormorant (solo `fuentes="marca"`).
+   * En /sitio el único uso arriba del pliegue (el wordmark de portada)
+   * se oculta en móvil: precargarla ahí son 37KB tirados que compiten
+   * con el LCP. En / el wordmark se ve siempre — sin media.
+   */
+  cormorantMedia?: string
 }
-const { titulo, fuentes = 'identidad', candado = false } = Astro.props
+const {
+  titulo,
+  fuentes = 'identidad',
+  candado = false,
+  descripcion,
+  ruta,
+  ogImagen = '/social/tarjeta.png',
+  esquema,
+  cormorantMedia,
+} = Astro.props
+
+// `<` escapado por higiene: JSON.stringify no escapa `</script>`.
+const esquemaJson = esquema ? JSON.stringify(esquema).replaceAll('<', '\\u003c') : undefined
 
 const LLAVE_SHA256 = 'edbf06dc247173ed729266aeff93df5d791076a460fe562496bef1ec69f39963'
 
-const familias =
+const ORIGEN = origenCanonico(Astro.site)
+const canonico = ruta !== undefined ? `${ORIGEN}${ruta}` : undefined
+
+const familias: { href: string; media?: string }[] =
   fuentes === 'marca'
-    ? ['/fonts/bricolage-grotesque-variable.woff2', '/fonts/trocchi.woff2', '/fonts/cormorant-garamond.woff2']
+    ? [
+        { href: '/fonts/bricolage-grotesque-variable.woff2' },
+        { href: '/fonts/trocchi.woff2' },
+        { href: '/fonts/cormorant-garamond.woff2', media: cormorantMedia },
+      ]
     : fuentes === 'sitio'
-      ? ['/fonts/cormorant-garamond.woff2', '/fonts/work-sans-variable.woff2']
-      : ['/fonts/fraunces-variable.woff2', '/fonts/work-sans-variable.woff2']
+      ? [{ href: '/fonts/cormorant-garamond.woff2' }, { href: '/fonts/work-sans-variable.woff2' }]
+      : [{ href: '/fonts/fraunces-variable.woff2' }, { href: '/fonts/work-sans-variable.woff2' }]
 ---
 <!doctype html>
 <html lang="es-MX">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    {familias.map((href) => (
-      <link rel="preload" href={href} as="font" type="font/woff2" crossorigin />
+    {familias.map((f) => (
+      <link rel="preload" href={f.href} as="font" type="font/woff2" crossorigin media={f.media} />
     ))}
     {/* Sello circular del §8 ("favicon, avatar de redes"), generado con
-        `pnpm favicon` desde el asset y el token verde-600. */}
+        `pnpm favicon` desde el asset y el token verde-600. El .ico y el
+        apple-touch-icon son los respaldos rasterizados del mismo sello
+        (Safari viejo, resultados de Google, pantalla de inicio iOS). */}
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>{titulo}</title>
+    {candado && <meta name="robots" content="noindex, nofollow" />}
+    {descripcion && <meta name="description" content={descripcion} />}
+    {canonico && <link rel="canonical" href={canonico} />}
+    <meta property="og:site_name" content="Maracacao" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={titulo} />
+    {descripcion && <meta property="og:description" content={descripcion} />}
+    {canonico && <meta property="og:url" content={canonico} />}
+    <meta property="og:image" content={`${ORIGEN}${ogImagen}`} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={titulo} />
+    {descripcion && <meta name="twitter:description" content={descripcion} />}
+    <meta name="twitter:image" content={`${ORIGEN}${ogImagen}`} />
+    <meta name="theme-color" content="#F8ECDE" />
+    {esquemaJson && <script type="application/ld+json" set:html={esquemaJson} />}
     {candado && (
       <script is:inline define:vars={{ LLAVE_SHA256 }}>
         // Antes del primer pintado: si la llave ya está guardada, se

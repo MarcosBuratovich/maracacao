@@ -13,7 +13,7 @@ export const familias = {
    * Sans de las más claras — y además ya es la tipografía de texto que
    * documenta el manual, así que sitio y manual hablan igual.
    */
-  sello: "'Cormorant Garamond', Garamond, 'Times New Roman', serif",
+  sello: "'Cormorant Garamond', 'Cormorant respaldo', Garamond, 'Times New Roman', serif",
   /**
    * Rediseño 2026-08-13 (claude.ai/design): las voces del EMPAQUE.
    * `titular` = Bricolage Grotesque 700/800 (los H1/H2 del canvas);
@@ -22,8 +22,10 @@ export const familias = {
    * `mano` = Patrick Hand como sustituto de Bryndan Write, la letra a
    * mano del impreso (pedir el TTF al diseñador para fidelidad total).
    */
-  titular: "'Bricolage Grotesque', 'Work Sans Variable', system-ui, sans-serif",
-  serifMarca: "'Trocchi', Georgia, serif",
+  // Los «respaldo» son caras métricas (fuentes-marca.css): la fuente
+  // local ajustada con size-adjust para que el swap no mueva el texto.
+  titular: "'Bricolage Grotesque', 'Bricolage respaldo', 'Work Sans Variable', system-ui, sans-serif",
+  serifMarca: "'Trocchi', 'Trocchi respaldo', Georgia, serif",
   mono: "'Courier Prime', 'Courier New', monospace",
   mano: "'Patrick Hand', 'Bryndan Write', 'Segoe Print', cursive",
 } as const

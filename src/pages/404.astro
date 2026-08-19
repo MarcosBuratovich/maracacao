@@ -1,0 +1,91 @@
+---
+// src/pages/404.astro — La página que no existe, en el sistema de
+// MARCA. Astro emite dist/404.html y Vercel lo sirve con status 404
+// para toda ruta inexistente (antes salía su 404 genérico en texto
+// plano). Sin candado: un 404 no revela nada y no se indexa.
+import Base from '@/layouts/Base.astro'
+import BotonMarca from '@/components/marca/BotonMarca.astro'
+import selloRaw from '@/assets/brand/sello-mano.svg?raw'
+import { marca } from '@/copy/sitio-marca'
+import '@/styles/global.css'
+import '@/styles/marca.css'
+
+const sello = selloRaw.replace('<svg', '<svg aria-hidden="true" focusable="false"')
+---
+<Base titulo={marca.noEncontrada.titulo} fuentes="marca">
+  <main class="perdida" data-tono="crema">
+    <span class="perdida-sello" set:html={sello} />
+    <p class="perdida-wordmark">{marca.marca.wordmark}</p>
+
+    <span class="perdida-codigo mano" aria-hidden="true">404</span>
+
+    <h1 class="perdida-titulo">{marca.noEncontrada.encabezado}</h1>
+    <p class="perdida-sub">{marca.noEncontrada.sub}</p>
+
+    <div class="perdida-accion">
+      <BotonMarca href={marca.noEncontrada.rutaInicio}>{marca.noEncontrada.cta}</BotonMarca>
+    </div>
+  </main>
+</Base>
+
+<style>
+  .perdida {
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: clamp(2rem, 6vh, 4rem) clamp(1.25rem, 5vw, 3rem);
+  }
+  .perdida-sello { display: inline-flex; width: clamp(110px, 13vw, 160px); }
+  .perdida-sello :global(svg) { width: 100%; height: auto; }
+  .perdida-wordmark {
+    font-family: var(--mrc-font-sello);
+    font-weight: 500;
+    font-size: clamp(1.5rem, 2.6vw, 2.25rem);
+    letter-spacing: 0.18em;
+    text-indent: 0.18em;
+    line-height: 1;
+    margin: clamp(10px, 1.6vh, 16px) 0 0;
+  }
+  /* El mismo sello estampado del sistema (obra-pronto), acá con el
+     código: rojoHondo para que el contraste pase AA sobre crema. */
+  .perdida-codigo {
+    position: relative;
+    display: inline-block;
+    padding: 6px 20px;
+    margin-top: clamp(20px, 3.4vh, 32px);
+    font-size: clamp(1.5rem, 3vw, 2rem);
+    letter-spacing: 0.18em;
+    text-indent: 0.18em;
+    color: var(--mrc-marca-rojoHondo);
+    border: 2px solid var(--mrc-marca-rojoHondo);
+    border-radius: 4px;
+    transform: rotate(-4deg);
+  }
+  .perdida-codigo::after {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border: 1.5px dashed var(--mrc-marca-rojoHondo);
+    border-radius: 2px;
+    opacity: 0.75;
+  }
+  .perdida-titulo {
+    font-family: var(--mrc-font-titular);
+    font-weight: 800;
+    font-size: clamp(2rem, 4.6vw, 3.25rem);
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    margin: clamp(16px, 2.6vh, 24px) 0 0;
+    text-wrap: balance;
+  }
+  .perdida-sub {
+    font-size: clamp(0.90625rem, 1.3vw, 1.0625rem);
+    line-height: 1.6;
+    max-width: 44ch;
+    margin: 14px 0 0;
+  }
+  .perdida-accion { margin-top: clamp(20px, 3.2vh, 30px); }
+</style>

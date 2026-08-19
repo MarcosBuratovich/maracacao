@@ -190,20 +190,20 @@ if (datosCrudos && anaquel) {
   const banda = document.querySelector<HTMLElement>('[data-anaquel-banda]')
 
   const campo = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)
-  const orden = campo('[data-anaquel-orden]')
   const contador = campo('[data-anaquel-contador]')
-  const nombre = campo('[data-anaquel-nombre]')
-  const precio = campo('[data-anaquel-precio]')
-  const cacao = campo('[data-anaquel-cacao]')
-  const ingredientes = campo('[data-anaquel-ingredientes]')
   const envoltura = campo<HTMLImageElement>('.ficha-envoltura img')
   const ilustracion = campo<HTMLImageElement>('[data-anaquel-ilustracion]')
-  const cta = campo<HTMLAnchorElement>('.ficha-ctas a')
+  // Las quince fichas vienen renderizadas del build (SEO: nombre,
+  // precio e ingredientes son texto indexable). Acá solo se decide
+  // cuál se ve; sin JS se apilan las quince, completas.
+  const fichas = [...document.querySelectorAll<HTMLElement>('[data-ficha-de]')]
 
   let slugActual =
     radios.find((r) => r.getAttribute('aria-checked') === 'true')?.dataset.anaquelRadio ?? 'canela'
   // El visor 3D se engancha acá cuando termina de cargar (sección 3c).
   let visorElige: ((slug: string) => void) | null = null
+
+  fichas.forEach((f) => { f.hidden = f.dataset.fichaDe !== slugActual })
 
   const elige = (slug: string, enfoca = false) => {
     const d = porSlug.get(slug)
@@ -219,12 +219,8 @@ if (datosCrudos && anaquel) {
     })
     banda?.style.setProperty('--fondo', d.color)
     banda?.style.setProperty('--texto', d.tinta)
-    if (orden) orden.textContent = String(d.orden)
     if (contador) contador.textContent = String(d.orden)
-    if (nombre) nombre.textContent = d.nombre
-    if (precio) precio.textContent = d.precio
-    if (cacao) cacao.textContent = d.cacao
-    if (ingredientes) ingredientes.textContent = d.ingredientes
+    fichas.forEach((f) => { f.hidden = f.dataset.fichaDe !== slug })
     if (envoltura) {
       envoltura.src = `/sitio/marca/barra-${d.slug}.webp`
       envoltura.alt = `Envoltura de ${d.nombre}`
@@ -233,8 +229,6 @@ if (datosCrudos && anaquel) {
       ilustracion.src = `/sitio/marca/ilustracion-${d.slug}.webp`
       ilustracion.alt = `Ilustración de la envoltura de ${d.nombre}`
     }
-    // «Ver en el catálogo» apunta al producto del sabor elegido.
-    if (cta) cta.href = d.url
   }
 
   radios.forEach((r, i) => {

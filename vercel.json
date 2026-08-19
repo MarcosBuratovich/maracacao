@@ -1,0 +1,17 @@
+{
+  "trailingSlash": false,
+  "headers": [
+    {
+      "source": "/(sitio|presentacion|manual)/:camino*",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/:camino*",
+      "has": [{ "type": "host", "value": "maracacao.vercel.app" }],
+      "destination": "https://www.maracacao.mx/:camino*",
+      "permanent": true
+    }
+  ]
+}

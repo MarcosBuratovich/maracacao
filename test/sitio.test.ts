@@ -292,9 +292,10 @@ describe('el candado de cortesía (2026-08-13)', () => {
       'src/pages/manual/index.astro',
       'src/pages/manual/[...slug].astro',
     ]) {
-      expect(readFileSync(pagina, 'utf8')).toMatch(/<Base [^>]*candado/)
+      // [^>]* cruza saltos de línea: la llamada a <Base> puede ser multilínea.
+      expect(readFileSync(pagina, 'utf8')).toMatch(/<Base[^>]*\scandado/)
     }
-    expect(readFileSync('src/pages/index.astro', 'utf8')).not.toMatch(/<Base [^>]*candado/)
+    expect(readFileSync('src/pages/index.astro', 'utf8')).not.toMatch(/<Base[^>]*\scandado/)
   })
 
   it('cerrado por defecto y sin la contraseña en claro', async () => {
