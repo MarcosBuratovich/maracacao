@@ -1,15 +1,19 @@
 /*
- * SEO (2026-08-19). Lo que fija:
+ * SEO (auditoría 2026-08-19; lanzamiento 2026-08-20). Lo que fija:
  *
- * 1. El switch de lanzamiento: candado ⇒ noindex,nofollow. Quitar el
- *    candado el día del lanzamiento abre la indexación solo — y las
+ * 1. El switch de lanzamiento quedó ejecutado: la landing vive en `/`
+ *    sin candado ni robots; las páginas que siguen privadas
+ *    (/presentacion, /manual) llevan candado ⇒ noindex,nofollow — y las
  *    páginas SIN candado jamás llevan noindex por accidente.
- * 2. El head completo de las dos páginas raíz: description, canonical
- *    absoluto en el host www, Open Graph con imagen social y JSON-LD
- *    que parsea, con cero datos inventados.
+ * 2. El head completo de la home: title de categoría+marca, description
+ *    ≤155, canonical absoluto en el host www, Open Graph con tarjeta
+ *    social y JSON-LD que parsea, con cero datos inventados.
  * 3. Los archivos de rastreo: robots.txt sin Disallow de rutas con
- *    candado (bloquearlas escondería su noindex), sitemap solo con lo
- *    indexable, y vercel.json con la cabecera X-Robots-Tag de refuerzo.
+ *    candado (bloquearlas escondería su noindex), el sitemap lo genera
+ *    src/seo/sitemap.ts en el build (raíz con barra, igual que el
+ *    canonical; sin rutas privadas ni 404), y vercel.json trae
+ *    el 301 de /sitio → / (sin tragarse los assets de /sitio/…) más la
+ *    cabecera X-Robots-Tag de refuerzo sobre lo privado.
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync, existsSync } from 'node:fs'
@@ -17,73 +21,97 @@ import { experimental_AstroContainer as AstroContainer } from 'astro/container'
 import { marca } from '@/copy/sitio-marca'
 import { sabores } from '@/copy/sabores'
 import { esquemaNegocio, esquemaPreguntas, esquemaBarras, origenCanonico } from '@/seo/esquema'
-import Sitio from '@/pages/sitio.astro'
-import EnConstruccion from '@/pages/index.astro'
+import { urlsDelSitemap, xmlDelSitemap } from '@/seo/sitemap'
+import Home from '@/pages/index.astro'
+import Presentacion from '@/pages/presentacion.astro'
 import NoEncontrada from '@/pages/404.astro'
 
 const container = await AstroContainer.create()
 const ORIGEN = 'https://www.maracacao.mx'
 
-describe('el switch de lanzamiento: candado ⇒ noindex', () => {
-  it('/sitio (con candado) va noindex,nofollow', async () => {
-    const html = await container.renderToString(Sitio)
-    expect(html).toContain('<meta name="robots" content="noindex, nofollow"')
+describe('el switch de lanzamiento: la home abierta, lo privado noindex', () => {
+  it('la home NO lleva meta robots ni candado: es lo que se indexa', async () => {
+    const html = await container.renderToString(Home)
+    expect(html).not.toContain('name="robots"')
+    expect(html).not.toContain('data-candado')
   })
 
-  it('la portada pública NO lleva meta robots: es la semilla de indexación del dominio', async () => {
-    const html = await container.renderToString(EnConstruccion)
-    expect(html).not.toContain('name="robots"')
+  it('/presentacion (con candado) va noindex,nofollow', async () => {
+    const html = await container.renderToString(Presentacion)
+    expect(html).toContain('<meta name="robots" content="noindex, nofollow"')
   })
 
   it('el noindex sale del prop candado en Base, no de una lista de rutas aparte', () => {
     const base = readFileSync('src/layouts/Base.astro', 'utf8')
     expect(base).toMatch(/candado && \(?<meta name="robots"/)
   })
+
+  it('ya no existe /sitio como página: la landing es index.astro', () => {
+    expect(existsSync('src/pages/sitio.astro')).toBe(false)
+    expect(existsSync('src/pages/index.astro')).toBe(true)
+  })
 })
 
-describe('el head de las páginas raíz', () => {
-  it('la portada: description, canonical www, OG completo y tarjeta social', async () => {
-    const html = await container.renderToString(EnConstruccion)
-    expect(html).toContain(`<meta name="description" content="${marca.descripcionConstruccion}"`)
+describe('el head de la home', () => {
+  it('description, canonical www sin barra extra, OG completo y tarjeta social', async () => {
+    const html = await container.renderToString(Home)
+    expect(html).toContain(`<title>${marca.titulo}</title>`)
+    expect(html).toContain(`<meta name="description" content="${marca.descripcion}"`)
     expect(html).toContain(`<link rel="canonical" href="${ORIGEN}/"`)
+    expect(html).toContain(`property="og:url" content="${ORIGEN}/"`)
     expect(html).toContain('property="og:locale" content="es_MX"')
     expect(html).toContain(`property="og:image" content="${ORIGEN}/social/tarjeta.png"`)
     expect(html).toContain('name="twitter:card" content="summary_large_image"')
+    // Los assets siguen bajo /sitio/… (ruta de archivos); la PÁGINA /sitio ya no se referencia.
+    expect(html).not.toContain(`${ORIGEN}/sitio"`)
   })
 
-  it('/sitio: description propia y canonical /sitio (sin barra final: una sola forma de URL)', async () => {
-    const html = await container.renderToString(Sitio)
-    expect(html).toContain(`<meta name="description" content="${marca.descripcion}"`)
-    expect(html).toContain(`<link rel="canonical" href="${ORIGEN}/sitio"`)
-    expect(html).not.toContain(`href="${ORIGEN}/sitio/"`)
+  it('title de categoría + marca (≤60) y description ≤155, sin «construcción»', () => {
+    const t = marca.titulo.toLowerCase()
+    expect(t).toContain('chocolate')
+    expect(t).toContain('coyoacán')
+    expect(t).toContain('maracacao')
+    expect(t).not.toContain('construcción')
+    expect(marca.titulo.length).toBeLessThanOrEqual(60)
+    expect(marca.descripcion.length).toBeLessThanOrEqual(155)
   })
 
-  it('el título de la portada trabaja la marca y la categoría, no «en construcción»', () => {
-    expect(marca.construccion.titulo.toLowerCase()).toContain('chocolate')
-    expect(marca.construccion.titulo.toLowerCase()).not.toContain('construcción')
+  it('la página en construcción se retiró del copy', () => {
+    expect('construccion' in marca).toBe(false)
+    expect('descripcionConstruccion' in marca).toBe(false)
   })
 
   it('favicon con respaldos: svg + ico + apple-touch-icon, y los archivos existen', async () => {
-    const html = await container.renderToString(EnConstruccion)
+    const html = await container.renderToString(Home)
     for (const ref of ['/favicon.svg', '/favicon.ico', '/apple-touch-icon.png']) {
       expect(html).toContain(`href="${ref}"`)
       expect(existsSync(`public${ref}`)).toBe(true)
     }
   })
+
+  it('la 404 tiene su título, vuelve al inicio y no lleva candado', async () => {
+    const html = await container.renderToString(NoEncontrada)
+    expect(html).toContain(`<title>${marca.noEncontrada.titulo}</title>`)
+    expect(html).toContain('href="/"')
+    expect(html).not.toContain('data-candado')
+  })
 })
 
 describe('JSON-LD — datos reales, nada inventado', () => {
-  it('las dos páginas emiten script ld+json que parsea', async () => {
-    for (const Pagina of [EnConstruccion, Sitio]) {
-      const html = await container.renderToString(Pagina)
-      const bloques = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)]
-      expect(bloques.length).toBeGreaterThan(0)
-      for (const [, crudo] of bloques) expect(() => JSON.parse(crudo)).not.toThrow()
-    }
+  it('la home emite LocalBusiness + FAQPage + ItemList en ld+json que parsea', async () => {
+    const html = await container.renderToString(Home)
+    const bloques = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)]
+    expect(bloques.length).toBeGreaterThan(0)
+    const tipos = bloques.flatMap(([, crudo]) => {
+      const dato = JSON.parse(crudo) as { '@type': string } | { '@type': string }[]
+      return (Array.isArray(dato) ? dato : [dato]).map((d) => d['@type'])
+    })
+    expect(tipos).toEqual(expect.arrayContaining(['LocalBusiness', 'FAQPage', 'ItemList']))
   })
 
-  it('el negocio: dirección real de Coyoacán y el correo del cliente', () => {
+  it('el negocio: dirección real de Coyoacán, el correo del cliente y la home como url', () => {
     const negocio = esquemaNegocio(ORIGEN)
+    expect(negocio.url).toBe(`${ORIGEN}/`)
     expect(negocio.address.streetAddress).toContain('Mercado de Coyoacán')
     expect(negocio.address.postalCode).toBe('04100')
     expect(negocio.email).toBe(marca.contacto.correo)
@@ -104,6 +132,7 @@ describe('JSON-LD — datos reales, nada inventado', () => {
       expect(el.item.offers.price).toBe(sabores[i].precio)
       expect(el.item.offers.priceCurrency).toBe('MXN')
       expect(el.item.offers.url).toMatch(/^https:\/\/chocolateria\.pulpos\.shop/)
+      expect(existsSync(`public/sitio/marca/barra-${sabores[i].slug}.webp`)).toBe(true)
     }
   })
 
@@ -115,8 +144,12 @@ describe('JSON-LD — datos reales, nada inventado', () => {
 
 describe('rastreo: robots.txt, sitemap y vercel.json', () => {
   const robots = readFileSync('public/robots.txt', 'utf8')
-  const sitemap = readFileSync('public/sitemap.xml', 'utf8')
-  const vercel = JSON.parse(readFileSync('vercel.json', 'utf8'))
+  const config = readFileSync('astro.config.mjs', 'utf8')
+  const vercel = JSON.parse(readFileSync('vercel.json', 'utf8')) as {
+    trailingSlash: boolean
+    headers: { source: string; headers: { key: string; value: string }[] }[]
+    redirects: { source: string; destination: string; permanent: boolean; has?: unknown }[]
+  }
 
   it('robots.txt: solo /api/ va con Disallow — nunca las rutas con candado (esconderían su noindex)', () => {
     expect(robots).toContain('Disallow: /api/')
@@ -126,22 +159,43 @@ describe('rastreo: robots.txt, sitemap y vercel.json', () => {
     expect(robots).toContain(`Sitemap: ${ORIGEN}/sitemap.xml`)
   })
 
-  it('el sitemap lista solo lo indexable hoy: la portada en el host www', () => {
-    expect(sitemap).toContain(`<loc>${ORIGEN}/</loc>`)
-    expect(sitemap).not.toContain('/sitio</loc>')
+  it('el sitemap sale del build (src/seo/sitemap.ts): raíz con barra como el canonical, sin privadas ni 404', () => {
+    expect(config).toContain("import { sitemapMaracacao } from './src/seo/sitemap'")
+    expect(config).toContain('sitemapMaracacao()')
+    expect(config).toContain(`site: '${ORIGEN}'`)
+    // Ningún sitemap estático en public/ que pise al generado.
+    expect(existsSync('public/sitemap.xml')).toBe(false)
+    const urls = urlsDelSitemap(`${ORIGEN}/`, ['', '404', 'presentacion', 'manual', 'manual/color/', '/sabores/', 'sabores'])
+    expect(urls).toEqual([`${ORIGEN}/`, `${ORIGEN}/sabores`])
+    expect(xmlDelSitemap(urls)).toContain(`<loc>${ORIGEN}/</loc>`)
+    expect(xmlDelSitemap(urls)).toMatch(/^<\?xml version="1.0" encoding="UTF-8"\?>\n<urlset xmlns="http:\/\/www.sitemaps.org\/schemas\/sitemap\/0.9">/)
   })
 
-  it('vercel.json: X-Robots-Tag de refuerzo sobre las rutas privadas y una sola forma de URL', () => {
+  it('vercel.json: 301 exacto de /sitio → / (sin comerse /sitio/… de assets) y una sola forma de URL', () => {
     expect(vercel.trailingSlash).toBe(false)
-    const cabecera = vercel.headers?.[0]
-    expect(cabecera.source).toContain('sitio|presentacion|manual')
+    const aHome = vercel.redirects.find((r) => r.source === '/sitio')
+    expect(aHome).toEqual({ source: '/sitio', destination: '/', permanent: true })
+    for (const r of vercel.redirects) expect(r.source).not.toMatch(/^\/sitio\//)
+  })
+
+  it('vercel.json: X-Robots-Tag de refuerzo solo sobre lo privado — ya no sobre /sitio (tapaba las imágenes)', () => {
+    const cabecera = vercel.headers[0]
+    expect(cabecera.source).toContain('presentacion|manual')
+    expect(cabecera.source).not.toContain('sitio')
     expect(cabecera.headers).toContainEqual({ key: 'X-Robots-Tag', value: 'noindex, nofollow' })
+  })
+
+  it('vercel.json: caché larga para fuentes (inmutables) y corta con revalidación para imágenes de public/', () => {
+    const valor = (fuente: string) =>
+      vercel.headers.find((h) => h.source.includes(fuente))?.headers.find((c) => c.key === 'Cache-Control')?.value
+    expect(valor('/fonts/')).toBe('public, max-age=31536000, immutable')
+    expect(valor('sitio|social')).toMatch(/^public, max-age=86400, stale-while-revalidate=/)
   })
 })
 
 describe('los sabores son texto servido, no solo aria-labels', () => {
   it('cada uno de los 15 nombres aparece como heading de su ficha', async () => {
-    const html = await container.renderToString(Sitio)
+    const html = await container.renderToString(Home)
     for (const s of sabores) {
       expect(html).toContain(`data-ficha-de="${s.slug}"`)
       // Astro suma su data-astro-cid de estilos scoped al tag.
@@ -150,7 +204,7 @@ describe('los sabores son texto servido, no solo aria-labels', () => {
   })
 
   it('sin `hidden` servido en las fichas: sin JS se ven las quince (el script esconde al tomar control)', () => {
-    const fuente = readFileSync('src/pages/sitio.astro', 'utf8')
+    const fuente = readFileSync('src/pages/index.astro', 'utf8')
     const bloque = fuente.slice(fuente.indexOf('data-ficha-de'), fuente.indexOf('ficha-extras'))
     expect(bloque).not.toContain('hidden')
   })

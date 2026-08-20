@@ -36,9 +36,9 @@ interface Props {
   candado?: boolean
   /**
    * Media query para el preload de Cormorant (solo `fuentes="marca"`).
-   * En /sitio el único uso arriba del pliegue (el wordmark de portada)
+   * En la home el único uso arriba del pliegue (el wordmark de portada)
    * se oculta en móvil: precargarla ahí son 37KB tirados que compiten
-   * con el LCP. En / el wordmark se ve siempre — sin media.
+   * con el LCP; la home pasa `(min-width: 761px)`.
    */
   cormorantMedia?: string
 }

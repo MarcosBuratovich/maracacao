@@ -113,7 +113,7 @@ export default async function handler(req: Pedido, res: Respuesta) {
         mensaje,
         '',
         '—',
-        'Enviado desde el formulario de maracacao.mx/sitio',
+        'Enviado desde el formulario de maracacao.mx',
       ].join('\n'),
     }),
   })

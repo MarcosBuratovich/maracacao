@@ -30,7 +30,7 @@ const punteroFino = matchMedia('(pointer: fine)').matches
 /* ---------- La barra 3D (compartida) ----------
    El modelo de Marcos (Blender): UN solo GLB para los quince sabores —
    cambiarle la textura del material «Label» por el pliego de imprenta
-   del sabor es cambiar de barra. La usan la ficha del anaquel (/sitio)
+   del sabor es cambiar de barra. La usan la ficha del anaquel (la home)
    y el catálogo inmersivo (/barras). model-viewer va self-hosteado y
    se carga una sola vez. */
 

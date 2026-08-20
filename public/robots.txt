@@ -1,6 +1,6 @@
-# www.maracacao.mx — mientras el sitio no es público, solo la portada
-# se indexa. OJO: las rutas con candado NO van con Disallow — el crawler
-# tiene que poder leerlas para ver su meta robots noindex.
+# www.maracacao.mx — la home es pública; /presentacion y /manual son
+# privadas y van noindex. OJO: las rutas con candado NO van con
+# Disallow — el crawler tiene que poder leerlas para ver su noindex.
 User-agent: *
 Disallow: /api/
 

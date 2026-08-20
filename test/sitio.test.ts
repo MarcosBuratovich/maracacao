@@ -1,5 +1,6 @@
 /*
- * Borrador del sitio público (/sitio). Los guards estructurales (hex a
+ * El sitio público (la home, /; hasta el lanzamiento 2026-08-20 vivió
+ * en /sitio con candado). Los guards estructurales (hex a
  * mano, <title> literal) ya lo cubren vía manual.test.ts; acá va lo
  * propio: registro es-MX y retro de Marcos sobre el copy nuevo, el
  * renderizado de la página con su contenido real, y que los assets
@@ -13,8 +14,8 @@ import { marca } from '@/copy/sitio-marca'
 import { sabores } from '@/copy/sabores'
 import { editorial, etiqueta } from '@/tokens/color'
 import { customProperties } from '@/tokens/css'
-import Borrador from '@/pages/sitio.astro'
-import EnConstruccion from '@/pages/index.astro'
+import Borrador from '@/pages/index.astro'
+import Presentacion from '@/pages/presentacion.astro'
 import TazaEspuma from '@/components/sitio/TazaEspuma.astro'
 import HojaCacao from '@/components/sitio/HojaCacao.astro'
 import Mazorca from '@/components/sitio/Mazorca.astro'
@@ -65,7 +66,7 @@ describe('copy del borrador — registro y retro vigentes', () => {
   })
 })
 
-describe('la página /sitio (rediseño de marca, 2026-08-13)', () => {
+describe('la página / (rediseño de marca, 2026-08-13; en la raíz desde 2026-08-20)', () => {
   it('renderiza el contenido real: los 15 sabores, correo, catálogo, precios, Tabasco y punto de venta', async () => {
     const html = await container.renderToString(Borrador)
     // Los quince están presentes: en el anaquel cada barra es un radio
@@ -117,14 +118,14 @@ describe('la página /sitio (rediseño de marca, 2026-08-13)', () => {
   })
 
   it('no pide la isla de Rive y no busca por id', () => {
-    const src = readFileSync('src/pages/sitio.astro', 'utf8')
+    const src = readFileSync('src/pages/index.astro', 'utf8')
     expect(src).not.toContain('rive')
     expect(src).not.toContain('getElementById')
     expect(src).not.toMatch(/href="\/(?!\{)/)
   })
 
   it('solo usa el personaje del cliente, con los assets sin fondo', () => {
-    const src = readFileSync('src/pages/sitio.astro', 'utf8')
+    const src = readFileSync('src/pages/index.astro', 'utf8')
     expect(src).not.toContain('components/brand/Mascota')
     expect(src).toContain('/sitio/personaje-sentado-t.webp')
   })
@@ -193,36 +194,18 @@ describe('sistema editorial', () => {
   })
 })
 
-describe('la página en construcción en / (lo público mientras llega el dominio)', () => {
-  it('muestra el sello inline y el personaje recortado, con catálogo y correo', async () => {
-    const html = await container.renderToString(EnConstruccion)
-    expect(html).toContain('fill="currentColor"') // el sello, inline, toma la tinta de su sección
-    expect(html).toContain(sitio.marca.wordmark)
-    // El video del cliente trae fondo blanco: sobre la tinta se ve como
-    // un parche, así que va la versión estática sin fondo.
-    expect(html).not.toContain('.mp4')
-    expect(html).toContain('/sitio/personaje-molinillo-t.webp')
-    expect(html).toContain(sitio.contacto.catalogoUrl)
-    expect(html).toContain(sitio.contacto.correo)
-    expect(html).toContain(sitio.construccion.encabezado)
-  })
-
-  it('el título va al punto, sin juegos de palabras', () => {
-    expect(sitio.construccion.encabezado).toBe('Sitio en construcción')
-  })
-
-  it('sin la mascota del sistema y sin enlaces a presentación/manual/borrador (van por URL directa)', async () => {
+describe('el lanzamiento (2026-08-20): la landing es la home', () => {
+  it('la home no enlaza presentación/manual/borrador (van por URL directa) ni usa la mascota del sistema', async () => {
     const src = readFileSync('src/pages/index.astro', 'utf8')
     expect(src).not.toContain('components/brand/Mascota')
-    const html = await container.renderToString(EnConstruccion)
+    const html = await container.renderToString(Borrador)
     expect(html).not.toContain('href="/manual"')
     expect(html).not.toContain('href="/sitio"')
     expect(html).not.toContain('href="/presentacion"')
+    expect(html).not.toContain('Sitio en construcción')
   })
 
   it('carga el módulo de marca, que apaga el movimiento bajo reduced-motion', () => {
-    // Rediseño 2026-08-13: la construcción vive en el sistema de marca,
-    // igual que /sitio — misma identidad para quien entra por el dominio.
     expect(readFileSync('src/pages/index.astro', 'utf8')).toContain("import '@/scripts/marca'")
     const js = readFileSync('src/scripts/marca.ts', 'utf8')
     expect(js).toContain("matchMedia('(prefers-reduced-motion: reduce)')")
@@ -235,7 +218,7 @@ describe('el catálogo inmersivo de barras (DESCONTINUADO 2026-08-17, vive en _b
     // que el código queda listo para revivir renombrando el archivo.
     expect(existsSync('src/pages/barras.astro')).toBe(false)
     expect(existsSync('src/pages/_barras.astro')).toBe(true)
-    expect(readFileSync('src/pages/sitio.astro', 'utf8')).not.toContain('anaquel-todas')
+    expect(readFileSync('src/pages/index.astro', 'utf8')).not.toContain('anaquel-todas')
   })
 
   it('una pantalla por sabor, con su color, su tinta y sus datos de ficha técnica', async () => {
@@ -285,9 +268,8 @@ describe('el formulario con envío real (2026-08-17)', () => {
 })
 
 describe('el candado de cortesía (2026-08-13)', () => {
-  it('las páginas privadas lo piden; la construcción, no', () => {
+  it('las páginas privadas lo piden; la home, no', () => {
     for (const pagina of [
-      'src/pages/sitio.astro',
       'src/pages/presentacion.astro',
       'src/pages/manual/index.astro',
       'src/pages/manual/[...slug].astro',
@@ -299,7 +281,7 @@ describe('el candado de cortesía (2026-08-13)', () => {
   })
 
   it('cerrado por defecto y sin la contraseña en claro', async () => {
-    const html = await container.renderToString(Borrador)
+    const html = await container.renderToString(Presentacion)
     // El formulario del candado está, con el hash como única llave.
     expect(html).toContain('data-candado')
     expect(html).toMatch(/data-llave="[0-9a-f]{64}"/)
@@ -310,8 +292,8 @@ describe('el candado de cortesía (2026-08-13)', () => {
     expect(base).toMatch(/LLAVE_SHA256 = '[0-9a-f]{64}'/)
   })
 
-  it('la construcción no lleva candado en su HTML', async () => {
-    const html = await container.renderToString(EnConstruccion)
+  it('la home no lleva candado en su HTML', async () => {
+    const html = await container.renderToString(Borrador)
     expect(html).not.toContain('data-candado')
   })
 })

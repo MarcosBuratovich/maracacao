@@ -2,15 +2,57 @@
   "trailingSlash": false,
   "headers": [
     {
-      "source": "/(sitio|presentacion|manual)/:camino*",
-      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
+      "source": "/(presentacion|manual)/:camino*",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/fonts/:archivo*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(sitio|social|referencias|vendor)/:archivo*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, stale-while-revalidate=604800"
+        }
+      ]
+    },
+    {
+      "source": "/(favicon.svg|favicon.ico|apple-touch-icon.png)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, stale-while-revalidate=604800"
+        }
+      ]
     }
   ],
   "redirects": [
     {
       "source": "/:camino*",
-      "has": [{ "type": "host", "value": "maracacao.vercel.app" }],
+      "has": [
+        {
+          "type": "host",
+          "value": "maracacao.vercel.app"
+        }
+      ],
       "destination": "https://www.maracacao.mx/:camino*",
+      "permanent": true
+    },
+    {
+      "source": "/sitio",
+      "destination": "/",
       "permanent": true
     }
   ]

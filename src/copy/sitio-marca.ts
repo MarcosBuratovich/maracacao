@@ -10,18 +10,19 @@
 //
 // Los datos de producto (nombres, ingredientes, %, precios) NO viven
 // acá: salen de src/copy/sabores.ts, la fuente única.
+//
+// Tipografía: entre cifra y unidad va espacio duro (\u00a0) para que
+// «250 g» nunca parta con la «g» sola en la línea siguiente.
 export const marca = {
-  // SEO (2026-08-19, auditoría): en /sitio la categoría va primero —
-  // ahí se pelea búsqueda no-marca («chocolate mexicano», «Coyoacán»).
-  // Al lanzar, este título y description pasan con el contenido a /.
+  // SEO (2026-08-19, auditoría): la categoría va primero — la home se
+  // pelea búsqueda no-marca («chocolate mexicano», «Coyoacán»); la
+  // marca cierra el título.
   titulo: 'Chocolate mexicano 70% cacao en Coyoacán | Maracacao',
   // Descriptions es-MX ≤155 caracteres, con las búsquedas reales en
   // mente (chocolate artesanal cdmx, 70% cacao, Coyoacán, gotas
   // repostería). El polvo no se menciona: aún no está a la venta.
   descripcion:
     'Barras 70% cacao con 15 sabores mexicanos —chiles, frutas, hierbas— y gotas para repostería. Encuéntranos en el Mercado de Coyoacán o ve el catálogo.',
-  descripcionConstruccion:
-    'Chocolate artesanal mexicano, 70% cacao, en el Mercado de Coyoacán, CDMX. La página está en camino; mientras tanto, ve el catálogo o escríbenos.',
   skipLink: 'Ir al contenido',
 
   marca: {
@@ -84,7 +85,7 @@ export const marca = {
     contadorDe: 'de 15',
     fichaEtiqueta: 'Barra n.º',
     grupoAria: 'Elige un sabor para ver su ficha',
-    pesoInsignia: '70 g',
+    pesoInsignia: '70\u00a0g',
     manoInsignia: 'hecho a mano',
     ingredientesEtiqueta: 'Ingredientes',
     cta: 'Ver en el catálogo',
@@ -103,7 +104,7 @@ export const marca = {
   },
 
   gotas: {
-    titulo: 'Gotas de chocolate · 250 g',
+    titulo: 'Gotas de chocolate · 250\u00a0g',
     precioDesde: 258,
     precioJengibre: 340,
     desdeEtiqueta: 'desde',
@@ -113,7 +114,7 @@ export const marca = {
   },
 
   polvoCard: {
-    titulo: 'En polvo · 250 g',
+    titulo: 'En polvo · 250\u00a0g',
     chip: 'PRÓXIMAMENTE',
     cuerpo: 'Para beber frío o caliente, con espuma, aroma y tradición.',
   },
@@ -230,7 +231,7 @@ export const marca = {
       {
         id: 'polvo',
         etiqueta: 'Chocolate en polvo',
-        titulo: 'Chocolate en polvo · 250 g y 1 kg',
+        titulo: 'Chocolate en polvo · 250\u00a0g y 1\u00a0kg',
         precioNota: 'próximamente',
         precio: null,
         clave: 'salDeMar',
@@ -244,7 +245,7 @@ export const marca = {
       {
         id: 'gotas',
         etiqueta: 'Chocolate en gotas',
-        titulo: 'Chocolate en gotas · 250 g',
+        titulo: 'Chocolate en gotas · 250\u00a0g',
         precioNota: 'desde',
         precio: 258,
         clave: 'cardamomo',
@@ -259,7 +260,7 @@ export const marca = {
       {
         id: 'barras',
         etiqueta: 'Chocolate en barras',
-        titulo: 'Chocolate en barras · 70 g',
+        titulo: 'Chocolate en barras · 70\u00a0g',
         precioNota: 'desde',
         precio: 108,
         clave: 'canela',
@@ -349,7 +350,7 @@ export const marca = {
     titulo: 'Maracacao — Las 15 barras',
     encabezado: 'Las 15 barras',
     ruta: '/barras',
-    rutaVolver: '/sitio',
+    rutaVolver: '/',
     volver: 'Volver al sitio',
     serie: 'Barra n.º',
     de15: 'de 15',
@@ -363,22 +364,6 @@ export const marca = {
     cta: 'Ver en el catálogo en línea',
     selectorAria: 'Elige un sabor del catálogo',
     visorAlt: 'La barra en tres dimensiones; arrastra para girarla',
-  },
-
-  // Página en construcción — lo público mientras el sitio no sale.
-  // Sin juegos de palabras: dice lo que pasa (retro de Marcos, vigente).
-  construccion: {
-    // El título trabaja la marca y la categoría, no el estado: durante
-    // la preventa casi toda la búsqueda es «maracacao», y «sitio en
-    // construcción» no lo busca nadie. El estado lo dice la página.
-    titulo: 'Maracacao — Chocolate mexicano 70% cacao',
-    encabezado: 'Sitio en construcción',
-    sub: 'Estamos armando la página. Mientras tanto, el catálogo está abierto y el chocolate, disponible.',
-    ctaCatalogo: 'Ver el catálogo',
-    ctaCorreo: 'Escríbenos',
-    lugar: 'Mercado de Coyoacán · CDMX',
-    muyPronto: 'Muy pronto',
-    personajeAlt: 'El personaje de Maracacao batiendo chocolate con su molinillo',
   },
 
   // Página 404 — sin candado (los 404 no se indexan) y con una sola
@@ -401,8 +386,8 @@ export const marca = {
     contactoTitulo: 'Contacto',
     legalesTitulo: 'Legales',
     productos: [
-      { ancla: '#sabores', texto: 'Barras 70 g' },
-      { ancla: '#sabores', texto: 'Gotas de chocolate 250 g' },
+      { ancla: '#sabores', texto: 'Barras 70\u00a0g' },
+      { ancla: '#sabores', texto: 'Gotas de chocolate 250\u00a0g' },
       { ancla: '#polvo', texto: 'Chocolate en polvo (próximamente)' },
     ],
     // Las páginas legales todavía no existen: van sin enlace, marcadas,
