@@ -147,6 +147,7 @@ describe('rastreo: robots.txt, sitemap y vercel.json', () => {
   const config = readFileSync('astro.config.mjs', 'utf8')
   const vercel = JSON.parse(readFileSync('vercel.json', 'utf8')) as {
     trailingSlash: boolean
+    cleanUrls: boolean
     headers: { source: string; headers: { key: string; value: string }[] }[]
     redirects: { source: string; destination: string; permanent: boolean; has?: unknown }[]
   }
@@ -173,6 +174,11 @@ describe('rastreo: robots.txt, sitemap y vercel.json', () => {
 
   it('vercel.json: 301 exacto de /sitio → / (sin comerse /sitio/… de assets) y una sola forma de URL', () => {
     expect(vercel.trailingSlash).toBe(false)
+    expect(vercel.cleanUrls).toBe(true) // /index.html → /
+    // El alias *.vercel.app redirige ENTERO a www: `/:camino*` no cubre la
+    // raíz en Vercel (verificado en producción), así que la raíz va aparte.
+    const alAlias = vercel.redirects.filter((r) => JSON.stringify(r.has ?? []).includes('maracacao.vercel.app'))
+    expect(alAlias.map((r) => r.source).sort()).toEqual(['/', '/:camino*'])
     const aHome = vercel.redirects.find((r) => r.source === '/sitio')
     expect(aHome).toEqual({ source: '/sitio', destination: '/', permanent: true })
     for (const r of vercel.redirects) expect(r.source).not.toMatch(/^\/sitio\//)
