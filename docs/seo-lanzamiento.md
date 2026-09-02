@@ -56,6 +56,10 @@ puede hacer Marcos a mano.
 
 ## Páginas futuras que la auditoría dejó tituladas
 
+La primera ya existe: **`/fichas-tecnicas`** (2026-09-02) — las cuatro
+fichas oficiales legibles en la página, con PDF descargable (los PDF van
+noindex: la página HTML es la cara indexable). Entra sola al sitemap.
+
 Contenido ya existente que merece URL propia (los titles/descriptions
 propuestos están en el registro de la auditoría): `/sabores`
 (long-tail: «chocolate con chamoy», «mango con chile»), `/recetas`

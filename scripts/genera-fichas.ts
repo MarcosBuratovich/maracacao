@@ -1,6 +1,6 @@
 /* Genera las fichas técnicas oficiales en PDF.
  *
- * `pnpm fichas` → docs/fichas/*.pdf
+ * `pnpm fichas` → public/fichas/*.pdf (los descarga /fichas-tecnicas)
  *
  * La plantilla y los datos viven en src/fichas/ (compartidos con el
  * generador en línea /fichas — mismo formato, mismo motor: Chromium).
@@ -12,7 +12,7 @@ import { fichaHtml } from '../src/fichas/plantilla'
 import { fichasBase } from '../src/fichas/base'
 
 const RAIZ = resolve(import.meta.dirname, '..')
-const SALIDA = resolve(RAIZ, 'docs/fichas')
+const SALIDA = resolve(RAIZ, 'public/fichas')
 const TEMPORAL = resolve(RAIZ, 'node_modules/.tmp-fichas')
 
 const sello = readFileSync(resolve(RAIZ, 'src/assets/brand/sello-mano.svg'), 'utf8')

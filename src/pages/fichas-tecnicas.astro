@@ -1,0 +1,308 @@
+---
+// src/pages/fichas-tecnicas.astro — Las fichas técnicas oficiales,
+// legibles en la página (pedido de Marcos, 2026-09-02) y descargables
+// en PDF tamaño carta.
+//
+// El CONTENIDO no vive acá: sale de src/fichas/base.ts — la fuente
+// única, verbatim de los documentos del cliente, la misma que genera
+// los PDF (`pnpm fichas` → public/fichas/). Editar allá y regenerar.
+//
+// Página estática a propósito: navegación por anclas, sin JS. Cada
+// ficha es un «documento» (hoja blanca sobre crema) con el acento del
+// producto; las secciones van numeradas como en el PDF.
+import Base from '@/layouts/Base.astro'
+import EtiquetaSabor from '@/components/marca/EtiquetaSabor.astro'
+import selloRaw from '@/assets/brand/sello-mano.svg?raw'
+import { marca } from '@/copy/sitio-marca'
+import { fichasBase } from '@/fichas/base'
+import '@/styles/global.css'
+import '@/styles/marca.css'
+
+const sello = selloRaw.replace('<svg', '<svg aria-hidden="true" focusable="false"')
+const copy = marca.fichasTecnicas
+
+// El ancla legible de cada ficha, sin el prefijo del nombre de archivo.
+const ancla = (archivo: string) => archivo.replace('ficha-tecnica-', '')
+---
+<Base titulo={copy.titulo} fuentes="marca" descripcion={copy.descripcion} ruta={copy.ruta}>
+  <a href="#contenido" class="salto">{marca.skipLink}</a>
+
+  <header class="cabecera" data-tono="crema">
+    <div class="contenedor cabecera-fila">
+      <a class="lockup" href={copy.rutaInicio}>
+        <span class="lockup-sello" set:html={sello} />
+        <span>
+          <span class="lockup-nombre">{marca.marca.wordmark}</span>
+          <span class="lockup-descriptor mono">{marca.marca.descriptor}</span>
+        </span>
+      </a>
+      <a class="volver mono" href={copy.rutaInicio}>{copy.volver}</a>
+    </div>
+  </header>
+
+  <main id="contenido" class="zona" data-tono="crema">
+    <div class="contenedor">
+      <EtiquetaSabor texto={copy.kicker} />
+      <h1 class="titular">{copy.encabezado}</h1>
+      <p class="intro">{copy.sub}</p>
+
+      <nav class="indice" aria-label={copy.indiceAria}>
+        {fichasBase.map((f) => <a href={`#${ancla(f.archivo)}`}>{f.producto}</a>)}
+      </nav>
+
+      {fichasBase.map((f) => (
+        <article class="doc" id={ancla(f.archivo)} style={`--acento: ${f.acento}`}>
+          <header class="doc-cabeza">
+            <div class="doc-titulos">
+              <p class="doc-tipo mono">{copy.tipoDocumento}</p>
+              <h2>{f.producto}</h2>
+              <p class="doc-denominacion">{f.denominacion}</p>
+            </div>
+            <a class="doc-pdf" href={`${copy.rutaPdf}/${f.archivo}.pdf`} download>
+              <span class="mono">{copy.descargar}</span>
+              <span class="doc-pdf-nota mono">{copy.descargarNota}</span>
+            </a>
+          </header>
+
+          <dl class="doc-meta">
+            {f.meta.map(([clave, valor]) => (
+              <div>
+                <dt class="mono">{clave}</dt>
+                <dd>{valor}</dd>
+              </div>
+            ))}
+          </dl>
+
+          <div class="doc-secciones">
+            {f.secciones.map((seccion, i) => (
+              <section>
+                <h3>
+                  <span class="n mono" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+                  {seccion.titulo}
+                </h3>
+                {seccion.bloques.map((b) =>
+                  b.tipo === 'parrafo' ? (
+                    <p>{b.texto}</p>
+                  ) : b.tipo === 'lista' ? (
+                    <ul>{b.items.map((item) => <li>{item}</li>)}</ul>
+                  ) : (
+                    <div class="tabla-marco">
+                      <table>
+                        <thead>
+                          <tr>{b.encabezados.map((e) => <th scope="col">{e}</th>)}</tr>
+                        </thead>
+                        <tbody>
+                          {b.filas.map((fila) => (
+                            <tr>
+                              {fila.map((celda, j) =>
+                                j === 0 ? <th scope="row">{celda}</th> : <td class="mono">{celda}</td>,
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ),
+                )}
+              </section>
+            ))}
+          </div>
+        </article>
+      ))}
+
+      <p class="pie-nota mono">
+        {copy.contactoNota} <a href={`mailto:${marca.contacto.correo}`}>{marca.contacto.correo}</a>
+        {' · '}{marca.contacto.redes}
+      </p>
+    </div>
+  </main>
+</Base>
+
+<style>
+  /* ——— Cabecera compacta (esta página no lleva el menú del sitio) ——— */
+  .cabecera { border-bottom: 1px solid rgb(76 44 22 / 0.25); }
+  .cabecera-fila {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding-block: 10px;
+  }
+  .lockup { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
+  .lockup-sello { display: inline-flex; width: 38px; flex: none; }
+  .lockup-sello :global(svg) { width: 100%; height: auto; }
+  .lockup-nombre {
+    display: block;
+    font-family: var(--mrc-font-sello);
+    font-weight: 600;
+    font-size: 1rem;
+    letter-spacing: 0.16em;
+    line-height: 1.1;
+  }
+  .lockup-descriptor { display: block; font-size: 0.5625rem; letter-spacing: 0.28em; color: var(--mrc-marca-rojoHondo); }
+  .volver {
+    flex: none;
+    font-size: 0.6875rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--mrc-marca-tinta);
+    text-decoration: none;
+    border-bottom: 2px solid var(--mrc-marca-amarillo);
+    padding-bottom: 2px;
+    transition: border-color 0.2s;
+  }
+  .volver:hover { border-color: var(--mrc-marca-rojo); }
+  /* A 320px la fila no daba (6px de desborde): el enlace se aprieta. */
+  @media (max-width: 360px) {
+    .volver { font-size: 0.625rem; letter-spacing: 0.05em; }
+    .cabecera-fila { flex-wrap: wrap; }
+  }
+
+  /* ——— Encabezado de la página ——— */
+  .zona { padding-block: clamp(28px, 5vw, 52px) clamp(48px, 7vw, 88px); }
+  .zona :global(.etiqueta-sabor) { color: var(--mrc-marca-rojoHondo); --chispa: var(--mrc-marca-rojo); }
+  .titular { margin: 10px 0 0; }
+  .intro { max-width: 62ch; font-size: 0.9375rem; line-height: 1.6; margin: 14px 0 0; }
+
+  .indice { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+  .indice a {
+    font-family: var(--mrc-font-titular);
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--mrc-marca-tinta);
+    text-decoration: none;
+    border: 2px solid rgb(76 44 22 / 0.35);
+    border-radius: 999px;
+    padding: 8px 16px;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .indice a:hover { border-color: var(--mrc-marca-rojo); color: var(--mrc-marca-rojoHondo); }
+
+  /* ——— El documento ——— */
+  .doc {
+    background: #fff;
+    border-radius: 12px;
+    border-top: 6px solid var(--acento);
+    box-shadow: 0 10px 26px rgb(76 44 22 / 0.14);
+    padding: clamp(20px, 3.5vw, 40px);
+    margin-top: clamp(24px, 4vw, 40px);
+  }
+  .doc-cabeza {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px 24px;
+    border-bottom: 2px solid var(--mrc-marca-tinta);
+    padding-bottom: 16px;
+  }
+  .doc-titulos { min-width: 0; }
+  .doc-tipo { font-size: 0.625rem; letter-spacing: 0.28em; text-transform: uppercase; color: var(--mrc-marca-rojoHondo); margin: 0 0 8px; }
+  .doc h2 {
+    font-family: var(--mrc-font-titular);
+    font-weight: 800;
+    font-size: clamp(1.5rem, 2.6vw, 1.9375rem);
+    letter-spacing: -0.01em;
+    line-height: 1.05;
+    color: var(--acento);
+    margin: 0;
+  }
+  .doc-denominacion { font-size: 0.9375rem; line-height: 1.5; color: var(--suave); max-width: 52ch; margin: 6px 0 0; }
+  .doc-pdf {
+    flex: none;
+    display: inline-flex;
+    flex-direction: column;
+    gap: 2px;
+    text-align: center;
+    text-decoration: none;
+    color: var(--mrc-marca-rojoHondo);
+    border: 2px solid var(--mrc-marca-rojoHondo);
+    border-radius: 6px;
+    padding: 9px 16px;
+    transition: background 0.2s, transform 0.2s;
+  }
+  .doc-pdf > .mono { font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; }
+  .doc-pdf-nota { font-size: 0.625rem; letter-spacing: 0.08em; color: var(--suave); }
+  .doc-pdf:hover { background: color-mix(in srgb, var(--mrc-marca-rojoHondo) 7%, transparent); transform: translateY(-1px); }
+
+  .doc-meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px 20px;
+    background: var(--mrc-marca-crema);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 18px 0 8px;
+  }
+  .doc-meta div { min-width: 0; }
+  .doc-meta dt { font-size: 0.625rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--mrc-marca-rojoHondo); margin-bottom: 3px; }
+  .doc-meta dd { margin: 0; font-size: 0.875rem; line-height: 1.4; }
+
+  /* Dos columnas de lectura en pantallas anchas, como el PDF. */
+  .doc-secciones { margin-top: 8px; }
+  @media (min-width: 920px) {
+    .doc-secciones { columns: 2; column-gap: 40px; }
+  }
+  .doc-secciones section { break-inside: avoid; padding-top: 14px; }
+  .doc h3 {
+    font-family: var(--mrc-font-titular);
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: 0.01em;
+    color: var(--acento);
+    border-bottom: 1px solid rgb(76 44 22 / 0.2);
+    padding-bottom: 5px;
+    margin: 0 0 9px;
+  }
+  .doc h3 .n { font-size: 0.75rem; color: var(--suave); margin-right: 7px; }
+  .doc-secciones p, .doc-secciones li { font-size: 0.90625rem; line-height: 1.55; }
+  .doc-secciones p { margin: 0 0 9px; }
+  .doc-secciones ul { margin: 0 0 9px; padding-left: 18px; }
+  .doc-secciones li { margin-bottom: 4px; }
+
+  .tabla-marco { overflow-x: auto; }
+  .doc table { width: 100%; border-collapse: collapse; font-size: 0.875rem; margin: 2px 0 10px; }
+  .doc thead th {
+    font-family: var(--mrc-font-mono);
+    font-weight: 400;
+    font-size: 0.6875rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-align: left;
+    color: var(--mrc-marca-rojoHondo);
+    border-bottom: 2px solid var(--mrc-marca-tinta);
+    padding: 6px 12px 6px 0;
+    white-space: nowrap;
+  }
+  .doc tbody th {
+    text-align: left;
+    font-weight: 400;
+    border-bottom: 1px solid rgb(76 44 22 / 0.15);
+    padding: 5px 12px 5px 0;
+  }
+  .doc td {
+    border-bottom: 1px solid rgb(76 44 22 / 0.15);
+    padding: 5px 12px 5px 0;
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .doc tr:last-child th, .doc tr:last-child td { border-bottom: none; }
+
+  .pie-nota { margin: clamp(28px, 5vw, 44px) 0 0; font-size: 0.75rem; letter-spacing: 0.08em; color: var(--suave); }
+  .pie-nota a { color: var(--mrc-marca-tinta); text-decoration: none; border-bottom: 2px solid var(--mrc-marca-amarillo); }
+  .pie-nota a:hover { border-color: var(--mrc-marca-rojo); }
+
+  /* ——— Impresión: solo los documentos, uno por hoja ——— */
+  @media print {
+    .cabecera, .indice, .doc-pdf, .pie-nota, .salto { display: none; }
+    .zona { padding: 0; }
+    .doc { box-shadow: none; border: 1px solid rgb(76 44 22 / 0.4); break-inside: avoid; page-break-inside: avoid; margin-top: 12px; }
+    .doc-secciones { columns: 2; column-gap: 28px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .volver, .indice a, .doc-pdf, .pie-nota a { transition: none; }
+    .doc-pdf:hover { transform: none; }
+  }
+</style>

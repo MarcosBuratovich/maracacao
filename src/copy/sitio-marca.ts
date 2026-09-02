@@ -214,8 +214,11 @@ export const marca = {
     kicker: 'PARA CAFÉS Y NEGOCIOS',
     titulo: '¿Con qué trabajas?',
     intro: 'Atendemos cafeterías, panaderías y cocinas de repostería.',
-    correoEtiqueta: 'Pedidos y fichas técnicas:',
+    // Las fichas ya se leen en el sitio (/fichas-tecnicas): el correo
+    // queda para pedidos; el enlace va bajo el semáforo.
+    correoEtiqueta: 'Pedidos y mayoreo:',
     correo: 'maracacaomx@gmail.com',
+    fichasCta: 'Ver las fichas técnicas',
     // Semáforo honesto de datos técnicos (rescatado de las opciones del
     // canvas): qué existe hoy y qué sigue en preparación.
     // La ficha técnica llegó (2026-08-14): el semáforo ya no promete.
@@ -366,6 +369,29 @@ export const marca = {
     visorAlt: 'La barra en tres dimensiones; arrastra para girarla',
   },
 
+  // Página de fichas técnicas (/fichas-tecnicas, 2026-09-02): las
+  // cuatro fichas oficiales legibles en la página y descargables en
+  // PDF. El CONTENIDO no vive acá: sale de src/fichas/base.ts, la
+  // fuente única (verbatim del cliente) que también genera los PDF.
+  fichasTecnicas: {
+    ruta: '/fichas-tecnicas',
+    rutaInicio: '/',
+    // Los PDF publicados (pnpm fichas escribe en public/fichas/).
+    rutaPdf: '/fichas',
+    titulo: 'Fichas técnicas — Maracacao | Chocolate 70%, polvo y cocoas',
+    descripcion:
+      'Las fichas técnicas oficiales de Maracacao: chocolate 70% cacao (barras y gotas), chocolate en polvo, cocoa natural y cocoa alcalina. Legibles y en PDF.',
+    kicker: 'PARA CAFÉS Y NEGOCIOS',
+    encabezado: 'Fichas técnicas',
+    sub: 'Los datos oficiales de cada producto: descripción, ingredientes, alérgenos, información nutrimental y almacenamiento. Cada ficha está también en PDF tamaño carta, lista para imprimir o reenviar.',
+    tipoDocumento: 'Ficha técnica de producto',
+    indiceAria: 'Elige una ficha',
+    descargar: 'Descargar PDF',
+    descargarNota: 'carta · 1 página',
+    volver: 'Volver al sitio',
+    contactoNota: 'Pedidos y dudas:',
+  },
+
   // Página 404 — sin candado (los 404 no se indexan) y con una sola
   // salida honesta: el inicio.
   noEncontrada: {
@@ -389,6 +415,7 @@ export const marca = {
       { ancla: '#sabores', texto: 'Barras 70\u00a0g' },
       { ancla: '#sabores', texto: 'Gotas de chocolate 250\u00a0g' },
       { ancla: '#polvo', texto: 'Chocolate en polvo (próximamente)' },
+      { ancla: '/fichas-tecnicas', texto: 'Fichas técnicas' },
     ],
     // Las páginas legales todavía no existen: van sin enlace, marcadas,
     // para que la estructura ya esté y activarlas sea poner el href.

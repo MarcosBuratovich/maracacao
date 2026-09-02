@@ -24,7 +24,8 @@ export function urlsDelSitemap(site: string, pathnames: string[]): string[] {
     if (/^(404|500)$/.test(ruta) || RUTAS_PRIVADAS.test(ruta)) continue
     vistas.add(ruta === '' ? `${origen}/` : `${origen}/${ruta}`)
   }
-  return [...vistas]
+  // La raíz primero: orden estable y legible del índice.
+  return [...vistas].sort((a, b) => a.length - b.length)
 }
 
 export function xmlDelSitemap(urls: string[]): string {

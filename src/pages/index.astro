@@ -513,6 +513,10 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
               </div>
             ))}
           </dl>
+          {/* Las fichas completas se leen en su propia página (2026-09-02). */}
+          <p class="negocios-fichas">
+            <a href={marca.fichasTecnicas.ruta}>{marca.negocios.fichasCta}</a>
+          </p>
         </div>
         <div class="negocios-paneles">
           {marca.negocios.tabs.map((t, i) => (
@@ -1517,6 +1521,18 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
   }
   .semaforo dt { font-size: 0.78125rem; }
   .semaforo dd { margin: 0; font-size: 0.65625rem; color: var(--mrc-marca-textoSuave); text-align: right; }
+  .negocios-fichas { margin: 14px 0 0; }
+  .negocios-fichas a {
+    font-family: var(--mrc-font-titular);
+    font-weight: 600;
+    font-size: 0.9375rem;
+    color: var(--mrc-marca-tinta);
+    text-decoration: none;
+    border-bottom: 2px solid var(--mrc-marca-amarillo);
+    padding-bottom: 2px;
+    transition: border-color 0.2s;
+  }
+  .negocios-fichas a:hover { border-color: var(--mrc-marca-rojo); }
   .negocios-paneles { display: flex; flex-direction: column; gap: 12px; }
   .negocio-panel {
     background: linear-gradient(168deg, color-mix(in srgb, var(--sabor) 88%, #fff) 0%, var(--sabor) 45%, color-mix(in srgb, var(--sabor) 80%, #000) 100%);
