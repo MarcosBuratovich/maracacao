@@ -219,6 +219,8 @@ export const marca = {
     correoEtiqueta: 'Pedidos y mayoreo:',
     correo: 'maracacaomx@gmail.com',
     fichasCta: 'Ver las fichas técnicas',
+    // El enlace contextual de cada panel apunta a SU ficha por ancla.
+    fichaEnlace: 'Ver la ficha técnica',
     // Semáforo honesto de datos técnicos (rescatado de las opciones del
     // canvas): qué existe hoy y qué sigue en preparación.
     // La ficha técnica llegó (2026-08-14): el semáforo ya no promete.
@@ -233,6 +235,7 @@ export const marca = {
     tabs: [
       {
         id: 'polvo',
+        ficha: '#chocolate-en-polvo',
         etiqueta: 'Chocolate en polvo',
         titulo: 'Chocolate en polvo · 250\u00a0g y 1\u00a0kg',
         precioNota: 'próximamente',
@@ -247,6 +250,7 @@ export const marca = {
       },
       {
         id: 'gotas',
+        ficha: '#barras-y-gotas',
         etiqueta: 'Chocolate en gotas',
         titulo: 'Chocolate en gotas · 250\u00a0g',
         precioNota: 'desde',
@@ -262,6 +266,7 @@ export const marca = {
       },
       {
         id: 'barras',
+        ficha: '#barras-y-gotas',
         etiqueta: 'Chocolate en barras',
         titulo: 'Chocolate en barras · 70\u00a0g',
         precioNota: 'desde',

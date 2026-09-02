@@ -513,9 +513,11 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
               </div>
             ))}
           </dl>
-          {/* Las fichas completas se leen en su propia página (2026-09-02). */}
+          {/* Las fichas completas se leen en su propia página (2026-09-02);
+              botón de verdad — el enlace de texto pasaba desapercibido
+              (retro de Marcos, 2026-09-02). */}
           <p class="negocios-fichas">
-            <a href={marca.fichasTecnicas.ruta}>{marca.negocios.fichasCta}</a>
+            <BotonMarca href={marca.fichasTecnicas.ruta} variante="secundario">{marca.negocios.fichasCta}</BotonMarca>
           </p>
         </div>
         <div class="negocios-paneles">
@@ -539,6 +541,11 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
                   <li><span class="mano negocio-flecha" aria-hidden="true">→</span>{d}</li>
                 ))}
               </ul>
+              <p class="negocio-ficha">
+                <a href={`${marca.fichasTecnicas.ruta}${t.ficha}`}>
+                  {marca.negocios.fichaEnlace}<span class="mano" aria-hidden="true"> →</span>
+                </a>
+              </p>
               <p class="mono negocio-correo">{marca.negocios.correoEtiqueta} {marca.negocios.correo}</p>
             </div>
           ))}
@@ -1521,18 +1528,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
   }
   .semaforo dt { font-size: 0.78125rem; }
   .semaforo dd { margin: 0; font-size: 0.65625rem; color: var(--mrc-marca-textoSuave); text-align: right; }
-  .negocios-fichas { margin: 14px 0 0; }
-  .negocios-fichas a {
-    font-family: var(--mrc-font-titular);
-    font-weight: 600;
-    font-size: 0.9375rem;
-    color: var(--mrc-marca-tinta);
-    text-decoration: none;
-    border-bottom: 2px solid var(--mrc-marca-amarillo);
-    padding-bottom: 2px;
-    transition: border-color 0.2s;
-  }
-  .negocios-fichas a:hover { border-color: var(--mrc-marca-rojo); }
+  .negocios-fichas { margin: 22px 0 8px; }
   .negocios-paneles { display: flex; flex-direction: column; gap: 12px; }
   .negocio-panel {
     background: linear-gradient(168deg, color-mix(in srgb, var(--sabor) 88%, #fff) 0%, var(--sabor) 45%, color-mix(in srgb, var(--sabor) 80%, #000) 100%);
@@ -1559,6 +1555,18 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
   .negocio-datos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; flex: 1; }
   .negocio-datos li { display: flex; gap: 9px; align-items: baseline; font-size: 0.78125rem; line-height: 1.45; }
   .negocio-flecha { color: var(--mrc-marca-amarillo); flex: none; }
+  .negocio-ficha { margin: 14px 0 0; }
+  .negocio-ficha a {
+    font-family: var(--mrc-font-titular);
+    font-weight: 600;
+    font-size: 0.8125rem;
+    color: inherit;
+    text-decoration: none;
+    border-bottom: 2px solid rgb(255 255 255 / 0.55);
+    padding-bottom: 1px;
+    transition: border-color 0.2s;
+  }
+  .negocio-ficha a:hover { border-color: #fff; }
   .negocio-correo {
     background: rgb(0 0 0 / 0.25);
     border-radius: 6px;

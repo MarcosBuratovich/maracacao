@@ -74,11 +74,17 @@ describe('la página /fichas-tecnicas (2026-09-02): legibles en el sitio', () =>
     expect(readFileSync('scripts/genera-fichas.ts', 'utf8')).toContain("resolve(RAIZ, 'public/fichas')")
   })
 
-  it('la home enlaza la página: bajo el semáforo de negocios y en el footer', async () => {
+  it('la home enlaza la página: botón en negocios, enlace por panel (con su ancla) y footer', async () => {
     const html = await container.renderToString(Home)
-    const enlaces = html.match(new RegExp(`href="${marca.fichasTecnicas.ruta}"`, 'g')) ?? []
-    expect(enlaces.length).toBeGreaterThanOrEqual(2)
+    const enlaces = html.match(new RegExp(`href="${marca.fichasTecnicas.ruta}[#"]`, 'g')) ?? []
+    expect(enlaces.length).toBeGreaterThanOrEqual(5)
     expect(html).toContain(marca.negocios.fichasCta)
+    // Cada panel apunta a SU ficha; las anclas existen en la página.
+    const fichasHtml = await container.renderToString(FichasTecnicas)
+    for (const t of marca.negocios.tabs) {
+      expect(html).toContain(`href="${marca.fichasTecnicas.ruta}${t.ficha}"`)
+      expect(fichasHtml).toContain(`id="${t.ficha.slice(1)}"`)
+    }
   })
 
   it('los PDF van noindex en Vercel: la página HTML es la cara indexable', () => {
