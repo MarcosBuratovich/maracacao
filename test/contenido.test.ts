@@ -21,6 +21,7 @@ import { recorre, cargar, serializa } from '../src/contenido/carga'
 import { cruzaConteo, enLetras } from '../src/contenido/conteos'
 import { contrasteSuficiente, resuelveColor, mejorTinta } from '../src/contenido/color-sabor'
 import { precioDesde, precioDe } from '../src/contenido/derivados'
+import { validarContra } from '../src/contenido/validacion'
 import * as tokens from '../src/tokens/color'
 
 describe('la capa de contenido', () => {
@@ -842,5 +843,79 @@ describe('la capa de contenido', () => {
 
   it('precioDe con una lista vacía tira, igual que con una clave ausente', () => {
     expect(() => precioDe([], 'canela')).toThrow(/canela/)
+  })
+
+  // validarContra es el traductor: de un error de Zod a un problema que la
+  // clienta entiende, con la ruta para que el panel la lleve al campo. Los
+  // cuatro consumidores (navegador, api/panel.ts, vitest, astro build)
+  // importan el MISMO archivo — si tuvieran criterios distintos, el panel
+  // diría que sí y el build diría que no.
+
+  it('traduce el error de Zod a algo que la clienta entiende, con la ruta para ir', () => {
+    const esquema = grupo({
+      etiqueta: 'x', seccion: 'portada', ayuda: 'x',
+      campos: {
+        hero: grupo({
+          etiqueta: 'Portada', seccion: 'portada', ayuda: 'y',
+          campos: { sub: texto({ etiqueta: 'Bajada', seccion: 'portada', ayuda: 'z', max: 10 }) },
+        }),
+      },
+    })
+    const problemas = validarContra(esquema, { hero: { sub: 'x'.repeat(30) } })
+    expect(problemas).toHaveLength(1)
+    // La ruta punteada es lo que le permite al panel llevarla al campo.
+    expect(problemas[0].campo).toBe('hero.sub')
+    expect(problemas[0].gravedad).toBe('impide')
+    // Y el título no tiene jerga: nada de «String must contain at most».
+    expect(problemas[0].titulo).not.toMatch(/string|expected|invalid/i)
+  })
+
+  it('un contenido válido no genera ni un problema', () => {
+    const esquema = grupo({
+      etiqueta: 'x', seccion: 'portada', ayuda: 'x',
+      campos: { t: texto({ etiqueta: 'T', seccion: 'portada', ayuda: 'y', max: 30 }) },
+    })
+    expect(validarContra(esquema, { t: 'Chocolate mexicano' })).toEqual([])
+  })
+
+  it('ofrece el arreglo de un toque cuando lo hay: el espacio que no parte', () => {
+    const esquema = grupo({
+      etiqueta: 'x', seccion: 'productos', ayuda: 'x',
+      campos: { p: medida({ etiqueta: 'Peso', seccion: 'productos', ayuda: 'y', max: 30 }) },
+    })
+    const problemas = validarContra(esquema, { p: 'Gotas de 250 g' })
+    expect(problemas).toHaveLength(1)
+    expect(problemas[0].arreglo?.valor).toBe('Gotas de 250\u00a0g')
+    expect(problemas[0].arreglo?.etiqueta).toMatch(/espacio/i)
+  })
+
+  it('el arreglo propuesto pasa la validación que lo rechazó — si no, es peor que no ofrecer nada', () => {
+    // Repite el caso de arriba pero cierra el círculo: no alcanza con que
+    // el arreglo LUZCA bien, tiene que aprobar el mismo esquema que
+    // rechazó el original. Si no, la clienta aprieta el botón, confía, y
+    // publica un error igual de inválido.
+    const esquema = grupo({
+      etiqueta: 'x', seccion: 'productos', ayuda: 'x',
+      campos: { p: medida({ etiqueta: 'Peso', seccion: 'productos', ayuda: 'y', max: 30 }) },
+    })
+    const problemas = validarContra(esquema, { p: 'Gotas de 250 g' })
+    const arreglo = problemas[0].arreglo
+    expect(arreglo).toBeDefined()
+    expect(esquema.safeParse({ p: arreglo!.valor }).success).toBe(true)
+  })
+
+  it('el arreglo del espacio no se ofrece cuando el espacio ya es el duro — la clase de caracteres, en aislado', () => {
+    // Si CIFRA_UNIDAD usara `\s` (como el brief original), matchearía
+    // TAMBIÉN el espacio duro U+00A0: un valor con el espacio YA correcto
+    // pero inválido por otra razón (acá, el largo) recibiría igual un
+    // "arreglo" que reescribe el mismo valor — sigue sin pasar el máximo,
+    // exactamente el caso que el punto anterior prueba que no puede pasar.
+    const esquema = grupo({
+      etiqueta: 'x', seccion: 'productos', ayuda: 'x',
+      campos: { p: medida({ etiqueta: 'Peso', seccion: 'productos', ayuda: 'y', max: 5 }) },
+    })
+    const problemas = validarContra(esquema, { p: `70\u00a0g extra` })
+    expect(problemas).toHaveLength(1)
+    expect(problemas[0].arreglo).toBeUndefined()
   })
 })
