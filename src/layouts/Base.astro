@@ -1,5 +1,6 @@
 ---
 import { origenCanonico } from '@/seo/esquema'
+import { jsonParaHtml } from '@/lib/json-en-html'
 
 interface Props {
   titulo: string
@@ -53,8 +54,9 @@ const {
   cormorantMedia,
 } = Astro.props
 
-// `<` escapado por higiene: JSON.stringify no escapa `</script>`.
-const esquemaJson = esquema ? JSON.stringify(esquema).replaceAll('<', '\\u003c') : undefined
+// `<` escapado por higiene: JSON.stringify no escapa `</script>`. Misma
+// regla que el JSON del anaquel — jsonParaHtml() la deja en un solo lugar.
+const esquemaJson = esquema ? jsonParaHtml(esquema) : undefined
 
 const LLAVE_SHA256 = 'edbf06dc247173ed729266aeff93df5d791076a460fe562496bef1ec69f39963'
 

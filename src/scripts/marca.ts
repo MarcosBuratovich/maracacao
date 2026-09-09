@@ -186,12 +186,18 @@ const anaquel = document.querySelector<HTMLElement>('[data-anaquel]')
 // quince fichas visibles, que ya se ve completo— y el resto del módulo
 // sigue vivo. Antes esto lo mataba entero y, con él, los seis pasos de
 // «Cómo catar»: marca.css los deja en opacity 0 esperando un observador
-// que ya no llegaba. jsonParaHtml() lo hace improbable; esto lo hace
-// inofensivo.
+// que ya no llegaba. jsonParaHtml() hace improbable que el JSON venga
+// roto; el chequeo de forma de abajo es lo que lo hace inofensivo
+// incluso cuando parsea pero no es la lista que se espera.
 let datos: DatoSabor[] | null = null
 if (datosCrudos) {
   try {
     datos = JSON.parse(datosCrudos)
+    // No alcanza con que parsee: `JSON.parse` devuelve `any`, y un JSON
+    // válido con la forma equivocada (un `{}`, un número, un string) es
+    // truthy, pasa la guarda de abajo y revienta en el `.map`, que está
+    // fuera del try. Es decir: mataría el módulo igual que antes.
+    if (!Array.isArray(datos)) datos = null
   } catch {
     datos = null
   }
