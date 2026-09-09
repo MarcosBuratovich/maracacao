@@ -12,6 +12,7 @@ import { experimental_AstroContainer as AstroContainer } from 'astro/container'
 import { sitio } from '@/copy/sitio'
 import { marca } from '@/copy/sitio-marca'
 import { sabores } from '@/copy/sabores'
+import { esc } from './regex'
 import { editorial, etiqueta } from '@/tokens/color'
 import { customProperties } from '@/tokens/css'
 import Borrador from '@/pages/index.astro'
@@ -166,9 +167,9 @@ describe('sistema editorial', () => {
     // El wordmark vive tres veces como texto: cabecera, lockup del hero
     // y pie — nunca como imagen (el arco a mano del pie se reemplazó por
     // el lockup vectorial, retro de Marcos 2026-08-13).
-    expect(html).toMatch(new RegExp(`class="lockup-nombre"[^>]*>${marca.marca.wordmark}<`))
-    expect(html).toMatch(new RegExp(`class="portada-wordmark"[^>]*>${marca.marca.wordmark}<`))
-    expect(html).toMatch(new RegExp(`class="pie-wordmark"[^>]*>${marca.marca.wordmark}<`))
+    expect(html).toMatch(new RegExp(`class="lockup-nombre"[^>]*>${esc(marca.marca.wordmark)}<`))
+    expect(html).toMatch(new RegExp(`class="portada-wordmark"[^>]*>${esc(marca.marca.wordmark)}<`))
+    expect(html).toMatch(new RegExp(`class="pie-wordmark"[^>]*>${esc(marca.marca.wordmark)}<`))
   })
 
   it('el sello va inline para tomar la tinta de su sección', async () => {

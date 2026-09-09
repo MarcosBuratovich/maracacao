@@ -13,6 +13,7 @@ import { fichasBase } from '@/fichas/base'
 import { marca } from '@/copy/sitio-marca'
 import FichasTecnicas from '@/pages/fichas-tecnicas.astro'
 import Home from '@/pages/index.astro'
+import { esc } from './regex'
 
 const container = await AstroContainer.create()
 
@@ -57,7 +58,7 @@ describe('la página /fichas-tecnicas (2026-09-02): legibles en el sitio', () =>
     const html = await container.renderToString(FichasTecnicas)
     for (const f of fichasBase) {
       expect(html).toContain(`id="${f.archivo.replace('ficha-tecnica-', '')}"`)
-      expect(html).toMatch(new RegExp(`<h2[^>]*>${f.producto}</h2>`))
+      expect(html).toMatch(new RegExp(`<h2[^>]*>${esc(f.producto)}</h2>`))
       expect(html).toContain(`href="${marca.fichasTecnicas.rutaPdf}/${f.archivo}.pdf"`)
     }
     // Datos duros servidos como texto: alérgenos y tabla nutrimental.
@@ -76,7 +77,7 @@ describe('la página /fichas-tecnicas (2026-09-02): legibles en el sitio', () =>
 
   it('la home enlaza la página: botón en negocios, enlace por panel (con su ancla) y footer', async () => {
     const html = await container.renderToString(Home)
-    const enlaces = html.match(new RegExp(`href="${marca.fichasTecnicas.ruta}[#"]`, 'g')) ?? []
+    const enlaces = html.match(new RegExp(`href="${esc(marca.fichasTecnicas.ruta)}[#"]`, 'g')) ?? []
     expect(enlaces.length).toBeGreaterThanOrEqual(5)
     expect(html).toContain(marca.negocios.fichasCta)
     // Cada panel apunta a SU ficha; las anclas existen en la página.

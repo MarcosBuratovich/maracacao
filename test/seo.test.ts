@@ -22,6 +22,7 @@ import { marca } from '@/copy/sitio-marca'
 import { sabores } from '@/copy/sabores'
 import { esquemaNegocio, esquemaPreguntas, esquemaBarras, origenCanonico } from '@/seo/esquema'
 import { urlsDelSitemap, xmlDelSitemap } from '@/seo/sitemap'
+import { esc } from './regex'
 import Home from '@/pages/index.astro'
 import Presentacion from '@/pages/presentacion.astro'
 import NoEncontrada from '@/pages/404.astro'
@@ -205,7 +206,7 @@ describe('los sabores son texto servido, no solo aria-labels', () => {
     for (const s of sabores) {
       expect(html).toContain(`data-ficha-de="${s.slug}"`)
       // Astro suma su data-astro-cid de estilos scoped al tag.
-      expect(html).toMatch(new RegExp(`<h3 class="ficha-nombre"[^>]*>${s.nombre}</h3>`))
+      expect(html).toMatch(new RegExp(`<h3 class="ficha-nombre"[^>]*>${esc(s.nombre)}</h3>`))
     }
   })
 
