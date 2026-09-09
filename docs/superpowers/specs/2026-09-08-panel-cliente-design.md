@@ -1362,7 +1362,10 @@ exactamente lo que dice el dato, y el dato está en rango».
   sitio:77       /\$\s?108/           → SE BORRA (§0.4)
   sitio:99/102   details ×4 y ×8      → toHaveLength(marca.X.length)
   sitio:169-171  wordmark en RegExp   → esc() + `>\s*` (§0.3)
-  sitio:235      data-salto ×15       → sabores.length
+  sitio:235      data-salto ×15       → NO LLEGA A LA FASE 7: vive dentro
+                                       del describe de _barras.astro, que
+                                       §0.3 borra entero en la fase 0.
+                                       Fila anulada (auditoría 2026-09-08).
   seo:130        ItemList 15          → sabores.length
   seo:208        nombre en RegExp     → esc() + `>\s*`
   fichas:23      fichas 4             → derivado de los datos
