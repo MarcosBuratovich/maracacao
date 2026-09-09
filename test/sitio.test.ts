@@ -160,15 +160,17 @@ describe('la página / (rediseño de marca, 2026-08-13; en la raíz desde 2026-0
   })
 
   it('el 2.º renglón del titular termina en coma, y se pinta sin ella con la coma aparte en rojo', async () => {
-    // La regla del slot: son tres renglones y el segundo cierra en coma,
-    // que la plantilla saca para repintarla en el acento. Sacarla con
-    // replace(',', '') quitaba la PRIMERA, no la última: con un
-    // «70% CACAO, DE VERDAD,» la página mostraba dos comas mal puestas
-    // y la regla igual daba por buena la cadena.
+    // La regla del slot es una sola: el segundo renglón CIERRA en coma,
+    // que la plantilla saca para repintarla en el acento. No exige que
+    // sea la única coma del renglón —un «70% CACAO, DE VERDAD,» es
+    // titular legítimo, con su coma interna y la de cierre— así que acá
+    // no se valida eso. Sacar la coma con replace(',', '') quitaba la
+    // PRIMERA, no la última: con ese mismo titular la página mostraba
+    // dos comas mal puestas y la regla de «termina en coma» igual daba
+    // por buena la cadena.
     expect(marca.hero.titular).toHaveLength(3)
     expect(marca.hero.titular[1].endsWith(',')).toBe(true)
     const sinComa = marca.hero.titular[1].slice(0, -1)
-    expect(sinComa).not.toContain(',')
 
     const html = await container.renderToString(Borrador)
     expect(html).toMatch(new RegExp(`${esc(sinComa)}<span class="acento"[^>]*>,</span>`))
