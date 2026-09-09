@@ -20,6 +20,7 @@ import {
 import { recorre, cargar, serializa } from '../src/contenido/carga'
 import { cruzaConteo, enLetras } from '../src/contenido/conteos'
 import { contrasteSuficiente, resuelveColor, mejorTinta } from '../src/contenido/color-sabor'
+import { precioDesde, precioDe } from '../src/contenido/derivados'
 import * as tokens from '../src/tokens/color'
 
 describe('la capa de contenido', () => {
@@ -792,5 +793,54 @@ describe('la capa de contenido', () => {
 
   it('mejorTinta devuelve undefined para una clave que no existe', () => {
     expect(mejorTinta('inventado')).toBeUndefined()
+  })
+
+  // El 108 está en las 14 barras Y en la pestaña de negocios; el 258 en
+  // las gotas, en gotas.precioDesde Y en otra pestaña. precioDesde y
+  // precioDe son los únicos lugares donde esos números se calculan —el
+  // resto del contenido los va a LEER de acá, no a repetirlos.
+
+  it('los precios repetidos se calculan, no se copian', () => {
+    const barras = [{ precio: 130 }, { precio: 108 }, { precio: 122 }]
+    expect(precioDesde(barras)).toBe(108)
+    // Sube la más barata: el «desde» sube solo.
+    expect(precioDesde([{ precio: 130 }, { precio: 122 }])).toBe(122)
+  })
+
+  it('precioDesde tira con una lista vacía, en vez de devolver Infinity', () => {
+    // Math.min() sin argumentos da Infinity. Sin este chequeo, un array
+    // vacío por un error de carga se renderiaría «desde $Infinity» en la
+    // portada en vez de romper el build — mucho peor que el undefined que
+    // ya motiva a precioDe.
+    expect(() => precioDesde([])).toThrow(/vacía/)
+  })
+
+  it('precioDesde con un solo elemento devuelve ese precio', () => {
+    expect(precioDesde([{ precio: 258 }])).toBe(258)
+  })
+
+  it('precioDesde con precios iguales devuelve ese precio', () => {
+    // Sin ganador único no hay ambigüedad que resolver: cualquiera de los
+    // tres es «el» mínimo.
+    expect(precioDesde([{ precio: 108 }, { precio: 108 }, { precio: 108 }])).toBe(108)
+  })
+
+  it('precioDe encuentra el precio de un elemento por su clave', () => {
+    const gotas = [
+      { clave: 'jengibreYNaranja', precio: 340 },
+      { clave: 'canela', precio: 258 },
+    ]
+    expect(precioDe(gotas, 'jengibreYNaranja')).toBe(340)
+    expect(precioDe(gotas, 'canela')).toBe(258)
+  })
+
+  it('precioDe tira si la clave no existe, en vez de devolver undefined', () => {
+    // Un undefined acá se renderiza como «$NaN» en la página. Mejor que
+    // reviente el build.
+    expect(() => precioDe([{ clave: 'canela', precio: 258 }], 'inventado')).toThrow(/inventado/)
+  })
+
+  it('precioDe con una lista vacía tira, igual que con una clave ausente', () => {
+    expect(() => precioDe([], 'canela')).toThrow(/canela/)
   })
 })
