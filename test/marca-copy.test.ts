@@ -215,10 +215,16 @@ describe('estructura de la página', () => {
       expect(html).not.toContain(muerto)
     }
     // Y que el campo ya no exista en el copy, no solo su texto:
-    // JSON.stringify incluye los nombres de las claves.
+    // JSON.stringify incluye los nombres de las claves. selloAlt,
+    // verTodas y wordmarkAlt vivían en sitio-marca.ts (marca).
     const copy = JSON.stringify(marca)
     for (const clave of ['selloAlt', 'verTodas', 'wordmarkAlt']) {
       expect(copy).not.toContain(clave)
     }
+    // paqueteSeis vivía en sabores.ts como export propio, no como campo
+    // DENTRO del array `sabores` —serializar `sabores` no lo vería nunca,
+    // esté o no reintroducido—, así que acá se mira el módulo entero.
+    const modulo = await import('@/copy/sabores')
+    expect(modulo).not.toHaveProperty('paqueteSeis')
   })
 })
