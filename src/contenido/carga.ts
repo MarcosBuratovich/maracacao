@@ -193,9 +193,26 @@ function ordenaSegun(esquema: z.ZodType, valor: unknown, ruta: string): unknown 
 
   switch (def.type) {
     case 'optional':
-      return valor === undefined
-        ? undefined
-        : ordenaSegun(def.innerType as z.ZodType, valor, ruta)
+    case 'nullable': {
+      // Misma pregunta que ya resuelve desenvuelve() para recorre() y
+      // para la opcionalidad de acá arriba: qué hay abajo de una
+      // envoltura optional/nullable lo decide UN desenvolvimiento, no un
+      // caso propio de este switch. Antes, el switch solo conocía
+      // 'optional': un grupo(...).nullable() con la clave PRESENTE caía
+      // en `default` y se salteaba las DOS cosas que ordenaSegun() existe
+      // para hacer —reordenar según el esquema y chequear completitud—
+      // en el bloque de adentro. Es un tercer criterio para la misma
+      // pregunta que ya resuelven recorre() y la opcionalidad: la misma
+      // familia de bug, otra vez.
+      const { fondo } = desenvuelve(esquema)
+      if (!esContenedor(definicion(fondo).type)) return valor
+      // undefined (optional) y null (nullable) son los dos valores que
+      // la envoltura existe para aceptar sobre un contenedor, y ninguno
+      // de los dos necesita reordenarse.
+      return valor === undefined || valor === null
+        ? valor
+        : ordenaSegun(fondo, valor, ruta)
+    }
 
     case 'object': {
       const shape = def.shape as Record<string, z.ZodType>

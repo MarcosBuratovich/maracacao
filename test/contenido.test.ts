@@ -572,7 +572,11 @@ describe('la capa de contenido', () => {
       etiqueta: 'x', seccion: 'portada', ayuda: 'x',
       campos: { a: texto({ etiqueta: 'A', seccion: 'portada', ayuda: 'y', max: 9 }) },
     })
-    expect(() => serializa(esquema, {})).toThrow(/a/)
+    // «a» a secas matcheaba cualquier «a» suelta del mensaje en español
+    // (por ejemplo la de «declara»), no el nombre de la clave — con
+    // comillas angulares alrededor, igual que escribe el mensaje real,
+    // afirma la clave de verdad.
+    expect(() => serializa(esquema, {})).toThrow(/«a»/)
     expect(() => serializa(esquema, { a: 'ok', sobra: 1 })).toThrow(/sobra/)
   })
 
@@ -650,5 +654,68 @@ describe('la capa de contenido', () => {
       },
     })
     expect(() => serializa(esquema, {})).toThrow(/obligatoria/)
+  })
+
+  // El switch de ordenaSegun() solo tenía `case 'optional'`: un
+  // grupo(...).nullable() con la clave PRESENTE caía en `default` y se
+  // saltaba las dos cosas que esta función existe para hacer —reordenar
+  // según el esquema y chequear completitud— en el bloque de adentro. Es
+  // un TERCER lugar del archivo decidiendo «¿esta envoltura es
+  // transparente?» con su propio criterio, la misma familia de bug que
+  // ya pagaron recorre() y la opcionalidad de acá arriba.
+
+  it('serializa() tira si sobra una clave adentro de un grupo(...).nullable()', () => {
+    const esquema = grupo({
+      etiqueta: 'x', seccion: 'productos', ayuda: 'x',
+      campos: {
+        hijo: grupo({
+          etiqueta: 'Hijo', seccion: 'productos', ayuda: 'y',
+          campos: {
+            nombre: texto({ etiqueta: 'Nombre', seccion: 'productos', ayuda: 'a', max: 20 }),
+            precio: texto({ etiqueta: 'Precio', seccion: 'productos', ayuda: 'b', max: 20 }),
+          },
+        }).nullable(),
+      },
+    })
+    expect(() => serializa(esquema, {
+      hijo: { nombre: 'Gotas', precio: '108', sobra: 1 },
+    })).toThrow(/sobra/)
+  })
+
+  it('serializa() tira si falta una clave adentro de un grupo(...).nullable()', () => {
+    const esquema = grupo({
+      etiqueta: 'x', seccion: 'productos', ayuda: 'x',
+      campos: {
+        hijo: grupo({
+          etiqueta: 'Hijo', seccion: 'productos', ayuda: 'y',
+          campos: {
+            nombre: texto({ etiqueta: 'Nombre', seccion: 'productos', ayuda: 'a', max: 20 }),
+            precio: texto({ etiqueta: 'Precio', seccion: 'productos', ayuda: 'b', max: 20 }),
+          },
+        }).nullable(),
+      },
+    })
+    expect(() => serializa(esquema, { hijo: { nombre: 'Gotas' } })).toThrow(/«precio»/)
+  })
+
+  it('serializa() reordena según el esquema adentro de un grupo(...).nullable()', () => {
+    const esquema = grupo({
+      etiqueta: 'x', seccion: 'productos', ayuda: 'x',
+      campos: {
+        hijo: grupo({
+          etiqueta: 'Hijo', seccion: 'productos', ayuda: 'y',
+          campos: {
+            nombre: texto({ etiqueta: 'Nombre', seccion: 'productos', ayuda: 'a', max: 20 }),
+            precio: texto({ etiqueta: 'Precio', seccion: 'productos', ayuda: 'b', max: 20 }),
+          },
+        }).nullable(),
+      },
+    })
+    // Se pasa con las claves al REVÉS del esquema, como en el test de
+    // bytes canónicos: si el switch tratara este bloque como una hoja
+    // opaca, esto ni siquiera reordenaría — devolvería el objeto tal
+    // cual vino.
+    const bytes = serializa(esquema, { hijo: { precio: '108', nombre: 'Gotas' } })
+    expect(bytes.indexOf('"nombre"')).toBeLessThan(bytes.indexOf('"precio"'))
   })
 })
