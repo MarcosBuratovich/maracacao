@@ -17,7 +17,7 @@ import {
   numero, tokenColor, ruta, url, correo, slug, archivo, derivado, grupo, precioONada,
   panel,
 } from '../src/contenido/campos'
-import { recorre } from '../src/contenido/carga'
+import { recorre, cargar, serializa } from '../src/contenido/carga'
 
 describe('la capa de contenido', () => {
   it('src/contenido/ no importa node:, ni Astro, ni el alias @/', () => {
@@ -514,5 +514,81 @@ describe('la capa de contenido', () => {
     // es, no como un fragmento genérico del objeto que lo contiene.
     expect(hojaPorRuta.a.safeParse('Chocolate').success).toBe(true)
     expect(hojaPorRuta.b.safeParse('x'.repeat(11)).success).toBe(false)
+  })
+
+  it('cargar() tira con la ruta punteada y el mensaje en español', () => {
+    const esquema = grupo({
+      etiqueta: 'x', seccion: 'portada', ayuda: 'x',
+      campos: { titulo: texto({ etiqueta: 'Título', seccion: 'portada', ayuda: 'y', max: 20 }) },
+    })
+    expect(() => cargar('datos/prueba.json', esquema, { titulo: '   ' })).toThrow(
+      /datos\/prueba\.json.*titulo.*vacío/s,
+    )
+  })
+
+  it('cargar() congela: el contenido no se muta por accidente en runtime', () => {
+    const esquema = grupo({
+      etiqueta: 'x', seccion: 'portada', ayuda: 'x',
+      campos: { titulo: texto({ etiqueta: 'Título', seccion: 'portada', ayuda: 'y', max: 20 }) },
+    })
+    const doc = cargar('datos/prueba.json', esquema, { titulo: 'Hola' }) as { titulo: string }
+    expect(Object.isFrozen(doc)).toBe(true)
+    expect(() => { (doc as { titulo: string }).titulo = 'otro' }).toThrow()
+  })
+
+  it('serializa() escribe bytes canónicos: orden del esquema e invisibles escapados', () => {
+    const esquema = grupo({
+      etiqueta: 'x', seccion: 'productos', ayuda: 'x',
+      campos: {
+        peso: medida({ etiqueta: 'Peso', seccion: 'productos', ayuda: 'y', max: 20 }),
+        nombre: texto({ etiqueta: 'Nombre', seccion: 'productos', ayuda: 'z', max: 20 }),
+      },
+    })
+    // Se pasa con las claves al REVÉS del esquema a propósito. El espacio
+    // duro va como escape (\u00a0), nunca pegado: pegado, un editor o un
+    // copiar-y-pegar lo puede normalizar a uno común sin que nadie lo note.
+    const bytes = serializa(esquema, { nombre: 'Gotas rellenas', peso: '250\u00a0g' })
+    // El orden lo manda el esquema, no el objeto: si no, dos guardados
+    // seguidos producen diffs distintos sin que cambie nada.
+    expect(bytes.indexOf('"peso"')).toBeLessThan(bytes.indexOf('"nombre"'))
+    // El espacio duro va escapado: en el fuente no hay ni uno literal, y
+    // así se ve en el diff que está.
+    expect(bytes).toContain('250\\u00a0g')
+    expect(bytes).not.toContain('250\u00a0g')
+    // Y un espacio NORMAL —el que sí puede aparecer en cualquier texto—
+    // tiene que sobrevivir tal cual: si la clase de invisibles se pasa de
+    // ancha, escapar el hard space de más no alcanza para notarlo, pero
+    // escapar el espacio normal rompería CADA texto con más de una
+    // palabra. «Gotas rellenas» trae un espacio normal adentro: tiene que
+    // quedar EXACTAMENTE así, sin escapar.
+    expect(bytes).toContain('Gotas rellenas')
+  })
+
+  it('serializa() tira si el esquema y el dato no dicen lo mismo', () => {
+    // Es la prueba de completitud de la migración: si el esquema declara
+    // una ruta que el objeto no tiene, o el objeto trae una que el
+    // esquema no declara, no se escribe nada.
+    const esquema = grupo({
+      etiqueta: 'x', seccion: 'portada', ayuda: 'x',
+      campos: { a: texto({ etiqueta: 'A', seccion: 'portada', ayuda: 'y', max: 9 }) },
+    })
+    expect(() => serializa(esquema, {})).toThrow(/a/)
+    expect(() => serializa(esquema, { a: 'ok', sobra: 1 })).toThrow(/sobra/)
+  })
+
+  it('serializa(cargar(bytes)) devuelve los mismos bytes', () => {
+    // El ida y vuelta completo: escribir, leer, volver a escribir. Es lo
+    // que hace CANÓNICO a canónico — si no coinciden, un guardado sin
+    // cambios reales igual ensuciaría el diff.
+    const esquema = grupo({
+      etiqueta: 'x', seccion: 'productos', ayuda: 'x',
+      campos: {
+        peso: medida({ etiqueta: 'Peso', seccion: 'productos', ayuda: 'y', max: 20 }),
+        nombre: texto({ etiqueta: 'Nombre', seccion: 'productos', ayuda: 'z', max: 20 }),
+      },
+    })
+    const bytes = serializa(esquema, { peso: '250\u00a0g', nombre: 'Gotas' })
+    const vuelta = serializa(esquema, cargar('x.json', esquema, JSON.parse(bytes)))
+    expect(vuelta).toBe(bytes)
   })
 })

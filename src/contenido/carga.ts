@@ -120,3 +120,108 @@ export function recorre(
       visita(prefijo, panel.get(esquema), esquema)
   }
 }
+
+/** Congela hacia adentro. La garantía real es de runtime, no de tipos. */
+function congela<T>(valor: T): T {
+  if (valor === null || typeof valor !== 'object') return valor
+  for (const v of Object.values(valor)) congela(v)
+  return Object.freeze(valor)
+}
+
+/**
+ * Valida el JSON contra su esquema y devuelve el objeto congelado.
+ *
+ * Si falla, TIRA. Y tiene que tirar: `cargar()` corre adentro del módulo
+ * que `index.astro` importa, así que un JSON inválido revienta
+ * `astro build` y Vercel deja servido el deploy anterior. Envolverlo en
+ * try/catch publicaría la página rota, que es exactamente lo contrario.
+ */
+export function cargar<E extends z.ZodType>(
+  archivo: string,
+  esquema: E,
+  crudo: unknown,
+): Readonly<z.infer<E>> {
+  const r = esquema.safeParse(crudo)
+  if (!r.success) {
+    const problemas = r.error.issues
+      .map((i) => `  ${i.path.join('.') || '(raíz)'}: ${i.message}`)
+      .join('\n')
+    throw new Error(`${archivo} — ${r.error.issues.length} problema(s):\n${problemas}`)
+  }
+  return congela(r.data) as Readonly<z.infer<E>>
+}
+
+/**
+ * Bytes canónicos: el orden de las claves lo manda el ESQUEMA, no el
+ * objeto, y los invisibles (U+00A0 y compañía) salen escapados.
+ *
+ * Lo primero evita que dos guardados seguidos produzcan diffs distintos
+ * sin que haya cambiado nada. Lo segundo conserva una convención que el
+ * repo ya tiene: hoy hay cero caracteres U+00A0 literales en el fuente.
+ *
+ * Tira si el esquema y el dato no coinciden — y por eso además sirve como
+ * prueba de que el esquema describe exactamente el contenido de hoy.
+ */
+export function serializa<E extends z.ZodType>(esquema: E, valor: unknown): string {
+  const ordenado = ordenaSegun(esquema, valor, '')
+  return JSON.stringify(ordenado, null, 2).replace(
+    // Escritos como \u para que el archivo no dependa de caracteres que
+    // un copiar-y-pegar puede comerse: espacio duro, los espacios finos,
+    // los de ancho cero y el BOM.
+    /[\u00a0\u2000-\u200d\ufeff]/g,
+    (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`,
+  )
+}
+
+function ordenaSegun(esquema: z.ZodType, valor: unknown, ruta: string): unknown {
+  const def = definicion(esquema)
+  const donde = ruta || '(raíz)'
+
+  switch (def.type) {
+    case 'optional':
+      return valor === undefined
+        ? undefined
+        : ordenaSegun(def.innerType as z.ZodType, valor, ruta)
+
+    case 'object': {
+      const shape = def.shape as Record<string, z.ZodType>
+      if (valor === null || typeof valor !== 'object' || Array.isArray(valor)) {
+        throw new Error(`${donde}: el esquema espera un bloque y el dato trae ${typeof valor}.`)
+      }
+      const dato = valor as Record<string, unknown>
+      const sobrantes = Object.keys(dato).filter((k) => !(k in shape))
+      if (sobrantes.length) {
+        throw new Error(
+          `${donde}: el dato trae claves que el esquema no declara: ${sobrantes.join(', ')}.`,
+        )
+      }
+      const salida: Record<string, unknown> = {}
+      for (const clave of Object.keys(shape)) {
+        const hijo = shape[clave]
+        const opcional = definicion(hijo).type === 'optional'
+        if (!(clave in dato)) {
+          if (opcional) continue
+          throw new Error(`${donde}: falta «${clave}», que el esquema declara.`)
+        }
+        salida[clave] = ordenaSegun(hijo, dato[clave], ruta ? `${ruta}.${clave}` : clave)
+      }
+      return salida
+    }
+
+    case 'tuple': {
+      const items = def.items as z.ZodType[]
+      if (!Array.isArray(valor) || valor.length !== items.length) {
+        throw new Error(`${donde}: el esquema espera exactamente ${items.length} elementos.`)
+      }
+      return items.map((it, i) => ordenaSegun(it, valor[i], `${ruta}.${i}`))
+    }
+
+    case 'array': {
+      if (!Array.isArray(valor)) throw new Error(`${donde}: el esquema espera una lista.`)
+      return valor.map((v, i) => ordenaSegun(def.element as z.ZodType, v, `${ruta}.${i}`))
+    }
+
+    default:
+      return valor
+  }
+}
