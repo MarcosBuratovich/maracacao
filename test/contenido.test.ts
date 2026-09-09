@@ -356,4 +356,14 @@ describe('la capa de contenido', () => {
       'sub=Bajada',
     ])
   })
+
+  it('recorre() no trata una unión como hoja: truena y dice qué falta', () => {
+    // Silencio es el peor resultado acá: una unión emitida como hoja deja
+    // todos los campos de sus variantes invisibles para el panel, sin error.
+    const conUnion = z.discriminatedUnion('tipo', [
+      z.object({ tipo: z.literal('parrafo'), texto: z.string() }),
+      z.object({ tipo: z.literal('lista'), items: z.array(z.string()) }),
+    ])
+    expect(() => recorre(conUnion, () => {})).toThrow(/unión/i)
+  })
 })
