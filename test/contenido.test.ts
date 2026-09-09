@@ -17,6 +17,7 @@ import {
   numero, tokenColor, ruta, url, correo, slug, archivo, derivado, grupo, precioONada,
   panel,
 } from '../src/contenido/campos'
+import { recorre } from '../src/contenido/carga'
 
 describe('la capa de contenido', () => {
   it('src/contenido/ no importa node:, ni Astro, ni el alias @/', () => {
@@ -312,5 +313,47 @@ describe('la capa de contenido', () => {
   it('precioONada rechaza un decimal, igual que precio', () => {
     const p = precioONada({ etiqueta: 'Precio', seccion: 'sabores', ayuda: 'x' })
     expect(p.safeParse(108.5).success).toBe(false)
+  })
+
+  it('canario: las formas internas de Zod son las que recorre() supone', () => {
+    // recorre() es lo ÚNICO que toca interna de Zod. Si una versión nueva
+    // mueve estas claves, el recorrido devolvería rutas vacías y el panel
+    // se pintaría sin campos, sin un solo error. Este test es el lugar
+    // donde eso tiene que doler, y el mensaje dice qué hacer.
+    const def = (e: unknown) => Object.keys((e as { _zod: { def: object } })._zod.def)
+    expect(def(z.object({ a: z.string() }))).toContain('shape')
+    expect(def(z.array(z.string()))).toContain('element')
+    expect(def(z.tuple([z.string(), z.string()]))).toContain('items')
+    expect(def(z.string().optional())).toContain('innerType')
+    const du = z.discriminatedUnion('t', [
+      z.object({ t: z.literal('a') }),
+      z.object({ t: z.literal('b') }),
+    ])
+    expect(def(du)).toEqual(expect.arrayContaining(['options', 'discriminator']))
+  })
+
+  it('recorre() emite la ruta punteada de cada hoja, con su metadato', () => {
+    const esquema = grupo({
+      etiqueta: 'Portada', seccion: 'portada', ayuda: 'x',
+      campos: {
+        titular: tupla({
+          etiqueta: 'Titular', seccion: 'portada', ayuda: 'y',
+          partes: [
+            texto({ etiqueta: 'Renglón 1', seccion: 'portada', ayuda: 'a', max: 40 }),
+            texto({ etiqueta: 'Renglón 2', seccion: 'portada', ayuda: 'b', max: 40 }),
+          ],
+        }),
+        sub: texto({ etiqueta: 'Bajada', seccion: 'portada', ayuda: 'c', max: 200 }),
+      },
+    })
+
+    const hojas: string[] = []
+    recorre(esquema, (ruta, meta) => hojas.push(`${ruta}=${meta?.etiqueta ?? '-'}`))
+
+    expect(hojas).toEqual([
+      'titular.0=Renglón 1',
+      'titular.1=Renglón 2',
+      'sub=Bajada',
+    ])
   })
 })
