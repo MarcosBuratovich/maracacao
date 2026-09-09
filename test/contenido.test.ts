@@ -18,6 +18,9 @@ import {
   panel,
 } from '../src/contenido/campos'
 import { recorre, cargar, serializa } from '../src/contenido/carga'
+import { cruzaConteo } from '../src/contenido/conteos'
+import { contrasteSuficiente } from '../src/contenido/color-sabor'
+import * as tokens from '../src/tokens/color'
 
 describe('la capa de contenido', () => {
   it('src/contenido/ no importa node:, ni Astro, ni el alias @/', () => {
@@ -717,5 +720,28 @@ describe('la capa de contenido', () => {
     // cual vino.
     const bytes = serializa(esquema, { hijo: { precio: '108', nombre: 'Gotas' } })
     expect(bytes.indexOf('"nombre"')).toBeLessThan(bytes.indexOf('"precio"'))
+  })
+
+  it('cruzaConteo detecta la cifra desactualizada, en número y en letras', () => {
+    expect(cruzaConteo('LOS 15 SABORES', 15)).toBeNull()
+    expect(cruzaConteo('LOS 15 SABORES', 16)).toMatch(/15.*16/)
+    // «seis sabores» es tan probable como «6 sabores» y hoy nada lo mira.
+    expect(cruzaConteo('Seis sabores de gotas', 6)).toBeNull()
+    expect(cruzaConteo('Seis sabores de gotas', 7)).toMatch(/seis.*7/i)
+    // Un número que no es el conteo no molesta.
+    expect(cruzaConteo('70% cacao, 15 sabores', 15)).toBeNull()
+  })
+
+  it('la regla de contraste hereda la excepción declarada en los tokens', () => {
+    // Un par nuevo tiene que dar 4.5 o más.
+    expect(contrasteSuficiente('#7D0303', '#FFFFFF', 'canela')).toBe(true)
+    expect(contrasteSuficiente('#F8ECDE', '#FFFFFF', 'canela')).toBe(false)
+    // Hierbabuena da 4.41 medido y está declarada soloDisplay en
+    // src/tokens/color.ts:182. La regla NO la reinventa ni la borra:
+    // la hereda por slug.
+    const { sabor, tintaSabor } = tokens
+    expect(contrasteSuficiente(sabor.hierbabuena, tintaSabor.hierbabuena, 'hierbabuena')).toBe(true)
+    // Y el mismo par, con otro slug, sigue siendo insuficiente.
+    expect(contrasteSuficiente(sabor.hierbabuena, tintaSabor.hierbabuena, 'canela')).toBe(false)
   })
 })
