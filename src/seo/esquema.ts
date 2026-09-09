@@ -55,7 +55,10 @@ export function esquemaBarras(origen: string) {
   return {
     '@context': 'https://schema.org',
     '@type': 'ItemList',
-    name: marca.catalogoBarras.encabezado,
+    // El nombre sale de la sección que existe (el anaquel de la home).
+    // Hasta 2026-09-08 salía de catalogoBarras.encabezado, el encabezado
+    // de /barras — una página fuera de ruta desde el 2026-08-17.
+    name: marca.anaquel.titulo,
     numberOfItems: sabores.length,
     itemListElement: sabores.map((s) => ({
       '@type': 'ListItem',

@@ -141,6 +141,15 @@ describe('JSON-LD — datos reales, nada inventado', () => {
     expect(origenCanonico(undefined)).toBe(ORIGEN)
     expect(origenCanonico(new URL('https://www.maracacao.mx'))).toBe(ORIGEN)
   })
+
+  it('el ItemList de las barras se llama como la sección que existe, no como una página retirada', () => {
+    const lista = esquemaBarras('https://www.maracacao.mx')
+    expect(lista.name).toBe(marca.anaquel.titulo)
+    // Hasta 2026-09-08 publicaba el encabezado de /barras, una página
+    // fuera de ruta desde el 2026-08-17: Google veía el nombre de algo
+    // que no existe.
+    expect(lista.name).not.toContain('15 barras')
+  })
 })
 
 describe('rastreo: robots.txt, sitemap y vercel.json', () => {

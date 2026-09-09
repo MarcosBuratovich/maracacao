@@ -7,7 +7,7 @@
  * El registro es-MX del copy vivo lo cubre `marca-copy.test.ts`.
  */
 import { describe, it, expect } from 'vitest'
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { experimental_AstroContainer as AstroContainer } from 'astro/container'
 import { marca } from '@/copy/sitio-marca'
 import { sabores } from '@/copy/sabores'
@@ -205,40 +205,6 @@ describe('el lanzamiento (2026-08-20): la landing es la home', () => {
     expect(readFileSync('src/pages/index.astro', 'utf8')).toContain("import '@/scripts/marca'")
     const js = readFileSync('src/scripts/marca.ts', 'utf8')
     expect(js).toContain("matchMedia('(prefers-reduced-motion: reduce)')")
-  })
-})
-
-describe('el catálogo inmersivo de barras (DESCONTINUADO 2026-08-17, vive en _barras.astro)', () => {
-  it('está fuera de ruta (prefijo _) y sin enlaces de entrada', () => {
-    // Marcos lo bajó «por ahora»: Astro no rutea archivos con _, así
-    // que el código queda listo para revivir renombrando el archivo.
-    expect(existsSync('src/pages/barras.astro')).toBe(false)
-    expect(existsSync('src/pages/_barras.astro')).toBe(true)
-    expect(readFileSync('src/pages/index.astro', 'utf8')).not.toContain('anaquel-todas')
-  })
-
-  it('una pantalla por sabor, con su color, su tinta y sus datos de ficha técnica', async () => {
-    const { default: Barras } = await import('@/pages/_barras.astro')
-    const html = await container.renderToString(Barras)
-    for (const s of sabores) {
-      expect(html).toContain(`id="${s.slug}"`)
-      expect(html).toContain(s.nombre)
-    }
-    // Los datos duros de la ficha técnica oficial (docx 2026-08-14).
-    expect(html).toContain(marca.catalogoBarras.alergenos)
-    expect(html).toContain(marca.catalogoBarras.conservacion)
-    // El selector de miniaturas trae los quince saltos.
-    expect(html.match(/data-salto=/g)).toHaveLength(15)
-    // Candado puesto: la página no es pública todavía.
-    expect(html).toContain('data-candado')
-  })
-
-  it('el snap es firme en desktop y suave en móvil, sin secuestrar el scroll', () => {
-    const src = readFileSync('src/pages/_barras.astro', 'utf8')
-    expect(src).toContain('scroll-snap-type: y proximity')
-    expect(src).toMatch(/min-width: 761px.*\n.*scroll-snap-type: y mandatory/)
-    // Nada de fullPage ni wheel hijack: el scroll es del visitante.
-    expect(src).not.toMatch(/addEventListener\(['"]wheel/)
   })
 })
 

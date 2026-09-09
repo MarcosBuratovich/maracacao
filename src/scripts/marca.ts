@@ -30,9 +30,8 @@ const punteroFino = matchMedia('(pointer: fine)').matches
 /* ---------- La barra 3D (compartida) ----------
    El modelo de Marcos (Blender): UN solo GLB para los quince sabores —
    cambiarle la textura del material «Label» por el pliego de imprenta
-   del sabor es cambiar de barra. La usan la ficha del anaquel (la home)
-   y el catálogo inmersivo (/barras). model-viewer va self-hosteado y
-   se carga una sola vez. */
+   del sabor es cambiar de barra. La usa la ficha del anaquel (la home).
+   model-viewer va self-hosteado y se carga una sola vez. */
 
 interface VisorModelo extends HTMLElement {
   model?: {
@@ -280,60 +279,6 @@ if (datos && anaquel) {
       { rootMargin: '250px' },
     )
     observador3d.observe(visor)
-  }
-}
-
-/* ---------- 3d. El catálogo inmersivo de barras (/barras) ----------
-   Una pantalla por sabor con scroll-snap (nunca secuestrado). El
-   observador marca el sabor activo: pinta el selector, actualiza el
-   hash (#canela es compartible) y le cambia el pliego a la única
-   instancia 3D fija. El selector de miniaturas salta a cualquier
-   sabor. */
-
-const catalogo = document.querySelector<HTMLElement>('[data-catalogo]')
-if (catalogo) {
-  const espectros = [...catalogo.querySelectorAll<HTMLElement>('[data-espectro]')]
-  const saltos = [...document.querySelectorAll<HTMLButtonElement>('[data-salto]')]
-  let aplicar3d: ((slug: string) => void) | null = null
-  let slugActivo = location.hash.replace('#', '') || espectros[0]?.id || ''
-
-  const marcaActivo = (slug: string) => {
-    if (!slug || slug === slugActivo) return
-    slugActivo = slug
-    saltos.forEach((b) => {
-      b.setAttribute('aria-current', b.dataset.salto === slug ? 'true' : 'false')
-    })
-    history.replaceState(null, '', `#${slug}`)
-    aplicar3d?.(slug)
-  }
-
-  const observadorActivo = new IntersectionObserver(
-    (entradas) => {
-      for (const e of entradas) {
-        if (e.isIntersecting) marcaActivo((e.target as HTMLElement).id)
-      }
-    },
-    { threshold: 0.55 },
-  )
-  espectros.forEach((s) => observadorActivo.observe(s))
-
-  saltos.forEach((b) => {
-    b.addEventListener('click', () => {
-      document.getElementById(b.dataset.salto ?? '')?.scrollIntoView({
-        behavior: quieto ? 'auto' : 'smooth',
-      })
-    })
-  })
-
-  const cajaVisor = document.querySelector<HTMLElement>('[data-catalogo-visor]')
-  if (cajaVisor && !quieto) {
-    void montarBarra3D(cajaVisor, cajaVisor.dataset.alt ?? '')
-      .then((aplica) => {
-        aplicar3d = aplica
-        raiz.classList.add('catalogo-3d')
-        aplica(slugActivo)
-      })
-      .catch(() => { /* quedan los packshots por sección */ })
   }
 }
 
