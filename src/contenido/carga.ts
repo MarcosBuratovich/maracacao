@@ -2,7 +2,7 @@
  * El cargador de contenido.
  *
  * `recorre()` es lo ÚNICO del sistema que toca interna de Zod. Está
- * acotado a propósito a ~60 líneas y a cinco formas, y `test/contenido.test.ts`
+ * acotado a propósito a ~60 líneas y a seis formas, y `test/contenido.test.ts`
  * afirma cada una: si una versión nueva de Zod las mueve, falla ahí —con
  * un mensaje que lo explica— y no adentro del panel seis meses después.
  */
@@ -16,6 +16,66 @@ const esContenedor = (tipo: string): boolean =>
   tipo === 'object' || tipo === 'tuple' || tipo === 'array' || tipo === 'union'
 
 const esEnvoltura = (tipo: string): boolean => tipo === 'optional' || tipo === 'nullable'
+
+/**
+ * Une un prefijo con una parte de la ruta. La raíz no tiene prefijo, así
+ * que su primera parte va SOLA: sin esto, un problema en el elemento 0 de
+ * una tupla o de una lista de raíz se reporta como «.0», con un punto
+ * colgando adelante — y eso es lo que se lee en un log de Vercel a las
+ * once de la noche. Vive acá, en un solo lugar, porque `recorre()` y
+ * `ordenaSegun()` arman la MISMA ruta: cuando cada una la armaba por su
+ * cuenta, `ordenaSegun()` se acordó de la raíz en UNA de sus tres ramas
+ * (el objeto) y se olvidó en las otras dos (tupla y lista).
+ */
+const con = (prefijo: string, parte: string | number): string =>
+  prefijo ? `${prefijo}.${parte}` : String(parte)
+
+/**
+ * El único «esto todavía no lo sé hacer» del archivo.
+ *
+ * `recorre()` y `ordenaSegun()` caminan el MISMO árbol, así que tienen que
+ * dar la MISMA respuesta a la misma pregunta. Cuando no la daban
+ * —`recorre()` tiraba con una unión y `ordenaSegun()` la devolvía cruda,
+ * dejando pasar claves que el esquema no declara— la que callaba era justo
+ * la que la Parte B iba a pisar: los bloques de ficha SON una unión
+ * discriminada. Un solo constructor del mensaje hace que agregar un caso
+ * ruidoso de un lado y olvidarlo del otro se note al escribirlo.
+ */
+const todaviaNo = (quien: string, que: string, donde: string, cola: string): never => {
+  throw new Error(`${quien}(): todavía no sé recorrer ${que} (en «${donde || '(raíz)'}»). ${cola}`)
+}
+
+const PORQUE_UNION = 'Lo agrega la fase 1 parte B, con los bloques de ficha.'
+
+/**
+ * Las envolturas que este archivo SÍ sabe pelar son `optional` y
+ * `nullable`, y tienen caso propio en los dos switches. Zod trae varias
+ * más —`default`, `catch`, `readonly`, `nonoptional`, `prefault`— y las
+ * cinco guardan lo que envuelven en `innerType` (verificado contra zod
+ * 4.4.3), así que un solo predicado cierra la familia presente y la
+ * futura.
+ *
+ * Sin este chequeo caen en el `default:` del switch, y el riesgo va en las
+ * DOS direcciones: `grupo(...).default({...})` se emite como hoja opaca y
+ * deja pasar claves que el esquema no declara; `texto(...).default('hola')`
+ * hace exactamente lo contrario, porque Zod acepta la clave ausente pero
+ * `ordenaSegun()` la reclama igual —un «falta «x»» que durante la
+ * migración se lee como un bug de la migración y se paga en horas de
+ * depuración.
+ *
+ * Esto NO las soporta: las hace RUIDOSAS. Cuando la Parte B necesite una,
+ * decide cómo pelarla con el caso real delante.
+ */
+const exigeEnvolturaConocida = (quien: string, def: Def, donde: string): void => {
+  if ('innerType' in def) {
+    todaviaNo(
+      quien,
+      `la envoltura «${def.type}»`,
+      donde,
+      'La Parte B decide cómo atravesarla, con el caso real delante.',
+    )
+  }
+}
 
 /**
  * Pela TODAS las envolturas (`optional`/`nullable`) de una vez y devuelve
@@ -89,14 +149,18 @@ export function recorre(
   prefijo = '',
 ): void {
   const def = definicion(esquema)
-  const con = (parte: string) => (prefijo ? `${prefijo}.${parte}` : parte)
 
   switch (def.type) {
     case 'optional':
     case 'nullable': {
-      // Un solo desenvolvimiento alimenta las dos decisiones de este caso.
+      // Un solo desenvolvimiento alimenta las tres decisiones de este caso.
       const { fondo, meta } = desenvuelve(esquema)
-      if (esContenedor(definicion(fondo).type)) {
+      const dentro = definicion(fondo)
+      // Una envoltura desconocida ABAJO de un optional/nullable no llega
+      // nunca al `default:` de este switch —este caso emite la hoja y
+      // vuelve—, así que el chequeo va también acá.
+      exigeEnvolturaConocida('recorre', dentro, prefijo)
+      if (esContenedor(dentro.type)) {
         recorre(fondo, visita, prefijo)
       } else {
         visita(prefijo, meta, esquema)
@@ -105,12 +169,12 @@ export function recorre(
     }
     case 'object': {
       const shape = def.shape as Record<string, z.ZodType>
-      for (const clave of Object.keys(shape)) recorre(shape[clave], visita, con(clave))
+      for (const clave of Object.keys(shape)) recorre(shape[clave], visita, con(prefijo, clave))
       return
     }
     case 'tuple': {
       const items = def.items as z.ZodType[]
-      items.forEach((item, i) => recorre(item, visita, con(String(i))))
+      items.forEach((item, i) => recorre(item, visita, con(prefijo, i)))
       return
     }
     case 'array':
@@ -126,11 +190,12 @@ export function recorre(
       // bloques de las fichas técnicas son una unión discriminada— y ahí se
       // decide cómo se nombra la ruta de cada variante, con el esquema real
       // delante. Hasta entonces, ruidoso antes que mudo.
-      throw new Error(
-        `recorre(): todavía no sé recorrer una unión (en «${prefijo || '(raíz)'}»). ` +
-          'Lo agrega la fase 1 parte B, con los bloques de ficha.',
-      )
+      // `return` para que el caso no caiga en `default:`: `todaviaNo()`
+      // siempre tira, pero un `case` sin salida explícita es una trampa
+      // para el que agregue una línea abajo.
+      return todaviaNo('recorre', 'una unión', prefijo, PORQUE_UNION)
     default:
+      exigeEnvolturaConocida('recorre', def, prefijo)
       visita(prefijo, panel.get(esquema), esquema)
   }
 }
@@ -205,7 +270,12 @@ function ordenaSegun(esquema: z.ZodType, valor: unknown, ruta: string): unknown 
       // pregunta que ya resuelven recorre() y la opcionalidad: la misma
       // familia de bug, otra vez.
       const { fondo } = desenvuelve(esquema)
-      if (!esContenedor(definicion(fondo).type)) return valor
+      const dentro = definicion(fondo)
+      // Igual que en recorre(): una envoltura desconocida abajo de un
+      // optional/nullable no llega al `default:` de este switch, porque
+      // este caso devuelve el valor y vuelve.
+      exigeEnvolturaConocida('serializa', dentro, ruta)
+      if (!esContenedor(dentro.type)) return valor
       // undefined (optional) y null (nullable) son los dos valores que
       // la envoltura existe para aceptar sobre un contenedor, y ninguno
       // de los dos necesita reordenarse.
@@ -233,12 +303,19 @@ function ordenaSegun(esquema: z.ZodType, valor: unknown, ruta: string): unknown 
         // niveles, no uno solo. Un chequeo aparte de un nivel es
         // exactamente el bug que ya pagó recorre() en otra forma — ver
         // el comentario de desenvuelve().
-        const { opcional } = desenvuelve(hijo)
+        const { fondo, opcional } = desenvuelve(hijo)
+        // Antes de decidir si la clave puede faltar: si el esquema la
+        // envuelve en algo que este archivo no sabe pelar, la respuesta
+        // honesta es «no sé», no «falta». `texto(...).default('hola')` con
+        // `{}` es válido para Zod —para eso está el default— y acá salía
+        // un «falta «x»» que en la migración se lee como un bug DE LA
+        // MIGRACIÓN y se paga en horas de depuración.
+        exigeEnvolturaConocida('serializa', definicion(fondo), con(ruta, clave))
         if (!(clave in dato)) {
           if (opcional) continue
           throw new Error(`${donde}: falta «${clave}», que el esquema declara.`)
         }
-        salida[clave] = ordenaSegun(hijo, dato[clave], ruta ? `${ruta}.${clave}` : clave)
+        salida[clave] = ordenaSegun(hijo, dato[clave], con(ruta, clave))
       }
       return salida
     }
@@ -248,15 +325,27 @@ function ordenaSegun(esquema: z.ZodType, valor: unknown, ruta: string): unknown 
       if (!Array.isArray(valor) || valor.length !== items.length) {
         throw new Error(`${donde}: el esquema espera exactamente ${items.length} elementos.`)
       }
-      return items.map((it, i) => ordenaSegun(it, valor[i], `${ruta}.${i}`))
+      return items.map((it, i) => ordenaSegun(it, valor[i], con(ruta, i)))
     }
 
     case 'array': {
       if (!Array.isArray(valor)) throw new Error(`${donde}: el esquema espera una lista.`)
-      return valor.map((v, i) => ordenaSegun(def.element as z.ZodType, v, `${ruta}.${i}`))
+      return valor.map((v, i) => ordenaSegun(def.element as z.ZodType, v, con(ruta, i)))
     }
 
+    case 'union':
+      // La MISMA respuesta que recorre(), a propósito. `esContenedor()`
+      // incluye 'union', así que la envoltura se atravesaba y el fondo caía
+      // en el `default:` de acá abajo, que devuelve el valor tal cual:
+      // `serializa()` escribía la unión entera sin reordenar y sin mirar
+      // completitud, dejando pasar claves que el esquema no declara —
+      // mientras `recorre()`, en el mismo archivo, tiraba por lo mismo. Es
+      // justo lo que la Parte B va a pisar, porque los bloques de ficha se
+      // declaran como `discriminatedUnion`.
+      return todaviaNo('serializa', 'una unión', ruta, PORQUE_UNION)
+
     default:
+      exigeEnvolturaConocida('serializa', def, ruta)
       return valor
   }
 }

@@ -724,6 +724,71 @@ describe('la capa de contenido', () => {
     expect(bytes.indexOf('"nombre"')).toBeLessThan(bytes.indexOf('"precio"'))
   })
 
+  // recorre() y ordenaSegun() caminan el MISMO árbol y hasta acá daban
+  // respuestas OPUESTAS a la misma pregunta: con una unión, recorre()
+  // tiraba y serializa() devolvía el bloque tal cual —con las claves que
+  // el esquema no declara adentro—. Era el cuarto mecanismo divergente del
+  // archivo, y el primero que la Parte B iba a pisar: los bloques de ficha
+  // se declaran como `discriminatedUnion`.
+
+  it('serializa() tira con una unión, igual que recorre(): una sola respuesta', () => {
+    const esquema = z.object({
+      bloque: z.discriminatedUnion('t', [
+        z.object({ t: z.literal('a'), uno: z.string() }),
+        z.object({ t: z.literal('b'), dos: z.string() }),
+      ]),
+    })
+    expect(() => recorre(esquema, () => {})).toThrow(/unión/i)
+    // Antes esto devolvía {"bloque":{"t":"a","uno":"hola","BASURA":"…"}}:
+    // la clave no declarada viajaba al JSON sin un solo error.
+    expect(() => serializa(esquema, { bloque: { t: 'a', uno: 'hola', BASURA: 'no declarada' } }))
+      .toThrow(/unión/i)
+  })
+
+  it('una envoltura que no sabemos pelar es ruidosa en los DOS caminos, no una hoja permisiva', () => {
+    // `esEnvoltura()` conoce `optional` y `nullable` nada más. Un
+    // `grupo(...).default({...})` caía en el `default:` de los dos
+    // switches: recorre() lo emitía como UNA hoja —los campos de adentro,
+    // invisibles para el panel— y serializa() lo devolvía crudo, dejando
+    // pasar claves que el esquema no declara.
+    const conDefault = grupo({
+      etiqueta: 'Bloque', seccion: 'productos', ayuda: 'x',
+      campos: { a: texto({ etiqueta: 'A', seccion: 'productos', ayuda: 'y', max: 20 }) },
+    }).default({ a: 'z' })
+    const esquema = z.object({ b: conDefault })
+    expect(() => recorre(esquema, () => {})).toThrow(/envoltura «default»/)
+    expect(() => serializa(esquema, { b: { a: 'z', SOBRA: 1 } })).toThrow(/envoltura «default»/)
+  })
+
+  it('un texto con .default() tira por la envoltura, no con un falso «falta la clave»', () => {
+    // El riesgo va en las DOS direcciones, y esta es la que no estaba
+    // documentada: acá Zod ACEPTA `{}` —para eso existe el default— y
+    // serializa() reclamaba «falta «x»». Un falso positivo que durante la
+    // migración se lee como un bug DE LA MIGRACIÓN y se paga en horas de
+    // depuración. El mensaje tiene que hablar de la envoltura que todavía
+    // no sabemos pelar, no de una clave ausente.
+    const esquema = z.object({
+      x: texto({ etiqueta: 'X', seccion: 'portada', ayuda: 'y', max: 20 }).default('hola'),
+    })
+    expect(esquema.safeParse({}).success).toBe(true)
+    expect(() => serializa(esquema, {})).toThrow(/envoltura «default»/)
+    expect(() => serializa(esquema, {})).not.toThrow(/falta/)
+  })
+
+  it('la ruta de una tupla de raíz no empieza con punto', () => {
+    // `ordenaSegun()` armaba «.0: …» en la tupla y en la lista de raíz,
+    // con un punto colgando adelante, mientras el objeto sí lo resolvía:
+    // el mismo helper en una sola de las tres ramas. Es lo que se lee en
+    // un log de Vercel.
+    const mensajeDe = (fn: () => unknown): string => {
+      try { fn() } catch (e) { return (e as Error).message }
+      return '(no tiró)'
+    }
+    const hijo = z.object({ a: z.string() })
+    expect(mensajeDe(() => serializa(z.tuple([hijo]), [{ a: 'ok', SOBRA: 1 }]))).toMatch(/^0:/)
+    expect(mensajeDe(() => serializa(z.array(hijo), [{ a: 'ok', SOBRA: 1 }]))).toMatch(/^0:/)
+  })
+
   it('cruzaConteo detecta la cifra desactualizada, en número y en letras', () => {
     expect(cruzaConteo('LOS 15 SABORES', 15, 'sabores')).toBeNull()
     expect(cruzaConteo('LOS 15 SABORES', 16, 'sabores')).toMatch(/15.*16/)
