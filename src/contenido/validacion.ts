@@ -8,6 +8,7 @@
  * experiencia posible: ella publica y le rebota sin saber por qué.
  */
 import type { z } from 'zod'
+import { cifraUnidad } from './campos'
 
 export interface Problema {
   /** Ruta punteada: 'sabores.3.nombre'. El panel la usa para llevarla al campo. */
@@ -20,28 +21,33 @@ export interface Problema {
   arreglo?: { etiqueta: string; valor: unknown }
 }
 
-// El brief original traía `\s` acá, que matchea TAMBIÉN el espacio duro
-// (U+00A0): con esa clase, esta regla ofrecía "arreglar" un valor que ya
-// estaba bien escrito, reescribiéndolo idéntico a sí mismo — y si ese
-// mismo valor era inválido por OTRA razón (por ejemplo el máximo), el
-// botón de un toque quedaba ofreciendo un arreglo que no arreglaba nada:
-// la clienta lo aprieta, confía, y publica el mismo error. Es el mismo bug
-// que en el constructor `medida` (campos.ts) dejaba pasar CERO valores.
-// `[^\S\u00a0]` es «espacio en blanco que no sea el duro», igual que en
-// campos.ts, y con el ESCAPE siempre: un espacio duro tipeado a mano es
-// frágil, un editor o un copiar-y-pegar lo puede normalizar a uno común
-// sin que nadie lo note — es exactamente este bug, movido de lugar.
-const CIFRA_UNIDAD = /(\d)[^\S\u00a0](g|kg|ml|l|°C)\b/g
+// La regla del espacio duro vive en `campos.ts` y sale de ahí para los DOS
+// usos: el constructor `medida` la usa para RECHAZAR y este archivo para
+// REEMPLAZAR. Escrita dos veces —lo estaba— nada las mantenía alineadas:
+// agregar `mm` a la lista de unidades sin tocar este archivo le deja a la
+// clienta un campo que se rechaza y sin el botón que lo arregla, y no cae
+// ningún test. El bug de la clase de caracteres (`\s` matchea TAMBIÉN el
+// espacio duro, así que la regla ofrecía «arreglar» un valor ya bien
+// escrito, reescribiéndolo idéntico a sí mismo) está explicado en el
+// docstring de `cifraUnidad`.
+//
+// Dos instancias y no una: el flag `g` le da `lastIndex` propio al objeto,
+// así que compartir UNA entre el `.test()` y el `.replace()` hace que la
+// pregunta siguiente arranque desde la mitad del texto y conteste que no.
+// La de preguntar va sin `g` justamente para que no tenga `lastIndex` que
+// filtrar; la de reemplazar lo necesita para agarrar todas las
+// apariciones, y `String.replace` le resetea el `lastIndex` sola.
+const TIENE_ESPACIO_BLANDO = cifraUnidad()
+const CADA_ESPACIO_BLANDO = cifraUnidad('g')
 
 function proponeArreglo(valor: unknown): Problema['arreglo'] {
-  if (typeof valor === 'string' && CIFRA_UNIDAD.test(valor)) {
-    CIFRA_UNIDAD.lastIndex = 0
+  if (typeof valor === 'string' && TIENE_ESPACIO_BLANDO.test(valor)) {
     return {
       etiqueta: 'Poner el espacio que no parte el renglón',
-      // El reemplazo también va con el escape, nunca con el carácter
-      // pegado: si no, el archivo fuente vuelve a tener el mismo invisible
-      // frágil que esta regla existe para corregir en el DATO de la clienta.
-      valor: valor.replace(CIFRA_UNIDAD, '$1\u00a0$2'),
+      // El reemplazo va con el escape, nunca con el carácter pegado: si
+      // no, el archivo fuente vuelve a tener el mismo invisible frágil que
+      // esta regla existe para corregir en el DATO de la clienta.
+      valor: valor.replace(CADA_ESPACIO_BLANDO, '$1\u00a0$2'),
     }
   }
   return undefined

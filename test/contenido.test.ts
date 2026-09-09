@@ -15,7 +15,7 @@ import { MARCA, MAQUETA, palabraProhibida } from '../src/contenido/vocabulario'
 import {
   texto, medida, precio, tupla, lista, claveSabor,
   numero, tokenColor, ruta, url, correo, slug, archivo, derivado, grupo, precioONada,
-  panel,
+  panel, UNIDADES_DE_MEDIDA,
 } from '../src/contenido/campos'
 import { recorre, cargar, serializa } from '../src/contenido/carga'
 import { cruzaConteo, enLetras } from '../src/contenido/conteos'
@@ -149,6 +149,32 @@ describe('la capa de contenido', () => {
     expect(m.safeParse('Barra de 70\u00a0g').success).toBe(true)
     // Con espacio normal: se marca, y con el arreglo a un toque.
     expect(m.safeParse('Barra de 70 g').success).toBe(false)
+  })
+
+  it('la regla del espacio duro es UNA: los dos lados reconocen cada unidad de la lista', () => {
+    // `campos.ts` (que RECHAZA) y `validacion.ts` (que OFRECE el botón de
+    // arreglo) escribían la misma regla dos veces. Estaban alineadas de
+    // casualidad y nada las mantenía así: agregar `mm` a una y olvidarla
+    // en la otra le deja a la clienta un campo que se rechaza y sin el
+    // botón que lo arregla, y no caía ningún test. Este barre la lista
+    // COMPARTIDA, así que una unidad nueva entra sola a las dos
+    // afirmaciones — que es justo lo que no existía.
+    const campo = medida({ etiqueta: 'Peso', seccion: 'productos', ayuda: 'x', max: 40 })
+    const esquema = z.object({ p: campo })
+    expect(UNIDADES_DE_MEDIDA.length).toBeGreaterThan(0)
+
+    for (const unidad of UNIDADES_DE_MEDIDA) {
+      const malEscrito = `Barra de 70 ${unidad}`
+      const bienEscrito = `Barra de 70\u00a0${unidad}`
+      // Lado 1, el constructor: rechaza el espacio blando y acepta el duro.
+      expect(campo.safeParse(malEscrito).success, `${unidad}: tiene que rechazar`).toBe(false)
+      expect(campo.safeParse(bienEscrito).success, `${unidad}: tiene que aceptar`).toBe(true)
+      // Lado 2, la validación: ofrece el arreglo, y el arreglo es
+      // exactamente el valor que el constructor acepta.
+      const problemas = validarContra(esquema, { p: malEscrito })
+      expect(problemas[0]?.arreglo?.valor, `${unidad}: tiene que ofrecer el arreglo`)
+        .toBe(bienEscrito)
+    }
   })
 
   it('el precio es entero y acotado: ni string, ni decimal, ni cero, ni absurdo', () => {

@@ -128,6 +128,54 @@ export const parrafo = (meta: Base & { max: number }) =>
   )
 
 /**
+ * Las unidades que el sitio escribe pegadas a una cifra. Agregar una acá
+ * la agrega en los DOS lados a la vez: la regla que rechaza y el botón que
+ * arregla salen de esta misma lista (ver `cifraUnidad`).
+ *
+ * El orden importa: la alternancia del regex prueba de izquierda a
+ * derecha, así que las unidades largas van ANTES que sus prefijos («kg»
+ * antes que «g», «ml» antes que «l»).
+ */
+export const UNIDADES_DE_MEDIDA = ['g', 'kg', 'ml', 'l', '°C'] as const
+
+/**
+ * «Una cifra, un espacio que NO es el duro, y una unidad»: la forma MAL
+ * escrita de una medida.
+ *
+ * Esta regla se escribía DOS veces —acá y en `validacion.ts`—, una para
+ * rechazar y otra para ofrecer el arreglo de un toque. Estaban alineadas
+ * de casualidad y nada las mantenía así: agregar `mm` a una y olvidar la
+ * otra le deja a la clienta un campo que se rechaza y sin el botón que lo
+ * arregla, y no cae ningún test. Ahora las dos salen de acá.
+ *
+ * Es una FÁBRICA y no una constante compartida por una razón concreta: un
+ * regex con el flag `g` guarda `lastIndex` entre llamadas, así que una
+ * sola instancia usada para `.test()` y para `.replace()` hace que la
+ * pregunta siguiente arranque desde la mitad del texto y conteste que no.
+ * Cada uso pide la suya, con las banderas que necesita.
+ *
+ * El grupo 1 captura la cifra porque `validacion.ts` reemplaza con
+ * «$1\u00a0$2»; a `.test()` no le molesta que esté.
+ *
+ * `\s` (la versión original) matchea TAMBIÉN el espacio duro (U+00A0):
+ * con esa clase, la regla rechazaba por igual el valor bien escrito y el
+ * mal escrito, así que NINGÚN valor de `medida` podía pasar nunca.
+ * `[^\S\u00a0]` es «espacio en blanco que no sea el duro» — y va con el
+ * ESCAPE, nunca como carácter literal pegado en el código: un espacio duro
+ * tipeado a mano es frágil, un editor o un copiar-y-pegar lo puede
+ * normalizar a uno común sin que nadie lo note, que es exactamente este
+ * bug, movido de lugar. Verificado con los tres casos: cadena con U+00A0
+ * real → no matchea (válida); con espacio normal → matchea (inválida); con
+ * tab → matchea (inválida).
+ */
+export const cifraUnidad = (banderas = ''): RegExp =>
+  new RegExp(`(\\d)[^\\S\\u00a0](${UNIDADES_DE_MEDIDA.join('|')})\\b`, banderas)
+
+// Sin `g`: esto solo pregunta. Así no hay `lastIndex` que se filtre entre
+// una validación y la siguiente.
+const MEDIDA_MAL_ESCRITA = cifraUnidad()
+
+/**
  * Cifra + unidad, con espacio duro: «70 g», «250 g».
  *
  * Si la clienta retoca esto en un input común, el espacio duro se vuelve
@@ -138,18 +186,7 @@ export const parrafo = (meta: Base & { max: number }) =>
 export const medida = (meta: Base & { max: number }) =>
   anota(
     reglasDeTexto(z.string().trim().max(meta.max, mensajeMax(meta.max))).refine(
-      // `\s` (la versión original) matchea TAMBIÉN el espacio duro
-      // (U+00A0): con esa clase, la regla rechazaba por igual el valor
-      // bien escrito y el mal escrito, así que NINGÚN valor de `medida`
-      // podía pasar nunca. `[^\S\u00a0]` es «espacio en blanco que
-      // no sea el duro» — y va con el ESCAPE, nunca como carácter literal
-      // pegado en el código: un espacio duro tipeado a mano es frágil, un
-      // editor o un copiar-y-pegar lo puede normalizar a uno común sin que
-      // nadie lo note, que es exactamente este bug, movido de lugar.
-      // Verificado con los tres casos: cadena con U+00A0 real → no matchea
-      // (válida); con espacio normal → matchea (inválida); con tab →
-      // matchea (inválida).
-      (v) => !/\d[^\S\u00a0](g|kg|ml|l|°C)\b/.test(v),
+      (v) => !MEDIDA_MAL_ESCRITA.test(v),
       'Entre el número y la unidad va un espacio que no parte el renglón.',
     ),
     { control: 'medida', ...meta },
