@@ -183,8 +183,22 @@ for (const grupo of document.querySelectorAll<HTMLElement>('[data-tabs]')) {
 const datosCrudos = document.getElementById('datos-anaquel')?.textContent
 const anaquel = document.querySelector<HTMLElement>('[data-anaquel]')
 
-if (datosCrudos && anaquel) {
-  const datos: DatoSabor[] = JSON.parse(datosCrudos)
+// Si el JSON viene roto, el anaquel se queda en su estado sin-JS —las
+// quince fichas visibles, que ya se ve completo— y el resto del módulo
+// sigue vivo. Antes esto lo mataba entero y, con él, los seis pasos de
+// «Cómo catar»: marca.css los deja en opacity 0 esperando un observador
+// que ya no llegaba. jsonParaHtml() lo hace improbable; esto lo hace
+// inofensivo.
+let datos: DatoSabor[] | null = null
+if (datosCrudos) {
+  try {
+    datos = JSON.parse(datosCrudos)
+  } catch {
+    datos = null
+  }
+}
+
+if (datos && anaquel) {
   const porSlug = new Map(datos.map((d) => [d.slug, d]))
   const radios = [...anaquel.querySelectorAll<HTMLButtonElement>('[data-anaquel-radio]')]
   const banda = document.querySelector<HTMLElement>('[data-anaquel-banda]')

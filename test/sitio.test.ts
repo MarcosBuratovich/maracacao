@@ -136,6 +136,17 @@ describe('la página / (rediseño de marca, 2026-08-13; en la raíz desde 2026-0
     expect(src).toContain("matchMedia('(prefers-reduced-motion: reduce)')")
     expect(src).toContain('video.pause()')
   })
+
+  it('el JSON del anaquel sale sin un solo «<» que pueda cerrar el script', async () => {
+    const html = await container.renderToString(Borrador)
+    const bloque = html.match(
+      /<script type="application\/json" id="datos-anaquel">([\s\S]*?)<\/script>/,
+    )
+    expect(bloque).not.toBeNull()
+    const crudo = bloque![1]
+    expect(crudo).not.toContain('<')
+    expect(JSON.parse(crudo)).toHaveLength(sabores.length)
+  })
 })
 
 /*
