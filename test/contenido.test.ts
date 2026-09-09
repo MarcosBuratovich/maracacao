@@ -11,6 +11,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { MARCA, MAQUETA, palabraProhibida } from '../src/contenido/vocabulario'
+import { texto, panel } from '../src/contenido/campos'
 
 describe('la capa de contenido', () => {
   it('src/contenido/ no importa node:, ni Astro, ni el alias @/', () => {
@@ -75,5 +76,53 @@ describe('la capa de contenido', () => {
     expect(MARCA).not.toContain('borrador')
     expect(MAQUETA).toContain('borrador')
     expect(palabraProhibida('Borrador sin publicar')).toBeNull()
+  })
+
+  it('todo campo anotado tiene etiqueta, ayuda y sección — el panel se pinta de ahí', () => {
+    // El panel dibuja cada campo con su etiqueta en español y su oración
+    // de «dónde vive». Un campo sin eso es un input mudo: la clienta lo ve
+    // y no sabe qué está tocando. Por eso el metadato es obligatorio en el
+    // tipo, y este test lo verifica también en runtime — TypeScript no
+    // alcanza cuando el esquema se arma con un spread.
+    const campo = texto({
+      etiqueta: 'Renglón 2 del titular',
+      seccion: 'portada',
+      ayuda: 'La segunda línea del título grande, arriba de todo.',
+      max: 40,
+    })
+    const meta = panel.get(campo)
+    expect(meta?.etiqueta).toBe('Renglón 2 del titular')
+    expect(meta?.ayuda).toBeTruthy()
+    expect(meta?.seccion).toBe('portada')
+    expect(meta?.control).toBe('texto')
+  })
+
+  it('el texto rechaza vacío, vocabulario de marca y precios pegados', () => {
+    const campo = texto({
+      etiqueta: 'Prueba', seccion: 'portada', ayuda: 'x', max: 60,
+    })
+    expect(campo.safeParse('Chocolate mexicano').success).toBe(true)
+
+    // Vaciar un campo es el gesto más típico de un CMS, y hoy rompe el build.
+    expect(campo.safeParse('   ').success).toBe(false)
+    // La marca no dice «chispas»: dice gotas.
+    expect(campo.safeParse('con chispas de chocolate').success).toBe(false)
+    // Los precios los formatea precioMXN; escritos a mano se desincronizan.
+    expect(campo.safeParse('desde $108 el paquete').success).toBe(false)
+    // Y el techo de cordura corta.
+    expect(campo.safeParse('x'.repeat(61)).success).toBe(false)
+  })
+
+  it('anotar no contamina: dos campos derivados de la misma base no comparten etiqueta', () => {
+    // `registry.get()` sigue la cadena de padres. Si alguien anotara una
+    // base compartida en vez del esquema terminado, TODOS los campos
+    // derivados de ella heredarían esa etiqueta y el panel mostraría el
+    // mismo nombre en veinte lugares. Verificado contra zod 4.4.3.
+    const a = texto({ etiqueta: 'Uno', seccion: 'portada', ayuda: 'a', max: 10 })
+    const b = texto({ etiqueta: 'Dos', seccion: 'pie', ayuda: 'b', max: 60 })
+    expect(panel.get(a)?.etiqueta).toBe('Uno')
+    expect(panel.get(b)?.etiqueta).toBe('Dos')
+    expect(panel.get(a)?.max).toBe(10)
+    expect(panel.get(b)?.max).toBe(60)
   })
 })
