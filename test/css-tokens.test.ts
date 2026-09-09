@@ -61,18 +61,32 @@ describe('bloqueTheme', () => {
    * El conteo se deriva de `customProperties()` en vez de estar
    * hardcodeado: la rampa rosa lo movió de 52 a 62 y un número a mano
    * obliga a editar el test cada vez que crece la paleta.
+   *
+   * El salto por falta de dist/ solo vale en local (comodidad: el bucle
+   * corto `pnpm test` no construye). En CI/Vercel el test SÍ corre, y si
+   * dist/ falta ahí es un fallo real: correr `pnpm verifica` sin su guard
+   * más importante no puede volver verde.
    */
   const hayDist = existsSync('dist/index.html')
-  if (!hayDist) {
+  // En local el salto es comodidad: `pnpm test` no construye y no vale la pena
+  // obligar a construir para el bucle corto. En CI o en Vercel, NO: ahí la
+  // ausencia de dist significa que la verificación corrió sin su guard más
+  // importante, y eso tiene que ser rojo. Un verde que no vale es peor que un
+  // rojo, sobre todo en la compuerta que decide si el sitio se publica.
+  const automatizado = !!(process.env.CI || process.env.VERCEL)
+  if (!hayDist && !automatizado) {
     console.warn(
       '\n[css-tokens] Falta dist/index.html: se salta el guard del CSS compilado.' +
         '\n  Corré `pnpm build:sitio` para que corra.\n',
     )
   }
 
-  it.skipIf(!hayDist)(
+  it.skipIf(!hayDist && !automatizado)(
     'todas las propiedades --mrc-* llegan al CSS compilado por Tailwind',
     async () => {
+      // Aserción dura, no condición de salto: si el artefacto no está cuando
+      // el test SÍ corre, es un fallo ruidoso.
+      expect(existsSync('dist/index.html')).toBe(true)
       const html = readFileSync('dist/index.html', 'utf-8')
 
       // Extraer referencias a archivos CSS (pueden ser inline o externos)

@@ -7,8 +7,12 @@
  * puesta una vez (css-tokens.test.ts hacía execSync); esto impide que
  * vuelva.
  *
- * Este archivo se excluye a sí mismo del barrido: nombra la regla que
- * vigila, así que se encontraría solo.
+ * Este archivo se excluye a sí mismo del barrido. Hoy el regex no se
+ * encuentra a sí mismo —su propio literal no arma "pnpm build" en una
+ * corrida contigua—, pero es una casualidad frágil: un ajuste futuro al
+ * regex (o a este comentario, si se sale del bloque que el barrido
+ * descarta) podría hacer que sí matchee. La autoexclusión es defensa
+ * contra ese día, no una necesidad de hoy.
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
@@ -16,7 +20,13 @@ import { readFileSync, readdirSync } from 'node:fs'
 describe('el andamiaje de tests', () => {
   it('ningún test construye el sitio: construir desde adentro es recursión', () => {
     const culpables: string[] = []
-    const archivos = readdirSync('test')
+    // Recursivo: vitest.config.ts incluye `test/**/*.test.ts`, así que un
+    // futuro test/e2e/algo.test.ts corre igual que uno en la raíz — el
+    // barrido tiene que alcanzarlo.
+    // `encoding: 'utf8'` explícito: sin él, el overload de readdirSync que
+    // resuelve TypeScript devuelve `string | Buffer`, y `.endsWith` no
+    // existe en `Buffer`.
+    const archivos = readdirSync('test', { recursive: true, encoding: 'utf8' })
       .filter((a) => a.endsWith('.test.ts') && a !== 'meta.test.ts')
 
     for (const archivo of archivos) {
@@ -26,7 +36,10 @@ describe('el andamiaje de tests', () => {
         .replace(/\/\*[\s\S]*?\*\//g, '')
         .replace(/^\s*\/\/.*$/gm, '')
       // `build:sitio` sí está permitido: es el script que NO verifica.
-      if (/pnpm (run )?build(?![:\w])/.test(codigo)) culpables.push(archivo)
+      // Cubre los cuatro gestores y flags entre `run`/`build` (`-s`,
+      // `--silent`, etc.): un guard que atrapa una sola grafía de
+      // `pnpm build` es un recordatorio, no una barrera.
+      if (/(pnpm|npm|yarn|bun)\s+(run\s+)?(-\S+\s+)*build(?![:\w])/.test(codigo)) culpables.push(archivo)
     }
 
     expect(culpables).toEqual([])

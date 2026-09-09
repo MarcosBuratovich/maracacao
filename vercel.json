@@ -1,4 +1,5 @@
 {
+  "buildCommand": "pnpm build",
   "cleanUrls": true,
   "trailingSlash": false,
   "headers": [
