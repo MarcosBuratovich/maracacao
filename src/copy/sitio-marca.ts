@@ -29,7 +29,6 @@ export const marca = {
     nombre: 'Maracacao',
     wordmark: 'MARACACAO',
     descriptor: 'CHOCOLATE MEXICANO',
-    selloAlt: 'Sello de Maracacao: la huella de una mano dentro de un círculo, con la palma formada por granos de cacao',
   },
 
   nav: {
@@ -93,7 +92,6 @@ export const marca = {
     ilustracionCaption: 'El personaje de la etiqueta',
     ilustracionAltPrefijo: 'Ilustración de la envoltura de',
     envolturaAltPrefijo: 'Envoltura de',
-    verTodas: 'Ver el catálogo completo →',
   },
 
   minis: {
@@ -349,31 +347,6 @@ export const marca = {
     },
   },
 
-  // El catálogo inmersivo de barras (/barras): una pantalla por sabor,
-  // referencia bennett-tea.com traducida al sistema — scroll con snap
-  // (nunca secuestrado), la barra 3D fija cambiando de pliego, y los
-  // datos DUROS de la ficha técnica oficial (docx 2026-08-14) en las
-  // columnas donde la referencia pone notas de cata.
-  catalogoBarras: {
-    titulo: 'Maracacao — Las 15 barras',
-    encabezado: 'Las 15 barras',
-    ruta: '/barras',
-    rutaVolver: '/',
-    volver: 'Volver al sitio',
-    serie: 'Barra n.º',
-    de15: 'de 15',
-    colIngredientes: 'Ingredientes',
-    colAlergenos: 'Alérgenos',
-    colConservacion: 'Conservación',
-    alergenos: 'Contiene soya. Puede contener trazas de leche y frutos de cáscara.',
-    alergenosBlanco: 'Contiene soya, leche en polvo y pistaches.',
-    conservacion: 'Lugar fresco y seco, de 16 a 20 °C, lejos del sol y de olores fuertes.',
-    vida: 'Vida de anaquel: dos años.',
-    cta: 'Ver en el catálogo en línea',
-    selectorAria: 'Elige un sabor del catálogo',
-    visorAlt: 'La barra en tres dimensiones; arrastra para girarla',
-  },
-
   // Página de fichas técnicas (/fichas-tecnicas, 2026-09-02): las
   // cuatro fichas oficiales legibles en la página y descargables en
   // PDF. El CONTENIDO no vive acá: sale de src/fichas/base.ts, la
@@ -410,7 +383,6 @@ export const marca = {
   footer: {
     // El lema es la frase textual del cliente (formulario, pregunta 11b).
     lema: 'Más cacao, ingredientes sencillos y muchas maneras de disfrutarlo',
-    wordmarkAlt: 'Chocolate mexicano, escrito a mano como en la envoltura',
     linea: 'CACAO 70% · COYOACÁN · CDMX',
     seccionesTitulo: 'Secciones',
     productosTitulo: 'Productos',

@@ -1,12 +1,15 @@
 {
   "name": "maracacao",
   "version": "0.0.1",
+  "packageManager": "pnpm@11.2.2",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
-    "build": "astro build",
+    "build:sitio": "astro build",
+    "verifica": "vitest run && astro check",
+    "build": "pnpm build:sitio && pnpm verifica",
     "preview": "astro preview",
     "astro": "astro",
     "render": "node scripts/render-svg.mjs",
@@ -23,7 +26,8 @@
     "@rive-app/react-canvas": "^4.30.0",
     "astro": "^7.1.6",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
@@ -33,6 +37,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "linkedom": "^0.18.13",
+    "sharp": "^0.35.4",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.4",
     "typescript": "^6.0.3",

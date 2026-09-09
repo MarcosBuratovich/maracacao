@@ -22,9 +22,10 @@ import Marquesina from '@/components/marca/Marquesina.astro'
 import TicketPanel from '@/components/marca/TicketPanel.astro'
 import selloRaw from '@/assets/brand/sello-mano.svg?raw'
 import { marca, precioMXN } from '@/copy/sitio-marca'
-import { sabores, gotas, paqueteSeis, polvo, urlCatalogoBarras } from '@/copy/sabores'
+import { sabores, gotas, polvo, urlCatalogoBarras } from '@/copy/sabores'
 import { sabor as colorSabor, tintaSabor, marca as paletaMarca } from '@/tokens/color'
 import { esquemaNegocio, esquemaPreguntas, esquemaBarras, origenCanonico } from '@/seo/esquema'
+import { jsonParaHtml } from '@/lib/json-en-html'
 import '@/styles/global.css'
 import '@/styles/marca.css'
 
@@ -142,7 +143,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
         <div class="portada-texto">
           <h1 class="portada-titular">
             {marca.hero.titular[0]}<br />
-            {marca.hero.titular[1].replace(',', '')}<span class="acento">,</span><br />
+            {marca.hero.titular[1].replace(/,$/, '')}<span class="acento">,</span><br />
             <span class="acento">{marca.hero.titular[2]}</span>
           </h1>
           <p class="portada-sub">{marca.hero.sub}</p>
@@ -242,8 +243,9 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
         <div class="contenedor anaquel-encabezado">
           <EtiquetaSabor texto={marca.anaquel.kicker} />
           {/* El enlace al catálogo /barras se retiró (2026-08-17: Marcos
-              lo descontinuó por ahora — la página vive en _barras.astro,
-              sin rutear, lista para revivir). */}
+              lo descontinuó). La página y su código se borraron el
+              2026-09-08: el anaquel de esta sección es el único
+              recorrido de los quince sabores. */}
           <span class="mono" aria-hidden="true"><span data-anaquel-contador>{inicial.orden}</span>/15</span>
         </div>
         <div class="contenedor">
@@ -772,7 +774,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
   {claveTurnstile && (
     <script is:inline src="https://challenges.cloudflare.com/turnstile/api.js" async defer></script>
   )}
-  <script type="application/json" id="datos-anaquel" set:html={JSON.stringify(datosAnaquel)} />
+  <script type="application/json" id="datos-anaquel" set:html={jsonParaHtml(datosAnaquel)} />
   <script>
     import '@/scripts/marca'
   </script>

@@ -22,6 +22,7 @@ import { marca } from '@/copy/sitio-marca'
 import { sabores } from '@/copy/sabores'
 import { esquemaNegocio, esquemaPreguntas, esquemaBarras, origenCanonico } from '@/seo/esquema'
 import { urlsDelSitemap, xmlDelSitemap } from '@/seo/sitemap'
+import { esc } from './regex'
 import Home from '@/pages/index.astro'
 import Presentacion from '@/pages/presentacion.astro'
 import NoEncontrada from '@/pages/404.astro'
@@ -140,6 +141,16 @@ describe('JSON-LD — datos reales, nada inventado', () => {
     expect(origenCanonico(undefined)).toBe(ORIGEN)
     expect(origenCanonico(new URL('https://www.maracacao.mx'))).toBe(ORIGEN)
   })
+
+  it('el ItemList de las barras se llama como la sección que existe, no como una página retirada', () => {
+    const lista = esquemaBarras('https://www.maracacao.mx')
+    // Hasta 2026-09-08 publicaba el encabezado de /barras, una página
+    // fuera de ruta desde el 2026-08-17: Google veía el nombre de algo
+    // que no existe. Desde 2026-09-09 es el kicker del anaquel, no el
+    // título — "Elige tu barra" es un CTA, no un nombre de lista.
+    expect(lista.name).toBe(marca.anaquel.kicker)
+    expect(lista.name).not.toContain('15 barras')
+  })
 })
 
 describe('rastreo: robots.txt, sitemap y vercel.json', () => {
@@ -205,7 +216,7 @@ describe('los sabores son texto servido, no solo aria-labels', () => {
     for (const s of sabores) {
       expect(html).toContain(`data-ficha-de="${s.slug}"`)
       // Astro suma su data-astro-cid de estilos scoped al tag.
-      expect(html).toMatch(new RegExp(`<h3 class="ficha-nombre"[^>]*>${s.nombre}</h3>`))
+      expect(html).toMatch(new RegExp(`<h3 class="ficha-nombre"[^>]*>${esc(s.nombre)}</h3>`))
     }
   })
 

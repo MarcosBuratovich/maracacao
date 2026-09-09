@@ -27,12 +27,11 @@ raiz.classList.add('js')
 const quieto = matchMedia('(prefers-reduced-motion: reduce)').matches
 const punteroFino = matchMedia('(pointer: fine)').matches
 
-/* ---------- La barra 3D (compartida) ----------
+/* ---------- La barra 3D ----------
    El modelo de Marcos (Blender): UN solo GLB para los quince sabores —
    cambiarle la textura del material «Label» por el pliego de imprenta
-   del sabor es cambiar de barra. La usan la ficha del anaquel (la home)
-   y el catálogo inmersivo (/barras). model-viewer va self-hosteado y
-   se carga una sola vez. */
+   del sabor es cambiar de barra. La usa la ficha del anaquel (la home).
+   model-viewer va self-hosteado y se carga una sola vez. */
 
 interface VisorModelo extends HTMLElement {
   model?: {
@@ -183,8 +182,28 @@ for (const grupo of document.querySelectorAll<HTMLElement>('[data-tabs]')) {
 const datosCrudos = document.getElementById('datos-anaquel')?.textContent
 const anaquel = document.querySelector<HTMLElement>('[data-anaquel]')
 
-if (datosCrudos && anaquel) {
-  const datos: DatoSabor[] = JSON.parse(datosCrudos)
+// Si el JSON viene roto, el anaquel se queda en su estado sin-JS —las
+// quince fichas visibles, que ya se ve completo— y el resto del módulo
+// sigue vivo. Antes esto lo mataba entero y, con él, los seis pasos de
+// «Cómo catar»: marca.css los deja en opacity 0 esperando un observador
+// que ya no llegaba. jsonParaHtml() hace improbable que el JSON venga
+// roto; el chequeo de forma de abajo es lo que lo hace inofensivo
+// incluso cuando parsea pero no es la lista que se espera.
+let datos: DatoSabor[] | null = null
+if (datosCrudos) {
+  try {
+    datos = JSON.parse(datosCrudos)
+    // No alcanza con que parsee: `JSON.parse` devuelve `any`, y un JSON
+    // válido con la forma equivocada (un `{}`, un número, un string) es
+    // truthy, pasa la guarda de abajo y revienta en el `.map`, que está
+    // fuera del try. Es decir: mataría el módulo igual que antes.
+    if (!Array.isArray(datos)) datos = null
+  } catch {
+    datos = null
+  }
+}
+
+if (datos && anaquel) {
   const porSlug = new Map(datos.map((d) => [d.slug, d]))
   const radios = [...anaquel.querySelectorAll<HTMLButtonElement>('[data-anaquel-radio]')]
   const banda = document.querySelector<HTMLElement>('[data-anaquel-banda]')
@@ -266,60 +285,6 @@ if (datosCrudos && anaquel) {
       { rootMargin: '250px' },
     )
     observador3d.observe(visor)
-  }
-}
-
-/* ---------- 3d. El catálogo inmersivo de barras (/barras) ----------
-   Una pantalla por sabor con scroll-snap (nunca secuestrado). El
-   observador marca el sabor activo: pinta el selector, actualiza el
-   hash (#canela es compartible) y le cambia el pliego a la única
-   instancia 3D fija. El selector de miniaturas salta a cualquier
-   sabor. */
-
-const catalogo = document.querySelector<HTMLElement>('[data-catalogo]')
-if (catalogo) {
-  const espectros = [...catalogo.querySelectorAll<HTMLElement>('[data-espectro]')]
-  const saltos = [...document.querySelectorAll<HTMLButtonElement>('[data-salto]')]
-  let aplicar3d: ((slug: string) => void) | null = null
-  let slugActivo = location.hash.replace('#', '') || espectros[0]?.id || ''
-
-  const marcaActivo = (slug: string) => {
-    if (!slug || slug === slugActivo) return
-    slugActivo = slug
-    saltos.forEach((b) => {
-      b.setAttribute('aria-current', b.dataset.salto === slug ? 'true' : 'false')
-    })
-    history.replaceState(null, '', `#${slug}`)
-    aplicar3d?.(slug)
-  }
-
-  const observadorActivo = new IntersectionObserver(
-    (entradas) => {
-      for (const e of entradas) {
-        if (e.isIntersecting) marcaActivo((e.target as HTMLElement).id)
-      }
-    },
-    { threshold: 0.55 },
-  )
-  espectros.forEach((s) => observadorActivo.observe(s))
-
-  saltos.forEach((b) => {
-    b.addEventListener('click', () => {
-      document.getElementById(b.dataset.salto ?? '')?.scrollIntoView({
-        behavior: quieto ? 'auto' : 'smooth',
-      })
-    })
-  })
-
-  const cajaVisor = document.querySelector<HTMLElement>('[data-catalogo-visor]')
-  if (cajaVisor && !quieto) {
-    void montarBarra3D(cajaVisor, cajaVisor.dataset.alt ?? '')
-      .then((aplica) => {
-        aplicar3d = aplica
-        raiz.classList.add('catalogo-3d')
-        aplica(slugActivo)
-      })
-      .catch(() => { /* quedan los packshots por sección */ })
   }
 }
 

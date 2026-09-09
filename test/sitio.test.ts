@@ -2,17 +2,17 @@
  * El sitio público (la home, /; hasta el lanzamiento 2026-08-20 vivió
  * en /sitio con candado). Los guards estructurales (hex a
  * mano, <title> literal) ya lo cubren vía manual.test.ts; acá va lo
- * propio: registro es-MX y retro de Marcos sobre el copy nuevo, el
- * renderizado de la página con su contenido real, y que los assets
- * decorativos respeten las reglas de construcción de la marca.
+ * propio: el renderizado de la página con su contenido real, y que los
+ * assets decorativos respeten las reglas de construcción de la marca.
+ * El registro es-MX del copy vivo lo cubre `marca-copy.test.ts`.
  */
 import { describe, it, expect } from 'vitest'
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { experimental_AstroContainer as AstroContainer } from 'astro/container'
-import { sitio } from '@/copy/sitio'
 import { marca } from '@/copy/sitio-marca'
 import { sabores } from '@/copy/sabores'
-import { editorial, etiqueta } from '@/tokens/color'
+import { esc } from './regex'
+import { editorial } from '@/tokens/color'
 import { customProperties } from '@/tokens/css'
 import Borrador from '@/pages/index.astro'
 import Presentacion from '@/pages/presentacion.astro'
@@ -22,49 +22,6 @@ import Mazorca from '@/components/sitio/Mazorca.astro'
 import Canela from '@/components/sitio/Canela.astro'
 
 const container = await AstroContainer.create()
-
-function stringsVisibles(nodo: unknown): string[] {
-  if (typeof nodo === 'string') return [nodo]
-  if (Array.isArray(nodo)) return nodo.flatMap(stringsVisibles)
-  if (nodo !== null && typeof nodo === 'object') return Object.values(nodo).flatMap(stringsVisibles)
-  return []
-}
-
-describe('copy del borrador — registro y retro vigentes', () => {
-  const textos = stringsVisibles(sitio)
-
-  it('es-MX: nunca "pistachos" ni regionalismos ajenos', () => {
-    for (const t of textos) {
-      for (const palabra of ['pistachos', 'cacahuete', 'maní', 'packaging']) {
-        expect(t.toLowerCase()).not.toContain(palabra)
-      }
-    }
-  })
-
-  it('el personaje no se llama "mono" (ni "chango")', () => {
-    for (const t of textos) expect(t).not.toMatch(/\b(monos?|changos?|changuitos?)\b/i)
-  })
-
-  it('sin carrito; los precios van como números por precioMXN (pregunta 11: sí se muestran)', () => {
-    for (const t of textos) {
-      expect(t.toLowerCase()).not.toContain('carrito')
-      expect(t).not.toMatch(/\$\s?\d/) // nunca precios pegados en strings
-    }
-    for (const f of sitio.productos.fotos) expect(typeof f.precio).toBe('number')
-  })
-
-  it('las 15 barras del catálogo están, sin inventar la 16', () => {
-    expect(sitio.productos.barras).toHaveLength(15)
-    expect(sitio.productos.barras.map((b) => b.nombre)).toContain('Chocolate blanco con pistache')
-  })
-
-  // El color dejó de ser fondo de sección y pasó a ser índice de sabor
-  // (rediseño 2026-08-12): cada barra apunta a un token `etiqueta` real.
-  it('cada sabor tiene un tono del sistema de etiquetas', () => {
-    const validos = Object.keys(etiqueta)
-    for (const b of sitio.productos.barras) expect(validos).toContain(b.tono)
-  })
-})
 
 describe('la página / (rediseño de marca, 2026-08-13; en la raíz desde 2026-08-20)', () => {
   it('renderiza el contenido real: los 15 sabores, correo, catálogo, precios, Tabasco y punto de venta', async () => {
@@ -135,6 +92,45 @@ describe('la página / (rediseño de marca, 2026-08-13; en la raíz desde 2026-0
     expect(src).toContain("matchMedia('(prefers-reduced-motion: reduce)')")
     expect(src).toContain('video.pause()')
   })
+
+  it('el anaquel se inyecta con jsonParaHtml(), no con JSON.stringify a mano', () => {
+    // Esta es la que de verdad blinda la regresión: con los datos de hoy
+    // (ningún campo trae «<») el bloque renderizado sale limpio tanto si
+    // se usa jsonParaHtml como si alguien vuelve a poner JSON.stringify a
+    // mano —así que probar el HTML resultante no alcanza para detectar un
+    // revert. Esto sí lo detecta: si la línea 776 de index.astro deja de
+    // llamar a jsonParaHtml(datosAnaquel), este test se rompe ahí mismo.
+    const src = readFileSync('src/pages/index.astro', 'utf8')
+    expect(src).toMatch(/id="datos-anaquel"\s+set:html=\{jsonParaHtml\(datosAnaquel\)\}/)
+  })
+
+  it('el JSON del anaquel renderizado parsea con las quince fichas (y hoy, sin un solo «<»)', async () => {
+    const html = await container.renderToString(Borrador)
+    const bloque = html.match(
+      /<script type="application\/json" id="datos-anaquel">([\s\S]*?)<\/script>/,
+    )
+    expect(bloque).not.toBeNull()
+    const crudo = bloque![1]
+    expect(crudo).not.toContain('<')
+    expect(JSON.parse(crudo)).toHaveLength(sabores.length)
+  })
+
+  it('el 2.º renglón del titular termina en coma, y se pinta sin ella con la coma aparte en rojo', async () => {
+    // La regla del slot es una sola: el segundo renglón CIERRA en coma,
+    // que la plantilla saca para repintarla en el acento. No exige que
+    // sea la única coma del renglón —un «70% CACAO, DE VERDAD,» es
+    // titular legítimo, con su coma interna y la de cierre— así que acá
+    // no se valida eso. Sacar la coma con replace(',', '') quitaba la
+    // PRIMERA, no la última: con ese mismo titular la página mostraba
+    // dos comas mal puestas y la regla de «termina en coma» igual daba
+    // por buena la cadena.
+    expect(marca.hero.titular).toHaveLength(3)
+    expect(marca.hero.titular[1].endsWith(',')).toBe(true)
+    const sinComa = marca.hero.titular[1].slice(0, -1)
+
+    const html = await container.renderToString(Borrador)
+    expect(html).toMatch(new RegExp(`${esc(sinComa)}<span class="acento"[^>]*>,</span>`))
+  })
 })
 
 /*
@@ -166,9 +162,9 @@ describe('sistema editorial', () => {
     // El wordmark vive tres veces como texto: cabecera, lockup del hero
     // y pie — nunca como imagen (el arco a mano del pie se reemplazó por
     // el lockup vectorial, retro de Marcos 2026-08-13).
-    expect(html).toMatch(new RegExp(`class="lockup-nombre"[^>]*>${marca.marca.wordmark}<`))
-    expect(html).toMatch(new RegExp(`class="portada-wordmark"[^>]*>${marca.marca.wordmark}<`))
-    expect(html).toMatch(new RegExp(`class="pie-wordmark"[^>]*>${marca.marca.wordmark}<`))
+    expect(html).toMatch(new RegExp(`class="lockup-nombre"[^>]*>${esc(marca.marca.wordmark)}<`))
+    expect(html).toMatch(new RegExp(`class="portada-wordmark"[^>]*>${esc(marca.marca.wordmark)}<`))
+    expect(html).toMatch(new RegExp(`class="pie-wordmark"[^>]*>${esc(marca.marca.wordmark)}<`))
   })
 
   it('el sello va inline para tomar la tinta de su sección', async () => {
@@ -209,40 +205,6 @@ describe('el lanzamiento (2026-08-20): la landing es la home', () => {
     expect(readFileSync('src/pages/index.astro', 'utf8')).toContain("import '@/scripts/marca'")
     const js = readFileSync('src/scripts/marca.ts', 'utf8')
     expect(js).toContain("matchMedia('(prefers-reduced-motion: reduce)')")
-  })
-})
-
-describe('el catálogo inmersivo de barras (DESCONTINUADO 2026-08-17, vive en _barras.astro)', () => {
-  it('está fuera de ruta (prefijo _) y sin enlaces de entrada', () => {
-    // Marcos lo bajó «por ahora»: Astro no rutea archivos con _, así
-    // que el código queda listo para revivir renombrando el archivo.
-    expect(existsSync('src/pages/barras.astro')).toBe(false)
-    expect(existsSync('src/pages/_barras.astro')).toBe(true)
-    expect(readFileSync('src/pages/index.astro', 'utf8')).not.toContain('anaquel-todas')
-  })
-
-  it('una pantalla por sabor, con su color, su tinta y sus datos de ficha técnica', async () => {
-    const { default: Barras } = await import('@/pages/_barras.astro')
-    const html = await container.renderToString(Barras)
-    for (const s of sabores) {
-      expect(html).toContain(`id="${s.slug}"`)
-      expect(html).toContain(s.nombre)
-    }
-    // Los datos duros de la ficha técnica oficial (docx 2026-08-14).
-    expect(html).toContain(marca.catalogoBarras.alergenos)
-    expect(html).toContain(marca.catalogoBarras.conservacion)
-    // El selector de miniaturas trae los quince saltos.
-    expect(html.match(/data-salto=/g)).toHaveLength(15)
-    // Candado puesto: la página no es pública todavía.
-    expect(html).toContain('data-candado')
-  })
-
-  it('el snap es firme en desktop y suave en móvil, sin secuestrar el scroll', () => {
-    const src = readFileSync('src/pages/_barras.astro', 'utf8')
-    expect(src).toContain('scroll-snap-type: y proximity')
-    expect(src).toMatch(/min-width: 761px.*\n.*scroll-snap-type: y mandatory/)
-    // Nada de fullPage ni wheel hijack: el scroll es del visitante.
-    expect(src).not.toMatch(/addEventListener\(['"]wheel/)
   })
 })
 
