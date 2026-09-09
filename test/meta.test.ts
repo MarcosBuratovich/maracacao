@@ -51,4 +51,13 @@ describe('el andamiaje de tests', () => {
     expect(scripts.verifica).toBe('vitest run && astro check')
     expect(scripts.build).toBe('pnpm build:sitio && pnpm verifica')
   })
+
+  it('Vercel invoca la compuerta: el buildCommand está fijado en el repo, no en el dashboard', () => {
+    // Sin esta línea, Vercel usaría el preset de Astro — que hoy hace lo
+    // mismo, pero se puede cambiar desde un dashboard que no se ve desde
+    // acá. Guardar los scripts sin guardar quién los invoca deja la
+    // compuerta a un commit de una línea de ser desarmada en silencio.
+    const vercel = JSON.parse(readFileSync('vercel.json', 'utf8'))
+    expect(vercel.buildCommand).toBe('pnpm build')
+  })
 })

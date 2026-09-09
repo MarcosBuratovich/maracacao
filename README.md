@@ -20,7 +20,8 @@ pnpm install
 pnpm dev        # servidor local
 pnpm test       # suite completa (tests de dibujo, contraste, guards y páginas)
 pnpm typecheck  # astro check
-pnpm build      # sitio estático en dist/
+pnpm build:sitio # solo el build (astro build, sin verificar)
+pnpm build      # la compuerta de publicación: build:sitio, luego test y typecheck — si algo falla, no hay dist/
 ```
 
 Scripts de generación (sus salidas no se editan a mano):
@@ -58,6 +59,10 @@ pnpm favicon    # public/favicon.svg desde el asset + token
 
 ## Deploy
 
-`pnpm build` genera un sitio 100% estático en `dist/` — funciona en
-Vercel, Netlify o cualquier hosting estático sin configuración extra
-(en Vercel el framework preset de Astro se detecta solo).
+`pnpm build` es la compuerta de publicación: corre `build:sitio`, la
+suite de tests y `astro check` antes de dejar nada en `dist/` — si algo
+falla, no hay `dist/` y no hay deploy. El sitio resultante es 100%
+estático: funciona en Vercel, Netlify o cualquier hosting estático sin
+configuración extra. En Vercel el comando de build está fijado en
+`vercel.json` (`buildCommand`), no delegado al preset del dashboard —
+así la compuerta no se puede desarmar sin tocar el repo.
