@@ -591,4 +591,64 @@ describe('la capa de contenido', () => {
     const vuelta = serializa(esquema, cargar('x.json', esquema, JSON.parse(bytes)))
     expect(vuelta).toBe(bytes)
   })
+
+  // ordenaSegun() decidía «¿esta clave se puede omitir?» mirando UN solo
+  // nivel de envoltura (`definicion(hijo).type === 'optional'`). Es el
+  // mismo patrón de bug que pagó `recorre()` en cuatro rondas: con UNA
+  // envoltura no se nota, con DOS se desincroniza. `texto({...}).optional()`
+  // reporta 'optional' en el nivel externo y pasaba; pero
+  // `texto({...}).optional().nullable()` reporta 'nullable' en el externo
+  // —el `.optional()` quedó adentro— y `serializa()` la exigía como si
+  // fuera obligatoria, aunque Zod SÍ acepta `undefined` para ese campo
+  // (ver el test de `recorre()` con las envolturas encadenadas, más
+  // arriba). El arreglo usa el mismo `desenvuelve()` que ya pela TODOS
+  // los niveles para `recorre()`, en vez de un criterio aparte.
+
+  it('serializa() omite una clave con UN wrapper optional cuando falta', () => {
+    const esquema = grupo({
+      etiqueta: 'x', seccion: 'productos', ayuda: 'x',
+      campos: {
+        simple: texto({ etiqueta: 'Simple', seccion: 'productos', ayuda: 'y', max: 20 })
+          .optional(),
+        obligatoria: texto({
+          etiqueta: 'Obligatoria', seccion: 'productos', ayuda: 'z', max: 20,
+        }),
+      },
+    })
+    expect(() => serializa(esquema, { obligatoria: 'x' })).not.toThrow()
+  })
+
+  it('serializa() omite una clave con DOS wrappers (optional + nullable) cuando falta', () => {
+    const esquema = grupo({
+      etiqueta: 'x', seccion: 'productos', ayuda: 'x',
+      campos: {
+        doble: texto({ etiqueta: 'Doble', seccion: 'productos', ayuda: 'y', max: 20 })
+          .optional()
+          .nullable(),
+        obligatoria: texto({
+          etiqueta: 'Obligatoria', seccion: 'productos', ayuda: 'z', max: 20,
+        }),
+      },
+    })
+    expect(() => serializa(esquema, { obligatoria: 'x' })).not.toThrow()
+  })
+
+  it('serializa() sigue exigiendo una clave obligatoria — no aflojamos de más', () => {
+    // Va con 'simple' (UN wrapper), no con 'doble': si compartiera esquema
+    // con 'doble', el iterador de Object.keys(shape) se topa con 'doble'
+    // primero y ESE throw taparía a este test, sin que le toque el turno a
+    // 'obligatoria'. Aislado así, la prueba roja/verde del
+    // reporte no depende del orden de otro campo.
+    const esquema = grupo({
+      etiqueta: 'x', seccion: 'productos', ayuda: 'x',
+      campos: {
+        simple: texto({ etiqueta: 'Simple', seccion: 'productos', ayuda: 'y', max: 20 })
+          .optional(),
+        obligatoria: texto({
+          etiqueta: 'Obligatoria', seccion: 'productos', ayuda: 'z', max: 20,
+        }),
+      },
+    })
+    expect(() => serializa(esquema, {})).toThrow(/obligatoria/)
+  })
 })

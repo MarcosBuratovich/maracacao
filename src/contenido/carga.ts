@@ -19,19 +19,32 @@ const esEnvoltura = (tipo: string): boolean => tipo === 'optional' || tipo === '
 
 /**
  * Pela TODAS las envolturas (`optional`/`nullable`) de una vez y devuelve
- * las dos cosas que cuelgan de ese mismo desenvolvimiento:
+ * las TRES cosas que cuelgan de ese mismo desenvolvimiento:
  *
  * - `fondo`: qué hay abajo del todo, que es lo que decide si la envoltura
  *   es transparente (contenedor: hay que atravesar para sacar a los hijos)
  *   o si la envoltura entera es la hoja.
  * - `meta`: el metadato del panel del primer nivel de la cadena que lo tenga.
+ * - `opcional`: si en CUALQUIER nivel de la cadena hubo un `.optional()`.
+ *   Es lo que decide si `serializa()` puede omitir la clave sin tirar: un
+ *   `.optional()` en cualquier posición hace que el valor completo acepte
+ *   `undefined` de verdad —Zod lo prueba contra el resto de la cadena—,
+ *   así que mirar solo el nivel MÁS EXTERNO se equivoca con
+ *   `.optional().nullable()`: ahí el nivel externo es `nullable`, el
+ *   `.optional()` quedó adentro, y una clave que sí acepta `undefined`
+ *   se exigiría como si fuera obligatoria.
  *
- * Las dos salen de acá a propósito. Cuando cada una pelaba por su cuenta
- * —el fondo todos los niveles, el metadato uno solo— coincidían con UNA
- * envoltura (el único caso que hoy existe en `campos.ts`) y se separaban
- * con dos: el nivel intermedio no tiene registro propio, así que el
- * metadato se perdía SIN UN SOLO ERROR y el panel dibujaría ese campo sin
- * nombre. Un desenvolvimiento único no se puede desincronizar de sí mismo.
+ * Las tres salen de ACÁ, del mismo desenvolvimiento, a propósito — es la
+ * lección de este archivo repetida una vez más. Cuando `fondo` y `meta`
+ * pelaban por su cuenta cada uno (`fondo` todos los niveles, `meta` uno
+ * solo) coincidían con UNA envoltura y se separaban con dos: el nivel
+ * intermedio no tiene registro propio, así que el metadato se perdía SIN
+ * UN SOLO ERROR y el panel dibujaría ese campo sin nombre. `opcional` es
+ * la misma trampa con una tercera pregunta: antes de esto vivía en un
+ * desenvolvimiento APARTE, adentro de `ordenaSegun()`, que pelaba un solo
+ * nivel — y ese desenvolvimiento aparte fue justo lo que se desincronizó
+ * en la revisión de esta tarea. Un desenvolvimiento único no se puede
+ * desincronizar de sí mismo.
  *
  * Se pregunta nivel por nivel, de AFUERA hacia adentro, por dos razones:
  * `panel.get()` no sigue la cadena de padres a través de
@@ -49,12 +62,13 @@ const esEnvoltura = (tipo: string): boolean => tipo === 'optional' || tipo === '
 const desenvuelve = (
   esquema: z.ZodType,
   heredado?: MetaCampo,
-): { fondo: z.ZodType; meta: MetaCampo | undefined } => {
+  opcional = false,
+): { fondo: z.ZodType; meta: MetaCampo | undefined; opcional: boolean } => {
   const meta = heredado ?? (panel.get(esquema) as MetaCampo | undefined)
   const def = definicion(esquema)
   return esEnvoltura(def.type)
-    ? desenvuelve(def.innerType as z.ZodType, meta)
-    : { fondo: esquema, meta }
+    ? desenvuelve(def.innerType as z.ZodType, meta, opcional || def.type === 'optional')
+    : { fondo: esquema, meta, opcional }
 }
 
 /**
@@ -198,7 +212,11 @@ function ordenaSegun(esquema: z.ZodType, valor: unknown, ruta: string): unknown 
       const salida: Record<string, unknown> = {}
       for (const clave of Object.keys(shape)) {
         const hijo = shape[clave]
-        const opcional = definicion(hijo).type === 'optional'
+        // Mismo desenvolvimiento que usa recorre(): pela TODOS los
+        // niveles, no uno solo. Un chequeo aparte de un nivel es
+        // exactamente el bug que ya pagó recorre() en otra forma — ver
+        // el comentario de desenvuelve().
+        const { opcional } = desenvuelve(hijo)
         if (!(clave in dato)) {
           if (opcional) continue
           throw new Error(`${donde}: falta «${clave}», que el esquema declara.`)
