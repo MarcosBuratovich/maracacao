@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
-    "build": "astro build",
+    "build:sitio": "astro build",
+    "verifica": "vitest run && astro check",
+    "build": "pnpm build:sitio && pnpm verifica",
     "preview": "astro preview",
     "astro": "astro",
     "render": "node scripts/render-svg.mjs",
