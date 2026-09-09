@@ -137,7 +137,18 @@ describe('la página / (rediseño de marca, 2026-08-13; en la raíz desde 2026-0
     expect(src).toContain('video.pause()')
   })
 
-  it('el JSON del anaquel sale sin un solo «<» que pueda cerrar el script', async () => {
+  it('el anaquel se inyecta con jsonParaHtml(), no con JSON.stringify a mano', () => {
+    // Esta es la que de verdad blinda la regresión: con los datos de hoy
+    // (ningún campo trae «<») el bloque renderizado sale limpio tanto si
+    // se usa jsonParaHtml como si alguien vuelve a poner JSON.stringify a
+    // mano —así que probar el HTML resultante no alcanza para detectar un
+    // revert. Esto sí lo detecta: si la línea 776 de index.astro deja de
+    // llamar a jsonParaHtml(datosAnaquel), este test se rompe ahí mismo.
+    const src = readFileSync('src/pages/index.astro', 'utf8')
+    expect(src).toMatch(/id="datos-anaquel"\s+set:html=\{jsonParaHtml\(datosAnaquel\)\}/)
+  })
+
+  it('el JSON del anaquel renderizado parsea con las quince fichas (y hoy, sin un solo «<»)', async () => {
     const html = await container.renderToString(Borrador)
     const bloque = html.match(
       /<script type="application\/json" id="datos-anaquel">([\s\S]*?)<\/script>/,
