@@ -607,6 +607,44 @@ describe('la capa de contenido', () => {
     expect(() => { (doc as { titulo: string }).titulo = 'otro' }).toThrow()
   })
 
+  it('cargar() congela HACIA ADENTRO: el bloque, la lista y cada elemento', () => {
+    // El test de arriba usa un esquema PLANO, así que un `congela()`
+    // superficial —un solo `Object.freeze()` en la raíz— lo pasaba igual:
+    // mutarlo así sobrevivía la suite entera. La garantía existía y nada
+    // la fijaba. Para verla hace falta anidar.
+    const esquema = grupo({
+      etiqueta: 'x', seccion: 'productos', ayuda: 'x',
+      campos: {
+        bloque: grupo({
+          etiqueta: 'Bloque', seccion: 'productos', ayuda: 'y',
+          campos: {
+            items: lista({
+              etiqueta: 'Items', seccion: 'productos', ayuda: 'z',
+              elemento: grupo({
+                etiqueta: 'Item', seccion: 'productos', ayuda: 'w',
+                campos: {
+                  nombre: texto({
+                    etiqueta: 'Nombre', seccion: 'productos', ayuda: 'v', maxCaracteres: 20,
+                  }),
+                },
+              }),
+              minItems: 1, maxItems: 3,
+            }),
+          },
+        }),
+      },
+    })
+    const doc = cargar('datos/prueba.json', esquema, {
+      bloque: { items: [{ nombre: 'Gotas' }] },
+    }) as { bloque: { items: { nombre: string }[] } }
+
+    expect(Object.isFrozen(doc)).toBe(true)
+    expect(Object.isFrozen(doc.bloque)).toBe(true)
+    expect(Object.isFrozen(doc.bloque.items)).toBe(true)
+    expect(Object.isFrozen(doc.bloque.items[0])).toBe(true)
+    expect(() => { doc.bloque.items[0].nombre = 'otro' }).toThrow()
+  })
+
   it('serializa() escribe bytes canónicos: orden del esquema e invisibles escapados', () => {
     const esquema = grupo({
       etiqueta: 'x', seccion: 'productos', ayuda: 'x',
