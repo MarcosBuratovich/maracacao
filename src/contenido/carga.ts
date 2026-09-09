@@ -15,14 +15,46 @@ const definicion = (e: unknown) => (e as { _zod: { def: Def } })._zod.def
 const esContenedor = (tipo: string): boolean =>
   tipo === 'object' || tipo === 'tuple' || tipo === 'array' || tipo === 'union'
 
-// Pela optional/nullable para ver qué hay al fondo: si al fondo hay un
-// contenedor, `optional`/`nullable` son transparentes y hay que atravesar.
-// Si al fondo hay una hoja, la envoltura ENTERA es la hoja real (ver abajo).
-const tipoDeFondo = (e: z.ZodType): string => {
-  const d = definicion(e)
-  return d.type === 'optional' || d.type === 'nullable'
-    ? tipoDeFondo(d.innerType as z.ZodType)
-    : d.type
+const esEnvoltura = (tipo: string): boolean => tipo === 'optional' || tipo === 'nullable'
+
+/**
+ * Pela TODAS las envolturas (`optional`/`nullable`) de una vez y devuelve
+ * las dos cosas que cuelgan de ese mismo desenvolvimiento:
+ *
+ * - `fondo`: qué hay abajo del todo, que es lo que decide si la envoltura
+ *   es transparente (contenedor: hay que atravesar para sacar a los hijos)
+ *   o si la envoltura entera es la hoja.
+ * - `meta`: el metadato del panel del primer nivel de la cadena que lo tenga.
+ *
+ * Las dos salen de acá a propósito. Cuando cada una pelaba por su cuenta
+ * —el fondo todos los niveles, el metadato uno solo— coincidían con UNA
+ * envoltura (el único caso que hoy existe en `campos.ts`) y se separaban
+ * con dos: el nivel intermedio no tiene registro propio, así que el
+ * metadato se perdía SIN UN SOLO ERROR y el panel dibujaría ese campo sin
+ * nombre. Un desenvolvimiento único no se puede desincronizar de sí mismo.
+ *
+ * Se pregunta nivel por nivel, de AFUERA hacia adentro, por dos razones:
+ * `panel.get()` no sigue la cadena de padres a través de
+ * `optional`/`nullable` (crean un tipo nuevo, sin `parent`) aunque sí la
+ * siga a través de `.refine()`/`.max()`; y `anota()` recibe siempre el
+ * esquema TERMINADO (ver `campos.ts`), así que si la cadena entera está
+ * anotada —`precioONada`— esa es la anotación deliberada y gana. Si no lo
+ * está —`texto({...}).optional()`, donde la base venía anotada antes de
+ * envolverla— se sigue bajando hasta encontrarla.
+ *
+ * Recursivo y no iterativo a propósito: una cadena circular solo se puede
+ * fabricar mutando `_zod.def` a mano, fuera de la API pública, y así
+ * revienta enseguida con un `RangeError` en vez de colgarse para siempre.
+ */
+const desenvuelve = (
+  esquema: z.ZodType,
+  heredado?: MetaCampo,
+): { fondo: z.ZodType; meta: MetaCampo | undefined } => {
+  const meta = heredado ?? (panel.get(esquema) as MetaCampo | undefined)
+  const def = definicion(esquema)
+  return esEnvoltura(def.type)
+    ? desenvuelve(def.innerType as z.ZodType, meta)
+    : { fondo: esquema, meta }
 }
 
 /**
@@ -41,15 +73,6 @@ export function recorre(
   esquema: z.ZodType,
   visita: (ruta: string, meta: MetaCampo | undefined, hoja: z.ZodType) => void,
   prefijo = '',
-  // El metadato de una envoltura (optional/nullable) más afuera, todavía
-  // sin usar. Existe porque el registro de zod NO viaja en una sola
-  // dirección: `texto({...}).optional()` (lo que hace la parte B) lo deja
-  // en el INTERIOR, porque la base ya venía anotada antes de envolverla;
-  // `precioONada({...})` anota la cadena ENTERA con el `.nullable()` ya
-  // puesto, así que queda en el EXTERIOR. Desenvolver a ciegas pierde uno
-  // de los dos casos según de qué lado esté. La envoltura más cercana a la
-  // hoja que SÍ tiene metadato gana.
-  metaEnvolvente?: MetaCampo,
 ): void {
   const def = definicion(esquema)
   const con = (parte: string) => (prefijo ? `${prefijo}.${parte}` : parte)
@@ -57,15 +80,12 @@ export function recorre(
   switch (def.type) {
     case 'optional':
     case 'nullable': {
-      const metaPropio = metaEnvolvente ?? (panel.get(esquema) as MetaCampo | undefined)
-      const interior = def.innerType as z.ZodType
-      if (esContenedor(tipoDeFondo(interior))) {
-        recorre(interior, visita, prefijo, metaPropio)
+      // Un solo desenvolvimiento alimenta las dos decisiones de este caso.
+      const { fondo, meta } = desenvuelve(esquema)
+      if (esContenedor(definicion(fondo).type)) {
+        recorre(fondo, visita, prefijo)
       } else {
-        // El interior desnudo no es lo que hay que usar para validar: no
-        // acepta el null/undefined que la envoltura sí acepta. El metadato
-        // igual se busca de los dos lados, como ya hacíamos.
-        visita(prefijo, metaPropio ?? (panel.get(interior) as MetaCampo | undefined), esquema)
+        visita(prefijo, meta, esquema)
       }
       return
     }
@@ -97,6 +117,6 @@ export function recorre(
           'Lo agrega la fase 1 parte B, con los bloques de ficha.',
       )
     default:
-      visita(prefijo, metaEnvolvente ?? panel.get(esquema), esquema)
+      visita(prefijo, panel.get(esquema), esquema)
   }
 }

@@ -410,6 +410,62 @@ describe('la capa de contenido', () => {
     expect(hojaChip!.safeParse('Bombón').success).toBe(true)
   })
 
+  it('dos envolturas encadenadas no pierden el metadato (optional y después nullable)', () => {
+    // La asimetría que este test fija: decidir «contenedor o hoja» pela
+    // TODAS las envolturas, así que buscar el metadato tiene que pelar las
+    // mismas. Con UNA envoltura —el único caso que hoy existe en
+    // `campos.ts`— las dos coincidían igual; con DOS, el nivel del medio
+    // es una envoltura sin registro propio y el metadato se perdía SIN UN
+    // SOLO ERROR: el panel dibujaría este campo sin nombre.
+    const esquema = grupo({
+      etiqueta: 'Bloque', seccion: 'productos', ayuda: 'x',
+      campos: {
+        chip: texto({ etiqueta: 'Chip', seccion: 'productos', ayuda: 'y', max: 20 })
+          .optional()
+          .nullable(),
+      },
+    })
+    const hojas: string[] = []
+    let hojaChip: z.ZodType | undefined
+    recorre(esquema, (ruta, meta, hoja) => {
+      hojas.push(`${ruta}=${meta?.etiqueta ?? '-'}`)
+      if (ruta === 'chip') hojaChip = hoja
+    })
+    expect(hojas).toEqual(['chip=Chip'])
+    // Y la hoja sigue siendo la cadena COMPLETA: acepta los dos vacíos que
+    // las dos envolturas existen para aceptar, sin dejar de validar lo suyo.
+    expect(hojaChip!.safeParse(null).success).toBe(true)
+    expect(hojaChip!.safeParse(undefined).success).toBe(true)
+    expect(hojaChip!.safeParse('Bombón').success).toBe(true)
+    expect(hojaChip!.safeParse('x'.repeat(21)).success).toBe(false)
+  })
+
+  it('dos envolturas en el orden inverso tampoco pierden el metadato', () => {
+    // El mismo campo escrito al revés (`.nullable().optional()`). Va
+    // aparte porque un desenvolvimiento sensible al orden haría caer uno
+    // de los dos y no el otro, y ninguna de las dos formas es más
+    // «correcta» que la otra para quien escriba el esquema.
+    const esquema = grupo({
+      etiqueta: 'Bloque', seccion: 'productos', ayuda: 'x',
+      campos: {
+        chip: texto({ etiqueta: 'Chip', seccion: 'productos', ayuda: 'y', max: 20 })
+          .nullable()
+          .optional(),
+      },
+    })
+    const hojas: string[] = []
+    let hojaChip: z.ZodType | undefined
+    recorre(esquema, (ruta, meta, hoja) => {
+      hojas.push(`${ruta}=${meta?.etiqueta ?? '-'}`)
+      if (ruta === 'chip') hojaChip = hoja
+    })
+    expect(hojas).toEqual(['chip=Chip'])
+    expect(hojaChip!.safeParse(null).success).toBe(true)
+    expect(hojaChip!.safeParse(undefined).success).toBe(true)
+    expect(hojaChip!.safeParse('Bombón').success).toBe(true)
+    expect(hojaChip!.safeParse('x'.repeat(21)).success).toBe(false)
+  })
+
   it('un campo anotado sobre la cadena entera (nullable adentro) conserva su etiqueta', () => {
     // El caso de `precioONada`: anota la cadena ENTERA, incluido el
     // `.nullable()` final, así que el metadato queda en el EXTERIOR y el
