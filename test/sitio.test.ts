@@ -2,18 +2,17 @@
  * El sitio público (la home, /; hasta el lanzamiento 2026-08-20 vivió
  * en /sitio con candado). Los guards estructurales (hex a
  * mano, <title> literal) ya lo cubren vía manual.test.ts; acá va lo
- * propio: registro es-MX y retro de Marcos sobre el copy nuevo, el
- * renderizado de la página con su contenido real, y que los assets
- * decorativos respeten las reglas de construcción de la marca.
+ * propio: el renderizado de la página con su contenido real, y que los
+ * assets decorativos respeten las reglas de construcción de la marca.
+ * El registro es-MX del copy vivo lo cubre `marca-copy.test.ts`.
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync, existsSync } from 'node:fs'
 import { experimental_AstroContainer as AstroContainer } from 'astro/container'
-import { sitio } from '@/copy/sitio'
 import { marca } from '@/copy/sitio-marca'
 import { sabores } from '@/copy/sabores'
 import { esc } from './regex'
-import { editorial, etiqueta } from '@/tokens/color'
+import { editorial } from '@/tokens/color'
 import { customProperties } from '@/tokens/css'
 import Borrador from '@/pages/index.astro'
 import Presentacion from '@/pages/presentacion.astro'
@@ -23,49 +22,6 @@ import Mazorca from '@/components/sitio/Mazorca.astro'
 import Canela from '@/components/sitio/Canela.astro'
 
 const container = await AstroContainer.create()
-
-function stringsVisibles(nodo: unknown): string[] {
-  if (typeof nodo === 'string') return [nodo]
-  if (Array.isArray(nodo)) return nodo.flatMap(stringsVisibles)
-  if (nodo !== null && typeof nodo === 'object') return Object.values(nodo).flatMap(stringsVisibles)
-  return []
-}
-
-describe('copy del borrador — registro y retro vigentes', () => {
-  const textos = stringsVisibles(sitio)
-
-  it('es-MX: nunca "pistachos" ni regionalismos ajenos', () => {
-    for (const t of textos) {
-      for (const palabra of ['pistachos', 'cacahuete', 'maní', 'packaging']) {
-        expect(t.toLowerCase()).not.toContain(palabra)
-      }
-    }
-  })
-
-  it('el personaje no se llama "mono" (ni "chango")', () => {
-    for (const t of textos) expect(t).not.toMatch(/\b(monos?|changos?|changuitos?)\b/i)
-  })
-
-  it('sin carrito; los precios van como números por precioMXN (pregunta 11: sí se muestran)', () => {
-    for (const t of textos) {
-      expect(t.toLowerCase()).not.toContain('carrito')
-      expect(t).not.toMatch(/\$\s?\d/) // nunca precios pegados en strings
-    }
-    for (const f of sitio.productos.fotos) expect(typeof f.precio).toBe('number')
-  })
-
-  it('las 15 barras del catálogo están, sin inventar la 16', () => {
-    expect(sitio.productos.barras).toHaveLength(15)
-    expect(sitio.productos.barras.map((b) => b.nombre)).toContain('Chocolate blanco con pistache')
-  })
-
-  // El color dejó de ser fondo de sección y pasó a ser índice de sabor
-  // (rediseño 2026-08-12): cada barra apunta a un token `etiqueta` real.
-  it('cada sabor tiene un tono del sistema de etiquetas', () => {
-    const validos = Object.keys(etiqueta)
-    for (const b of sitio.productos.barras) expect(validos).toContain(b.tono)
-  })
-})
 
 describe('la página / (rediseño de marca, 2026-08-13; en la raíz desde 2026-08-20)', () => {
   it('renderiza el contenido real: los 15 sabores, correo, catálogo, precios, Tabasco y punto de venta', async () => {
