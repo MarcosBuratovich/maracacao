@@ -21,7 +21,7 @@ pnpm dev        # servidor local
 pnpm test       # suite completa (tests de dibujo, contraste, guards y páginas)
 pnpm typecheck  # astro check
 pnpm build:sitio # solo el build (astro build, sin verificar)
-pnpm build      # la compuerta de publicación: build:sitio, luego test y typecheck — si algo falla, no hay dist/
+pnpm build      # la compuerta: build:sitio, luego test y typecheck — si algo falla, sale con error
 ```
 
 Scripts de generación (sus salidas no se editan a mano):
@@ -59,9 +59,11 @@ pnpm favicon    # public/favicon.svg desde el asset + token
 
 ## Deploy
 
-`pnpm build` es la compuerta de publicación: corre `build:sitio`, la
-suite de tests y `astro check` antes de dejar nada en `dist/` — si algo
-falla, no hay `dist/` y no hay deploy. El sitio resultante es 100%
+`pnpm build` es la compuerta de publicación: construye con `build:sitio`
+y recién después corre la suite y `astro check`. O sea que `dist/` se
+escribe primero —el build en sí compiló—, pero si la verificación falla
+el comando sale con código distinto de cero y Vercel no publica ese
+`dist/`: queda en línea el último deploy bueno. El sitio resultante es 100%
 estático: funciona en Vercel, Netlify o cualquier hosting estático sin
 configuración extra. En Vercel el comando de build está fijado en
 `vercel.json` (`buildCommand`), no delegado al preset del dashboard —
