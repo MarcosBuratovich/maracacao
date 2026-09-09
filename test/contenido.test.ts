@@ -99,7 +99,7 @@ describe('la capa de contenido', () => {
       etiqueta: 'Renglón 2 del titular',
       seccion: 'portada',
       ayuda: 'La segunda línea del título grande, arriba de todo.',
-      max: 40,
+      maxCaracteres: 40,
     })
     const meta = panel.get(campo)
     expect(meta?.etiqueta).toBe('Renglón 2 del titular')
@@ -110,7 +110,7 @@ describe('la capa de contenido', () => {
 
   it('el texto rechaza vacío, vocabulario de marca y precios pegados', () => {
     const campo = texto({
-      etiqueta: 'Prueba', seccion: 'portada', ayuda: 'x', max: 60,
+      etiqueta: 'Prueba', seccion: 'portada', ayuda: 'x', maxCaracteres: 60,
     })
     expect(campo.safeParse('Chocolate mexicano').success).toBe(true)
 
@@ -129,12 +129,12 @@ describe('la capa de contenido', () => {
     // base compartida en vez del esquema terminado, TODOS los campos
     // derivados de ella heredarían esa etiqueta y el panel mostraría el
     // mismo nombre en veinte lugares. Verificado contra zod 4.4.3.
-    const a = texto({ etiqueta: 'Uno', seccion: 'portada', ayuda: 'a', max: 10 })
-    const b = texto({ etiqueta: 'Dos', seccion: 'pie', ayuda: 'b', max: 60 })
+    const a = texto({ etiqueta: 'Uno', seccion: 'portada', ayuda: 'a', maxCaracteres: 10 })
+    const b = texto({ etiqueta: 'Dos', seccion: 'pie', ayuda: 'b', maxCaracteres: 60 })
     expect(panel.get(a)?.etiqueta).toBe('Uno')
     expect(panel.get(b)?.etiqueta).toBe('Dos')
-    expect(panel.get(a)?.max).toBe(10)
-    expect(panel.get(b)?.max).toBe(60)
+    expect(panel.get(a)?.maxCaracteres).toBe(10)
+    expect(panel.get(b)?.maxCaracteres).toBe(60)
   })
 
   it('medida acepta el espacio duro y rechaza el normal — es su razón de existir', () => {
@@ -143,12 +143,52 @@ describe('la capa de contenido', () => {
     // nunca, ni siquiera el bien escrito. Este test ejercita el camino
     // feliz que faltaba y prueba las dos formas a la vez, porque el punto
     // entero de este campo es distinguirlas.
-    const m = medida({ etiqueta: 'Peso', seccion: 'productos', ayuda: 'x', max: 30 })
+    const m = medida({ etiqueta: 'Peso', seccion: 'productos', ayuda: 'x', maxCaracteres: 30 })
     // Con espacio duro: válido. Es la forma que el sitio usa hoy y la que
     // impide que la «g» quede sola en el renglón siguiente del celular.
     expect(m.safeParse('Barra de 70\u00a0g').success).toBe(true)
     // Con espacio normal: se marca, y con el arreglo a un toque.
     expect(m.safeParse('Barra de 70 g').success).toBe(false)
+  })
+
+  it('el metadato dice lo que significa: ningún nombre vale para dos cosas', () => {
+    // `max` significaba CARACTERES en texto/parrafo/medida, VALOR numérico
+    // en numero/precio/derivado y CANTIDAD DE ELEMENTOS en lista; y `de`
+    // era un esquema en `lista` y una ruta en `derivado`. La fase 2 pinta
+    // el panel leyendo este metadato: un widget que lea `meta.max` y
+    // escriba «tope de seguridad de 2 caracteres» sobre una lista de 2
+    // elementos es el bug garantizado, y el tipo no lo iba a atajar porque
+    // los tres eran `number`.
+    const item = texto({ etiqueta: 'Item', seccion: 'preguntas', ayuda: 'y', maxCaracteres: 90 })
+    const l = lista({
+      etiqueta: 'Lista', seccion: 'preguntas', ayuda: 'x',
+      elemento: item, minItems: 1, maxItems: 2,
+    })
+    const n = numero({
+      etiqueta: 'Orden', seccion: 'productos', ayuda: 'x', minValor: 1, maxValor: 10,
+    })
+    const d = derivado({
+      etiqueta: 'Total', seccion: 'productos', ayuda: 'x', saleDe: 'gotas.items',
+    })
+
+    expect(panel.get(item)?.maxCaracteres).toBe(90)
+    expect(panel.get(l)?.minItems).toBe(1)
+    expect(panel.get(l)?.maxItems).toBe(2)
+    expect(panel.get(n)?.minValor).toBe(1)
+    expect(panel.get(n)?.maxValor).toBe(10)
+    // Los dos `de`: uno era un esquema y el otro una ruta, con el mismo
+    // nombre. Ahora un widget sabe cuál está leyendo.
+    expect(panel.get(l)?.elemento).toBe(item)
+    expect(panel.get(d)?.saleDe).toBe('gotas.items')
+
+    // Y los nombres ambiguos no quedaron dando vueltas en el registro: si
+    // vuelven, vuelve el bug.
+    for (const campo of [item, l, n, d]) {
+      const claves = Object.keys(panel.get(campo) as object)
+      expect(claves).not.toContain('max')
+      expect(claves).not.toContain('min')
+      expect(claves).not.toContain('de')
+    }
   })
 
   it('la regla del espacio duro es UNA: los dos lados reconocen cada unidad de la lista', () => {
@@ -159,7 +199,7 @@ describe('la capa de contenido', () => {
     // botón que lo arregla, y no caía ningún test. Este barre la lista
     // COMPARTIDA, así que una unidad nueva entra sola a las dos
     // afirmaciones — que es justo lo que no existía.
-    const campo = medida({ etiqueta: 'Peso', seccion: 'productos', ayuda: 'x', max: 40 })
+    const campo = medida({ etiqueta: 'Peso', seccion: 'productos', ayuda: 'x', maxCaracteres: 40 })
     const esquema = z.object({ p: campo })
     expect(UNIDADES_DE_MEDIDA.length).toBeGreaterThan(0)
 
@@ -192,9 +232,9 @@ describe('la capa de contenido', () => {
     const t = tupla({
       etiqueta: 'Titular', seccion: 'portada', ayuda: 'Las tres líneas del título grande.',
       partes: [
-        texto({ etiqueta: 'Renglón 1', seccion: 'portada', ayuda: 'a', max: 40 }),
-        texto({ etiqueta: 'Renglón 2', seccion: 'portada', ayuda: 'b', max: 40 }),
-        texto({ etiqueta: 'Renglón 3', seccion: 'portada', ayuda: 'c', max: 40 }),
+        texto({ etiqueta: 'Renglón 1', seccion: 'portada', ayuda: 'a', maxCaracteres: 40 }),
+        texto({ etiqueta: 'Renglón 2', seccion: 'portada', ayuda: 'b', maxCaracteres: 40 }),
+        texto({ etiqueta: 'Renglón 3', seccion: 'portada', ayuda: 'c', maxCaracteres: 40 }),
       ],
     })
     expect(t.safeParse(['CHOCOLATE', 'MEXICANO,', '70% CACAO.']).success).toBe(true)
@@ -205,8 +245,8 @@ describe('la capa de contenido', () => {
   it('la lista respeta su mínimo y su máximo — los conteos del sitio dependen de eso', () => {
     const l = lista({
       etiqueta: 'Preguntas frecuentes', seccion: 'preguntas', ayuda: 'x',
-      de: texto({ etiqueta: 'Pregunta', seccion: 'preguntas', ayuda: 'y', max: 90 }),
-      min: 4, max: 12,
+      elemento: texto({ etiqueta: 'Pregunta', seccion: 'preguntas', ayuda: 'y', maxCaracteres: 90 }),
+      minItems: 4, maxItems: 12,
     })
     expect(l.safeParse(['a', 'b', 'c', 'd']).success).toBe(true)
     expect(l.safeParse(['a', 'b', 'c']).success).toBe(false)
@@ -230,12 +270,12 @@ describe('la capa de contenido', () => {
   // exactamente lo que pasó en el test de la tupla del Step 6.
 
   it('numero acepta un valor dentro de su rango', () => {
-    const n = numero({ etiqueta: 'Orden', seccion: 'productos', ayuda: 'x', min: 1, max: 10 })
+    const n = numero({ etiqueta: 'Orden', seccion: 'productos', ayuda: 'x', minValor: 1, maxValor: 10 })
     expect(n.safeParse(5).success).toBe(true)
   })
 
   it('numero rechaza un valor fuera de su rango', () => {
-    const n = numero({ etiqueta: 'Orden', seccion: 'productos', ayuda: 'x', min: 1, max: 10 })
+    const n = numero({ etiqueta: 'Orden', seccion: 'productos', ayuda: 'x', minValor: 1, maxValor: 10 })
     expect(n.safeParse(11).success).toBe(false)
   })
 
@@ -305,14 +345,14 @@ describe('la capa de contenido', () => {
 
   it('derivado acepta un entero positivo dentro de su rango', () => {
     const d = derivado({
-      etiqueta: 'Total', seccion: 'productos', ayuda: 'x', de: 'la suma de los sabores activos',
+      etiqueta: 'Total', seccion: 'productos', ayuda: 'x', saleDe: 'la suma de los sabores activos',
     })
     expect(d.safeParse(42).success).toBe(true)
   })
 
   it('derivado rechaza cero', () => {
     const d = derivado({
-      etiqueta: 'Total', seccion: 'productos', ayuda: 'x', de: 'la suma de los sabores activos',
+      etiqueta: 'Total', seccion: 'productos', ayuda: 'x', saleDe: 'la suma de los sabores activos',
     })
     expect(d.safeParse(0).success).toBe(false)
   })
@@ -387,11 +427,11 @@ describe('la capa de contenido', () => {
         titular: tupla({
           etiqueta: 'Titular', seccion: 'portada', ayuda: 'y',
           partes: [
-            texto({ etiqueta: 'Renglón 1', seccion: 'portada', ayuda: 'a', max: 40 }),
-            texto({ etiqueta: 'Renglón 2', seccion: 'portada', ayuda: 'b', max: 40 }),
+            texto({ etiqueta: 'Renglón 1', seccion: 'portada', ayuda: 'a', maxCaracteres: 40 }),
+            texto({ etiqueta: 'Renglón 2', seccion: 'portada', ayuda: 'b', maxCaracteres: 40 }),
           ],
         }),
-        sub: texto({ etiqueta: 'Bajada', seccion: 'portada', ayuda: 'c', max: 200 }),
+        sub: texto({ etiqueta: 'Bajada', seccion: 'portada', ayuda: 'c', maxCaracteres: 200 }),
       },
     })
 
@@ -423,7 +463,7 @@ describe('la capa de contenido', () => {
     const esquema = grupo({
       etiqueta: 'Bloque', seccion: 'productos', ayuda: 'x',
       campos: {
-        chip: texto({ etiqueta: 'Chip', seccion: 'productos', ayuda: 'y', max: 20 }).optional(),
+        chip: texto({ etiqueta: 'Chip', seccion: 'productos', ayuda: 'y', maxCaracteres: 20 }).optional(),
       },
     })
     const hojas: string[] = []
@@ -451,7 +491,7 @@ describe('la capa de contenido', () => {
     const esquema = grupo({
       etiqueta: 'Bloque', seccion: 'productos', ayuda: 'x',
       campos: {
-        chip: texto({ etiqueta: 'Chip', seccion: 'productos', ayuda: 'y', max: 20 })
+        chip: texto({ etiqueta: 'Chip', seccion: 'productos', ayuda: 'y', maxCaracteres: 20 })
           .optional()
           .nullable(),
       },
@@ -479,7 +519,7 @@ describe('la capa de contenido', () => {
     const esquema = grupo({
       etiqueta: 'Bloque', seccion: 'productos', ayuda: 'x',
       campos: {
-        chip: texto({ etiqueta: 'Chip', seccion: 'productos', ayuda: 'y', max: 20 })
+        chip: texto({ etiqueta: 'Chip', seccion: 'productos', ayuda: 'y', maxCaracteres: 20 })
           .nullable()
           .optional(),
       },
@@ -530,8 +570,8 @@ describe('la capa de contenido', () => {
     const esquema = grupo({
       etiqueta: 'Bloque', seccion: 'productos', ayuda: 'x',
       campos: {
-        a: texto({ etiqueta: 'A', seccion: 'productos', ayuda: 'y', max: 10 }),
-        b: texto({ etiqueta: 'B', seccion: 'productos', ayuda: 'z', max: 10 }),
+        a: texto({ etiqueta: 'A', seccion: 'productos', ayuda: 'y', maxCaracteres: 10 }),
+        b: texto({ etiqueta: 'B', seccion: 'productos', ayuda: 'z', maxCaracteres: 10 }),
       },
     }).nullable()
     const hojas: string[] = []
@@ -550,7 +590,7 @@ describe('la capa de contenido', () => {
   it('cargar() tira con la ruta punteada y el mensaje en español', () => {
     const esquema = grupo({
       etiqueta: 'x', seccion: 'portada', ayuda: 'x',
-      campos: { titulo: texto({ etiqueta: 'Título', seccion: 'portada', ayuda: 'y', max: 20 }) },
+      campos: { titulo: texto({ etiqueta: 'Título', seccion: 'portada', ayuda: 'y', maxCaracteres: 20 }) },
     })
     expect(() => cargar('datos/prueba.json', esquema, { titulo: '   ' })).toThrow(
       /datos\/prueba\.json.*titulo.*vacío/s,
@@ -560,7 +600,7 @@ describe('la capa de contenido', () => {
   it('cargar() congela: el contenido no se muta por accidente en runtime', () => {
     const esquema = grupo({
       etiqueta: 'x', seccion: 'portada', ayuda: 'x',
-      campos: { titulo: texto({ etiqueta: 'Título', seccion: 'portada', ayuda: 'y', max: 20 }) },
+      campos: { titulo: texto({ etiqueta: 'Título', seccion: 'portada', ayuda: 'y', maxCaracteres: 20 }) },
     })
     const doc = cargar('datos/prueba.json', esquema, { titulo: 'Hola' }) as { titulo: string }
     expect(Object.isFrozen(doc)).toBe(true)
@@ -571,8 +611,8 @@ describe('la capa de contenido', () => {
     const esquema = grupo({
       etiqueta: 'x', seccion: 'productos', ayuda: 'x',
       campos: {
-        peso: medida({ etiqueta: 'Peso', seccion: 'productos', ayuda: 'y', max: 20 }),
-        nombre: texto({ etiqueta: 'Nombre', seccion: 'productos', ayuda: 'z', max: 20 }),
+        peso: medida({ etiqueta: 'Peso', seccion: 'productos', ayuda: 'y', maxCaracteres: 20 }),
+        nombre: texto({ etiqueta: 'Nombre', seccion: 'productos', ayuda: 'z', maxCaracteres: 20 }),
       },
     })
     // Se pasa con las claves al REVÉS del esquema a propósito. El espacio
@@ -601,7 +641,7 @@ describe('la capa de contenido', () => {
     // esquema no declara, no se escribe nada.
     const esquema = grupo({
       etiqueta: 'x', seccion: 'portada', ayuda: 'x',
-      campos: { a: texto({ etiqueta: 'A', seccion: 'portada', ayuda: 'y', max: 9 }) },
+      campos: { a: texto({ etiqueta: 'A', seccion: 'portada', ayuda: 'y', maxCaracteres: 9 }) },
     })
     // «a» a secas matcheaba cualquier «a» suelta del mensaje en español
     // (por ejemplo la de «declara»), no el nombre de la clave — con
@@ -618,8 +658,8 @@ describe('la capa de contenido', () => {
     const esquema = grupo({
       etiqueta: 'x', seccion: 'productos', ayuda: 'x',
       campos: {
-        peso: medida({ etiqueta: 'Peso', seccion: 'productos', ayuda: 'y', max: 20 }),
-        nombre: texto({ etiqueta: 'Nombre', seccion: 'productos', ayuda: 'z', max: 20 }),
+        peso: medida({ etiqueta: 'Peso', seccion: 'productos', ayuda: 'y', maxCaracteres: 20 }),
+        nombre: texto({ etiqueta: 'Nombre', seccion: 'productos', ayuda: 'z', maxCaracteres: 20 }),
       },
     })
     const bytes = serializa(esquema, { peso: '250\u00a0g', nombre: 'Gotas' })
@@ -643,10 +683,10 @@ describe('la capa de contenido', () => {
     const esquema = grupo({
       etiqueta: 'x', seccion: 'productos', ayuda: 'x',
       campos: {
-        simple: texto({ etiqueta: 'Simple', seccion: 'productos', ayuda: 'y', max: 20 })
+        simple: texto({ etiqueta: 'Simple', seccion: 'productos', ayuda: 'y', maxCaracteres: 20 })
           .optional(),
         obligatoria: texto({
-          etiqueta: 'Obligatoria', seccion: 'productos', ayuda: 'z', max: 20,
+          etiqueta: 'Obligatoria', seccion: 'productos', ayuda: 'z', maxCaracteres: 20,
         }),
       },
     })
@@ -657,11 +697,11 @@ describe('la capa de contenido', () => {
     const esquema = grupo({
       etiqueta: 'x', seccion: 'productos', ayuda: 'x',
       campos: {
-        doble: texto({ etiqueta: 'Doble', seccion: 'productos', ayuda: 'y', max: 20 })
+        doble: texto({ etiqueta: 'Doble', seccion: 'productos', ayuda: 'y', maxCaracteres: 20 })
           .optional()
           .nullable(),
         obligatoria: texto({
-          etiqueta: 'Obligatoria', seccion: 'productos', ayuda: 'z', max: 20,
+          etiqueta: 'Obligatoria', seccion: 'productos', ayuda: 'z', maxCaracteres: 20,
         }),
       },
     })
@@ -677,10 +717,10 @@ describe('la capa de contenido', () => {
     const esquema = grupo({
       etiqueta: 'x', seccion: 'productos', ayuda: 'x',
       campos: {
-        simple: texto({ etiqueta: 'Simple', seccion: 'productos', ayuda: 'y', max: 20 })
+        simple: texto({ etiqueta: 'Simple', seccion: 'productos', ayuda: 'y', maxCaracteres: 20 })
           .optional(),
         obligatoria: texto({
-          etiqueta: 'Obligatoria', seccion: 'productos', ayuda: 'z', max: 20,
+          etiqueta: 'Obligatoria', seccion: 'productos', ayuda: 'z', maxCaracteres: 20,
         }),
       },
     })
@@ -702,8 +742,8 @@ describe('la capa de contenido', () => {
         hijo: grupo({
           etiqueta: 'Hijo', seccion: 'productos', ayuda: 'y',
           campos: {
-            nombre: texto({ etiqueta: 'Nombre', seccion: 'productos', ayuda: 'a', max: 20 }),
-            precio: texto({ etiqueta: 'Precio', seccion: 'productos', ayuda: 'b', max: 20 }),
+            nombre: texto({ etiqueta: 'Nombre', seccion: 'productos', ayuda: 'a', maxCaracteres: 20 }),
+            precio: texto({ etiqueta: 'Precio', seccion: 'productos', ayuda: 'b', maxCaracteres: 20 }),
           },
         }).nullable(),
       },
@@ -720,8 +760,8 @@ describe('la capa de contenido', () => {
         hijo: grupo({
           etiqueta: 'Hijo', seccion: 'productos', ayuda: 'y',
           campos: {
-            nombre: texto({ etiqueta: 'Nombre', seccion: 'productos', ayuda: 'a', max: 20 }),
-            precio: texto({ etiqueta: 'Precio', seccion: 'productos', ayuda: 'b', max: 20 }),
+            nombre: texto({ etiqueta: 'Nombre', seccion: 'productos', ayuda: 'a', maxCaracteres: 20 }),
+            precio: texto({ etiqueta: 'Precio', seccion: 'productos', ayuda: 'b', maxCaracteres: 20 }),
           },
         }).nullable(),
       },
@@ -736,8 +776,8 @@ describe('la capa de contenido', () => {
         hijo: grupo({
           etiqueta: 'Hijo', seccion: 'productos', ayuda: 'y',
           campos: {
-            nombre: texto({ etiqueta: 'Nombre', seccion: 'productos', ayuda: 'a', max: 20 }),
-            precio: texto({ etiqueta: 'Precio', seccion: 'productos', ayuda: 'b', max: 20 }),
+            nombre: texto({ etiqueta: 'Nombre', seccion: 'productos', ayuda: 'a', maxCaracteres: 20 }),
+            precio: texto({ etiqueta: 'Precio', seccion: 'productos', ayuda: 'b', maxCaracteres: 20 }),
           },
         }).nullable(),
       },
@@ -779,7 +819,7 @@ describe('la capa de contenido', () => {
     // pasar claves que el esquema no declara.
     const conDefault = grupo({
       etiqueta: 'Bloque', seccion: 'productos', ayuda: 'x',
-      campos: { a: texto({ etiqueta: 'A', seccion: 'productos', ayuda: 'y', max: 20 }) },
+      campos: { a: texto({ etiqueta: 'A', seccion: 'productos', ayuda: 'y', maxCaracteres: 20 }) },
     }).default({ a: 'z' })
     const esquema = z.object({ b: conDefault })
     expect(() => recorre(esquema, () => {})).toThrow(/envoltura «default»/)
@@ -794,7 +834,7 @@ describe('la capa de contenido', () => {
     // depuración. El mensaje tiene que hablar de la envoltura que todavía
     // no sabemos pelar, no de una clave ausente.
     const esquema = z.object({
-      x: texto({ etiqueta: 'X', seccion: 'portada', ayuda: 'y', max: 20 }).default('hola'),
+      x: texto({ etiqueta: 'X', seccion: 'portada', ayuda: 'y', maxCaracteres: 20 }).default('hola'),
     })
     expect(esquema.safeParse({}).success).toBe(true)
     expect(() => serializa(esquema, {})).toThrow(/envoltura «default»/)
@@ -948,7 +988,7 @@ describe('la capa de contenido', () => {
       campos: {
         hero: grupo({
           etiqueta: 'Portada', seccion: 'portada', ayuda: 'y',
-          campos: { sub: texto({ etiqueta: 'Bajada', seccion: 'portada', ayuda: 'z', max: 10 }) },
+          campos: { sub: texto({ etiqueta: 'Bajada', seccion: 'portada', ayuda: 'z', maxCaracteres: 10 }) },
         }),
       },
     })
@@ -964,7 +1004,7 @@ describe('la capa de contenido', () => {
   it('un contenido válido no genera ni un problema', () => {
     const esquema = grupo({
       etiqueta: 'x', seccion: 'portada', ayuda: 'x',
-      campos: { t: texto({ etiqueta: 'T', seccion: 'portada', ayuda: 'y', max: 30 }) },
+      campos: { t: texto({ etiqueta: 'T', seccion: 'portada', ayuda: 'y', maxCaracteres: 30 }) },
     })
     expect(validarContra(esquema, { t: 'Chocolate mexicano' })).toEqual([])
   })
@@ -972,7 +1012,7 @@ describe('la capa de contenido', () => {
   it('ofrece el arreglo de un toque cuando lo hay: el espacio que no parte', () => {
     const esquema = grupo({
       etiqueta: 'x', seccion: 'productos', ayuda: 'x',
-      campos: { p: medida({ etiqueta: 'Peso', seccion: 'productos', ayuda: 'y', max: 30 }) },
+      campos: { p: medida({ etiqueta: 'Peso', seccion: 'productos', ayuda: 'y', maxCaracteres: 30 }) },
     })
     const problemas = validarContra(esquema, { p: 'Gotas de 250 g' })
     expect(problemas).toHaveLength(1)
@@ -987,7 +1027,7 @@ describe('la capa de contenido', () => {
     // publica un error igual de inválido.
     const esquema = grupo({
       etiqueta: 'x', seccion: 'productos', ayuda: 'x',
-      campos: { p: medida({ etiqueta: 'Peso', seccion: 'productos', ayuda: 'y', max: 30 }) },
+      campos: { p: medida({ etiqueta: 'Peso', seccion: 'productos', ayuda: 'y', maxCaracteres: 30 }) },
     })
     const problemas = validarContra(esquema, { p: 'Gotas de 250 g' })
     const arreglo = problemas[0].arreglo
@@ -1003,7 +1043,7 @@ describe('la capa de contenido', () => {
     // exactamente el caso que el punto anterior prueba que no puede pasar.
     const esquema = grupo({
       etiqueta: 'x', seccion: 'productos', ayuda: 'x',
-      campos: { p: medida({ etiqueta: 'Peso', seccion: 'productos', ayuda: 'y', max: 5 }) },
+      campos: { p: medida({ etiqueta: 'Peso', seccion: 'productos', ayuda: 'y', maxCaracteres: 5 }) },
     })
     const problemas = validarContra(esquema, { p: `70\u00a0g extra` })
     expect(problemas).toHaveLength(1)
@@ -1023,7 +1063,7 @@ describe('la capa de contenido', () => {
   it('el t\u00edtulo no tiene jerga cuando la clave falta: es un campo que qued\u00f3 vac\u00edo, no "undefined"', () => {
     const esquema = grupo({
       etiqueta: 'x', seccion: 'portada', ayuda: 'x',
-      campos: { t: texto({ etiqueta: 'T', seccion: 'portada', ayuda: 'y', max: 20 }) },
+      campos: { t: texto({ etiqueta: 'T', seccion: 'portada', ayuda: 'y', maxCaracteres: 20 }) },
     })
     const problemas = validarContra(esquema, {})
     expect(problemas).toHaveLength(1)
@@ -1034,7 +1074,7 @@ describe('la capa de contenido', () => {
   it('el t\u00edtulo no tiene jerga cuando llega null en un campo de texto', () => {
     const esquema = grupo({
       etiqueta: 'x', seccion: 'portada', ayuda: 'x',
-      campos: { t: texto({ etiqueta: 'T', seccion: 'portada', ayuda: 'y', max: 20 }) },
+      campos: { t: texto({ etiqueta: 'T', seccion: 'portada', ayuda: 'y', maxCaracteres: 20 }) },
     })
     const problemas = validarContra(esquema, { t: null })
     expect(problemas).toHaveLength(1)
@@ -1044,7 +1084,7 @@ describe('la capa de contenido', () => {
   it('el t\u00edtulo no tiene jerga cuando llega un n\u00famero donde va texto', () => {
     const esquema = grupo({
       etiqueta: 'x', seccion: 'portada', ayuda: 'x',
-      campos: { t: texto({ etiqueta: 'T', seccion: 'portada', ayuda: 'y', max: 20 }) },
+      campos: { t: texto({ etiqueta: 'T', seccion: 'portada', ayuda: 'y', maxCaracteres: 20 }) },
     })
     const problemas = validarContra(esquema, { t: 5 })
     expect(problemas).toHaveLength(1)
@@ -1057,8 +1097,8 @@ describe('la capa de contenido', () => {
       campos: {
         preguntas: lista({
           etiqueta: 'Preguntas', seccion: 'preguntas', ayuda: 'y',
-          de: texto({ etiqueta: 'Pregunta', seccion: 'preguntas', ayuda: 'z', max: 90 }),
-          min: 1, max: 5,
+          elemento: texto({ etiqueta: 'Pregunta', seccion: 'preguntas', ayuda: 'z', maxCaracteres: 90 }),
+          minItems: 1, maxItems: 5,
         }),
       },
     })
@@ -1074,7 +1114,7 @@ describe('la capa de contenido', () => {
         hijo: grupo({
           etiqueta: 'Hijo', seccion: 'productos', ayuda: 'y',
           campos: {
-            nombre: texto({ etiqueta: 'Nombre', seccion: 'productos', ayuda: 'z', max: 20 }),
+            nombre: texto({ etiqueta: 'Nombre', seccion: 'productos', ayuda: 'z', maxCaracteres: 20 }),
           },
         }),
       },
@@ -1096,13 +1136,13 @@ describe('la capa de contenido', () => {
     const esquema = grupo({
       etiqueta: 'x', seccion: 'productos', ayuda: 'x',
       campos: {
-        falta: texto({ etiqueta: 'Falta', seccion: 'productos', ayuda: 'y', max: 20 }),
-        tipoRaro: texto({ etiqueta: 'Tipo raro', seccion: 'productos', ayuda: 'y', max: 20 }),
-        largo: texto({ etiqueta: 'Largo', seccion: 'productos', ayuda: 'y', max: 5 }),
+        falta: texto({ etiqueta: 'Falta', seccion: 'productos', ayuda: 'y', maxCaracteres: 20 }),
+        tipoRaro: texto({ etiqueta: 'Tipo raro', seccion: 'productos', ayuda: 'y', maxCaracteres: 20 }),
+        largo: texto({ etiqueta: 'Largo', seccion: 'productos', ayuda: 'y', maxCaracteres: 5 }),
         coleccion: lista({
           etiqueta: 'Colecci\u00f3n', seccion: 'productos', ayuda: 'y',
-          de: texto({ etiqueta: 'Item', seccion: 'productos', ayuda: 'z', max: 10 }),
-          min: 1, max: 5,
+          elemento: texto({ etiqueta: 'Item', seccion: 'productos', ayuda: 'z', maxCaracteres: 10 }),
+          minItems: 1, maxItems: 5,
         }),
       },
     })

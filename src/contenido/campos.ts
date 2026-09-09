@@ -48,14 +48,53 @@ export interface MetaCampo {
   control?:
     | 'texto' | 'parrafo' | 'precio' | 'medida' | 'renglones'
     | 'lista' | 'foto' | 'regulado' | 'derivado' | 'oculto'
+  // Los tres «máximos» del sistema van con nombres distintos a propósito.
+  // `max` solo significaba caracteres en `texto`/`parrafo`/`medida`, valor
+  // numérico en `numero`, y CANTIDAD DE ELEMENTOS en `lista` — tres cosas
+  // bajo una palabra. La fase 2 pinta el panel leyendo este metadato: un
+  // widget que lea `meta.max` y escriba «tope de seguridad de 2
+  // caracteres» sobre una lista de 2 elementos es el bug garantizado, y
+  // ninguna herramienta lo iba a atajar porque el tipo era el mismo
+  // `number`. Lo mismo pasaba con `de`, que era un `ZodType` en `lista` y
+  // una ruta en `derivado`.
+  //
+  // Se separan ACÁ, con 18 llamadas: la Parte B escribe ~900 líneas contra
+  // esta API y después son cientos.
+
   /**
-   * TECHO DE CORDURA, no el límite de diseño. Generoso a propósito: si
-   * el texto entra o no lo decide el medidor midiendo la página de
-   * verdad (fase 4), porque 31 «W» miden 426 px y 31 «i» miden 142 px.
-   * El panel lo dice con esas palabras: «tope de seguridad», no «cabe».
+   * Cuántos CARACTERES entran. TECHO DE CORDURA, no el límite de diseño.
+   * Generoso a propósito: si el texto entra o no lo decide el medidor
+   * midiendo la página de verdad (fase 4), porque 31 «W» miden 426 px y 31
+   * «i» miden 142 px. El panel lo dice con esas palabras: «tope de
+   * seguridad», no «cabe».
    */
-  max?: number
-  min?: number
+  maxCaracteres?: number
+  /** El VALOR numérico más chico y el más grande que acepta el campo. */
+  minValor?: number
+  maxValor?: number
+  /** Cuántos ELEMENTOS puede tener la lista: ni uno menos, ni uno más. */
+  minItems?: number
+  maxItems?: number
+  // Los tres que siguen guardan ESQUEMAS, y van tipados `unknown` a
+  // propósito: `MetaCampo` es el parámetro de `z.registry<MetaCampo>()`, y
+  // meter un `z.ZodType` adentro le pide a TypeScript que instancie el
+  // tipo del registro contra el tipo de los esquemas que registra —
+  // «Type instantiation is excessively deep», verificado contra zod 4.4.3
+  // y typescript 6.0.3. No se pierde nada real: el panel saca la forma del
+  // árbol con `recorre()`, que la lee del esquema; esto queda como la
+  // constancia de con qué se construyó el campo.
+  /** El esquema de CADA elemento de una `lista`. */
+  elemento?: unknown
+  /** Los campos nombrados de un `grupo`. */
+  campos?: unknown
+  /** Las partes de una `tupla`, en orden y en cantidad fija. */
+  partes?: unknown
+  /** La lista cerrada de valores que acepta una `opcion`. */
+  valores?: readonly string[]
+  /** Los tokens de color que acepta un `tokenColor`. */
+  validos?: readonly string[]
+  /** De dónde sale el valor de un `derivado`. El panel lo dibuja en gris. */
+  saleDe?: string
   /** El ':' o el '.' que agrega la plantilla. El panel lo dibuja gris. */
   sufijo?: string
   /** El texto menciona una cantidad que sale de una lista: hay que cruzarla. */
@@ -114,16 +153,16 @@ const reglasDeTexto = (base: z.ZodString) =>
 type Base = Omit<MetaCampo, 'control'>
 
 /** Una línea de texto. El caso normal. */
-export const texto = (meta: Base & { max: number }) =>
+export const texto = (meta: Base & { maxCaracteres: number }) =>
   anota(
-    reglasDeTexto(z.string().trim().max(meta.max, mensajeMax(meta.max))),
+    reglasDeTexto(z.string().trim().max(meta.maxCaracteres, mensajeMax(meta.maxCaracteres))),
     { control: 'texto', ...meta },
   )
 
 /** Varias oraciones: un párrafo de «Nosotros», la respuesta de una pregunta. */
-export const parrafo = (meta: Base & { max: number }) =>
+export const parrafo = (meta: Base & { maxCaracteres: number }) =>
   anota(
-    reglasDeTexto(z.string().trim().max(meta.max, mensajeMax(meta.max))),
+    reglasDeTexto(z.string().trim().max(meta.maxCaracteres, mensajeMax(meta.maxCaracteres))),
     { control: 'parrafo', ...meta },
   )
 
@@ -183,9 +222,9 @@ const MEDIDA_MAL_ESCRITA = cifraUnidad()
  * El panel le ofrece el arreglo con un botón; ella nunca se entera de
  * que el espacio duro existe, que es lo correcto.
  */
-export const medida = (meta: Base & { max: number }) =>
+export const medida = (meta: Base & { maxCaracteres: number }) =>
   anota(
-    reglasDeTexto(z.string().trim().max(meta.max, mensajeMax(meta.max))).refine(
+    reglasDeTexto(z.string().trim().max(meta.maxCaracteres, mensajeMax(meta.maxCaracteres))).refine(
       (v) => !MEDIDA_MAL_ESCRITA.test(v),
       'Entre el número y la unidad va un espacio que no parte el renglón.',
     ),
@@ -242,11 +281,11 @@ export const precioONada = (meta: Base) =>
   )
 
 /** Un número que no es plata (el `orden` impreso de la serie). */
-export const numero = (meta: Base & { min: number; max: number }) =>
+export const numero = (meta: Base & { minValor: number; maxValor: number }) =>
   anota(
     z.int('Tiene que ser un número entero.')
-      .min(meta.min, `Tiene que ser mayor o igual a ${meta.min}.`)
-      .max(meta.max, `Tiene que ser menor o igual a ${meta.max}.`),
+      .min(meta.minValor, `Tiene que ser mayor o igual a ${meta.minValor}.`)
+      .max(meta.maxValor, `Tiene que ser menor o igual a ${meta.maxValor}.`),
     { control: 'oculto', quien: 'marcos', ...meta },
   )
 
@@ -300,7 +339,7 @@ export const archivo = (meta: Base) =>
  * el esquema para que el panel sepa dibujarlo en gris con su explicación,
  * pero no sale del JSON.
  */
-export const derivado = (meta: Base & { de: string }) =>
+export const derivado = (meta: Base & { saleDe: string }) =>
   anota(
     z.int('Tiene que ser un número entero.')
       .min(1, 'Tiene que ser mayor a cero.')
@@ -335,10 +374,12 @@ export const tupla = <T extends readonly [z.ZodType, ...z.ZodType[]]>(
   )
 
 /** Colección con mínimo y máximo: agregar, quitar, reordenar. */
-export const lista = <T extends z.ZodType>(meta: Base & { de: T; min: number; max: number }) =>
+export const lista = <T extends z.ZodType>(
+  meta: Base & { elemento: T; minItems: number; maxItems: number },
+) =>
   anota(
-    z.array(meta.de)
-      .min(meta.min, `Necesitás al menos ${meta.min} elementos.`)
-      .max(meta.max, `No pueden ser más de ${meta.max} elementos.`),
+    z.array(meta.elemento)
+      .min(meta.minItems, `Necesitás al menos ${meta.minItems} elementos.`)
+      .max(meta.maxItems, `No pueden ser más de ${meta.maxItems} elementos.`),
     { control: 'lista', ...meta },
   )
