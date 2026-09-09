@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { MARCA, MAQUETA, palabraProhibida } from '../src/contenido/vocabulario'
-import { texto, medida, panel } from '../src/contenido/campos'
+import { texto, medida, precio, tupla, lista, claveSabor, panel } from '../src/contenido/campos'
 
 describe('la capa de contenido', () => {
   it('src/contenido/ no importa node:, ni Astro, ni el alias @/', () => {
@@ -138,5 +138,47 @@ describe('la capa de contenido', () => {
     expect(m.safeParse('Barra de 70\u00a0g').success).toBe(true)
     // Con espacio normal: se marca, y con el arreglo a un toque.
     expect(m.safeParse('Barra de 70 g').success).toBe(false)
+  })
+
+  it('el precio es entero y acotado: ni string, ni decimal, ni cero, ni absurdo', () => {
+    const p = precio({ etiqueta: 'Precio de la barra', seccion: 'sabores', ayuda: 'x' })
+    expect(p.safeParse(108).success).toBe(true)
+    // «$108» como string es el error que rompe tres tests del sitio.
+    expect(p.safeParse('108').success).toBe(false)
+    expect(p.safeParse(108.5).success).toBe(false)
+    expect(p.safeParse(0).success).toBe(false)
+    expect(p.safeParse(-1).success).toBe(false)
+    expect(p.safeParse(100000).success).toBe(false)
+  })
+
+  it('la tupla es forma fija: no acepta ni uno de más ni uno de menos', () => {
+    const t = tupla({
+      etiqueta: 'Titular', seccion: 'portada', ayuda: 'Las tres líneas del título grande.',
+      partes: [
+        texto({ etiqueta: 'Renglón 1', seccion: 'portada', ayuda: 'a', max: 40 }),
+        texto({ etiqueta: 'Renglón 2', seccion: 'portada', ayuda: 'b', max: 40 }),
+        texto({ etiqueta: 'Renglón 3', seccion: 'portada', ayuda: 'c', max: 40 }),
+      ],
+    })
+    expect(t.safeParse(['CHOCOLATE', 'MEXICANO,', '70% CACAO.']).success).toBe(true)
+    expect(t.safeParse(['CHOCOLATE', 'MEXICANO,']).success).toBe(false)
+    expect(t.safeParse(['A', 'B', 'C', 'D']).success).toBe(false)
+  })
+
+  it('la lista respeta su mínimo y su máximo — los conteos del sitio dependen de eso', () => {
+    const l = lista({
+      etiqueta: 'Preguntas frecuentes', seccion: 'preguntas', ayuda: 'x',
+      de: texto({ etiqueta: 'Pregunta', seccion: 'preguntas', ayuda: 'y', max: 90 }),
+      min: 4, max: 12,
+    })
+    expect(l.safeParse(['a', 'b', 'c', 'd']).success).toBe(true)
+    expect(l.safeParse(['a', 'b', 'c']).success).toBe(false)
+    expect(l.safeParse(Array(13).fill('a')).success).toBe(false)
+  })
+
+  it('claveSabor solo acepta claves que existen en los tokens de color', () => {
+    const c = claveSabor({ etiqueta: 'Sabor', seccion: 'sabores', ayuda: 'x' })
+    expect(c.safeParse('canela').success).toBe(true)
+    expect(c.safeParse('inventado').success).toBe(false)
   })
 })
