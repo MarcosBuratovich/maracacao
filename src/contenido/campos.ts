@@ -137,7 +137,18 @@ export const parrafo = (meta: Base & { max: number }) =>
 export const medida = (meta: Base & { max: number }) =>
   anota(
     reglasDeTexto(z.string().trim().max(meta.max, mensajeMax(meta.max))).refine(
-      (v) => !/\d\s(g|kg|ml|l|°C)\b/.test(v),
+      // `\s` (la versión original) matchea TAMBIÉN el espacio duro
+      // (U+00A0): con esa clase, la regla rechazaba por igual el valor
+      // bien escrito y el mal escrito, así que NINGÚN valor de `medida`
+      // podía pasar nunca. `[^\S\u00a0]` es «espacio en blanco que
+      // no sea el duro» — y va con el ESCAPE, nunca como carácter literal
+      // pegado en el código: un espacio duro tipeado a mano es frágil, un
+      // editor o un copiar-y-pegar lo puede normalizar a uno común sin que
+      // nadie lo note, que es exactamente este bug, movido de lugar.
+      // Verificado con los tres casos: cadena con U+00A0 real → no matchea
+      // (válida); con espacio normal → matchea (inválida); con tab →
+      // matchea (inválida).
+      (v) => !/\d[^\S\u00a0](g|kg|ml|l|°C)\b/.test(v),
       'Entre el número y la unidad va un espacio que no parte el renglón.',
     ),
     { control: 'medida', ...meta },

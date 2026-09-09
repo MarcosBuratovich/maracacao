@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { MARCA, MAQUETA, palabraProhibida } from '../src/contenido/vocabulario'
-import { texto, panel } from '../src/contenido/campos'
+import { texto, medida, panel } from '../src/contenido/campos'
 
 describe('la capa de contenido', () => {
   it('src/contenido/ no importa node:, ni Astro, ni el alias @/', () => {
@@ -124,5 +124,19 @@ describe('la capa de contenido', () => {
     expect(panel.get(b)?.etiqueta).toBe('Dos')
     expect(panel.get(a)?.max).toBe(10)
     expect(panel.get(b)?.max).toBe(60)
+  })
+
+  it('medida acepta el espacio duro y rechaza el normal — es su razón de existir', () => {
+    // `\s` (la versión que traía el brief original) matchea también el
+    // espacio duro: con esa regla, NINGÚN valor de `medida` podía pasar
+    // nunca, ni siquiera el bien escrito. Este test ejercita el camino
+    // feliz que faltaba y prueba las dos formas a la vez, porque el punto
+    // entero de este campo es distinguirlas.
+    const m = medida({ etiqueta: 'Peso', seccion: 'productos', ayuda: 'x', max: 30 })
+    // Con espacio duro: válido. Es la forma que el sitio usa hoy y la que
+    // impide que la «g» quede sola en el renglón siguiente del celular.
+    expect(m.safeParse('Barra de 70\u00a0g').success).toBe(true)
+    // Con espacio normal: se marca, y con el arreglo a un toque.
+    expect(m.safeParse('Barra de 70 g').success).toBe(false)
   })
 })
