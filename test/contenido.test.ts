@@ -10,8 +10,13 @@
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
+import { z } from 'zod'
 import { MARCA, MAQUETA, palabraProhibida } from '../src/contenido/vocabulario'
-import { texto, medida, precio, tupla, lista, claveSabor, panel } from '../src/contenido/campos'
+import {
+  texto, medida, precio, tupla, lista, claveSabor,
+  numero, tokenColor, ruta, url, correo, slug, archivo, derivado, grupo, precioONada,
+  panel,
+} from '../src/contenido/campos'
 
 describe('la capa de contenido', () => {
   it('src/contenido/ no importa node:, ni Astro, ni el alias @/', () => {
@@ -180,5 +185,132 @@ describe('la capa de contenido', () => {
     const c = claveSabor({ etiqueta: 'Sabor', seccion: 'sabores', ayuda: 'x' })
     expect(c.safeParse('canela').success).toBe(true)
     expect(c.safeParse('inventado').success).toBe(false)
+  })
+
+  // Los diez constructores que siguen no tenían test propio: quedaban
+  // cubiertos solo por el typecheck y por auditoría manual del revisor.
+  // Eso no alcanza — que anden bien HOY y que la suite los agarre si se
+  // rompen MAÑANA son cosas distintas, y es el mismo patrón estructural
+  // que dejó pasar, en una tarea anterior, un constructor que no aceptaba
+  // ningún valor. Cada uno va en un `it` por DIRECCIÓN (acepta / rechaza),
+  // nunca los dos en el mismo `it`: si están juntos y falla el primer
+  // `expect`, el segundo ni se corre y el fallo queda tapado — es
+  // exactamente lo que pasó en el test de la tupla del Step 6.
+
+  it('numero acepta un valor dentro de su rango', () => {
+    const n = numero({ etiqueta: 'Orden', seccion: 'productos', ayuda: 'x', min: 1, max: 10 })
+    expect(n.safeParse(5).success).toBe(true)
+  })
+
+  it('numero rechaza un valor fuera de su rango', () => {
+    const n = numero({ etiqueta: 'Orden', seccion: 'productos', ayuda: 'x', min: 1, max: 10 })
+    expect(n.safeParse(11).success).toBe(false)
+  })
+
+  it('tokenColor acepta un token declarado en `validos`', () => {
+    const t = tokenColor({
+      etiqueta: 'Color', seccion: 'sabores', ayuda: 'x', validos: ['rojo', 'azul'],
+    })
+    expect(t.safeParse('rojo').success).toBe(true)
+  })
+
+  it('tokenColor rechaza un token que no está en `validos`', () => {
+    const t = tokenColor({
+      etiqueta: 'Color', seccion: 'sabores', ayuda: 'x', validos: ['rojo', 'azul'],
+    })
+    expect(t.safeParse('verde').success).toBe(false)
+  })
+
+  it('ruta acepta una ruta interna que empieza con «/»', () => {
+    const r = ruta({ etiqueta: 'Ruta', seccion: 'buscadores', ayuda: 'x' })
+    expect(r.safeParse('/fichas-tecnicas').success).toBe(true)
+  })
+
+  it('ruta rechaza una cadena sin la barra inicial', () => {
+    const r = ruta({ etiqueta: 'Ruta', seccion: 'buscadores', ayuda: 'x' })
+    expect(r.safeParse('fichas-tecnicas').success).toBe(false)
+  })
+
+  it('url acepta una dirección web completa', () => {
+    const u = url({ etiqueta: 'Sitio', seccion: 'buscadores', ayuda: 'x' })
+    expect(u.safeParse('https://maracacao.mx').success).toBe(true)
+  })
+
+  it('url rechaza texto que no es una dirección web', () => {
+    const u = url({ etiqueta: 'Sitio', seccion: 'buscadores', ayuda: 'x' })
+    expect(u.safeParse('no es una url').success).toBe(false)
+  })
+
+  it('correo acepta un correo válido', () => {
+    const c = correo({ etiqueta: 'Correo', seccion: 'contacto', ayuda: 'x' })
+    expect(c.safeParse('hola@maracacao.mx').success).toBe(true)
+  })
+
+  it('correo rechaza texto que no es un correo', () => {
+    const c = correo({ etiqueta: 'Correo', seccion: 'contacto', ayuda: 'x' })
+    expect(c.safeParse('no-es-correo').success).toBe(false)
+  })
+
+  it('slug acepta minúsculas, números y guiones', () => {
+    const s = slug({ etiqueta: 'Slug', seccion: 'sabores', ayuda: 'x' })
+    expect(s.safeParse('canela').success).toBe(true)
+  })
+
+  it('slug rechaza mayúsculas y signos', () => {
+    const s = slug({ etiqueta: 'Slug', seccion: 'sabores', ayuda: 'x' })
+    expect(s.safeParse('Canela!').success).toBe(false)
+  })
+
+  it('archivo acepta minúsculas, números y guiones', () => {
+    const a = archivo({ etiqueta: 'Archivo', seccion: 'fichas', ayuda: 'x' })
+    expect(a.safeParse('ficha-canela').success).toBe(true)
+  })
+
+  it('archivo rechaza mayúsculas, espacios y la extensión', () => {
+    const a = archivo({ etiqueta: 'Archivo', seccion: 'fichas', ayuda: 'x' })
+    expect(a.safeParse('Ficha Canela.pdf').success).toBe(false)
+  })
+
+  it('derivado acepta un entero positivo dentro de su rango', () => {
+    const d = derivado({
+      etiqueta: 'Total', seccion: 'productos', ayuda: 'x', de: 'la suma de los sabores activos',
+    })
+    expect(d.safeParse(42).success).toBe(true)
+  })
+
+  it('derivado rechaza cero', () => {
+    const d = derivado({
+      etiqueta: 'Total', seccion: 'productos', ayuda: 'x', de: 'la suma de los sabores activos',
+    })
+    expect(d.safeParse(0).success).toBe(false)
+  })
+
+  it('grupo acepta un objeto cuyos campos cumplen su propio esquema', () => {
+    const g = grupo({
+      etiqueta: 'Bloque', seccion: 'productos', ayuda: 'x', campos: { a: z.string() },
+    })
+    expect(g.safeParse({ a: 'x' }).success).toBe(true)
+  })
+
+  it('grupo rechaza un objeto cuyo campo no cumple el tipo declarado', () => {
+    const g = grupo({
+      etiqueta: 'Bloque', seccion: 'productos', ayuda: 'x', campos: { a: z.string() },
+    })
+    expect(g.safeParse({ a: 5 }).success).toBe(false)
+  })
+
+  it('precioONada acepta null cuando el precio no existe todavía', () => {
+    const p = precioONada({ etiqueta: 'Precio', seccion: 'sabores', ayuda: 'x' })
+    expect(p.safeParse(null).success).toBe(true)
+  })
+
+  it('precioONada acepta un precio real, no solo null — es su razón de existir', () => {
+    const p = precioONada({ etiqueta: 'Precio', seccion: 'sabores', ayuda: 'x' })
+    expect(p.safeParse(108).success).toBe(true)
+  })
+
+  it('precioONada rechaza un decimal, igual que precio', () => {
+    const p = precioONada({ etiqueta: 'Precio', seccion: 'sabores', ayuda: 'x' })
+    expect(p.safeParse(108.5).success).toBe(false)
   })
 })
