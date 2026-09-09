@@ -25,10 +25,20 @@ describe('la capa de contenido', () => {
         .replace(/\/\*[\s\S]*?\*\//g, '')
         .replace(/^\s*\/\/.*$/gm, '')
 
+      // Cuatro formas de traer un módulo, todas prohibidas por igual: el
+      // estático `from '...'` (cubre también el re-export, que conserva
+      // el `from`), el dinámico `import('...')`, el bare `import '...'`
+      // por efecto secundario, y el `require('...')` de CommonJS. Un
+      // patrón que solo mirara `from` es un recordatorio, no un guard.
+      const formasDeImportar = (prefijo: string) =>
+        new RegExp(
+          `(?:\\bfrom\\s+|\\bimport\\s*\\(\\s*|\\bimport\\s+|\\brequire\\s*\\(\\s*)['"]${prefijo}`,
+        )
+
       const prohibidos = [
-        [/from\s+['"]node:/, 'node:'],
-        [/from\s+['"]astro/, 'astro'],
-        [/from\s+['"]@\//, 'el alias @/'],
+        [formasDeImportar('node:'), 'node:'],
+        [formasDeImportar('astro'), 'astro'],
+        [formasDeImportar('@/'), 'el alias @/'],
       ] as const
 
       for (const [patron, motivo] of prohibidos) {
@@ -39,8 +49,7 @@ describe('la capa de contenido', () => {
     expect(infractores).toEqual([])
   })
 
-  it('palabraProhibida encuentra la palabra, y no la encuentra donde no está', () => {
-    // Las que tiene que cachar, incluidas las formas en plural.
+  it('palabraProhibida encuentra la palabra, incluidas las formas en plural', () => {
     expect(palabraProhibida('el mono de la envoltura')).toBe('mono')
     expect(palabraProhibida('dos monos')).toBe('mono')
     expect(palabraProhibida('chispas de chocolate')).toBe('chispa')
@@ -48,9 +57,12 @@ describe('la capa de contenido', () => {
     expect(palabraProhibida('los carritos')).toBe('carrito')
     expect(palabraProhibida('con pistachos')).toBe('pistachos')
     expect(palabraProhibida('trae maní')).toBe('maní')
+  })
 
-    // Las que NO son la palabra prohibida, aunque la contengan. Sin
-    // esto, el filtro le prohibiría a la clienta escribir «monocromo».
+  it('palabraProhibida no la encuentra donde no está, aunque la palabra esté contenida', () => {
+    // Sin esto, el filtro le prohibiría a la clienta escribir «monocromo».
+    // Va en un `it` separado del de los positivos para que, si algún caso
+    // de estos falla, la corrida lo señale sin cortar antes por otro motivo.
     expect(palabraProhibida('impresión monocromo')).toBeNull()
     expect(palabraProhibida('un chispazo de sabor')).toBeNull()
     expect(palabraProhibida('la manía de revisar')).toBeNull()
