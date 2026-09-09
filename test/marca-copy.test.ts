@@ -7,9 +7,11 @@
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
+import { experimental_AstroContainer as AstroContainer } from 'astro/container'
 import { marca } from '@/copy/sitio-marca'
 import { sabores, gotas, polvo } from '@/copy/sabores'
 import { sabor } from '@/tokens/color'
+import Home from '@/pages/index.astro'
 
 function stringsVisibles(nodo: unknown): string[] {
   if (typeof nodo === 'string') return [nodo]
@@ -195,5 +197,28 @@ describe('estructura de la página', () => {
     for (const paso of marca.catar.pasos) expect(sabor).toHaveProperty(paso.clave)
     for (const r of marca.recetas.lista) expect(sabor).toHaveProperty(r.clave)
     for (const t of marca.negocios.tabs) expect(sabor).toHaveProperty(t.clave)
+  })
+
+  it('ningún campo de copy queda sin llegar al HTML: lo muerto se borra, no se acumula', async () => {
+    // Un campo que la clienta puede editar y no cambia nada en la página
+    // es el peor caso del panel: como no pasa nada, insiste. Este guard
+    // no cubre los 327 campos —la fase 2 hace ese trabajo con
+    // data-campo—; cubre los cuatro que se borraron el 2026-09-08, para
+    // que no vuelvan por copiar y pegar.
+    const container = await AstroContainer.create()
+    const html = await container.renderToString(Home)
+    for (const muerto of [
+      'Sello de Maracacao: la huella de una mano',
+      'Ver el catálogo completo',
+      'Chocolate mexicano, escrito a mano como en la envoltura',
+    ]) {
+      expect(html).not.toContain(muerto)
+    }
+    // Y que el campo ya no exista en el copy, no solo su texto:
+    // JSON.stringify incluye los nombres de las claves.
+    const copy = JSON.stringify(marca)
+    for (const clave of ['selloAlt', 'verTodas', 'wordmarkAlt']) {
+      expect(copy).not.toContain(clave)
+    }
   })
 })

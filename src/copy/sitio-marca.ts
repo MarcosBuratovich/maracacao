@@ -29,7 +29,6 @@ export const marca = {
     nombre: 'Maracacao',
     wordmark: 'MARACACAO',
     descriptor: 'CHOCOLATE MEXICANO',
-    selloAlt: 'Sello de Maracacao: la huella de una mano dentro de un círculo, con la palma formada por granos de cacao',
   },
 
   nav: {
@@ -93,7 +92,6 @@ export const marca = {
     ilustracionCaption: 'El personaje de la etiqueta',
     ilustracionAltPrefijo: 'Ilustración de la envoltura de',
     envolturaAltPrefijo: 'Envoltura de',
-    verTodas: 'Ver el catálogo completo →',
   },
 
   minis: {
@@ -385,7 +383,6 @@ export const marca = {
   footer: {
     // El lema es la frase textual del cliente (formulario, pregunta 11b).
     lema: 'Más cacao, ingredientes sencillos y muchas maneras de disfrutarlo',
-    wordmarkAlt: 'Chocolate mexicano, escrito a mano como en la envoltura',
     linea: 'CACAO 70% · COYOACÁN · CDMX',
     seccionesTitulo: 'Secciones',
     productosTitulo: 'Productos',

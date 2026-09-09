@@ -81,9 +81,6 @@ export const gotas = [
   { clave: 'limaYChile', nombre: 'Lima y chile', precio: 258 },
 ] as const satisfies ReadonlyArray<{ clave: keyof typeof sabor; nombre: string; precio: number }>
 
-/** Paquete de seis minis de 10 g: surtido, los sabores siempre cambian. */
-export const paqueteSeis = { precio: 118 } as const
-
 /**
  * La línea de chocolate en polvo (PRÓXIMAMENTE — no está a la venta).
  * Ocho etiquetas reales en public/sitio/etiqueta-*.webp; los campos de
