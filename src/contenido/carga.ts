@@ -17,20 +17,32 @@ const definicion = (e: unknown) => (e as { _zod: { def: Def } })._zod.def
  * ruta punteada ('hero.titular.1') y el metadato del panel.
  *
  * Los contenedores (object, array, tuple) no son hojas: se atraviesan.
- * Un `optional` se desenvuelve y la hoja es lo de adentro.
+ * `optional` y `nullable` se desenvuelven y la hoja es lo de adentro.
  */
 export function recorre(
   esquema: z.ZodType,
   visita: (ruta: string, meta: MetaCampo | undefined, hoja: z.ZodType) => void,
   prefijo = '',
+  // El metadato de una envoltura (optional/nullable) más afuera, todavía
+  // sin usar. Existe porque el registro de zod NO viaja en una sola
+  // dirección: `texto({...}).optional()` (lo que hace la parte B) lo deja
+  // en el INTERIOR, porque la base ya venía anotada antes de envolverla;
+  // `precioONada({...})` anota la cadena ENTERA con el `.nullable()` ya
+  // puesto, así que queda en el EXTERIOR. Desenvolver a ciegas pierde uno
+  // de los dos casos según de qué lado esté. La envoltura más cercana a la
+  // hoja que SÍ tiene metadato gana.
+  metaEnvolvente?: MetaCampo,
 ): void {
   const def = definicion(esquema)
   const con = (parte: string) => (prefijo ? `${prefijo}.${parte}` : parte)
 
   switch (def.type) {
     case 'optional':
-      recorre(def.innerType as z.ZodType, visita, prefijo)
+    case 'nullable': {
+      const metaPropio = metaEnvolvente ?? (panel.get(esquema) as MetaCampo | undefined)
+      recorre(def.innerType as z.ZodType, visita, prefijo, metaPropio)
       return
+    }
     case 'object': {
       const shape = def.shape as Record<string, z.ZodType>
       for (const clave of Object.keys(shape)) recorre(shape[clave], visita, con(clave))
@@ -59,6 +71,6 @@ export function recorre(
           'Lo agrega la fase 1 parte B, con los bloques de ficha.',
       )
     default:
-      visita(prefijo, panel.get(esquema), esquema)
+      visita(prefijo, metaEnvolvente ?? panel.get(esquema), esquema)
   }
 }

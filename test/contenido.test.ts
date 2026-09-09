@@ -330,6 +330,23 @@ describe('la capa de contenido', () => {
       z.object({ t: z.literal('b') }),
     ])
     expect(def(du)).toEqual(expect.arrayContaining(['options', 'discriminator']))
+
+    // El switch de recorre() no despacha por estas claves: despacha por
+    // `def.type`. Si una versión futura de Zod renombrara el discriminante
+    // (p. ej. `'object'` → `'obj'`) pero conservara `shape`, las
+    // aserciones de arriba seguirían en VERDE mientras el switch caería en
+    // `default` y emitiría cada contenedor como una sola hoja — el mismo
+    // silencio que este canario existe para atajar. Por eso el tipo va
+    // aparte, con el valor exacto — incluido que la unión discriminada
+    // reporta `'union'`, no `'discriminatedUnion'`: es justo la clase de
+    // sorpresa que esto tiene que congelar.
+    const tipo = (e: unknown) => (e as { _zod: { def: { type: string } } })._zod.def.type
+    expect(tipo(z.object({ a: z.string() }))).toBe('object')
+    expect(tipo(z.array(z.string()))).toBe('array')
+    expect(tipo(z.tuple([z.string(), z.string()]))).toBe('tuple')
+    expect(tipo(z.string().optional())).toBe('optional')
+    expect(tipo(z.string().nullable())).toBe('nullable')
+    expect(tipo(du)).toBe('union')
   })
 
   it('recorre() emite la ruta punteada de cada hoja, con su metadato', () => {
@@ -365,5 +382,53 @@ describe('la capa de contenido', () => {
       z.object({ tipo: z.literal('lista'), items: z.array(z.string()) }),
     ])
     expect(() => recorre(conUnion, () => {})).toThrow(/unión/i)
+  })
+
+  it('un campo anotado y después envuelto en optional conserva su etiqueta', () => {
+    // El caso que va a producir la parte B: `texto({...}).optional()`. La
+    // base ya venía anotada ANTES de envolverla, así que el metadato queda
+    // en el INTERIOR. Si el recorrido mirara solo el envoltorio (que no
+    // tiene registro propio), el panel dibujaría el campo sin nombre.
+    const esquema = grupo({
+      etiqueta: 'Bloque', seccion: 'productos', ayuda: 'x',
+      campos: {
+        chip: texto({ etiqueta: 'Chip', seccion: 'productos', ayuda: 'y', max: 20 }).optional(),
+      },
+    })
+    const hojas: string[] = []
+    recorre(esquema, (ruta, meta) => hojas.push(`${ruta}=${meta?.etiqueta ?? '-'}`))
+    expect(hojas).toEqual(['chip=Chip'])
+  })
+
+  it('un campo anotado sobre la cadena entera (nullable adentro) conserva su etiqueta', () => {
+    // El caso de `precioONada`: anota la cadena ENTERA, incluido el
+    // `.nullable()` final, así que el metadato queda en el EXTERIOR y el
+    // interior (el entero antes de envolverlo) no tiene registro propio.
+    // Si el recorrido desenvolviera a ciegas hacia el interior, lo perdería.
+    const esquema = grupo({
+      etiqueta: 'Bloque', seccion: 'sabores', ayuda: 'x',
+      campos: {
+        precio: precioONada({ etiqueta: 'Precio', seccion: 'sabores', ayuda: 'y' }),
+      },
+    })
+    const hojas: string[] = []
+    recorre(esquema, (ruta, meta) => hojas.push(`${ruta}=${meta?.etiqueta ?? '-'}`))
+    expect(hojas).toEqual(['precio=Precio'])
+  })
+
+  it('grupo(...).nullable() emite sus hijos, no una sola hoja', () => {
+    // Mismo landmine que la unión: sin `case 'nullable'`, esto caía en
+    // `default` y se emitía como una hoja única, con los dos campos de
+    // adentro invisibles para el panel.
+    const esquema = grupo({
+      etiqueta: 'Bloque', seccion: 'productos', ayuda: 'x',
+      campos: {
+        a: texto({ etiqueta: 'A', seccion: 'productos', ayuda: 'y', max: 10 }),
+        b: texto({ etiqueta: 'B', seccion: 'productos', ayuda: 'z', max: 10 }),
+      },
+    }).nullable()
+    const hojas: string[] = []
+    recorre(esquema, (ruta, meta) => hojas.push(`${ruta}=${meta?.etiqueta ?? '-'}`))
+    expect(hojas).toEqual(['a=A', 'b=B'])
   })
 })
