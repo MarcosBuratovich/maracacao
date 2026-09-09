@@ -396,8 +396,18 @@ describe('la capa de contenido', () => {
       },
     })
     const hojas: string[] = []
-    recorre(esquema, (ruta, meta) => hojas.push(`${ruta}=${meta?.etiqueta ?? '-'}`))
+    let hojaChip: z.ZodType | undefined
+    recorre(esquema, (ruta, meta, hoja) => {
+      hojas.push(`${ruta}=${meta?.etiqueta ?? '-'}`)
+      if (ruta === 'chip') hojaChip = hoja
+    })
     expect(hojas).toEqual(['chip=Chip'])
+    // La hoja tiene que ser la envoltura COMPLETA, no el `texto` de adentro
+    // sin envolver: ese rechazaría `undefined`, justo el valor que
+    // `.optional()` existe para aceptar. Mirar solo la ruta y el metadato
+    // (como hacía este test antes) no detecta esa pérdida.
+    expect(hojaChip!.safeParse(undefined).success).toBe(true)
+    expect(hojaChip!.safeParse('Bombón').success).toBe(true)
   })
 
   it('un campo anotado sobre la cadena entera (nullable adentro) conserva su etiqueta', () => {
@@ -412,8 +422,18 @@ describe('la capa de contenido', () => {
       },
     })
     const hojas: string[] = []
-    recorre(esquema, (ruta, meta) => hojas.push(`${ruta}=${meta?.etiqueta ?? '-'}`))
+    let hojaPrecio: z.ZodType | undefined
+    recorre(esquema, (ruta, meta, hoja) => {
+      hojas.push(`${ruta}=${meta?.etiqueta ?? '-'}`)
+      if (ruta === 'precio') hojaPrecio = hoja
+    })
     expect(hojas).toEqual(['precio=Precio'])
+    // La hoja tiene que ser la envoltura COMPLETA (con el `.nullable()`
+    // puesto): es la que acepta `null`, el valor que precioONada existe
+    // para permitir («Próximamente»). El entero de adentro, sin envolver,
+    // lo rechazaría — y mirar solo ruta+metadato no lo detecta.
+    expect(hojaPrecio!.safeParse(null).success).toBe(true)
+    expect(hojaPrecio!.safeParse(108).success).toBe(true)
   })
 
   it('grupo(...).nullable() emite sus hijos, no una sola hoja', () => {
@@ -428,7 +448,15 @@ describe('la capa de contenido', () => {
       },
     }).nullable()
     const hojas: string[] = []
-    recorre(esquema, (ruta, meta) => hojas.push(`${ruta}=${meta?.etiqueta ?? '-'}`))
+    const hojaPorRuta: Record<string, z.ZodType> = {}
+    recorre(esquema, (ruta, meta, hoja) => {
+      hojas.push(`${ruta}=${meta?.etiqueta ?? '-'}`)
+      hojaPorRuta[ruta] = hoja
+    })
     expect(hojas).toEqual(['a=A', 'b=B'])
+    // Cada hijo sigue siendo SU PROPIO esquema: valida como el `texto` que
+    // es, no como un fragmento genérico del objeto que lo contiene.
+    expect(hojaPorRuta.a.safeParse('Chocolate').success).toBe(true)
+    expect(hojaPorRuta.b.safeParse('x'.repeat(11)).success).toBe(false)
   })
 })

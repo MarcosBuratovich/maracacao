@@ -12,12 +12,30 @@ import { panel, type MetaCampo } from './campos'
 type Def = { type: string; [clave: string]: unknown }
 const definicion = (e: unknown) => (e as { _zod: { def: Def } })._zod.def
 
+const esContenedor = (tipo: string): boolean =>
+  tipo === 'object' || tipo === 'tuple' || tipo === 'array' || tipo === 'union'
+
+// Pela optional/nullable para ver qué hay al fondo: si al fondo hay un
+// contenedor, `optional`/`nullable` son transparentes y hay que atravesar.
+// Si al fondo hay una hoja, la envoltura ENTERA es la hoja real (ver abajo).
+const tipoDeFondo = (e: z.ZodType): string => {
+  const d = definicion(e)
+  return d.type === 'optional' || d.type === 'nullable'
+    ? tipoDeFondo(d.innerType as z.ZodType)
+    : d.type
+}
+
 /**
  * Recorre el árbol del esquema y llama a `visita` en cada HOJA, con su
- * ruta punteada ('hero.titular.1') y el metadato del panel.
+ * ruta punteada ('hero.titular.1'), el metadato del panel y el esquema
+ * que de verdad hay que usar para validar ese valor.
  *
  * Los contenedores (object, array, tuple) no son hojas: se atraviesan.
- * `optional` y `nullable` se desenvuelven y la hoja es lo de adentro.
+ * `optional`/`nullable` son transparentes SOLO cuando envuelven un
+ * contenedor (ahí hay que seguir para sacar a los hijos). Cuando envuelven
+ * una hoja, la hoja que se emite es la envoltura COMPLETA, no el interior
+ * desnudo: `precioONada` existe para aceptar `null`, y el `z.int()` de
+ * adentro, sin el `.nullable()` puesto, lo rechazaría.
  */
 export function recorre(
   esquema: z.ZodType,
@@ -40,7 +58,15 @@ export function recorre(
     case 'optional':
     case 'nullable': {
       const metaPropio = metaEnvolvente ?? (panel.get(esquema) as MetaCampo | undefined)
-      recorre(def.innerType as z.ZodType, visita, prefijo, metaPropio)
+      const interior = def.innerType as z.ZodType
+      if (esContenedor(tipoDeFondo(interior))) {
+        recorre(interior, visita, prefijo, metaPropio)
+      } else {
+        // El interior desnudo no es lo que hay que usar para validar: no
+        // acepta el null/undefined que la envoltura sí acepta. El metadato
+        // igual se busca de los dos lados, como ya hacíamos.
+        visita(prefijo, metaPropio ?? (panel.get(interior) as MetaCampo | undefined), esquema)
+      }
       return
     }
     case 'object': {
