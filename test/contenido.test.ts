@@ -723,13 +723,25 @@ describe('la capa de contenido', () => {
   })
 
   it('cruzaConteo detecta la cifra desactualizada, en número y en letras', () => {
-    expect(cruzaConteo('LOS 15 SABORES', 15)).toBeNull()
-    expect(cruzaConteo('LOS 15 SABORES', 16)).toMatch(/15.*16/)
+    expect(cruzaConteo('LOS 15 SABORES', 15, 'sabores')).toBeNull()
+    expect(cruzaConteo('LOS 15 SABORES', 16, 'sabores')).toMatch(/15.*16/)
     // «seis sabores» es tan probable como «6 sabores» y hoy nada lo mira.
-    expect(cruzaConteo('Seis sabores de gotas', 6)).toBeNull()
-    expect(cruzaConteo('Seis sabores de gotas', 7)).toMatch(/seis.*7/i)
+    expect(cruzaConteo('Seis sabores de gotas', 6, 'sabores')).toBeNull()
+    expect(cruzaConteo('Seis sabores de gotas', 7, 'sabores')).toMatch(/seis.*7/i)
     // Un número que no es el conteo no molesta.
-    expect(cruzaConteo('70% cacao, 15 sabores', 15)).toBeNull()
+    expect(cruzaConteo('70% cacao, 15 sabores', 15, 'sabores')).toBeNull()
+  })
+
+  it('cruzaConteo no marca un número que no está pegado al sustantivo', () => {
+    // Contra copy REAL del sitio: sin la noción de sustantivo, cualquier
+    // número entre 0 y 20 en TODO el texto disparaba el aviso, y esto dio
+    // cuatro falsos positivos de seis casos reales. Un aviso falso es peor
+    // que ninguno: la clienta lee dos veces «dice 16 pero hoy hay 15»
+    // sobre una temperatura y deja de leer los avisos para siempre.
+    expect(cruzaConteo('Temperatura recomendada: 16–20 °C.', 15, 'sabores')).toBeNull()
+    expect(cruzaConteo('Barra 70 g · Gotas 250 g (±10 g)', 15, 'sabores')).toBeNull()
+    expect(cruzaConteo('250 g · 1 kg', 15, 'sabores')).toBeNull()
+    expect(cruzaConteo('entre 16 y 20 °C', 15, 'sabores')).toBeNull()
   })
 
   it('la regla de contraste hereda la excepción declarada en los tokens', () => {
