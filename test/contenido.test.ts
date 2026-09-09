@@ -918,4 +918,112 @@ describe('la capa de contenido', () => {
     expect(problemas).toHaveLength(1)
     expect(problemas[0].arreglo).toBeUndefined()
   })
+
+  // `titulo: issue.message` no traduc\u00eda los errores de TIPO (`invalid_type`):
+  // una clave que falta, un `null`, o un valor de otro tipo llegaban con el
+  // mensaje default de Zod, en ingl\u00e9s. Es la mitad del cat\u00e1logo de errores
+  // de Zod (la otra mitad son los `refine`/`.max()` con mensaje propio), y
+  // la que m\u00e1s importa para `api/panel.ts`: un payload malformado \u2014una
+  // clave que falta, un JSON post-migraci\u00f3n con una clave nueva sin
+  // llenar\u2014 es EXACTAMENTE lo que produce un `invalid_type`.
+
+  const JERGA_PROHIBIDA = /\b(string|expected|invalid|received|number|boolean|array)\b/i
+
+  it('el t\u00edtulo no tiene jerga cuando la clave falta: es un campo que qued\u00f3 vac\u00edo, no "undefined"', () => {
+    const esquema = grupo({
+      etiqueta: 'x', seccion: 'portada', ayuda: 'x',
+      campos: { t: texto({ etiqueta: 'T', seccion: 'portada', ayuda: 'y', max: 20 }) },
+    })
+    const problemas = validarContra(esquema, {})
+    expect(problemas).toHaveLength(1)
+    expect(problemas[0].titulo).not.toMatch(JERGA_PROHIBIDA)
+    expect(problemas[0].titulo).toMatch(/vac[i\u00ed]o/i)
+  })
+
+  it('el t\u00edtulo no tiene jerga cuando llega null en un campo de texto', () => {
+    const esquema = grupo({
+      etiqueta: 'x', seccion: 'portada', ayuda: 'x',
+      campos: { t: texto({ etiqueta: 'T', seccion: 'portada', ayuda: 'y', max: 20 }) },
+    })
+    const problemas = validarContra(esquema, { t: null })
+    expect(problemas).toHaveLength(1)
+    expect(problemas[0].titulo).not.toMatch(JERGA_PROHIBIDA)
+  })
+
+  it('el t\u00edtulo no tiene jerga cuando llega un n\u00famero donde va texto', () => {
+    const esquema = grupo({
+      etiqueta: 'x', seccion: 'portada', ayuda: 'x',
+      campos: { t: texto({ etiqueta: 'T', seccion: 'portada', ayuda: 'y', max: 20 }) },
+    })
+    const problemas = validarContra(esquema, { t: 5 })
+    expect(problemas).toHaveLength(1)
+    expect(problemas[0].titulo).not.toMatch(JERGA_PROHIBIDA)
+  })
+
+  it('el t\u00edtulo no tiene jerga en un contenedor: un objeto donde va una lista', () => {
+    const esquema = grupo({
+      etiqueta: 'x', seccion: 'preguntas', ayuda: 'x',
+      campos: {
+        preguntas: lista({
+          etiqueta: 'Preguntas', seccion: 'preguntas', ayuda: 'y',
+          de: texto({ etiqueta: 'Pregunta', seccion: 'preguntas', ayuda: 'z', max: 90 }),
+          min: 1, max: 5,
+        }),
+      },
+    })
+    const problemas = validarContra(esquema, { preguntas: { no: 'es una lista' } })
+    expect(problemas).toHaveLength(1)
+    expect(problemas[0].titulo).not.toMatch(JERGA_PROHIBIDA)
+  })
+
+  it('el t\u00edtulo no tiene jerga en un contenedor: un string donde va un grupo', () => {
+    const esquema = grupo({
+      etiqueta: 'x', seccion: 'productos', ayuda: 'x',
+      campos: {
+        hijo: grupo({
+          etiqueta: 'Hijo', seccion: 'productos', ayuda: 'y',
+          campos: {
+            nombre: texto({ etiqueta: 'Nombre', seccion: 'productos', ayuda: 'z', max: 20 }),
+          },
+        }),
+      },
+    })
+    const problemas = validarContra(esquema, { hijo: 'no es un objeto' })
+    expect(problemas).toHaveLength(1)
+    expect(problemas[0].titulo).not.toMatch(JERGA_PROHIBIDA)
+  })
+
+  it('ning\u00fan problema devuelto trae jerga de Zod, para ning\u00fan c\u00f3digo de issue a la vez', () => {
+    // La aserci\u00f3n que cierra la clase entera, no solo los casos de hoy:
+    // en vez de mirar UN problema, barre TODOS los que devuelva esta
+    // llamada \u2014 con varios c\u00f3digos de issue mezclados a prop\u00f3sito
+    // (invalid_type por clave faltante, invalid_type por tipo, too_big
+    // con mensaje propio, invalid_type de contenedor) \u2014 contra la lista
+    // completa de palabras prohibidas. Un c\u00f3digo nuevo que se cuele
+    // ma\u00f1ana con el default de Zod lo agarra AC\u00c1, sin que haga falta
+    // acordarse de escribirle un test aparte.
+    const esquema = grupo({
+      etiqueta: 'x', seccion: 'productos', ayuda: 'x',
+      campos: {
+        falta: texto({ etiqueta: 'Falta', seccion: 'productos', ayuda: 'y', max: 20 }),
+        tipoRaro: texto({ etiqueta: 'Tipo raro', seccion: 'productos', ayuda: 'y', max: 20 }),
+        largo: texto({ etiqueta: 'Largo', seccion: 'productos', ayuda: 'y', max: 5 }),
+        coleccion: lista({
+          etiqueta: 'Colecci\u00f3n', seccion: 'productos', ayuda: 'y',
+          de: texto({ etiqueta: 'Item', seccion: 'productos', ayuda: 'z', max: 10 }),
+          min: 1, max: 5,
+        }),
+      },
+    })
+    const problemas = validarContra(esquema, {
+      // 'falta' se omite a prop\u00f3sito: dispara invalid_type con undefined.
+      tipoRaro: 5,
+      largo: 'x'.repeat(10),
+      coleccion: 'no es una lista',
+    })
+    expect(problemas.length).toBeGreaterThanOrEqual(4)
+    for (const p of problemas) {
+      expect(p.titulo).not.toMatch(JERGA_PROHIBIDA)
+    }
+  })
 })

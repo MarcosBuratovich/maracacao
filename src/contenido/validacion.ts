@@ -56,6 +56,52 @@ function enRuta(crudo: unknown, ruta: readonly PropertyKey[]): unknown {
   return actual
 }
 
+// La jerga de tipos de Zod, detectada por CONTENIDO y no por código: así,
+// un código de issue que hoy no existe pero mañana se cuela con el
+// default de Zod cae en la misma red, sin que haga falta acordarse de
+// agregarlo a una lista. `issue.message` es lo único que se mira: los
+// constructores que ya pisan el mensaje (precio, numero, derivado…) nunca
+// lo tocan, porque su propio texto no contiene ninguna de estas palabras.
+const JERGA_DE_ZOD = /\b(string|number|boolean|array|object|invalid|expected|received)\b/i
+
+// Lo único que la clienta necesita saber de un tipo, en su idioma. Sin
+// entrada en el diccionario, el genérico de abajo sigue sin nombrar el
+// tipo — nunca se interpola `issue.expected` crudo en el título.
+const NOMBRE_TIPO: Record<string, string> = {
+  string: 'texto',
+  number: 'un número',
+  int: 'un número entero',
+  boolean: 'sí o no',
+  array: 'una lista',
+  object: 'un bloque de datos',
+  tuple: 'una lista de tamaño fijo',
+}
+
+/**
+ * La red de contención: cuando el mensaje que trae el issue TODAVÍA tiene
+ * jerga de Zod (porque ni el constructor del campo ni un error map más
+ * específico la pisaron), esto decide qué decirle a la clienta en su
+ * lugar. `invalid_type` es el caso real de hoy —una clave que falta o un
+ * valor de otro tipo, que en la función serverless es EXACTAMENTE lo que
+ * produce un payload mal formado o un JSON post-migración con una clave
+ * nueva sin llenar— pero cualquier otro código cae acá igual, con un
+ * genérico que sigue sin nombrar tipos.
+ */
+function tituloSinJerga(issue: { code: string; expected?: string }, valor: unknown): string {
+  if (issue.code === 'invalid_type') {
+    // Un valor ausente es, para la clienta, un campo que quedó vacío —no
+    // «recibió undefined». Un valor presente pero del tipo equivocado es
+    // otra cosa: ella no distingue «string» de «number», pero sí entiende
+    // que ESE valor no va ahí.
+    if (valor === undefined) return 'El campo quedó vacío.'
+    const nombre = issue.expected ? NOMBRE_TIPO[issue.expected] : undefined
+    return nombre
+      ? `Ese valor no corresponde acá: tiene que ser ${nombre}.`
+      : 'Ese valor no corresponde acá.'
+  }
+  return 'Ese valor no es válido.'
+}
+
 /** Valida un contenido contra su esquema y devuelve problemas legibles. */
 export function validarContra(esquema: z.ZodType, crudo: unknown): Problema[] {
   const r = esquema.safeParse(crudo)
@@ -64,10 +110,11 @@ export function validarContra(esquema: z.ZodType, crudo: unknown): Problema[] {
   return r.error.issues.map((issue) => {
     const campo = issue.path.join('.')
     const valor = enRuta(crudo, issue.path)
+    const titulo = JERGA_DE_ZOD.test(issue.message) ? tituloSinJerga(issue, valor) : issue.message
     return {
       campo,
       gravedad: 'impide' as const,
-      titulo: issue.message,
+      titulo,
       arreglo: proponeArreglo(valor),
     }
   })
