@@ -38,7 +38,12 @@ describe('el andamiaje de tests', () => {
       // `build:sitio` sí está permitido: es el script que NO verifica.
       // Cubre los cuatro gestores y flags entre `run`/`build` (`-s`,
       // `--silent`, etc.): un guard que atrapa una sola grafía de
-      // `pnpm build` es un recordatorio, no una barrera.
+      // `pnpm build` es un recordatorio, no una barrera. Grafía que
+      // este regex NO atrapa: `execSync('pnpm', ['build'])` con
+      // argumentos en array — el comando y el flag nunca quedan
+      // pegados en un mismo string. Es la forma menos probable (nadie
+      // la usó todavía) y no amerita otra ronda de regex, pero que
+      // quede escrito para quien la escriba después.
       if (/(pnpm|npm|yarn|bun)\s+(run\s+)?(-\S+\s+)*build(?![:\w])/.test(codigo)) culpables.push(archivo)
     }
 

@@ -143,7 +143,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
         <div class="portada-texto">
           <h1 class="portada-titular">
             {marca.hero.titular[0]}<br />
-            {marca.hero.titular[1].slice(0, -1)}<span class="acento">,</span><br />
+            {marca.hero.titular[1].replace(/,$/, '')}<span class="acento">,</span><br />
             <span class="acento">{marca.hero.titular[2]}</span>
           </h1>
           <p class="portada-sub">{marca.hero.sub}</p>

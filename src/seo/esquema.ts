@@ -57,8 +57,10 @@ export function esquemaBarras(origen: string) {
     '@type': 'ItemList',
     // El nombre sale de la sección que existe (el anaquel de la home).
     // Hasta 2026-09-08 salía de catalogoBarras.encabezado, el encabezado
-    // de /barras — una página fuera de ruta desde el 2026-08-17.
-    name: marca.anaquel.titulo,
+    // de /barras — una página fuera de ruta desde el 2026-08-17. El
+    // kicker, no el título: "Elige tu barra" es un CTA, no un nombre de
+    // lista — "LOS 15 SABORES" sí lo es, y es el mismo contenido real.
+    name: marca.anaquel.kicker,
     numberOfItems: sabores.length,
     itemListElement: sabores.map((s) => ({
       '@type': 'ListItem',

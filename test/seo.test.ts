@@ -144,10 +144,11 @@ describe('JSON-LD — datos reales, nada inventado', () => {
 
   it('el ItemList de las barras se llama como la sección que existe, no como una página retirada', () => {
     const lista = esquemaBarras('https://www.maracacao.mx')
-    expect(lista.name).toBe(marca.anaquel.titulo)
     // Hasta 2026-09-08 publicaba el encabezado de /barras, una página
     // fuera de ruta desde el 2026-08-17: Google veía el nombre de algo
-    // que no existe.
+    // que no existe. Desde 2026-09-09 es el kicker del anaquel, no el
+    // título — "Elige tu barra" es un CTA, no un nombre de lista.
+    expect(lista.name).toBe(marca.anaquel.kicker)
     expect(lista.name).not.toContain('15 barras')
   })
 })
