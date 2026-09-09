@@ -18,8 +18,8 @@ import {
   panel,
 } from '../src/contenido/campos'
 import { recorre, cargar, serializa } from '../src/contenido/carga'
-import { cruzaConteo } from '../src/contenido/conteos'
-import { contrasteSuficiente } from '../src/contenido/color-sabor'
+import { cruzaConteo, enLetras } from '../src/contenido/conteos'
+import { contrasteSuficiente, resuelveColor, mejorTinta } from '../src/contenido/color-sabor'
 import * as tokens from '../src/tokens/color'
 
 describe('la capa de contenido', () => {
@@ -743,5 +743,42 @@ describe('la capa de contenido', () => {
     expect(contrasteSuficiente(sabor.hierbabuena, tintaSabor.hierbabuena, 'hierbabuena')).toBe(true)
     // Y el mismo par, con otro slug, sigue siendo insuficiente.
     expect(contrasteSuficiente(sabor.hierbabuena, tintaSabor.hierbabuena, 'canela')).toBe(false)
+  })
+
+  // enLetras, resuelveColor y mejorTinta no traían test propio: el mismo
+  // hueco estructural que dejó pasar, en esta fase, un constructor
+  // (medida) que rechazaba absolutamente todo, y que después obligó a una
+  // ronda aparte para cubrir diez constructores sin test. «Anda hoy» no
+  // es «está cubierto». Cada uno va en su propio `it` por dirección, como
+  // el resto del archivo.
+
+  it('enLetras devuelve la palabra dentro de la tabla', () => {
+    expect(enLetras(15)).toBe('quince')
+    expect(enLetras(6)).toBe('seis')
+  })
+
+  it('enLetras cae a la cifra como string fuera de la tabla', () => {
+    // Este fallback tiene consecuencia real: si devolviera undefined,
+    // cruzaConteo armaría un regex con la palabra "undefined" adentro y
+    // dejaría de detectar cualquier desactualización.
+    expect(enLetras(99)).toBe('99')
+  })
+
+  it('resuelveColor devuelve el hex de una clave que existe', () => {
+    // Contra el token real, no un hex hardcodeado: si el diseño cambia
+    // el color de canela, este test no se rompe por las razones equivocadas.
+    expect(resuelveColor('canela')).toBe(tokens.sabor.canela)
+  })
+
+  it('resuelveColor devuelve undefined para una clave que no existe', () => {
+    expect(resuelveColor('inventado')).toBeUndefined()
+  })
+
+  it('mejorTinta devuelve la tinta declarada para una clave que existe', () => {
+    expect(mejorTinta('canela')).toBe(tokens.tintaSabor.canela)
+  })
+
+  it('mejorTinta devuelve undefined para una clave que no existe', () => {
+    expect(mejorTinta('inventado')).toBeUndefined()
   })
 })
