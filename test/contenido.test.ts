@@ -29,6 +29,7 @@ import { esquemaFichas } from '../src/contenido/esquema/fichas'
 import { camposDeCabecera } from '../src/contenido/esquema/sitio/cabecera'
 import { camposDeProducto } from '../src/contenido/esquema/sitio/producto'
 import { camposDeExperiencia } from '../src/contenido/esquema/sitio/experiencia'
+import { camposDeNegocio } from '../src/contenido/esquema/sitio/negocio'
 import { fichasBase } from '../src/fichas/base'
 import * as tokens from '../src/tokens/color'
 // La foto congelada, no el módulo: el fixture no se mueve cuando la Tarea 13
@@ -1677,6 +1678,47 @@ describe('la capa de contenido', () => {
       const etiquetas = new Map<string, string | undefined>()
       recorre(experiencia, (ruta, meta) => etiquetas.set(ruta, meta?.etiqueta))
       expect(etiquetas.get('recetas.lista[].chipPolvo')).toBe('Cápsula de polvo')
+    })
+  })
+
+  describe('el esquema de negocio', () => {
+    const negocio = grupo({
+      etiqueta: 'Negocio', seccion: 'negocios', ayuda: 'Prueba.',
+      campos: camposDeNegocio,
+    })
+    const hoy = () => {
+      const m = JSON.parse(JSON.stringify(fixture.marca))
+      return { negocios: m.negocios, preguntas: m.preguntas }
+    }
+    const CONTEOS = { sabores: 15, gotas: 6, polvo: 8, preguntas: 8 }
+
+    it('valida el contenido de hoy, avisos incluidos', () => {
+      expect(validar(negocio, hoy(), CONTEOS)).toEqual([])
+    })
+
+    it('toda hoja tiene etiqueta, ayuda y sección', () => {
+      recorre(negocio, (ruta, meta) => {
+        expect(meta?.etiqueta, `sin etiqueta: ${ruta}`).toBeTruthy()
+        expect(meta?.ayuda, `sin ayuda: ${ruta}`).toBeTruthy()
+        expect(meta?.seccion, `sin sección: ${ruta}`).toBeTruthy()
+      })
+    })
+
+    it('cada panel tiene su propia regla de conteo', () => {
+      // Es lo que la `tupla` compra y la `lista` no podía: tres reglas
+      // distintas sobre tres campos con la misma forma.
+      const cuentas = new Map<string, string | undefined>()
+      recorre(negocio, (ruta, meta) => cuentas.set(ruta, meta?.cuenta && `${meta.cuenta.de}/${meta.cuenta.sustantivo}`))
+      expect(cuentas.get('negocios.tabs.0.cuerpo')).toBe('polvo/variedades')
+      expect(cuentas.get('negocios.tabs.1.datos[]')).toBe('gotas/sabores')
+      expect(cuentas.get('negocios.tabs.2.cuerpo')).toBe('sabores/barras')
+    })
+
+    it('avisa en el panel de barras si cambia la cantidad de sabores', () => {
+      const problemas = validar(negocio, hoy(), { ...CONTEOS, sabores: 16 })
+      expect(problemas).toContainEqual(
+        expect.objectContaining({ campo: 'negocios.tabs.2.cuerpo', gravedad: 'avisa' }),
+      )
     })
   })
 
