@@ -39,7 +39,11 @@ const productos = () => ({
 describe('el sitio: lo que impide publicar', () => {
   const casos: [string, (d: any) => void, string][] = [
     ['el titular sin la coma final',            (d) => { d.hero.titular[1] = 'MEXICANO' },                    'hero.titular.1'],
-    ['el titular con dos comas',                (d) => { d.hero.titular[1] = '70% CACAO, DE VERDAD,' },       'hero.titular.1'],
+    // Aislado del tope de 20 caracteres: '70% CACAO, DE VERDAD,' mide 21 y
+    // se pasa de largo, así que ese caso quedaba verde aunque el refine de
+    // la coma se rompiera entero —el tope solo alcanzaba para sostenerlo.
+    // Con 17 caracteres, lo único que puede tirar el test es la coma.
+    ['el titular con dos comas',                (d) => { d.hero.titular[1] = 'CACAO, DE VERDAD,' },           'hero.titular.1'],
     ['un renglón de más en el titular',         (d) => { d.hero.titular.push('Y PUNTO.') },                   'hero.titular'],
     ['un renglón de menos en el titular',       (d) => { d.hero.titular.pop() },                              'hero.titular'],
     ['la insignia con espacio normal',          (d) => { d.anaquel.pesoInsignia = '70 g' },                   'anaquel.pesoInsignia'],
@@ -74,7 +78,12 @@ describe('el sitio: lo que impide publicar', () => {
     // La razón entera por la que existe validacion.ts. «Expected string,
     // received number» no le dice nada a nadie, y «Invalid option» encima
     // está en inglés.
-    const JERGA = /string|number|boolean|array|invalid|expected|received|required|undefined|null\b/i
+    //
+    // Con frontera de palabra en las dos puntas: sin ella, «string» matchea
+    // adentro de «restringido» y el guard empieza a dar falsos positivos
+    // sobre copy perfectamente en castellano. Y con `object`, que está en
+    // JERGA_DE_ZOD (validacion.ts) y acá faltaba.
+    const JERGA = /\b(string|number|boolean|array|object|invalid|expected|received|required|undefined|null)\b/i
     for (const [, cambia] of casos) {
       for (const p of validar(esquemaSitio, conCambio(sitio(), cambia as never), CONTEOS)) {
         expect(p.titulo, `${p.campo}: «${p.titulo}»`).not.toMatch(JERGA)
@@ -106,6 +115,11 @@ describe('los productos y las fichas', () => {
   it.each(casos)('caza %s', (_n, esquema, cambia, ruta) => {
     const problemas = validar(esquema as never, conCambio(productos(), cambia as never), CONTEOS)
     expect(problemas.map((p) => p.campo)).toContain(ruta)
+    // Misma aserción que el bloque del sitio: sin ella, un `validar()` que
+    // devolviera avisos en vez de impedimentos también dejaría pasar este
+    // test —hoy es inocuo porque `toContain` ya falla sobre un array vacío,
+    // pero es la misma asimetría de rigor entre los dos bloques.
+    expect(problemas.every((p) => p.gravedad === 'impide')).toBe(true)
   })
 
   it('caza un bloque de ficha con una forma que no existe', () => {
