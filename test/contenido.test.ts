@@ -3,10 +3,16 @@
  *
  * El primero es la constitución de la carpeta: `src/contenido/**` tiene que
  * poder correr en TRES lugares —el navegador de la clienta, la función
- * serverless y vitest— así que no puede tocar `node:*`, ni Astro, ni el
- * alias `@/` (que solo resuelven el bundler y vitest, no el navegador).
- * Sin este guard, la primera vez que alguien importe `node:fs` para una
- * comodidad, el panel deja de compilar en el navegador y nadie sabe por qué.
+ * serverless y vitest—, y el spec dice qué se puede traer de afuera, no qué
+ * no: «dependencias externas permitidas: `zod`, `../tokens/color` y
+ * `../tokens/contrast`». Por eso el guard es LISTA BLANCA.
+ *
+ * Lo era al revés y no alcanzaba ni de cerca: prohibía `node:`, `astro` y
+ * `@/`, así que `from 'fs'`, `from 'path'` y `from 'lodash'` pasaban los
+ * tres sin que nada dijera nada — y cualquiera de esos rompe el panel en el
+ * navegador exactamente igual que `node:fs`. Una lista negra solo prohíbe
+ * las tres formas que alguien se acordó de escribir; la propiedad que hay
+ * que sostener es la otra.
  */
 import { describe, it, expect, expectTypeOf } from 'vitest'
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
@@ -47,41 +53,114 @@ import * as tokens from '../src/tokens/color'
 // reescriba la fachada, y estos tests validan CONTRA esa foto.
 import fixture from './fixtures/contenido-2026-09-10.json'
 
+/*
+ * Cuatro formas de traer un módulo, todas miradas por igual: el estático
+ * `from '...'` (cubre también el re-export, que conserva el `from`), el
+ * dinámico `import('...')`, el bare `import '...'` por efecto secundario y
+ * el `require('...')` de CommonJS. Un patrón que solo mirara `from` es un
+ * recordatorio, no un guard.
+ *
+ * El orden de la alternancia importa: `import(` va ANTES que `import ` —si
+ * no, `import('x')` se prueba primero contra la forma que exige un espacio
+ * y no matchea.
+ */
+const FORMAS_DE_IMPORTAR =
+  /(?:\bfrom\s+|\bimport\s*\(\s*|\bimport\s+|\brequire\s*\(\s*)['"]([^'"]+)['"]/g
+
+/** Todo lo que un archivo trae de afuera, sin los comentarios. */
+const especificadoresDe = (fuente: string): string[] => {
+  // Los comentarios quedan fuera: este mismo archivo los nombra.
+  const codigo = fuente
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '')
+  return [...codigo.matchAll(FORMAS_DE_IMPORTAR)].map((m) => m[1])
+}
+
+/**
+ * `null` si ese especificador se puede traer; si no, POR QUÉ no.
+ *
+ * La regla es la del spec, en positivo: `zod` —la única dependencia
+ * externa declarada— o una ruta relativa sin extensión, que es lo que
+ * resuelven por igual el navegador, la función serverless y vitest. Los
+ * `../tokens/color` y `../tokens/contrast` que el spec nombra entran por
+ * ser relativos, no por estar en una lista aparte.
+ *
+ * La excepción del `.json` de `datos/` va declarada y acotada: el contenido
+ * SÍ se importa con extensión porque es un JSON, y ningún otro archivo con
+ * extensión tiene por qué entrar por esa puerta.
+ */
+const porQueNoSePuede = (especificador: string): string | null => {
+  if (especificador === 'zod') return null
+  if (!/^\.\.?\//.test(especificador)) {
+    return 'no es «zod» ni una ruta relativa (./ o ../): en el navegador no lo resuelve nadie'
+  }
+  if (/\.json$/i.test(especificador)) {
+    return /(^|\/)datos\/[^/]+\.json$/.test(especificador)
+      ? null
+      : 'el único .json que esta carpeta importa es uno de datos/'
+  }
+  if (/\.[a-z]+$/i.test(especificador)) {
+    return 'las rutas relativas van sin extensión'
+  }
+  return null
+}
+
 describe('la capa de contenido', () => {
-  it('src/contenido/ no importa node:, ni Astro, ni el alias @/', () => {
+  it('src/contenido/ solo importa zod y rutas relativas sin extensión', () => {
     const infractores: string[] = []
     const archivos = readdirSync('src/contenido', { recursive: true, encoding: 'utf8' })
 
     for (const archivo of archivos) {
       if (!archivo.endsWith('.ts')) continue
-      const fuente = readFileSync(`src/contenido/${archivo}`, 'utf8')
-      // Los comentarios quedan fuera: este mismo archivo los nombra.
-      const codigo = fuente
-        .replace(/\/\*[\s\S]*?\*\//g, '')
-        .replace(/^\s*\/\/.*$/gm, '')
-
-      // Cuatro formas de traer un módulo, todas prohibidas por igual: el
-      // estático `from '...'` (cubre también el re-export, que conserva
-      // el `from`), el dinámico `import('...')`, el bare `import '...'`
-      // por efecto secundario, y el `require('...')` de CommonJS. Un
-      // patrón que solo mirara `from` es un recordatorio, no un guard.
-      const formasDeImportar = (prefijo: string) =>
-        new RegExp(
-          `(?:\\bfrom\\s+|\\bimport\\s*\\(\\s*|\\bimport\\s+|\\brequire\\s*\\(\\s*)['"]${prefijo}`,
-        )
-
-      const prohibidos = [
-        [formasDeImportar('node:'), 'node:'],
-        [formasDeImportar('astro'), 'astro'],
-        [formasDeImportar('@/'), 'el alias @/'],
-      ] as const
-
-      for (const [patron, motivo] of prohibidos) {
-        if (patron.test(codigo)) infractores.push(`${archivo} importa ${motivo}`)
+      for (const especificador of especificadoresDe(readFileSync(`src/contenido/${archivo}`, 'utf8'))) {
+        const motivo = porQueNoSePuede(especificador)
+        if (motivo !== null) infractores.push(`${archivo} importa «${especificador}»: ${motivo}`)
       }
     }
 
     expect(infractores).toEqual([])
+  })
+
+  it('el guard es lista blanca: lo que la lista negra dejaba pasar ahora no pasa', () => {
+    // Los tres que pasaban los tres prohibidos de la versión anterior. Cada
+    // uno rompe el panel en el navegador igual que un `node:fs`, y ninguno
+    // decía ni «node:», ni «astro», ni «@/».
+    const traidos = (fuente: string) =>
+      especificadoresDe(fuente).map((e) => [e, porQueNoSePuede(e)] as const)
+
+    expect(traidos(`import { readFileSync } from 'fs'`)).toEqual([
+      ['fs', 'no es «zod» ni una ruta relativa (./ o ../): en el navegador no lo resuelve nadie'],
+    ])
+    expect(traidos(`import path from 'path'`)).toEqual([
+      ['path', 'no es «zod» ni una ruta relativa (./ o ../): en el navegador no lo resuelve nadie'],
+    ])
+    expect(traidos(`import x from 'lodash'`)).toEqual([
+      ['lodash', 'no es «zod» ni una ruta relativa (./ o ../): en el navegador no lo resuelve nadie'],
+    ])
+
+    // Y lo legítimo sigue siendo legítimo: el import relativo de al lado,
+    // la única dependencia externa declarada, los tokens que el spec
+    // nombra, y el JSON de datos/ con su extensión.
+    for (const bueno of [
+      `import x from './carga'`,
+      `import { z } from 'zod'`,
+      `import { sabor } from '../tokens/color'`,
+      `import { grupo } from '../../campos'`,
+      `import datos from './datos/sitio.json'`,
+      `export * from './conteos'`,
+      `const x = await import('../color-sabor')`,
+      `import './efecto-secundario'`,
+    ]) {
+      expect(traidos(bueno).map(([, motivo]) => motivo), bueno).toEqual([null])
+    }
+
+    // La extensión de más y el .json fuera de datos/ también caen.
+    expect(traidos(`import x from './carga.ts'`)).toEqual([
+      ['./carga.ts', 'las rutas relativas van sin extensión'],
+    ])
+    expect(traidos(`import x from '../paquete.json'`)).toEqual([
+      ['../paquete.json', 'el único .json que esta carpeta importa es uno de datos/'],
+    ])
   })
 
   it('palabraProhibida encuentra la palabra, incluidas las formas en plural', () => {
