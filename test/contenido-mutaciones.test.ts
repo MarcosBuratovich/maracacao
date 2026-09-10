@@ -114,6 +114,14 @@ describe('los productos y las fichas', () => {
     ['un nombre de archivo con mayúsculas', esquemaSabores, (d) => { d.sabores[0].slug = 'Jengibre' }, 'sabores.0.slug'],
     ['la lista de barras vacía',     esquemaSabores, (d) => { d.sabores = [] },                        'sabores'],
     ['unos ingredientes vacíos',     esquemaSabores, (d) => { d.sabores[0].ingredientes = '' },        'sabores.0.ingredientes'],
+    // La mutación que el spec §2 enumera y que faltaba: faltaba porque
+    // hasta ahora no había nada que la cazara. Los tres campos que viajan
+    // al `<script type="application/json">` del anaquel no tenían la regla
+    // del `<`; el escape de `jsonParaHtml()` desactiva la mina al
+    // RENDERIZAR, pero el dato entraba igual.
+    ['un </script en los ingredientes', esquemaSabores, (d) => { d.sabores[0].ingredientes = 'Cacao </script>' }, 'sabores.0.ingredientes'],
+    ['un < en el nombre del sabor',   esquemaSabores, (d) => { d.sabores[0].nombre = 'Canela <b>' },   'sabores.0.nombre'],
+    ['un < en el porcentaje de cacao', esquemaSabores, (d) => { d.sabores[0].cacao = 'Cacao <70%' },   'sabores.0.cacao'],
   ]
 
   it.each(casos)('caza %s', (_n, esquema, cambia, ruta) => {

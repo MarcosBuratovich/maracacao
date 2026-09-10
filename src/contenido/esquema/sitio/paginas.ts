@@ -10,8 +10,7 @@
  * agregaría un nivel de anidamiento que no existe en el contenido
  * (`paginas.fichasTecnicas.titulo` en vez de `fichasTecnicas.titulo`).
  */
-import { grupo, lista, texto, parrafo, ruta, ancla, medida } from '../../campos'
-import { sinHtml } from './cabecera'
+import { grupo, lista, texto, parrafo, ruta, ancla, medida, sinHtml } from '../../campos'
 
 const enFichas = { seccion: 'fichas' } as const
 const enBuscadores = { seccion: 'buscadores' } as const
@@ -43,8 +42,8 @@ export const camposDePaginas = {
       // Mismos topes que titulo/descripcion de la portada (cabecera.ts) y
       // la misma regla de `& < > "`: el <title> y la meta description de
       // esta página se escriben dentro del <head>, donde esos caracteres
-      // no se escapan solos. `sinHtml` sale de cabecera.ts para no pagar
-      // esa regla dos veces.
+      // no se escapan solos. `sinHtml` sale de `campos.ts` para no pagar esa
+      // regla dos veces.
       titulo: sinHtml(
         texto({
           ...enBuscadores,

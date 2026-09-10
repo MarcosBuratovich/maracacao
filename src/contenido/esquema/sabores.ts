@@ -10,7 +10,7 @@
  * un texto entra o no lo decide el medidor de la fase 4 midiendo la página
  * de verdad; el panel dice «tope de seguridad», nunca «cabe».
  */
-import { grupo, lista, texto, precio, numero, slug, archivo, claveSabor, url } from '../campos'
+import { grupo, lista, texto, precio, numero, slug, archivo, claveSabor, url, sinMenorQue } from '../campos'
 import { resuelveColor, mejorTinta, contrasteSuficiente } from '../color-sabor'
 
 const sabor = grupo({
@@ -36,29 +36,42 @@ const sabor = grupo({
       seccion: 'sabores',
       ayuda: 'De aquí salen el color de fondo y el color de la letra de esta barra.',
     }),
-    nombre: texto({
-      etiqueta: 'Nombre del sabor',
-      seccion: 'sabores',
-      ayuda: 'Como está impreso en la envoltura. Aparece en el anaquel y en el catálogo.',
-      maxCaracteres: 40,
-    }),
-    cacao: texto({
-      etiqueta: 'Porcentaje de cacao',
-      seccion: 'sabores',
-      ayuda: 'La línea chica bajo el nombre: «Cacao 70%» o «Chocolate blanco».',
-      maxCaracteres: 30,
-    }),
+    // Los TRES campos que viajan al `<script type="application/json">` del
+    // anaquel (index.astro:45-57) llevan la regla del `<` del spec §1.2.
+    // `jsonParaHtml()` ya escapa al renderizar, así que la mina está
+    // desactivada — pero el spec pide la regla de DATO ADEMÁS del escape:
+    // el escape lo puede revertir alguien que no sepa para qué estaba, y
+    // entonces el dato ya guardado explota. `nombre` viaja además al
+    // JSON-LD de los buscadores, que es otro `<script>`.
+    nombre: sinMenorQue(
+      texto({
+        etiqueta: 'Nombre del sabor',
+        seccion: 'sabores',
+        ayuda: 'Como está impreso en la envoltura. Aparece en el anaquel y en el catálogo.',
+        maxCaracteres: 40,
+      }),
+    ),
+    cacao: sinMenorQue(
+      texto({
+        etiqueta: 'Porcentaje de cacao',
+        seccion: 'sabores',
+        ayuda: 'La línea chica bajo el nombre: «Cacao 70%» o «Chocolate blanco».',
+        maxCaracteres: 30,
+      }),
+    ),
     precio: precio({
       etiqueta: 'Precio de la barra',
       seccion: 'sabores',
       ayuda: 'En pesos, sin centavos. De aquí sale el «desde» de la pestaña Para negocios.',
     }),
-    ingredientes: texto({
-      etiqueta: 'Ingredientes',
-      seccion: 'sabores',
-      ayuda: 'Copiados de la envoltura impresa, en el mismo orden. Es información legal.',
-      maxCaracteres: 190,
-    }),
+    ingredientes: sinMenorQue(
+      texto({
+        etiqueta: 'Ingredientes',
+        seccion: 'sabores',
+        ayuda: 'Copiados de la envoltura impresa, en el mismo orden. Es información legal.',
+        maxCaracteres: 190,
+      }),
+    ),
     catalogo: url({
       etiqueta: 'Página en el catálogo',
       seccion: 'sabores',

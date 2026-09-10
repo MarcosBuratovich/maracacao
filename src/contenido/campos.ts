@@ -262,6 +262,69 @@ export const medida = (meta: Base & { maxCaracteres: number }) =>
     { control: 'medida', ...meta },
   )
 
+/*
+ * Las DOS reglas de carácter del spec §1.2, en un solo lugar.
+ *
+ * Son reglas de DATO, no de diseño: bloquean desde el esquema porque el
+ * carácter no se escapa solo en el lugar al que ese campo viaja. Viven
+ * juntas —y no cada una en el archivo que la estrenó— porque son la misma
+ * familia con dos alcances distintos, y una familia repartida es una
+ * familia que se desalinea: el día que haya que tocar el mecanismo, se
+ * toca en un lado y no en el otro.
+ *
+ * El cast existe porque `.refine()` de Zod devuelve el mismo tipo pero
+ * TypeScript no lo sabe a través de un genérico tan amplio. Y va como
+ * `.refine()` y no como un constructor nuevo a propósito: el registro del
+ * panel SÍ sigue la cadena de padres a través de `.refine()` (a diferencia
+ * de `.optional()`), así que la etiqueta y la ayuda sobreviven.
+ */
+const conRegla = <T extends { refine: unknown }>(
+  campo: T,
+  pasa: (v: string) => boolean,
+  mensaje: string,
+): T => (campo as unknown as { refine: (p: (v: string) => boolean, m: string) => T }).refine(pasa, mensaje)
+
+/** Ni `&` ni `<` ni `>` ni `"` en lo que viaja al <head>. */
+export const SIN_CARACTERES_DE_HTML = /^[^&<>"]*$/
+
+/**
+ * Para el <title> y la meta descripción, que se escriben dentro de
+ * atributos y elementos del <head>, donde ninguno de esos cuatro se escapa
+ * solo: el resultado es una etiqueta rota y Google mostrando basura.
+ */
+export const sinHtml = <T extends { refine: unknown }>(campo: T) =>
+  conRegla(
+    campo,
+    (v) => SIN_CARACTERES_DE_HTML.test(v),
+    'No se pueden usar los signos & < > ni las comillas dobles: rompen la ficha que ve Google.',
+  )
+
+/** Ningún `<` en lo que viaja adentro de un `<script>`. */
+export const SIN_MENOR_QUE = /^[^<]*$/
+
+/**
+ * Para los campos que se imprimen adentro de un `<script>`: el JSON del
+ * anaquel (`<script type="application/json" id="datos-anaquel">`) y el
+ * JSON-LD de los buscadores.
+ *
+ * Un `</script` en cualquiera de ellos CIERRA la etiqueta, mata todo el JS
+ * de la página y deja los seis pasos de «Cómo catar» invisibles para
+ * siempre. `jsonParaHtml()` (fase 0) ya escapa el `<` al renderizar, así
+ * que la mina está desactivada — pero el spec pide la regla de DATO
+ * ADEMÁS del escape, en profundidad: el escape lo puede revertir alguien
+ * que no sepa para qué estaba, y entonces el dato ya guardado explota.
+ *
+ * Solo el `<` y no los cuatro de `sinHtml`: adentro de un `<script>` un
+ * `&`, un `>` o una comilla no rompen nada, y prohibirlos sería prohibirle
+ * a la clienta escribir «Jengibre & naranja» sin ninguna razón.
+ */
+export const sinMenorQue = <T extends { refine: unknown }>(campo: T) =>
+  conRegla(
+    campo,
+    (v) => SIN_MENOR_QUE.test(v),
+    'No se puede usar el signo «<»: rompe la página donde este texto se publica.',
+  )
+
 /**
  * El valor FIJO que dice de qué forma es un bloque: 'parrafo', 'lista',
  * 'tabla'. No es un campo que se edite —la clienta elige la forma al

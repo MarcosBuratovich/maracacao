@@ -7,26 +7,12 @@
  * anidamiento que no existe en el contenido (`cabecera.hero.sub` en vez de
  * `hero.sub`), cambiando todas las rutas del sistema.
  */
-import { grupo, lista, tupla, texto, parrafo, ancla, correo } from '../../campos'
-
-/**
- * Ni `&` ni `<` ni `>` ni `"` en lo que viaja al <head>.
- *
- * El <title> y la meta descripción se escriben dentro de atributos y de
- * elementos del <head>, donde un carácter de estos no se escapa solo: el
- * resultado es una etiqueta rota y Google mostrando basura. La regla es de
- * DATO, no de diseño, así que bloquea desde el esquema.
- */
-export const SIN_CARACTERES_DE_HTML = /^[^&<>"]*$/
-// Exportada: los dos campos SEO de la ficha técnica (Tarea 12) necesitan la
-// misma regla. Escribirla de nuevo ahí sería pagar otra vez el patrón que
-// esta capa ya pagó cuatro veces — la misma regla en dos lugares que se
-// desalinean sin que nada avise.
-export const sinHtml = <T extends { refine: unknown }>(campo: T) =>
-  (campo as unknown as { refine: (p: (v: string) => boolean, m: string) => T }).refine(
-    (v) => SIN_CARACTERES_DE_HTML.test(v),
-    'No se pueden usar los signos & < > ni las comillas dobles: rompen la ficha que ve Google.',
-  )
+// `sinHtml` sale de `campos.ts`, junto a `sinMenorQue`: las dos reglas de
+// carácter del spec §1.2 viven en el mismo lugar. Vivía acá porque este
+// archivo fue el primero en necesitarla, y así el día que apareció la
+// segunda regla —la del `<` de los campos del anaquel— iban a quedar en
+// dos archivos distintos, que es como se desalinean.
+import { grupo, lista, tupla, texto, parrafo, ancla, correo, sinHtml } from '../../campos'
 
 const enBuscadores = { seccion: 'buscadores' } as const
 const enPortada = { seccion: 'portada' } as const
