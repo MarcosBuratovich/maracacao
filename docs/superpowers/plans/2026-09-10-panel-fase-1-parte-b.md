@@ -4330,13 +4330,30 @@ describe('las ocho aserciones de forma', () => {
     }
   })
 
-  it('6 · el JSON del anaquel se renderiza y vuelve a parsear', () => {
-    // La mina de la fase 0: un `</script` en un ingrediente mataba todo el
-    // JS de la página y dejaba los 6 pasos de «Cómo catar» invisibles para
-    // siempre. `jsonParaHtml` la desactivó; esto lo mantiene desactivado.
-    const datos = sabores.map((s) => ({ slug: s.slug, ingredientes: s.ingredientes }))
-    expect(() => JSON.parse(jsonParaHtml(datos).replace(/\\u003c/g, '<'))).not.toThrow()
-    expect(jsonParaHtml(datos)).not.toContain('</script')
+  it('6 · el JSON del anaquel sale escapado, aunque el contenido traiga un </script', () => {
+    // La mina de la fase 0: `set:html={JSON.stringify(datosAnaquel)}` sin
+    // escapar (index.astro:777). Un «</script» en cualquier campo CIERRA el
+    // <script> del HTML, mata todo el JS de la página y deja los seis pasos
+    // de «Cómo catar» invisibles para siempre.
+    //
+    // OJO CON LO QUE ESTE TEST TIENE QUE PROBAR: hoy NINGÚN ingrediente real
+    // trae un «<», así que afirmar sobre el contenido real deja
+    // `jsonParaHtml` y `JSON.stringify` dando lo mismo byte a byte — y el
+    // test queda verde aunque alguien revierta el escape, que es justo la
+    // regresión que dice evitar. El caso adversario se inyecta a mano.
+    //
+    // (Y `JSON.parse` no es el que corre riesgo: nunca tira por un «<»
+    // adentro de un string. El que corta el <script> es el parser de HTML.)
+    const conMina = [
+      ...sabores.map((s) => ({ slug: s.slug, ingredientes: s.ingredientes })),
+      { slug: 'prueba', ingredientes: 'Cacao </script><script>alert(1)</script>' },
+    ]
+    const salida = jsonParaHtml(conMina)
+
+    expect(salida).not.toContain('</script')
+    expect(salida).toContain('\\u003c/script')
+    // Escapar para el HTML no puede cambiar el dato que el navegador lee.
+    expect(JSON.parse(salida)).toEqual(conMina)
   })
 
   it('7 · el sabor con el que abre el anaquel existe', () => {
@@ -4391,6 +4408,7 @@ Es el test más importante de la fase; merece la prueba completa. Una mutación 
 3. En `sitio.json`, sacale la coma final a `hero.titular[1]` → la 3 roja (y `cargar()` truena antes, en el build: pegá las dos cosas).
 4. En `sitio.json`, cambiá el espacio duro de `anaquel.pesoInsignia` por uno normal → la 8 roja (y `medida` la rechaza en `cargar()`).
 5. En `derivados.ts`, cambiá `precioDe(f.gotas, 'jengibreYNaranja')` por `precioDesde(f.gotas)` → la igualdad 1 roja en `gotas.precioJengibre`: 258 donde va 340.
+6. **La que prueba que la aserción 6 sirve**, y sin la cual esa aserción no vale nada: en `src/lib/json-en-html.ts`, sacá el `.replace(/</g, '\\u003c')` y dejá el `JSON.stringify` pelado → el test 6 **rojo** en `not.toContain('</script')`. Restaurá con `git checkout src/lib/json-en-html.ts`, verde.
 
 Pegá las cinco salidas en rojo y la restaurada en verde.
 
