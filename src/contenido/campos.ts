@@ -42,6 +42,8 @@ export type Seccion =
   | 'fichas'
   | 'buscadores'
   | 'accesibilidad'
+  /** La página que se ve cuando un enlace está roto. */
+  | 'no-encontrada'
 
 /**
  * Cómo se rompe el slot si el texto no entra. Lo usa el medidor (fase 4)

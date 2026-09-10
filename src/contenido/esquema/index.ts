@@ -7,12 +7,14 @@
  * candados de test.
  */
 import type { z } from 'zod'
+import { esquemaSitio } from './sitio'
 import { esquemaSabores } from './sabores'
 import { esquemaFichas } from './fichas'
 
-export type IdDocumento = 'sabores' | 'fichas'
+export type IdDocumento = 'sitio' | 'sabores' | 'fichas'
 
 export const DOCUMENTOS = {
+  sitio: esquemaSitio,
   sabores: esquemaSabores,
   fichas: esquemaFichas,
 } as const satisfies Readonly<Record<IdDocumento, z.ZodType>>

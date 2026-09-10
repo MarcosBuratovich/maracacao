@@ -31,6 +31,8 @@ import { camposDeProducto } from '../src/contenido/esquema/sitio/producto'
 import { camposDeExperiencia } from '../src/contenido/esquema/sitio/experiencia'
 import { camposDeNegocio } from '../src/contenido/esquema/sitio/negocio'
 import { camposDeContacto } from '../src/contenido/esquema/sitio/contacto'
+import { camposDePaginas } from '../src/contenido/esquema/sitio/paginas'
+import { esquemaSitio } from '../src/contenido/esquema/sitio'
 import { fichasBase } from '../src/fichas/base'
 import * as tokens from '../src/tokens/color'
 // La foto congelada, no el módulo: el fixture no se mueve cuando la Tarea 13
@@ -1753,6 +1755,47 @@ describe('la capa de contenido', () => {
     })
   })
 
+  describe('el esquema de páginas', () => {
+    const paginas = grupo({
+      etiqueta: 'Páginas', seccion: 'fichas', ayuda: 'Prueba.',
+      campos: camposDePaginas,
+    })
+    const hoy = () => {
+      const m = JSON.parse(JSON.stringify(fixture.marca))
+      return { fichasTecnicas: m.fichasTecnicas, noEncontrada: m.noEncontrada, footer: m.footer }
+    }
+
+    it('valida el contenido de hoy', () => {
+      expect(validar(paginas, hoy(), {})).toEqual([])
+    })
+
+    it('toda hoja tiene etiqueta, ayuda y sección', () => {
+      recorre(paginas, (ruta, meta) => {
+        expect(meta?.etiqueta, `sin etiqueta: ${ruta}`).toBeTruthy()
+        expect(meta?.ayuda, `sin ayuda: ${ruta}`).toBeTruthy()
+        expect(meta?.seccion, `sin sección: ${ruta}`).toBeTruthy()
+      })
+    })
+
+    it('los dos espacios duros de footer.productos se exigen', () => {
+      // El modo de falla es invisible en el escritorio y evidente en el
+      // celular: la «g» sola en el renglón siguiente.
+      const roto = hoy()
+      roto.footer.productos[0].texto = 'Barras 70 g' // espacio NORMAL, a propósito
+      const problemas = validar(paginas, roto, {})
+      expect(problemas.map((p) => p.campo)).toContain('footer.productos.0.texto')
+    })
+
+    it('footer.productos nombra el elemento con su texto, no con «Enlace» a secas', () => {
+      // Igual que el test de «el metadato dice lo que significa»: `elemento`
+      // guarda el ESQUEMA del elemento, y su propio registro trae `nombra`.
+      const metaLista = panel.get(camposDePaginas.footer.shape.productos) as MetaCampo
+      const nombra = (panel.get(metaLista.elemento as z.ZodType) as MetaCampo).nombra
+      expect(nombra?.({ texto: 'Fichas técnicas' })).toBe('Fichas técnicas')
+      expect(nombra?.({})).toBe('Enlace')
+    })
+  })
+
   describe('el contraste de la banda de cada sabor', () => {
     const unSabor = {
       orden: 1, slug: 'canela', clave: 'canela', nombre: 'Canela', cacao: 'Cacao 70%',
@@ -1778,6 +1821,52 @@ describe('la capa de contenido', () => {
       expect(tokens.saboresSoloDisplay).toContain('hierbabuena')
       const hierbabuena = { ...unSabor, slug: 'hierbabuena', clave: 'hierbabuena', nombre: 'Hierbabuena' }
       expect(validar(esquemaSabores, doc(hierbabuena), {})).toEqual([])
+    })
+  })
+
+  describe('el documento del sitio, entero', () => {
+    const CONTEOS = { sabores: 15, gotas: 6, polvo: 8, recetas: 4, preguntas: 8, pasos: 6, ingredientes: 5 }
+
+    it('los 21 bloques están, en el orden de la página', () => {
+      // El orden de las claves del esquema es el orden del JSON y el orden
+      // en que el panel dibuja las secciones. Si alguien reordena los
+      // spread de sitio.ts, el JSON entero se reescribe y el diff del
+      // commit siguiente es de 900 líneas sin que haya cambiado nada.
+      const bloques = Object.keys((esquemaSitio as unknown as { _zod: { def: { shape: object } } })._zod.def.shape)
+      expect(bloques).toEqual([
+        'titulo', 'descripcion', 'skipLink', 'marca', 'nav', 'hero',
+        'postura', 'anaquel', 'minis', 'gotas', 'polvoCard', 'polvo',
+        'catar', 'recetas', 'nosotros',
+        'negocios', 'preguntas', 'contacto',
+        'fichasTecnicas', 'noEncontrada', 'footer',
+      ])
+    })
+
+    it('valida el contenido de hoy, entero y con avisos', () => {
+      // La prueba de que el esquema describe EXACTAMENTE lo que hay. Si
+      // sobra una clave o falta una, esto lo dice con la ruta.
+      expect(validar(esquemaSitio, JSON.parse(JSON.stringify(fixture.marca)), CONTEOS)).toEqual([])
+    })
+
+    it('todas las hojas tienen etiqueta, ayuda y sección', () => {
+      const rutas: string[] = []
+      recorre(esquemaSitio, (ruta, meta) => {
+        expect(meta?.etiqueta, `sin etiqueta: ${ruta}`).toBeTruthy()
+        expect(meta?.ayuda, `sin ayuda: ${ruta}`).toBeTruthy()
+        expect(meta?.seccion, `sin sección: ${ruta}`).toBeTruthy()
+        rutas.push(ruta)
+      })
+      expect(new Set(rutas).size, 'hay rutas repetidas').toBe(rutas.length)
+      expect(rutas.length).toBeGreaterThan(190)
+    })
+
+    it('ninguna etiqueta ni ayuda usa una palabra que la marca no usa', () => {
+      // El filtro de MARCA vale también para lo que lee la clienta en el
+      // panel. El de MAQUETA no: el panel necesita la palabra «Borrador».
+      recorre(esquemaSitio, (ruta, meta) => {
+        expect(palabraProhibida(meta?.etiqueta ?? ''), `en la etiqueta de ${ruta}`).toBeNull()
+        expect(palabraProhibida(meta?.ayuda ?? ''), `en la ayuda de ${ruta}`).toBeNull()
+      })
     })
   })
 })
