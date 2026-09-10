@@ -2680,10 +2680,19 @@ describe('el esquema de cabecera', () => {
   it('el renglón 2 del titular exige una coma y solo una', () => {
     // La plantilla le SACA la coma final y pinta una roja en su lugar. Con
     // dos comas, la del medio se queda: «70% CACAO, DE VERDAD,,» en el h1.
+    // El valor de prueba tiene que caber en el tope de 20 caracteres, o el
+    // problema sale por LARGO y no por la coma — y entonces el test pasa
+    // igual con la regla de la coma rota. «70% CACAO, DE VERDAD,» mide 21 y
+    // hacía exactamente eso: afirmaba la ruta, que las dos reglas comparten.
     const datos = hoy()
-    datos.hero.titular = ['CHOCOLATE', '70% CACAO, DE VERDAD,', 'MEXICANO.']
+    datos.hero.titular = ['CHOCOLATE', 'MEXICANO, RICO,', 'CACAO.']
     const problemas = validar(cabecera, datos, { sabores: 15 })
-    expect(problemas.map((p) => p.campo)).toContain('hero.titular.1')
+    // Y se afirma el MENSAJE, no solo la ruta: `hero.titular.1` es la misma
+    // para el tope de caracteres y para la coma, así que la ruta sola no
+    // distingue cuál de las dos reglas se disparó.
+    expect(problemas).toHaveLength(1)
+    expect(problemas[0].campo).toBe('hero.titular.1')
+    expect(problemas[0].titulo).toMatch(/coma/i)
   })
 })
 ```
@@ -2697,8 +2706,8 @@ Expected: PASS los tres.
 
 Mutaciones, una por vez:
 1. Bajá `maxCaracteres` de `hero.sub` a 50 → el primero rojo, con el mensaje que va a leer la clienta.
-2. Sacá la `ayuda` de `nav.catalogo` → **`pnpm typecheck` da error** (la ayuda es obligatoria: ese es el punto del diseño, y vitest no lo vería). Pegá el error del compilador; eso ES la prueba.
-3. Cambiá el regex del renglón 2 a `/,$/` → el tercero rojo.
+2. Sacá la `ayuda` de `nav.catalogo` → **`pnpm typecheck` da error** (la ayuda es obligatoria: ese es el punto del diseño). Pegá el error del compilador. Y `vitest run` **también** lo caza, por otra vía: el test «toda hoja tiene etiqueta, ayuda y sección» lee `ayuda` en runtime. Son dos detectores independientes de la misma regla, que es mejor de lo que yo suponía al escribir esto.
+3. Cambiá el regex del renglón 2 a `/,$/` → el tercero rojo. (Con el valor corregido sí distingue: «MEXICANO, RICO,» mide 15, así que no toca el tope, y la regla mutada lo acepta mientras la buena lo rechaza.)
 
 - [ ] **Paso 8: Compuerta y commit**
 
