@@ -46,6 +46,7 @@ export const camposDeExperiencia = {
           ...enCatar,
           etiqueta: 'Paso',
           ayuda: 'Uno de los pasos para catar.',
+          nombra: (v) => (v as { nombre?: string }).nombre ?? 'Paso',
           campos: {
             nombre: texto({
               ...enCatar,
@@ -161,6 +162,7 @@ export const camposDeExperiencia = {
           ...enRecetas,
           etiqueta: 'Receta',
           ayuda: 'Una de las tarjetas del carrusel.',
+          nombra: (v) => (v as { titulo?: string }).titulo ?? 'Receta',
           campos: {
             kicker: texto({
               ...enRecetas,
