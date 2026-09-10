@@ -128,11 +128,11 @@ export const camposDeCabecera = {
         ayuda: 'En el orden en que aparecen, arriba y en el pie.',
         minItems: 3,
         maxItems: 12,
-        nombra: (v) => (v as { texto?: string }).texto ?? 'Entrada',
         elemento: grupo({
           ...enPortada,
           etiqueta: 'Entrada del menú',
           ayuda: 'Un renglón del menú.',
+          nombra: (v) => (v as { texto?: string }).texto ?? 'Entrada',
           campos: {
             ancla: ancla({
               ...enPortada,
