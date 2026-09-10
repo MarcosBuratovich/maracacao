@@ -83,13 +83,31 @@ describe('las ocho aserciones de forma', () => {
     }
   })
 
-  it('6 · el JSON del anaquel se renderiza y vuelve a parsear', () => {
-    // La mina de la fase 0: un `</script` en un ingrediente mataba todo el
-    // JS de la página y dejaba los 6 pasos de «Cómo catar» invisibles para
-    // siempre. `jsonParaHtml` la desactivó; esto lo mantiene desactivado.
-    const datos = sabores.map((s) => ({ slug: s.slug, ingredientes: s.ingredientes }))
-    expect(() => JSON.parse(jsonParaHtml(datos).replace(/\\u003c/g, '<'))).not.toThrow()
-    expect(jsonParaHtml(datos)).not.toContain('</script')
+  it('6 · el JSON del anaquel sale escapado, aunque el contenido traiga un </script', () => {
+    // La mina de la fase 0: `set:html={JSON.stringify(datosAnaquel)}` sin
+    // escapar (index.astro:777). Un «</script» en cualquier campo CIERRA el
+    // <script> del HTML, mata todo el JS de la página y deja los seis pasos
+    // de «Cómo catar» invisibles para siempre — `html.js [data-revelar]
+    // {opacity:0}` nunca se apaga.
+    //
+    // OJO CON LO QUE ESTE TEST TIENE QUE PROBAR, porque la primera versión
+    // no probaba nada: hoy NINGÚN ingrediente real trae un «<», así que
+    // afirmar sobre el contenido real deja `jsonParaHtml` y `JSON.stringify`
+    // dando lo mismo byte a byte — y el test seguía verde aunque alguien
+    // revirtiera el escape. El caso adversario hay que inyectarlo a mano.
+    const conMina = [
+      ...sabores.map((s) => ({ slug: s.slug, ingredientes: s.ingredientes })),
+      { slug: 'prueba', ingredientes: 'Cacao </script><script>alert(1)</script>' },
+    ]
+    const salida = jsonParaHtml(conMina)
+
+    // Lo que va al HTML no puede cerrar el <script>...
+    expect(salida).not.toContain('</script')
+    // ...y el escape tiene que haberse ejecutado de verdad.
+    expect(salida).toContain('\\u003c/script')
+    // Y escapar para el HTML no puede cambiar el dato que el navegador lee:
+    // `\u003c` es un escape válido de JSON, así que vuelve a ser «<».
+    expect(JSON.parse(salida)).toEqual(conMina)
   })
 
   it('7 · el sabor con el que abre el anaquel existe', () => {
