@@ -14,6 +14,7 @@ import { grupo, lista, texto, parrafo, ruta, ancla, medida } from '../../campos'
 import { sinHtml } from './cabecera'
 
 const enFichas = { seccion: 'fichas' } as const
+const enBuscadores = { seccion: 'buscadores' } as const
 const enNoEncontrada = { seccion: 'no-encontrada' } as const
 const enPie = { seccion: 'pie' } as const
 const enAccesibilidad = { seccion: 'accesibilidad' } as const
@@ -46,7 +47,7 @@ export const camposDePaginas = {
       // esa regla dos veces.
       titulo: sinHtml(
         texto({
-          ...enFichas,
+          ...enBuscadores,
           etiqueta: 'Título en Google de esta página',
           ayuda: 'El renglón azul del resultado de búsqueda de la página de fichas.',
           maxCaracteres: 70,
@@ -55,7 +56,7 @@ export const camposDePaginas = {
       ),
       descripcion: sinHtml(
         parrafo({
-          ...enFichas,
+          ...enBuscadores,
           etiqueta: 'Descripción en Google de esta página',
           ayuda: 'El párrafo gris del resultado de búsqueda de la página de fichas.',
           maxCaracteres: 155,
@@ -135,7 +136,7 @@ export const camposDePaginas = {
       // diferencia de fichasTecnicas.titulo, NO lleva sinHtml.
       titulo: texto({
         ...enNoEncontrada,
-        etiqueta: 'Título en Google',
+        etiqueta: 'Título de la pestaña',
         ayuda: 'El nombre de la pestaña del navegador. Esta página no la indexa Google.',
         maxCaracteres: 60,
         falla: ['ninguno'],
