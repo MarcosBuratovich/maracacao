@@ -20,7 +20,7 @@ import {
 } from '../src/contenido/campos'
 import type { MetaCampo } from '../src/contenido/campos'
 import { recorre, cargar, serializa } from '../src/contenido/carga'
-import { cruzaConteo, enLetras } from '../src/contenido/conteos'
+import { cruzaConteo, enLetras, conteosDe } from '../src/contenido/conteos'
 import { contrasteSuficiente, resuelveColor, mejorTinta } from '../src/contenido/color-sabor'
 import { precioDesde, precioDe, DERIVADOS_DEL_SITIO, injerta } from '../src/contenido/derivados'
 import { validarContra, validar } from '../src/contenido/validacion'
@@ -1833,7 +1833,11 @@ describe('la capa de contenido', () => {
   })
 
   describe('el documento del sitio, entero', () => {
-    const CONTEOS = { sabores: 15, gotas: 6, polvo: 8, recetas: 4, preguntas: 8, pasos: 6, ingredientes: 5 }
+    // Derivado del fixture y no escrito a mano: es un documento COMPLETO,
+    // así que el mapa se puede sacar del propio dato. Los mapas parciales
+    // de los fragmentos de más arriba sí se escriben, porque lo que
+    // documentan es qué colecciones necesita ESE fragmento.
+    const CONTEOS = conteosDe({ sitio: fixture.marca, sabores: fixture })
 
     it('los 21 bloques están, en el orden de la página', () => {
       // El orden de las claves del esquema es el orden del JSON y el orden
@@ -1930,14 +1934,19 @@ describe('la capa de contenido', () => {
  * de cada documento — así que estos diez tests son nuevos, no reescritos.
  */
 describe('los candados del sistema de contenido', () => {
-  const CONTEOS = { sabores: 15, gotas: 6, polvo: 8, recetas: 4, preguntas: 8, pasos: 6, ingredientes: 5 }
-
   /** El dato crudo de cada documento, con los derivados ya injertados. */
   const CRUDO: Record<IdDocumento, unknown> = {
     sitio: injerta(JSON.parse(readFileSync('src/contenido/datos/sitio.json', 'utf8')), { sabores, gotas }),
     sabores: JSON.parse(readFileSync('src/contenido/datos/sabores.json', 'utf8')),
     fichas: JSON.parse(readFileSync('src/contenido/datos/fichas.json', 'utf8')),
   }
+
+  // Los conteos salen del DATO, nunca de un mapa escrito acá. Escritos a
+  // mano, este candado quedaba ciego justo al revés de lo que hace falta:
+  // agregar una barra al JSON sin tocar los textos daba verde (el mapa
+  // seguía diciendo 15, igual que el kicker) y agregar la barra Y corregir
+  // el kicker a «16» daba rojo. Premiaba el error y castigaba el arreglo.
+  const CONTEOS = conteosDe({ sitio: CRUDO.sitio, sabores: CRUDO.sabores })
 
   it('1 · los tres documentos están declarados', () => {
     expect(Object.keys(DOCUMENTOS).sort()).toEqual(['fichas', 'sabores', 'sitio'])

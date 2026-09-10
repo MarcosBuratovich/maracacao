@@ -15,8 +15,12 @@ import { esquemaSitio } from '@/contenido/esquema/sitio'
 import { esquemaSabores } from '@/contenido/esquema/sabores'
 import { esquemaFichas } from '@/contenido/esquema/fichas'
 import { validar } from '@/contenido/validacion'
+import { conteosDe } from '@/contenido/conteos'
 
-const CONTEOS = { sabores: 15, gotas: 6, polvo: 8, recetas: 4, preguntas: 8, pasos: 6, ingredientes: 5 }
+// Del fixture, no a mano: un mapa escrito acá dice «15» aunque el fixture
+// tenga 16, y entonces los avisos de conteo salen al revés — verde con el
+// texto viejo, rojo con el texto corregido. Ver `conteosDe`.
+const CONTEOS = conteosDe({ sitio: fixture.marca, sabores: fixture })
 
 /** El contenido real, con una cosa cambiada. */
 const conCambio = (
