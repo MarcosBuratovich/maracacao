@@ -1622,7 +1622,7 @@ Después, la otra dirección: bajá el umbral de la regla a `9` en vez de `4.5` 
 Run: `pnpm exec vitest run test/contenido.test.ts -t 'productos vuelve a salir'`
 Expected: PASS.
 
-Para probar el poder de detección: en el JSON, mové la clave `nombre` del primer sabor al final del objeto y corré → tiene que dar **rojo** (el archivo dejó de estar en orden canónico). Restaurá con `git checkout` o volviendo a correr `pnpm migra sabores`. Pegá las dos salidas.
+Para probar el poder de detección: en el JSON, mové la clave `nombre` del primer sabor al final del objeto y corré → tiene que dar **rojo** (el archivo dejó de estar en orden canónico). Restaurá con `git checkout src/contenido/datos/sabores.json`. Pegá las dos salidas.
 
 - [ ] **Paso 13: La fachada**
 
@@ -2051,11 +2051,11 @@ Expected, exacto:
 nbsp literales: 0
 fichas: 4
 archivos: ['ficha-tecnica-barras-y-gotas', 'ficha-tecnica-chocolate-en-polvo', 'ficha-tecnica-cocoa-natural', 'ficha-tecnica-cocoa-alcalina']
-bloques por tipo: {'parrafo': ..., 'lista': ..., 'tabla': 12}
+bloques por tipo: {'parrafo': 25, 'lista': 5, 'tabla': 11}
 orden de claves de una ficha: ['archivo', 'producto', 'denominacion', 'acento', 'meta', 'secciones']
 ```
 
-Las 12 tablas son el conteo medido. Si sale otro número, algo se perdió.
+Los 41 bloques (25 párrafos, 5 listas, 11 tablas) son el conteo medido contra el fixture del árbol viejo. Si sale otro número, algo se perdió.
 
 - [ ] **Paso 9: Los tres tests de las fichas**
 
@@ -2112,7 +2112,7 @@ Run: `pnpm exec vitest run test/contenido.test.ts -t 'documento de fichas'`
 Expected: PASS los tres.
 
 Mutaciones, una por vez:
-1. Borrá una celda de una fila de una tabla en `fichas.json` → el segundo test rojo. (Restaurá con `pnpm migra fichas`.)
+1. Borrá una celda de una fila de una tabla en `fichas.json` → el segundo test rojo. (Restaurá con `git checkout src/contenido/datos/fichas.json`.)
 2. En `esquemaFichas`, sacá el `valorFijo` del bloque de tabla y poné `z.literal('tabla')` pelado → el tercer test rojo por `sin etiqueta`. Restaurá.
 
 Pegá las cuatro salidas.
@@ -4656,7 +4656,7 @@ Expected: los nueve verdes.
 Cuatro mutaciones, una por vez:
 
 1. Agregá `"basura": 1` a `sitio.json` en el nivel raíz → el candado 2 rojo con la clave. Restaurá.
-2. Reordená dos claves de `sabores.json` a mano → el candado 3 rojo. Restaurá con `pnpm migra sabores`.
+2. Reordená dos claves de `sabores.json` a mano → el candado 3 rojo. **Restaurá con `git checkout src/contenido/datos/sabores.json`, NO con `pnpm migra sabores`:** una vez migrado el documento, el script lee la fachada, que lee ese mismo JSON — regenerarlo reescribe la mutación en vez de deshacerla.
 3. Cambiá `nav.items[0].ancla` a `#sabor` en `sitio.json` → el candado 8 rojo. **Y el candado 2 sigue verde**: es un ancla válida como dato, y solo el HTML renderizado sabe que no existe. Anotá eso en el reporte: es la razón por la que este candado no puede vivir en el esquema.
 4. Cambiá el correo de `negocios.correo` en `sitio.json` por otro → el candado 9 rojo. Restaurá.
 
