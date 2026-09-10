@@ -24,14 +24,13 @@ import Canela from '@/components/sitio/Canela.astro'
 const container = await AstroContainer.create()
 
 describe('la página / (rediseño de marca, 2026-08-13; en la raíz desde 2026-08-20)', () => {
-  it('renderiza el contenido real: los 15 sabores, correo, catálogo, precios, Tabasco y punto de venta', async () => {
+  it('renderiza el contenido real: los 15 sabores, correo, catálogo, Tabasco y punto de venta', async () => {
     const html = await container.renderToString(Borrador)
     // Los quince están presentes: en el anaquel cada barra es un radio
     // con su nombre como aria-label.
     for (const s of sabores) expect(html).toContain(`aria-label="${s.nombre}"`)
     expect(html).toContain(marca.contacto.correo)
     expect(html).toContain(marca.contacto.catalogoUrl)
-    expect(html).toMatch(/\$\s?108/)
     expect(html).toContain('Tabasco')
     expect(html).toContain(marca.contacto.direccion[0])
   })

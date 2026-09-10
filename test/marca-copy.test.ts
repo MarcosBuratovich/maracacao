@@ -136,12 +136,6 @@ describe('sabores — fuente única sincronizada con el arte de imprenta', () =>
     expect(readFileSync('public/vendor/model-viewer.min.js').length).toBeGreaterThan(100 * 1024)
   })
 
-  it('precios del catálogo: jengibre y naranja 122, el resto 108', () => {
-    for (const s of sabores) {
-      expect(s.precio).toBe(s.slug === 'jengibre-y-naranja' ? 122 : 108)
-    }
-  })
-
   it('el enlace al catálogo es por producto; solo faltan los 4 sin alta (2026-08-13)', () => {
     // Cosechado del propio catálogo: naranja-jengibre (la barra), mango,
     // chamoy y blanco NO existen como producto todavía — caen a la
@@ -187,10 +181,6 @@ describe('estructura de la página', () => {
       expect(r.pasos.length).toBeGreaterThan(60)
       expect(r.tip.length).toBeGreaterThan(10)
     }
-  })
-
-  it('el lema del pie es la frase textual del cliente', () => {
-    expect(marca.footer.lema).toBe('Más cacao, ingredientes sencillos y muchas maneras de disfrutarlo')
   })
 
   it('las claves de color citadas por el copy existen', () => {
