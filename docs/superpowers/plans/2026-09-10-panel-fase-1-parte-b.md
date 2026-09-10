@@ -4712,7 +4712,56 @@ describe('los candados del sistema de contenido', () => {
     }
   })
 
-  it('9 · todo correo escrito en el sitio es el correo de la marca', () => {
+  it('9 · `nombra` vive en el grupo del elemento, nunca en la lista', () => {
+    // Esta norma se rompió DOS veces mientras se escribía la fase, y la
+    // segunda la rompió el mismo implementador que acababa de arreglar la
+    // primera, en el mismo trabajo. No es descuido: `recorre()` no visita
+    // los contenedores —salta del `array` directo al elemento— así que un
+    // `nombra` colgado del `lista` es INVISIBLE para todos los demás
+    // tests. Ningún rojo, ningún error de tipos, nada.
+    //
+    // Una convención que nadie puede ver es una convención que se vuelve a
+    // romper. Este candado es lo que la hace visible.
+    type Def = { type: string; [k: string]: unknown }
+    const def = (e: unknown) => (e as { _zod: { def: Def } })._zod.def
+    const meta = (e: unknown) => panel.get(e as z.ZodType) as MetaCampo | undefined
+    const mal: string[] = []
+
+    const anda = (esquema: z.ZodType, ruta: string): void => {
+      const d = def(esquema)
+      switch (d.type) {
+        case 'array': {
+          const elemento = d.element as z.ZodType
+          if (meta(esquema)?.nombra) {
+            mal.push(`${ruta}: el «nombra» cuelga de la lista; va en el grupo del elemento`)
+          }
+          if (def(elemento).type === 'object' && !meta(elemento)?.nombra) {
+            mal.push(`${ruta}[]: el grupo del elemento no declara «nombra»`)
+          }
+          return anda(elemento, `${ruta}[]`)
+        }
+        case 'object':
+          for (const [k, v] of Object.entries(d.shape as Record<string, z.ZodType>)) {
+            anda(v, ruta ? `${ruta}.${k}` : k)
+          }
+          return
+        case 'tuple':
+          return (d.items as z.ZodType[]).forEach((it, i) => anda(it, `${ruta}.${i}`))
+        case 'union':
+          return (d.options as z.ZodType[]).forEach((o) => anda(o, ruta))
+        case 'optional':
+        case 'nullable':
+          return anda(d.innerType as z.ZodType, ruta)
+        default:
+          return
+      }
+    }
+
+    for (const [id, esquema] of Object.entries(DOCUMENTOS)) anda(esquema, id)
+    expect(mal).toEqual([])
+  })
+
+  it('10 · todo correo escrito en el sitio es el correo de la marca', () => {
     // El correo vive en CUATRO lugares y uno de ellos está en medio de la
     // respuesta de una pregunta frecuente, donde no puede ser una ruta
     // hermana de `escribeTambien`. Este candado lo cubre igual.
@@ -4730,7 +4779,7 @@ describe('los candados del sistema de contenido', () => {
 - [ ] **Paso 2: Correr**
 
 Run: `pnpm build`
-Expected: los nueve verdes.
+Expected: los diez verdes.
 
 - [ ] **Paso 3: Probar el poder de detección de los que importan**
 
@@ -4739,7 +4788,8 @@ Cuatro mutaciones, una por vez:
 1. Agregá `"basura": 1` a `sitio.json` en el nivel raíz → el candado 2 rojo con la clave. Restaurá.
 2. Reordená dos claves de `sabores.json` a mano → el candado 3 rojo. **Restaurá con `git checkout src/contenido/datos/sabores.json`, NO con `pnpm migra sabores`:** una vez migrado el documento, el script lee la fachada, que lee ese mismo JSON — regenerarlo reescribe la mutación en vez de deshacerla.
 3. Cambiá `nav.items[0].ancla` a `#sabor` en `sitio.json` → el candado 8 rojo. **Y el candado 2 sigue verde**: es un ancla válida como dato, y solo el HTML renderizado sabe que no existe. Anotá eso en el reporte: es la razón por la que este candado no puede vivir en el esquema.
-4. Cambiá el correo de `negocios.correo` en `sitio.json` por otro → el candado 9 rojo. Restaurá.
+4. Cambiá el correo de `negocios.correo` en `sitio.json` por otro → el candado 10 rojo. Restaurá.
+5. Mové el `nombra` de `preguntas.items[]` del `grupo` del elemento al `lista` que lo contiene → el candado 9 rojo, con la ruta. Restaurá. **Esta mutación importa más que las otras cuatro:** es la única que reproduce un error que ya se cometió dos veces durante esta fase, y el candado existe justamente porque ningún otro test lo veía.
 
 Pegá las cuatro salidas.
 
@@ -4749,7 +4799,7 @@ Pegá las cuatro salidas.
 pnpm build
 git add test/contenido.test.ts
 git commit -m "$(cat <<'EOF'
-test: los nueve candados que el catálogo de campos hace posibles
+test: los diez candados que el catálogo de campos hace posibles
 
 Ninguno se podía escribir antes de que existiera un esquema que supiera
 nombrar todos sus campos: que el dato y el esquema no se separen, que dos
