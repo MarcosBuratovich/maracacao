@@ -15,7 +15,7 @@ import { z } from 'zod'
 import { MARCA, MAQUETA, palabraProhibida } from '../src/contenido/vocabulario'
 import {
   texto, parrafo, medida, precio, tupla, lista, claveSabor, CLAVES_DE_SABOR,
-  numero, tokenColor, ruta, url, correo, slug, archivo, derivado, grupo, precioONada,
+  numero, tokenColor, ruta, ancla, url, correo, slug, archivo, derivado, grupo, precioONada,
   panel, UNIDADES_DE_MEDIDA, opcion, valorFijo,
 } from '../src/contenido/campos'
 import type { MetaCampo } from '../src/contenido/campos'
@@ -355,6 +355,18 @@ describe('la capa de contenido', () => {
   it('ruta rechaza una cadena sin la barra inicial', () => {
     const r = ruta({ etiqueta: 'Ruta', seccion: 'buscadores', ayuda: 'x' })
     expect(r.safeParse('fichas-tecnicas').success).toBe(false)
+  })
+
+  it('ancla acepta un salto interno y una ruta, y rechaza lo demás', () => {
+    // nav.items[].ancla es '#sabores'; footer.productos[3].ancla es
+    // '/fichas-tecnicas'. Los dos son «a dónde lleva este enlace» y viven en
+    // la misma lista de campos, así que es un solo constructor. `ruta()` no
+    // sirve: exige empezar con «/» y rechaza los saltos.
+    const campo = ancla({ etiqueta: 'A dónde lleva', seccion: 'portada', ayuda: 'El destino del enlace.' })
+    expect(campo.parse('#sabores')).toBe('#sabores')
+    expect(campo.parse('/fichas-tecnicas')).toBe('/fichas-tecnicas')
+    expect(() => campo.parse('https://ejemplo.com')).toThrow()
+    expect(() => campo.parse('sabores')).toThrow()
   })
 
   it('url acepta una dirección web completa', () => {

@@ -374,6 +374,18 @@ export const ruta = (meta: Base) =>
     control: 'oculto', quien: 'marcos', ...meta,
   })
 
+/**
+ * A dónde lleva un enlace del sitio: un salto dentro de la página
+ * ('#sabores') o una ruta interna ('/fichas-tecnicas'). Nunca una
+ * dirección externa — para eso está `url`, y mezclarlas es cómo un menú
+ * termina sacando a la visitante del sitio sin querer.
+ */
+export const ancla = (meta: Base) =>
+  anota(
+    z.string().regex(/^[#/][\w\-/]*$/, 'Tiene que empezar con «#» (un salto) o con «/» (una página).'),
+    { control: 'oculto', quien: 'marcos', ...meta },
+  )
+
 /** Una dirección web completa. */
 export const url = (meta: Base) =>
   anota(z.url('No es una dirección web válida.'), { control: 'oculto', quien: 'marcos', ...meta })
