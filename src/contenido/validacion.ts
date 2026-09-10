@@ -9,6 +9,9 @@
  */
 import type { z } from 'zod'
 import { cifraUnidad } from './campos'
+import type { ColeccionContada } from './campos'
+import { cruzaConteo } from './conteos'
+import { recorre } from './carga'
 
 export interface Problema {
   /** Ruta punteada: 'sabores.3.nombre'. El panel la usa para llevarla al campo. */
@@ -124,4 +127,94 @@ export function validarContra(esquema: z.ZodType, crudo: unknown): Problema[] {
       arreglo: proponeArreglo(valor),
     }
   })
+}
+
+/** Cuántos hay de verdad en cada lista contada. Lo arma el llamador. */
+export type Conteos = Readonly<Partial<Record<ColeccionContada, number>>>
+
+/**
+ * Une un prefijo con una parte de la ruta. Misma regla que `con()` en
+ * carga.ts: la raíz no lleva punto adelante.
+ */
+const une = (a: string, b: string | number): string => (a === '' ? String(b) : `${a}.${b}`)
+
+/**
+ * `recorre()` devuelve rutas de ESQUEMA, con `[]` donde hay una lista
+ * ('negocios.tabs[].datos[]'). Los avisos son sobre VALORES, así que hay
+ * que instanciar cada `[]` contra el dato real y devolver una ruta
+ * concreta por elemento — que es la que el panel usa para llevar a la
+ * clienta al campo exacto.
+ */
+const enRutas = (dato: unknown, ruta: string): { ruta: string; valor: unknown }[] => {
+  let actuales: { ruta: string; valor: unknown }[] = [{ ruta: '', valor: dato }]
+  for (const parte of ruta.split('.')) {
+    const siguiente: { ruta: string; valor: unknown }[] = []
+    for (const { ruta: r, valor } of actuales) {
+      if (valor === null || valor === undefined) continue
+      if (parte.endsWith('[]')) {
+        const clave = parte.slice(0, -2)
+        const lista = clave ? (valor as Record<string, unknown>)[clave] : valor
+        const base = clave ? une(r, clave) : r
+        if (Array.isArray(lista)) lista.forEach((v, i) => siguiente.push({ ruta: une(base, i), valor: v }))
+      } else {
+        siguiente.push({ ruta: une(r, parte), valor: (valor as Record<string, unknown>)[parte] })
+      }
+    }
+    actuales = siguiente
+  }
+  return actuales
+}
+
+/**
+ * Los avisos de conteo: el texto dice «15 sabores» y hoy hay 16.
+ *
+ * Esta función es el ÚNICO productor de `gravedad: 'avisa'` del sistema.
+ * Hasta acá las tres piezas existían por separado —el metadato `cuenta`,
+ * la regla `cruzaConteo()` y el valor `'avisa'` del tipo— y ninguna las
+ * juntaba: la clase de feature de tres piezas que se olvida.
+ */
+function avisosDeConteo(esquema: z.ZodType, crudo: unknown, conteos: Conteos): Problema[] {
+  const avisos: Problema[] = []
+  recorre(esquema, (ruta, meta) => {
+    const cuenta = meta?.cuenta
+    if (!cuenta) return
+    const esperado = conteos[cuenta.de]
+    // Callarse acá sería volver al estado anterior: la regla declarada y
+    // nadie ejecutándola. Un conteo que falta es un error de cableado del
+    // llamador, no un problema del contenido de la clienta.
+    if (esperado === undefined) {
+      throw new Error(
+        `validar(): el campo «${ruta}» declara un conteo sobre «${cuenta.de}», que no vino en los conteos.`,
+      )
+    }
+    for (const { ruta: concreta, valor } of enRutas(crudo, ruta)) {
+      if (typeof valor !== 'string') continue
+      const aviso = cruzaConteo(valor, esperado, cuenta.sustantivo)
+      if (aviso === null) continue
+      avisos.push({
+        campo: concreta,
+        gravedad: 'avisa',
+        titulo: `Este texto ${aviso}`,
+        detalle: 'Si agregaste o quitaste algo de la lista, este texto quedó viejo.',
+      })
+    }
+  })
+  return avisos
+}
+
+/**
+ * La verdad única de la validación, la que importan los cuatro
+ * consumidores: el navegador mientras la clienta escribe, la función
+ * antes de tocar GitHub, vitest, y `astro build` por el camino del import.
+ *
+ * Lo que IMPIDE publicar sale del esquema; lo que solo AVISA sale de
+ * cruzar los textos contra las listas reales.
+ */
+export function validar(esquema: z.ZodType, crudo: unknown, conteos: Conteos = {}): Problema[] {
+  const impiden = validarContra(esquema, crudo)
+  // Si el dato no pasa el esquema, cruzar conteos sobre él es ruido sobre
+  // ruido: la clienta ya tiene que arreglar algo, y los avisos se
+  // calculan sobre valores que pueden ni existir.
+  if (impiden.length > 0) return impiden
+  return avisosDeConteo(esquema, crudo, conteos)
 }

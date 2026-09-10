@@ -22,7 +22,7 @@ import { recorre, cargar, serializa } from '../src/contenido/carga'
 import { cruzaConteo, enLetras } from '../src/contenido/conteos'
 import { contrasteSuficiente, resuelveColor, mejorTinta } from '../src/contenido/color-sabor'
 import { precioDesde, precioDe } from '../src/contenido/derivados'
-import { validarContra } from '../src/contenido/validacion'
+import { validarContra, validar } from '../src/contenido/validacion'
 import * as tokens from '../src/tokens/color'
 
 describe('la capa de contenido', () => {
@@ -1229,5 +1229,48 @@ describe('la capa de contenido', () => {
     for (const p of problemas) {
       expect(p.titulo).not.toMatch(JERGA_PROHIBIDA)
     }
+  })
+
+  describe('validar() — los avisos de conteo', () => {
+    const esquemaDePrueba = grupo({
+      etiqueta: 'Prueba',
+      seccion: 'sabores',
+      ayuda: 'Un documento de prueba.',
+      campos: {
+        kicker: texto({
+          etiqueta: 'Antetítulo del anaquel',
+          seccion: 'sabores',
+          ayuda: 'La línea chiquita arriba de «Elige tu barra».',
+          maxCaracteres: 30,
+          cuenta: { de: 'sabores', sustantivo: 'sabores' },
+        }),
+      },
+    })
+
+    it('avisa cuando el texto dice un número distinto del real', () => {
+      const problemas = validar(esquemaDePrueba, { kicker: 'LOS 15 SABORES' }, { sabores: 16 })
+      expect(problemas).toEqual([
+        {
+          campo: 'kicker',
+          gravedad: 'avisa',
+          titulo: 'Este texto dice «15» pero hoy hay 16.',
+          detalle: 'Si agregaste o quitaste algo de la lista, este texto quedó viejo.',
+        },
+      ])
+    })
+
+    it('no avisa cuando el texto y la lista dicen lo mismo', () => {
+      expect(validar(esquemaDePrueba, { kicker: 'LOS 16 SABORES' }, { sabores: 16 })).toEqual([])
+    })
+
+    it('truena si el esquema declara un conteo que el llamador no pasó', () => {
+      // Es un error de cableado, no de contenido: las tres piezas del aviso
+      // existían desde la Parte A y nadie las ensamblaba. Si el silencio
+      // fuera aceptable acá, la feature podría volver a quedar muerta sin
+      // que un solo test lo note.
+      expect(() => validar(esquemaDePrueba, { kicker: 'LOS 15 SABORES' }, {})).toThrow(
+        /kicker.*«sabores».*no vino en los conteos/,
+      )
+    })
   })
 })
