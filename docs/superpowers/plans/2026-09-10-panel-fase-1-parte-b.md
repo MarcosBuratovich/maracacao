@@ -2654,13 +2654,19 @@ describe('el esquema de cabecera', () => {
     campos: camposDeCabecera,
   })
 
-  it('valida el contenido de hoy', () => {
-    const hoy = {
-      titulo: marcaVieja.titulo, descripcion: marcaVieja.descripcion,
-      skipLink: marcaVieja.skipLink, marca: marcaVieja.marca,
-      nav: marcaVieja.nav, hero: marcaVieja.hero,
+  // Una fábrica y no una constante: cada test que muta necesita su propia
+  // copia. Compartir un objeto entre tests los acopla por orden de
+  // ejecución, que es el bug de test más difícil de ver.
+  const hoy = () => {
+    const m = JSON.parse(JSON.stringify(fixture.marca))
+    return {
+      titulo: m.titulo, descripcion: m.descripcion, skipLink: m.skipLink,
+      marca: m.marca, nav: m.nav, hero: m.hero,
     }
-    expect(validar(cabecera, JSON.parse(JSON.stringify(hoy)), { sabores: 15 })).toEqual([])
+  }
+
+  it('valida el contenido de hoy', () => {
+    expect(validar(cabecera, hoy(), { sabores: 15 })).toEqual([])
   })
 
   it('toda hoja tiene etiqueta, ayuda y sección', () => {
@@ -2674,14 +2680,15 @@ describe('el esquema de cabecera', () => {
   it('el renglón 2 del titular exige una coma y solo una', () => {
     // La plantilla le SACA la coma final y pinta una roja en su lugar. Con
     // dos comas, la del medio se queda: «70% CACAO, DE VERDAD,,» en el h1.
-    const conDos = { ...JSON.parse(JSON.stringify(marcaVieja.hero)), titular: ['CHOCOLATE', '70% CACAO, DE VERDAD,', 'MEXICANO.'] }
-    const problemas = validar(cabecera, { ...base, hero: conDos }, { sabores: 15 })
+    const datos = hoy()
+    datos.hero.titular = ['CHOCOLATE', '70% CACAO, DE VERDAD,', 'MEXICANO.']
+    const problemas = validar(cabecera, datos, { sabores: 15 })
     expect(problemas.map((p) => p.campo)).toContain('hero.titular.1')
   })
 })
 ```
 
-Donde `marcaVieja` es el import del fixture (`test/fixtures/contenido-2026-09-10.json`), **no** del módulo: el fixture es la foto congelada y no se mueve cuando la Tarea 13 reescriba la fachada.
+Donde `fixture` es el import de `test/fixtures/contenido-2026-09-10.json`, **no** del módulo: el fixture es la foto congelada y no se mueve cuando la Tarea 13 reescriba la fachada. Las seis tareas del esquema del sitio usan la misma forma —una fábrica `hoy()` que devuelve una copia fresca— para que ningún test quede acoplado al orden en que corre.
 
 - [ ] **Paso 7: Correr y probar detección**
 
