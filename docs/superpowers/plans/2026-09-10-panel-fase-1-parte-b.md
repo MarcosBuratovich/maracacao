@@ -2406,8 +2406,11 @@ import { grupo, lista, tupla, texto, parrafo, ancla, correo } from '../../campos
  * resultado es una etiqueta rota y Google mostrando basura. La regla es de
  * DATO, no de diseño, así que bloquea desde el esquema.
  */
-const SIN_CARACTERES_DE_HTML = /^[^&<>"]*$/
-const sinHtml = <T extends { refine: unknown }>(campo: T) =>
+export const SIN_CARACTERES_DE_HTML = /^[^&<>"]*$/
+// Exportada a propósito: la Tarea 12 la IMPORTA para los dos campos SEO de
+// la página de fichas técnicas. La misma regla escrita dos veces es el
+// patrón que esta capa ya pagó cuatro veces.
+export const sinHtml = <T extends { refine: unknown }>(campo: T) =>
   (campo as unknown as { refine: (p: (v: string) => boolean, m: string) => T }).refine(
     (v) => SIN_CARACTERES_DE_HTML.test(v),
     'No se pueden usar los signos & < > ni las comillas dobles: rompen la ficha que ve Google.',
@@ -2457,8 +2460,13 @@ export const camposDeCabecera = {
       nombre: texto({
         ...enPortada,
         etiqueta: 'Nombre',
-        ayuda: 'El nombre tal cual, con mayúscula y minúsculas.',
+        // Verificado: se usa en src/seo/esquema.ts:23 y :73, o sea que vive en
+        // el JSON-LD que lee Google y no en ningún nodo visible. Por eso la
+        // ayuda dice eso y por eso lleva `falla: ['ninguno']`: no hay caja que
+        // el medidor pueda medir.
+        ayuda: 'El nombre de la marca que lee Google en la ficha de datos de la página. No se ve escrito en el sitio.',
         maxCaracteres: 20,
+        falla: ['ninguno'],
       }),
       wordmark: texto({
         ...enPortada,
