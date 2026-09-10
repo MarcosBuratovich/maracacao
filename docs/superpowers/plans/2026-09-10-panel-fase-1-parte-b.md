@@ -3300,7 +3300,10 @@ const panelDeProducto = (p: {
     etiqueta: `Panel de ${p.nombre}`,
     ayuda: `La pestaña de chocolate en ${p.nombre} de la sección Para negocios.`,
     campos: {
-      id: ancla({
+      // `slug` y no `ancla`: el dato real es «polvo», «gotas», «barras», sin
+      // «#» ni «/» adelante — `ancla()` los rechaza a los tres. El que SÍ es
+      // un ancla es el campo `ficha` de abajo.
+      id: slug({
         seccion: 'negocios',
         etiqueta: 'Nombre interno de la pestaña',
         ayuda: 'Con este nombre la página recuerda qué pestaña estaba abierta. No se cambia.',
