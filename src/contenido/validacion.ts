@@ -149,11 +149,15 @@ const une = (a: string, b: string | number): string => (a === '' ? String(b) : `
  */
 
 /**
- * Una parte de ruta puede traer tres cosas: la clave (`bloques`), el `[]`
- * de una lista y la marca de variante de una unión (`<tipo=parrafo>`).
- * 'bloques[]<tipo=parrafo>' trae las tres.
+ * Una parte de ruta puede traer tres cosas: la clave (`bloques`), uno o
+ * más `[]` de lista y la marca de variante de una unión (`<tipo=parrafo>`).
+ * 'bloques[]<tipo=parrafo>' trae las tres; 'filas[][]' trae DOS `[]`
+ * seguidos, sin clave entre medio, porque una lista de listas —las filas
+ * de una tabla— se desenvuelve dos veces sin que haya una clave nueva
+ * entre un nivel y el otro (ver el caso 'array' de `recorre()` en
+ * carga.ts, que agrega `[]` sin punto).
  */
-const PARTE = /^([^<[]*)(\[\])?(?:<([^=>]+)=([^>]+)>)?$/
+const PARTE = /^([^<[]*)((?:\[\])*)(?:<([^=>]+)=([^>]+)>)?$/
 
 const enRutas = (dato: unknown, ruta: string): { ruta: string; valor: unknown }[] => {
   let actuales: { ruta: string; valor: unknown }[] = [{ ruta: '', valor: dato }]
@@ -161,17 +165,24 @@ const enRutas = (dato: unknown, ruta: string): { ruta: string; valor: unknown }[
     const m = PARTE.exec(parte)
     if (!m) throw new Error(`enRutas(): no entiendo la parte «${parte}» de la ruta «${ruta}».`)
     const [, clave, corchetes, discriminante, variante] = m
+    // Cada par de corchetes es UN nivel de lista a desenvolver: 'filas[][]'
+    // desenvuelve dos veces seguidas, sin una clave entre medio.
+    const niveles = corchetes.length / 2
     const siguiente: { ruta: string; valor: unknown }[] = []
     for (const { ruta: r, valor } of actuales) {
       if (valor === null || valor === undefined) continue
       const base = clave ? une(r, clave) : r
       const dentro = clave ? (valor as Record<string, unknown>)[clave] : valor
-      // Sin corchetes hay un solo candidato; con corchetes, uno por elemento.
-      const candidatos = corchetes
-        ? Array.isArray(dentro)
-          ? dentro.map((v, i) => ({ ruta: une(base, i), valor: v }))
-          : []
-        : [{ ruta: base, valor: dentro }]
+      // Sin corchetes hay un solo candidato; cada nivel de `[]` multiplica
+      // los candidatos por uno por elemento del nivel anterior.
+      let candidatos: { ruta: string; valor: unknown }[] = [{ ruta: base, valor: dentro }]
+      for (let nivel = 0; nivel < niveles; nivel++) {
+        const desenvueltos: { ruta: string; valor: unknown }[] = []
+        for (const { ruta: r2, valor: v2 } of candidatos) {
+          if (Array.isArray(v2)) v2.forEach((v, i) => desenvueltos.push({ ruta: une(r2, i), valor: v }))
+        }
+        candidatos = desenvueltos
+      }
       for (const c of candidatos) {
         // La variante FILTRA: la rama <tipo=parrafo> del esquema solo
         // aplica a los bloques cuyo dato dice tipo: 'parrafo'.

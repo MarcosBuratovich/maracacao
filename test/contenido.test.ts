@@ -1297,6 +1297,40 @@ describe('la capa de contenido', () => {
         /kicker.*«sabores».*no vino en los conteos/,
       )
     })
+
+    it('avisa dentro de una lista de listas: la ruta trae DOS corchetes seguidos (filas[][])', () => {
+      // 'filas[][]' es la forma real de la ruta de una celda de tabla: dos
+      // niveles de lista SIN una clave entre medio, porque recorre() arma
+      // esa parte así (ver el caso 'array' de carga.ts, que agrega `[]`
+      // sin punto). enRutas() tiene que poder instanciarla contra el dato,
+      // no solo el caso de UN corchete que ya cubrían los otros tests.
+      const esquemaTabla = grupo({
+        etiqueta: 'Tabla', seccion: 'productos', ayuda: 'x',
+        campos: {
+          filas: lista({
+            etiqueta: 'Filas', seccion: 'productos', ayuda: 'y',
+            minItems: 1, maxItems: 3,
+            elemento: lista({
+              etiqueta: 'Fila', seccion: 'productos', ayuda: 'z',
+              minItems: 1, maxItems: 3,
+              elemento: texto({
+                etiqueta: 'Celda', seccion: 'productos', ayuda: 'w', maxCaracteres: 30,
+                cuenta: { de: 'sabores', sustantivo: 'sabores' },
+              }),
+            }),
+          }),
+        },
+      })
+      const problemas = validar(esquemaTabla, { filas: [['LOS 15 SABORES']] }, { sabores: 16 })
+      expect(problemas).toEqual([
+        {
+          campo: 'filas.0.0',
+          gravedad: 'avisa',
+          titulo: 'Este texto dice «15» pero hoy hay 16.',
+          detalle: 'Si agregaste o quitaste algo de la lista, este texto quedó viejo.',
+        },
+      ])
+    })
   })
 
   describe('recorre() y serializa() sobre una unión discriminada', () => {

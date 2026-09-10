@@ -307,6 +307,22 @@ export function serializa<E extends z.ZodType>(esquema: E, valor: unknown): stri
   return escapaInvisibles(JSON.stringify(ordenaSegun(esquema, valor, ''), null, 2))
 }
 
+/**
+ * Un bloque es un objeto llano: ni `null`, ni una lista, ni un valor
+ * suelto. Los casos 'object' y 'union' de `ordenaSegun()` hacían la MISMA
+ * pregunta cada uno por su cuenta —¿esto es un bloque?—, con el mismo
+ * chequeo copiado carácter por carácter: la clase de bug que este archivo
+ * ya pagó cuatro veces en la Parte A. `typeof valor` no entra en el
+ * mensaje: en runtime escupe «string», «number», «undefined» — jerga en
+ * inglés que la restricción de vocabulario prohíbe — así que acá se
+ * describe la forma en español, no el tipo de JS.
+ */
+const exigeObjeto = (donde: string, valor: unknown): void => {
+  if (valor !== null && typeof valor === 'object' && !Array.isArray(valor)) return
+  const forma = valor === null ? 'nada' : Array.isArray(valor) ? 'una lista' : 'un valor suelto, no un bloque'
+  throw new Error(`${donde}: el esquema espera un bloque y el dato trae ${forma}.`)
+}
+
 function ordenaSegun(esquema: z.ZodType, valor: unknown, ruta: string): unknown {
   const def = definicion(esquema)
   const donde = ruta || '(raíz)'
@@ -341,9 +357,7 @@ function ordenaSegun(esquema: z.ZodType, valor: unknown, ruta: string): unknown 
 
     case 'object': {
       const shape = def.shape as Record<string, z.ZodType>
-      if (valor === null || typeof valor !== 'object' || Array.isArray(valor)) {
-        throw new Error(`${donde}: el esquema espera un bloque y el dato trae ${typeof valor}.`)
-      }
+      exigeObjeto(donde, valor)
       const dato = valor as Record<string, unknown>
       const sobrantes = Object.keys(dato).filter((k) => !(k in shape))
       if (sobrantes.length) {
@@ -401,9 +415,7 @@ function ordenaSegun(esquema: z.ZodType, valor: unknown, ruta: string): unknown 
       // pasar claves que el esquema no declara— la que callaba era justo
       // la que esta parte iba a pisar.
       const discriminante = discriminanteDe('serializa', def, ruta)
-      if (valor === null || typeof valor !== 'object' || Array.isArray(valor)) {
-        throw new Error(`${donde}: el esquema espera un bloque y el dato trae ${typeof valor}.`)
-      }
+      exigeObjeto(donde, valor)
       const opciones = def.options as z.ZodType[]
       const nombres = opciones.map((o) => varianteDe(o, discriminante, ruta))
       const dice = (valor as Record<string, unknown>)[discriminante]
