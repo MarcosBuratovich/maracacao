@@ -8,9 +8,11 @@
  */
 import type { z } from 'zod'
 import { esquemaSabores } from './sabores'
+import { esquemaFichas } from './fichas'
 
-export type IdDocumento = 'sabores'
+export type IdDocumento = 'sabores' | 'fichas'
 
 export const DOCUMENTOS = {
   sabores: esquemaSabores,
+  fichas: esquemaFichas,
 } as const satisfies Readonly<Record<IdDocumento, z.ZodType>>

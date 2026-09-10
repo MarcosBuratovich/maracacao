@@ -16,6 +16,7 @@
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs'
 import { escapaInvisibles, serializa } from '../src/contenido/carga'
 import { esquemaSabores } from '../src/contenido/esquema/sabores'
+import { esquemaFichas } from '../src/contenido/esquema/fichas'
 import { marca } from '../src/copy/sitio-marca'
 import { sabores, gotas, polvo, urlCatalogoBarras } from '../src/copy/sabores'
 import { fichasBase } from '../src/fichas/base'
@@ -124,10 +125,25 @@ function migraSabores(): void {
   )
 }
 
+/**
+ * Escribe el documento de fichas técnicas.
+ *
+ * Mismo contrato que `migraSabores()`: `serializa()` recorre el ESQUEMA, así
+ * que si el esquema y `fichasBase` no coinciden en una sola ruta, esto tira
+ * antes de escribir nada.
+ */
+function migraFichas(): void {
+  escribe(
+    'src/contenido/datos/fichas.json',
+    serializa(esquemaFichas, { fichas: estructura(fichasBase) }),
+  )
+}
+
 const modo = process.argv[2]
 if (modo === 'fixture') capturaFixture()
 else if (modo === 'sabores') migraSabores()
+else if (modo === 'fichas') migraFichas()
 else {
-  console.error(`Modo desconocido: «${modo ?? '(ninguno)'}». Modos: fixture, sabores`)
+  console.error(`Modo desconocido: «${modo ?? '(ninguno)'}». Modos: fixture, sabores, fichas`)
   process.exit(1)
 }

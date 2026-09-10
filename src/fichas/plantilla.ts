@@ -26,9 +26,6 @@ export interface Ficha {
   secciones: Seccion[]
 }
 
-export const p = (texto: string): Bloque => ({ tipo: 'parrafo', texto })
-export const li = (...items: string[]): Bloque => ({ tipo: 'lista', items })
-
 /* ---------- Render ---------- */
 
 const escapa = (t: string) =>

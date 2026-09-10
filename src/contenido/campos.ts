@@ -260,6 +260,20 @@ export const medida = (meta: Base & { maxCaracteres: number }) =>
     { control: 'medida', ...meta },
   )
 
+/**
+ * El valor FIJO que dice de qué forma es un bloque: 'parrafo', 'lista',
+ * 'tabla'. No es un campo que se edite —la clienta elige la forma al
+ * insertar el bloque y el panel la dibuja como el nombre del bloque, no
+ * como un input— pero lleva etiqueta y ayuda igual, porque es una hoja
+ * del esquema y toda hoja del esquema tiene que poder nombrarse.
+ *
+ * `valores` con un solo elemento y no un `valor` suelto: es la misma
+ * pregunta que contestan `opcion` y `tokenColor` —qué valores acepta este
+ * campo— y ya pagamos una vez el precio de contestarla con dos nombres.
+ */
+export const valorFijo = <const V extends string>(meta: Base & { valores: readonly [V] }) =>
+  anota(z.literal(meta.valores[0]), { control: 'oculto', quien: 'marcos', ...meta })
+
 /** Un valor de una lista cerrada (el `valor` de las opciones del formulario). */
 export const opcion = <const V extends readonly [string, ...string[]]>(
   meta: Base & { valores: V },

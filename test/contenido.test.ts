@@ -16,7 +16,7 @@ import { MARCA, MAQUETA, palabraProhibida } from '../src/contenido/vocabulario'
 import {
   texto, parrafo, medida, precio, tupla, lista, claveSabor, CLAVES_DE_SABOR,
   numero, tokenColor, ruta, url, correo, slug, archivo, derivado, grupo, precioONada,
-  panel, UNIDADES_DE_MEDIDA, opcion,
+  panel, UNIDADES_DE_MEDIDA, opcion, valorFijo,
 } from '../src/contenido/campos'
 import type { MetaCampo } from '../src/contenido/campos'
 import { recorre, cargar, serializa } from '../src/contenido/carga'
@@ -25,6 +25,8 @@ import { contrasteSuficiente, resuelveColor, mejorTinta } from '../src/contenido
 import { precioDesde, precioDe } from '../src/contenido/derivados'
 import { validarContra, validar } from '../src/contenido/validacion'
 import { esquemaSabores } from '../src/contenido/esquema/sabores'
+import { esquemaFichas } from '../src/contenido/esquema/fichas'
+import { fichasBase } from '../src/fichas/base'
 import * as tokens from '../src/tokens/color'
 
 describe('la capa de contenido', () => {
@@ -436,6 +438,22 @@ describe('la capa de contenido', () => {
   it('precioONada rechaza un decimal, igual que precio', () => {
     const p = precioONada({ etiqueta: 'Precio', seccion: 'sabores', ayuda: 'x' })
     expect(p.safeParse(108.5).success).toBe(false)
+  })
+
+  it('valorFijo anota el literal que discrimina una forma de bloque', () => {
+    // Sin esto, el `tipo` de cada variante es un z.literal pelado: recorre()
+    // lo emite como hoja SIN metadato, y el candado «todo campo tiene
+    // etiqueta» de la Tarea 16 lo cuenta como un campo sin nombre.
+    const campo = valorFijo({
+      etiqueta: 'Forma del bloque',
+      seccion: 'fichas',
+      ayuda: 'Dice si este bloque es un párrafo, una lista o una tabla.',
+      valores: ['parrafo'],
+    })
+    expect((panel.get(campo) as MetaCampo).etiqueta).toBe('Forma del bloque')
+    expect(campo.parse('parrafo')).toBe('parrafo')
+    expect(() => campo.parse('lista')).toThrow()
+    expectTypeOf<z.infer<typeof campo>>().toEqualTypeOf<'parrafo'>()
   })
 
   it('canario: las formas internas de Zod son las que recorre() supone', () => {
@@ -1465,6 +1483,51 @@ describe('la capa de contenido', () => {
     const bytes = readFileSync('src/contenido/datos/sabores.json', 'utf8')
     const cargado = cargar('src/contenido/datos/sabores.json', esquemaSabores, JSON.parse(bytes))
     expect(serializa(esquemaSabores, cargado) + '\n').toBe(bytes)
+  })
+
+  describe('el documento de fichas', () => {
+    it('vuelve a salir idéntico', () => {
+      const bytes = readFileSync('src/contenido/datos/fichas.json', 'utf8')
+      const cargado = cargar('src/contenido/datos/fichas.json', esquemaFichas, JSON.parse(bytes))
+      expect(serializa(esquemaFichas, cargado) + '\n').toBe(bytes)
+    })
+
+    it('toda fila trae una celda por encabezado', () => {
+      // El esquema no puede expresar esto: `lista` no sabe cuánto mide su
+      // hermana. Y una fila con una celda de menos renderiza una tabla
+      // corrida — el modo de falla que el PDF le manda a las cafeterías.
+      for (const ficha of fichasBase) {
+        for (const seccion of ficha.secciones) {
+          for (const bloque of seccion.bloques) {
+            if (bloque.tipo !== 'tabla') continue
+            for (const fila of bloque.filas) {
+              expect(fila, `${ficha.archivo} · ${seccion.titulo}`).toHaveLength(bloque.encabezados.length)
+            }
+          }
+        }
+      }
+    })
+
+    it('el panel puede nombrar todas las hojas de las tres formas de bloque', () => {
+      // Es la prueba de que las uniones se recorren de verdad: si recorre()
+      // emitiera el bloque como hoja opaca, este test vería 1 ruta en vez de
+      // las 8 de las tres variantes.
+      const rutas: string[] = []
+      recorre(esquemaFichas, (r, meta) => {
+        expect(meta?.etiqueta, `sin etiqueta: ${r}`).toBeTruthy()
+        rutas.push(r)
+      })
+      const deBloques = rutas.filter((r) => r.includes('bloques[]'))
+      expect(deBloques).toEqual([
+        'fichas[].secciones[].bloques[]<tipo=parrafo>.tipo',
+        'fichas[].secciones[].bloques[]<tipo=parrafo>.texto',
+        'fichas[].secciones[].bloques[]<tipo=lista>.tipo',
+        'fichas[].secciones[].bloques[]<tipo=lista>.items[]',
+        'fichas[].secciones[].bloques[]<tipo=tabla>.tipo',
+        'fichas[].secciones[].bloques[]<tipo=tabla>.encabezados[]',
+        'fichas[].secciones[].bloques[]<tipo=tabla>.filas[][]',
+      ])
+    })
   })
 
   describe('el contraste de la banda de cada sabor', () => {
