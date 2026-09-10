@@ -28,6 +28,7 @@ import { esquemaSabores } from '../src/contenido/esquema/sabores'
 import { esquemaFichas } from '../src/contenido/esquema/fichas'
 import { camposDeCabecera } from '../src/contenido/esquema/sitio/cabecera'
 import { camposDeProducto } from '../src/contenido/esquema/sitio/producto'
+import { camposDeExperiencia } from '../src/contenido/esquema/sitio/experiencia'
 import { fichasBase } from '../src/fichas/base'
 import * as tokens from '../src/tokens/color'
 // La foto congelada, no el módulo: el fixture no se mueve cuando la Tarea 13
@@ -1636,6 +1637,46 @@ describe('la capa de contenido', () => {
       roto.anaquel.pesoInsignia = '70 g' // espacio NORMAL, escrito a propósito
       const problemas = validar(producto, roto, CONTEOS)
       expect(problemas.map((p) => p.campo)).toContain('anaquel.pesoInsignia')
+    })
+  })
+
+  describe('el esquema de experiencia', () => {
+    const experiencia = grupo({
+      etiqueta: 'Experiencia', seccion: 'catar', ayuda: 'Prueba.',
+      campos: camposDeExperiencia,
+    })
+    const hoy = () => {
+      const m = JSON.parse(JSON.stringify(fixture.marca))
+      return { catar: m.catar, recetas: m.recetas, nosotros: m.nosotros }
+    }
+    const CONTEOS = { pasos: 6, recetas: 4 }
+
+    it('valida el contenido de hoy, avisos incluidos', () => {
+      expect(validar(experiencia, hoy(), CONTEOS)).toEqual([])
+    })
+
+    it('toda hoja tiene etiqueta, ayuda y sección', () => {
+      recorre(experiencia, (ruta, meta) => {
+        expect(meta?.etiqueta, `sin etiqueta: ${ruta}`).toBeTruthy()
+        expect(meta?.ayuda, `sin ayuda: ${ruta}`).toBeTruthy()
+        expect(meta?.seccion, `sin sección: ${ruta}`).toBeTruthy()
+      })
+    })
+
+    it('el chip de polvo puede faltar, y falta en tres de las cuatro recetas', () => {
+      const datos = hoy()
+      expect(datos.recetas.lista.filter((r: object) => 'chipPolvo' in r)).toHaveLength(1)
+      expect(validar(experiencia, datos, CONTEOS)).toEqual([])
+    })
+
+    it('el chip opcional conserva su etiqueta a través del .optional()', () => {
+      // `panel.get()` NO sigue la cadena de padres a través de .optional()
+      // —crea un tipo nuevo, sin `parent`— aunque sí la siga a través de
+      // .refine(). Si esto se rompe, el panel dibuja ese campo sin nombre y
+      // no hay ningún error que lo diga.
+      const etiquetas = new Map<string, string | undefined>()
+      recorre(experiencia, (ruta, meta) => etiquetas.set(ruta, meta?.etiqueta))
+      expect(etiquetas.get('recetas.lista[].chipPolvo')).toBe('Cápsula de polvo')
     })
   })
 
