@@ -30,6 +30,7 @@ import { camposDeCabecera } from '../src/contenido/esquema/sitio/cabecera'
 import { camposDeProducto } from '../src/contenido/esquema/sitio/producto'
 import { camposDeExperiencia } from '../src/contenido/esquema/sitio/experiencia'
 import { camposDeNegocio } from '../src/contenido/esquema/sitio/negocio'
+import { camposDeContacto } from '../src/contenido/esquema/sitio/contacto'
 import { fichasBase } from '../src/fichas/base'
 import * as tokens from '../src/tokens/color'
 // La foto congelada, no el módulo: el fixture no se mueve cuando la Tarea 13
@@ -1719,6 +1720,36 @@ describe('la capa de contenido', () => {
       expect(problemas).toContainEqual(
         expect.objectContaining({ campo: 'negocios.tabs.2.cuerpo', gravedad: 'avisa' }),
       )
+    })
+  })
+
+  describe('el esquema de contacto', () => {
+    const contacto = grupo({
+      etiqueta: 'Contacto', seccion: 'contacto', ayuda: 'Prueba.',
+      campos: camposDeContacto,
+    })
+    const hoy = () => ({ contacto: JSON.parse(JSON.stringify(fixture.marca.contacto)) })
+
+    it('valida el contenido de hoy', () => {
+      expect(validar(contacto, hoy(), {})).toEqual([])
+    })
+
+    it('toda hoja tiene etiqueta, ayuda y sección', () => {
+      recorre(contacto, (ruta, meta) => {
+        expect(meta?.etiqueta, `sin etiqueta: ${ruta}`).toBeTruthy()
+        expect(meta?.ayuda, `sin ayuda: ${ruta}`).toBeTruthy()
+        expect(meta?.seccion, `sin sección: ${ruta}`).toBeTruthy()
+      })
+    })
+
+    it('el correo declara sus tres hermanas y rechaza lo que no es un correo', () => {
+      const metas = new Map<string, MetaCampo | undefined>()
+      recorre(contacto, (ruta, meta) => metas.set(ruta, meta))
+      expect(metas.get('contacto.correo')?.escribeTambien).toEqual(['nav.pie.1', 'negocios.correo'])
+
+      const roto = hoy()
+      roto.contacto.correo = 'maracacaomx arroba gmail punto com'
+      expect(validar(contacto, roto, {}).map((p) => p.campo)).toContain('contacto.correo')
     })
   })
 
