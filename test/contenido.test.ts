@@ -1345,4 +1345,29 @@ describe('la capa de contenido', () => {
       )
     })
   })
+
+  describe('los campos derivados no viajan al JSON', () => {
+    const conDerivado = grupo({
+      etiqueta: 'Gotas', seccion: 'productos', ayuda: 'El bloque de las gotas.',
+      campos: {
+        titulo: texto({ etiqueta: 'Título', seccion: 'productos', ayuda: 'El título del bloque.', maxCaracteres: 50 }),
+        precioDesde: derivado({
+          etiqueta: 'Precio desde', seccion: 'productos',
+          ayuda: 'El precio más bajo de las bolsas de gotas.',
+          saleDe: 'el precio más bajo de las bolsas de gotas',
+        }),
+      },
+    })
+
+    it('serializa() no escribe el derivado', () => {
+      const salida = JSON.parse(serializa(conDerivado, { titulo: 'Gotas', precioDesde: 258 }))
+      expect(salida).toEqual({ titulo: 'Gotas' })
+    })
+
+    it('cargar() SÍ lo exige: la fachada tiene que injertarlo antes', () => {
+      // Es el contrato con la fachada. Si cargar() lo dejara pasar, el sitio
+      // publicaría un `undefined` donde va un precio y nada avisaría.
+      expect(() => cargar('prueba.json', conDerivado, { titulo: 'Gotas' })).toThrow(/precioDesde/)
+    })
+  })
 })

@@ -274,6 +274,25 @@ export function cargar<E extends z.ZodType>(
 }
 
 /**
+ * Los invisibles salen escapados: el espacio duro, los espacios finos, los
+ * de ancho cero y el BOM. Es la convención que el repo ya tiene —hoy hay
+ * CERO caracteres U+00A0 literales en el fuente— y existe porque un
+ * copiar-y-pegar se los come sin dejar rastro. En la Parte A esto mordió a
+ * cuatro implementadores, en las dos direcciones.
+ *
+ * Exportada porque `serializa()` no es su único usuario: el script de
+ * migración escribe el fixture con la misma regla, y dos copias de esta
+ * regla es exactamente la clase de bug que esta capa existe para no tener.
+ */
+export const escapaInvisibles = (json: string): string =>
+  json.replace(
+    // Escritos como \u para que este archivo no dependa de caracteres que
+    // un copiar-y-pegar puede comerse.
+    /[\u00a0\u2000-\u200d\ufeff]/g,
+    (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`,
+  )
+
+/**
  * Bytes canónicos: el orden de las claves lo manda el ESQUEMA, no el
  * objeto, y los invisibles (U+00A0 y compañía) salen escapados.
  *
@@ -285,14 +304,7 @@ export function cargar<E extends z.ZodType>(
  * prueba de que el esquema describe exactamente el contenido de hoy.
  */
 export function serializa<E extends z.ZodType>(esquema: E, valor: unknown): string {
-  const ordenado = ordenaSegun(esquema, valor, '')
-  return JSON.stringify(ordenado, null, 2).replace(
-    // Escritos como \u para que el archivo no dependa de caracteres que
-    // un copiar-y-pegar puede comerse: espacio duro, los espacios finos,
-    // los de ancho cero y el BOM.
-    /[\u00a0\u2000-\u200d\ufeff]/g,
-    (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`,
-  )
+  return escapaInvisibles(JSON.stringify(ordenaSegun(esquema, valor, ''), null, 2))
 }
 
 function ordenaSegun(esquema: z.ZodType, valor: unknown, ruta: string): unknown {
@@ -346,7 +358,13 @@ function ordenaSegun(esquema: z.ZodType, valor: unknown, ruta: string): unknown 
         // niveles, no uno solo. Un chequeo aparte de un nivel es
         // exactamente el bug que ya pagó recorre() en otra forma — ver
         // el comentario de desenvuelve().
-        const { fondo, opcional } = desenvuelve(hijo)
+        const { fondo, opcional, meta } = desenvuelve(hijo)
+        // Un derivado no se escribe: se calcula (ver derivados.ts). Vive en
+        // el esquema para que el panel lo dibuje en gris con su
+        // explicación, y en el objeto que cargar() valida, pero no en el
+        // archivo — si estuviera, se podría editar a mano y el sitio
+        // publicaría un precio que no coincide con ningún producto.
+        if (meta?.control === 'derivado') continue
         // Antes de decidir si la clave puede faltar: si el esquema la
         // envuelve en algo que este archivo no sabe pelar, la respuesta
         // honesta es «no sé», no «falta». `texto(...).default('hola')` con
