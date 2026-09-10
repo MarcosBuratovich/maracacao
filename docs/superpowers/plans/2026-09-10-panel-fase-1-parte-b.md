@@ -4494,7 +4494,7 @@ const productos = () => ({
 describe('el sitio: lo que impide publicar', () => {
   const casos: [string, (d: any) => void, string][] = [
     ['el titular sin la coma final',            (d) => { d.hero.titular[1] = 'MEXICANO' },                    'hero.titular.1'],
-    ['el titular con dos comas',                (d) => { d.hero.titular[1] = '70% CACAO, DE VERDAD,' },       'hero.titular.1'],
+    ['el titular con dos comas',                (d) => { d.hero.titular[1] = 'CACAO, DE VERDAD,' },          'hero.titular.1'],
     ['un renglón de más en el titular',         (d) => { d.hero.titular.push('Y PUNTO.') },                   'hero.titular'],
     ['un renglón de menos en el titular',       (d) => { d.hero.titular.pop() },                              'hero.titular'],
     ['la insignia con espacio normal',          (d) => { d.anaquel.pesoInsignia = '70 g' },                   'anaquel.pesoInsignia'],
@@ -4529,7 +4529,11 @@ describe('el sitio: lo que impide publicar', () => {
     // La razón entera por la que existe validacion.ts. «Expected string,
     // received number» no le dice nada a nadie, y «Invalid option» encima
     // está en inglés.
-    const JERGA = /string|number|boolean|array|invalid|expected|received|required|undefined|null\b/i
+    // Con frontera de palabra: sin ella, «string» matchea adentro de
+  // «restringido» y el guard empieza a dar falsos positivos sobre copy
+  // perfectamente en castellano. Y con `object`, que está en JERGA_DE_ZOD
+  // y acá faltaba.
+  const JERGA = /\b(string|number|boolean|array|object|invalid|expected|received|required|undefined|null)\b/i
     for (const [, cambia] of casos) {
       for (const p of validar(esquemaSitio, conCambio(sitio(), cambia as never), CONTEOS)) {
         expect(p.titulo, `${p.campo}: «${p.titulo}»`).not.toMatch(JERGA)
@@ -4576,7 +4580,7 @@ describe('los productos y las fichas', () => {
 - [ ] **Paso 2: Correr**
 
 Run: `pnpm exec vitest run test/contenido-mutaciones.test.ts`
-Expected: PASS las 29 (23 del sitio + jerga + aviso + 4 de productos + 1 de fichas).
+Expected: PASS las 30 (23 del sitio + jerga + aviso + 4 de productos + 1 de fichas).
 
 **Es muy probable que algunas fallen la primera vez, y ahí está el valor.** Los dos modos de falla, con qué significan:
 - **«no cazó nada»** → falta una regla en el esquema. Agregala en el archivo que corresponda y decilo en el reporte: es un hallazgo real.
