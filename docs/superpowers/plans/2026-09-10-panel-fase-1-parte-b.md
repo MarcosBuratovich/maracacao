@@ -2307,6 +2307,36 @@ Las tareas 8 a 12 traen **una tabla con el contenido exacto de cada campo**: rut
 
 Los campos marcados con **⚑** llevan además algo que una tabla no puede expresar: una regla propia, un `cuenta`, un `enAtributo`, un derivado. Debajo de cada tabla van esos, en código. **En esos bloques, el `…` significa «la etiqueta, la ayuda y la sección que dice la tabla de arriba»** — no es un hueco por llenar a criterio: está escrito tres renglones más arriba. Todo lo demás del bloque va literal.
 
+### Los `grupo` contenedores también llevan etiqueta y ayuda, y no están en las tablas
+
+Las tablas listan las **hojas**: los campos que la clienta escribe. Pero cada bloque
+(`postura`, `anaquel`, `contacto`…) es un `grupo`, y `grupo` **exige** etiqueta y ayuda
+igual que cualquier otro constructor — un campo sin etiqueta no compila, y eso vale también
+para los contenedores.
+
+No están en las tablas porque no son campos que se editen. **Escribilos vos**, con la misma
+regla que todo lo demás: la etiqueta nombra la sección como la ve la clienta en la página,
+la ayuda dice dónde vive. Son los rótulos con los que el panel va a agrupar los campos, así
+que la clienta los lee.
+
+Los seis de la Tarea 8, como ejemplo trabajado del tono que corresponde:
+
+| Bloque | Etiqueta | Ayuda |
+|---|---|---|
+| `postura` | Ingredientes de la barra | La sección que explica qué lleva y qué no lleva cada barra. |
+| `anaquel` | El anaquel de sabores | La sección donde se elige la barra, sabor por sabor. |
+| `minis` | Paquete de minis | La tarjeta del paquete de seis minibarras. |
+| `gotas` | Gotas de chocolate | La tarjeta de las bolsas de gotas. |
+| `polvoCard` | Tarjeta de chocolate en polvo | La tarjeta chica que anticipa el chocolate en polvo. |
+| `polvo` | Chocolate en polvo | El bloque grande del chocolate en polvo, con sus variedades. |
+
+Fijate en el par `polvoCard` / `polvo`: son dos bloques distintos con nombres parecidos, y
+las etiquetas los distinguen por lo que la clienta ve —una tarjeta chica en la fila de
+productos, y el bloque grande de más abajo— y no por el nombre de la clave.
+
+**Listá en tu reporte los que hayas escrito**, para que se revisen como se revisa todo lo
+demás que la clienta lee.
+
 **Los topes son el largo medido hoy × 1,6 redondeado a la decena, con piso de 20.** Son techo de cordura. Las dos excepciones —`titulo` y `descripcion`— llevan el tope de lo que corta Google, y están explicadas donde aparecen.
 
 ---
