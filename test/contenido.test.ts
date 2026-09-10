@@ -9,7 +9,7 @@
  * comodidad, el panel deja de compilar en el navegador y nadie sabe por qué.
  */
 import { describe, it, expect, expectTypeOf } from 'vitest'
-import { readFileSync, readdirSync } from 'node:fs'
+import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { z } from 'zod'
 import { MARCA, MAQUETA, palabraProhibida } from '../src/contenido/vocabulario'
@@ -33,7 +33,15 @@ import { camposDeNegocio } from '../src/contenido/esquema/sitio/negocio'
 import { camposDeContacto } from '../src/contenido/esquema/sitio/contacto'
 import { camposDePaginas } from '../src/contenido/esquema/sitio/paginas'
 import { esquemaSitio } from '../src/contenido/esquema/sitio'
+import { DOCUMENTOS } from '../src/contenido/esquema'
+import type { IdDocumento } from '../src/contenido/esquema'
 import { fichasBase } from '../src/fichas/base'
+// Las fachadas: lo que de verdad importa index.astro. `marca` para el
+// candado de las anclas del menú; `sabores`/`gotas` para injertar los
+// derivados del documento del sitio exactamente como lo hace
+// `src/copy/sitio-marca.ts`, sin repetir esa cuenta a mano acá.
+import { marca } from '../src/copy/sitio-marca'
+import { sabores, gotas } from '../src/copy/sabores'
 import * as tokens from '../src/tokens/color'
 // La foto congelada, no el módulo: el fixture no se mueve cuando la Tarea 13
 // reescriba la fachada, y estos tests validan CONTRA esa foto.
@@ -1911,5 +1919,216 @@ describe('la capa de contenido', () => {
       injerta(crudo, FUENTES)
       expect(crudo.gotas).toEqual({})
     })
+  })
+})
+
+/*
+ * Los candados de la §11: los que no se podían escribir antes de que
+ * existiera un catálogo de campos que supiera nombrar TODO el contenido
+ * del sitio. Antes de la Tarea 12 no había `DOCUMENTOS` para recorrer, ni
+ * `recorre()` para caminarlo genéricamente sin saber de antemano la forma
+ * de cada documento — así que estos diez tests son nuevos, no reescritos.
+ */
+describe('los candados del sistema de contenido', () => {
+  const CONTEOS = { sabores: 15, gotas: 6, polvo: 8, recetas: 4, preguntas: 8, pasos: 6, ingredientes: 5 }
+
+  /** El dato crudo de cada documento, con los derivados ya injertados. */
+  const CRUDO: Record<IdDocumento, unknown> = {
+    sitio: injerta(JSON.parse(readFileSync('src/contenido/datos/sitio.json', 'utf8')), { sabores, gotas }),
+    sabores: JSON.parse(readFileSync('src/contenido/datos/sabores.json', 'utf8')),
+    fichas: JSON.parse(readFileSync('src/contenido/datos/fichas.json', 'utf8')),
+  }
+
+  it('1 · los tres documentos están declarados', () => {
+    expect(Object.keys(DOCUMENTOS).sort()).toEqual(['fichas', 'sabores', 'sitio'])
+  })
+
+  it('2 · toda ruta del esquema existe en el dato, y toda clave del dato está en el esquema', () => {
+    // El candado anti-desincronización. `serializa()` ya lo verifica al
+    // escribir, pero eso pasa UNA vez, cuando alguien corre el script.
+    // Esto lo verifica en cada build, que es cuando importa: si alguien
+    // edita un JSON a mano y le agrega una clave, o le saca una, el build
+    // no publica.
+    for (const [id, esquema] of Object.entries(DOCUMENTOS)) {
+      expect(() => serializa(esquema, CRUDO[id as IdDocumento]), id).not.toThrow()
+    }
+  })
+
+  it('3 · bytes canónicos: lo que se lee y se vuelve a escribir es idéntico', () => {
+    // Si esto no se cumple, dos guardados seguidos producen diffs
+    // distintos sin que haya cambiado nada, y el historial se llena de
+    // ruido que esconde los cambios de verdad.
+    for (const id of Object.keys(DOCUMENTOS) as IdDocumento[]) {
+      const ruta = `src/contenido/datos/${id}.json`
+      const bytes = readFileSync(ruta, 'utf8')
+      const cargado = cargar(ruta, DOCUMENTOS[id], CRUDO[id])
+      expect(serializa(DOCUMENTOS[id], cargado) + '\n', id).toBe(bytes)
+    }
+  })
+
+  it('4 · el contenido publicado no tiene ni un problema, avisos incluidos', () => {
+    // El candado de conteos (Ruling F). `cargar()` no cruza conteos porque
+    // un aviso no impide publicar; acá sí se exige que no haya ninguno,
+    // porque este test corre adentro de `pnpm build` y el contenido que se
+    // publica no tiene por qué tener textos viejos.
+    for (const id of Object.keys(DOCUMENTOS) as IdDocumento[]) {
+      expect(validar(DOCUMENTOS[id], CRUDO[id], CONTEOS), id).toEqual([])
+    }
+  })
+
+  it('5 · todo campo de todo documento tiene etiqueta, ayuda y una sección válida', () => {
+    const SECCIONES = new Set<string>([
+      'portada', 'productos', 'sabores', 'negocios', 'recetas', 'nosotros', 'catar',
+      'preguntas', 'contacto', 'pie', 'fichas', 'buscadores', 'accesibilidad', 'no-encontrada',
+    ])
+    for (const [id, esquema] of Object.entries(DOCUMENTOS)) {
+      recorre(esquema, (ruta, meta) => {
+        expect(meta?.etiqueta, `${id} · ${ruta}`).toBeTruthy()
+        expect(meta?.ayuda, `${id} · ${ruta}`).toBeTruthy()
+        expect(SECCIONES.has(meta?.seccion ?? ''), `${id} · ${ruta}: sección «${meta?.seccion}»`).toBe(true)
+      })
+    }
+  })
+
+  it('6 · lo que la clienta lee en el panel pasa el filtro de la marca', () => {
+    // El de MARCA, no el de MAQUETA: el panel necesita la palabra
+    // «Borrador» para su concepto central.
+    for (const [id, esquema] of Object.entries(DOCUMENTOS)) {
+      recorre(esquema, (ruta, meta) => {
+        expect(palabraProhibida(meta?.etiqueta ?? ''), `${id} · ${ruta} · etiqueta`).toBeNull()
+        expect(palabraProhibida(meta?.ayuda ?? ''), `${id} · ${ruta} · ayuda`).toBeNull()
+      })
+    }
+  })
+
+  it('7 · lo que la clienta NO puede editar es exactamente lo declarado', () => {
+    // El reparto de permisos, escrito una vez y verificado. Si mañana
+    // alguien marca `quien: 'marcos'` en un campo de copy, la clienta se
+    // queda sin poder editar su propio texto y nadie se entera hasta que
+    // ella lo pide.
+    const deMarcos: string[] = []
+    recorre(DOCUMENTOS.sitio, (ruta, meta) => {
+      if (meta?.quien === 'marcos') deMarcos.push(ruta)
+    })
+    // Rutas estructurales: anclas, identificadores internos, colores,
+    // valores fijos, derivados y el honeypot. NINGUNA es copy.
+    expect(deMarcos.sort()).toMatchInlineSnapshot(`
+      [
+        "anaquel.contadorDe",
+        "catar.pasos[].clave",
+        "contacto.catalogoUrl",
+        "contacto.formulario.tipoOpciones.0.valor",
+        "contacto.formulario.tipoOpciones.1.valor",
+        "contacto.formulario.trampa",
+        "fichasTecnicas.ruta",
+        "fichasTecnicas.rutaInicio",
+        "fichasTecnicas.rutaPdf",
+        "footer.productos[].ancla",
+        "gotas.precioDesde",
+        "gotas.precioJengibre",
+        "nav.items[].ancla",
+        "negocios.tabs.0.clave",
+        "negocios.tabs.0.ficha",
+        "negocios.tabs.0.id",
+        "negocios.tabs.1.clave",
+        "negocios.tabs.1.ficha",
+        "negocios.tabs.1.id",
+        "negocios.tabs.1.precio",
+        "negocios.tabs.2.clave",
+        "negocios.tabs.2.ficha",
+        "negocios.tabs.2.id",
+        "negocios.tabs.2.precio",
+        "noEncontrada.rutaInicio",
+        "recetas.lista[].clave",
+      ]
+    `)
+  })
+
+  // El mismo patrón que dejó la fase 0 en test/css-tokens.test.ts: se lee
+  // del dist/ construido —nunca se construye desde acá, sería recursión—
+  // y se saltea SOLO cuando no hay dist/ Y no estamos en CI. En Vercel
+  // corre siempre, porque `pnpm build` construye antes de testear, así
+  // que un dist/ ausente ahí es un fallo real y no una comodidad local.
+  const hayDist = existsSync('dist/index.html')
+  const automatizado = !!(process.env.CI || process.env.VERCEL)
+  if (!hayDist && !automatizado) {
+    // `build:sitio` y no el gate completo: es el mismo aviso que deja
+    // css-tokens.test.ts, y el guard de test/meta.test.ts prohíbe que
+    // cualquier test mencione el comando completo —ni siquiera en un
+    // string— porque ESE es el que corre la suite adentro de sí misma.
+    console.warn('\n[anclas] Falta dist/index.html: se salta el guard. Corré `pnpm build:sitio`.\n')
+  }
+
+  it.skipIf(!hayDist && !automatizado)(
+    '8 · cada entrada del menú apunta a una sección que existe en la página',
+    () => {
+      // Hoy nada lo vigila, y es lo que rompe un cliente reordenando el
+      // menú: el enlace queda y la sección no. Aserción dura, no
+      // condición de salto: si el artefacto no está cuando el test SÍ
+      // corre, es un fallo ruidoso.
+      expect(existsSync('dist/index.html')).toBe(true)
+      const html = readFileSync('dist/index.html', 'utf8')
+      for (const item of marca.nav.items) {
+        expect(html, `${item.texto} → ${item.ancla}`).toContain(`id="${item.ancla.slice(1)}"`)
+      }
+    },
+  )
+
+  it('9 · `nombra` vive en el grupo del elemento, nunca en la lista', () => {
+    // Esta norma se rompió DOS veces mientras se escribía la fase, y la
+    // segunda la rompió el mismo implementador que acababa de arreglar la
+    // primera, en el mismo trabajo. No es descuido: `recorre()` no visita
+    // los contenedores —salta del `array` directo al elemento— así que un
+    // `nombra` colgado del `lista` es INVISIBLE para todos los demás
+    // tests. Ningún rojo, ningún error de tipos, nada.
+    //
+    // Una convención que nadie puede ver es una convención que se vuelve a
+    // romper. Este candado es lo que la hace visible.
+    type Def = { type: string; [k: string]: unknown }
+    const def = (e: unknown) => (e as { _zod: { def: Def } })._zod.def
+    const meta = (e: unknown) => panel.get(e as z.ZodType) as MetaCampo | undefined
+    const mal: string[] = []
+
+    const anda = (esquema: z.ZodType, ruta: string): void => {
+      const d = def(esquema)
+      switch (d.type) {
+        case 'array': {
+          const elemento = d.element as z.ZodType
+          if (meta(esquema)?.nombra) {
+            mal.push(`${ruta}: el «nombra» cuelga de la lista; va en el grupo del elemento`)
+          }
+          if (def(elemento).type === 'object' && !meta(elemento)?.nombra) {
+            mal.push(`${ruta}[]: el grupo del elemento no declara «nombra»`)
+          }
+          return anda(elemento, `${ruta}[]`)
+        }
+        case 'object':
+          for (const [k, v] of Object.entries(d.shape as Record<string, z.ZodType>)) {
+            anda(v, ruta ? `${ruta}.${k}` : k)
+          }
+          return
+        case 'tuple':
+          return (d.items as z.ZodType[]).forEach((it, i) => anda(it, `${ruta}.${i}`))
+        case 'union':
+          return (d.options as z.ZodType[]).forEach((o) => anda(o, ruta))
+        case 'optional':
+        case 'nullable':
+          return anda(d.innerType as z.ZodType, ruta)
+        default:
+          return
+      }
+    }
+
+    for (const [id, esquema] of Object.entries(DOCUMENTOS)) anda(esquema, id)
+    expect(mal).toEqual([])
+  })
+
+  it('10 · todo correo escrito en el sitio es el correo de la marca', () => {
+    // El correo vive en CUATRO lugares y uno de ellos está en medio de la
+    // respuesta de una pregunta frecuente, donde no puede ser una ruta
+    // hermana de `escribeTambien`. Este candado lo cubre igual.
+    const texto = JSON.stringify(CRUDO.sitio)
+    const correos = new Set(texto.match(/[\w.+-]+@[\w-]+\.[\w.]+/g) ?? [])
+    expect([...correos]).toEqual([marca.contacto.correo])
   })
 })
