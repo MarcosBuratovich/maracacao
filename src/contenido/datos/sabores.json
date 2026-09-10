@@ -1,0 +1,221 @@
+{
+  "urlCatalogoBarras": "https://chocolateria.pulpos.shop/products?c=cmbrdybsb01o3ckpojgkdphjh&s=bestSellers",
+  "sabores": [
+    {
+      "orden": 1,
+      "slug": "jengibre-y-naranja",
+      "clave": "jengibreYNaranja",
+      "nombre": "Jengibre y naranja",
+      "cacao": "Cacao 70%",
+      "precio": 122,
+      "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural y jengibre",
+      "catalogo": null
+    },
+    {
+      "orden": 2,
+      "slug": "menta-intensa",
+      "clave": "mentaIntensa",
+      "nombre": "Menta intensa",
+      "cacao": "Cacao 70%",
+      "precio": 108,
+      "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural",
+      "catalogo": "https://chocolateria.pulpos.shop/product/cm2nojzhq000nvz0mmtsi6800"
+    },
+    {
+      "orden": 3,
+      "slug": "limoncillo",
+      "clave": "limoncillo",
+      "nombre": "Limoncillo",
+      "cacao": "Cacao 70%",
+      "precio": 108,
+      "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural",
+      "catalogo": "https://chocolateria.pulpos.shop/product/cm2rxaju500c91ngg2mu4v4h2"
+    },
+    {
+      "orden": 4,
+      "slug": "lima-y-chile",
+      "clave": "limaYChile",
+      "nombre": "Lima y chile",
+      "cacao": "Cacao 70%",
+      "precio": 108,
+      "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, chiles ahumados, esencia natural",
+      "catalogo": "https://chocolateria.pulpos.shop/product/cm2nolh8t00aq145fx80bvy6l"
+    },
+    {
+      "orden": 5,
+      "slug": "coriandro",
+      "clave": "coriandro",
+      "nombre": "Coriandro",
+      "cacao": "Cacao 70%",
+      "precio": 108,
+      "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural",
+      "catalogo": "https://chocolateria.pulpos.shop/product/cm2rx6zwv000ssl4kt6nzr9gc"
+    },
+    {
+      "orden": 6,
+      "slug": "fresas-y-chile",
+      "clave": "fresasYChile",
+      "nombre": "Fresas y chile",
+      "cacao": "Cacao 70%",
+      "precio": 108,
+      "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, fresas, esencia natural de mandarina y chile chipotle",
+      "catalogo": "https://chocolateria.pulpos.shop/product/cm2rx9x2y003vsl4kr0wlxcpq"
+    },
+    {
+      "orden": 7,
+      "slug": "hierbabuena",
+      "clave": "hierbabuena",
+      "nombre": "Hierbabuena",
+      "cacao": "Cacao 70%",
+      "precio": 108,
+      "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural",
+      "catalogo": "https://chocolateria.pulpos.shop/product/cmcf6crlb02yjgexdoxvcwuvs"
+    },
+    {
+      "orden": 8,
+      "slug": "canela",
+      "clave": "canela",
+      "nombre": "Canela",
+      "cacao": "Cacao 70%",
+      "precio": 108,
+      "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural",
+      "catalogo": "https://chocolateria.pulpos.shop/product/cmccepnd403es13pcu2jmmyxf"
+    },
+    {
+      "orden": 9,
+      "slug": "sal-de-mar",
+      "clave": "salDeMar",
+      "nombre": "Sal de mar",
+      "cacao": "Cacao 70%",
+      "precio": 108,
+      "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, sal de mar",
+      "catalogo": "https://chocolateria.pulpos.shop/product/cmcnofnzl02o3tzxx9slblmuc"
+    },
+    {
+      "orden": 10,
+      "slug": "tamarindo",
+      "clave": "tamarindo",
+      "nombre": "Tamarindo con chile",
+      "cacao": "Cacao 70%",
+      "precio": 108,
+      "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, tamarindo con chile",
+      "catalogo": "https://chocolateria.pulpos.shop/product/cmcnogojx05eujzgzz2tochyc"
+    },
+    {
+      "orden": 11,
+      "slug": "pina-con-chile",
+      "clave": "pinaConChile",
+      "nombre": "Piña con chile",
+      "cacao": "Cacao 70%",
+      "precio": 108,
+      "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, piña con chile",
+      "catalogo": "https://chocolateria.pulpos.shop/product/cmgu5lmw00ft4563yncetf7xa"
+    },
+    {
+      "orden": 12,
+      "slug": "cardamomo",
+      "clave": "cardamomo",
+      "nombre": "Cardamomo",
+      "cacao": "Cacao 70%",
+      "precio": 108,
+      "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, cardamomo",
+      "catalogo": "https://chocolateria.pulpos.shop/product/cmqzcygiu0og3cbzjtbyhaa6p"
+    },
+    {
+      "orden": 13,
+      "slug": "blanco-con-pistache",
+      "clave": "blancoConPistache",
+      "nombre": "Blanco con pistache",
+      "cacao": "Chocolate blanco",
+      "precio": 108,
+      "ingredientes": "Manteca de cacao, leche en polvo, azúcar, lecitina de soya, pistaches",
+      "catalogo": null
+    },
+    {
+      "orden": 14,
+      "slug": "mango-con-chile",
+      "clave": "mangoConChile",
+      "nombre": "Mango con chile",
+      "cacao": "Cacao 70%",
+      "precio": 108,
+      "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, mango con chile",
+      "catalogo": null
+    },
+    {
+      "orden": 15,
+      "slug": "chamoy",
+      "clave": "chamoy",
+      "nombre": "Chamoy",
+      "cacao": "Cacao 70%",
+      "precio": 108,
+      "ingredientes": "Licor de cacao, manteca de cacao, azúcar, lecitina de soya, chamoy",
+      "catalogo": null
+    }
+  ],
+  "gotas": [
+    {
+      "clave": "jengibreYNaranja",
+      "nombre": "Jengibre y naranja",
+      "precio": 340
+    },
+    {
+      "clave": "hierbabuena",
+      "nombre": "Hierbabuena",
+      "precio": 258
+    },
+    {
+      "clave": "canela",
+      "nombre": "Canela",
+      "precio": 258
+    },
+    {
+      "clave": "mentaIntensa",
+      "nombre": "Menta",
+      "precio": 258
+    },
+    {
+      "clave": "limoncillo",
+      "nombre": "Limoncillo",
+      "precio": 258
+    },
+    {
+      "clave": "limaYChile",
+      "nombre": "Lima y chile",
+      "precio": 258
+    }
+  ],
+  "polvo": [
+    {
+      "archivo": "etiqueta-naranja-jengibre",
+      "nombre": "Naranja y jengibre"
+    },
+    {
+      "archivo": "etiqueta-canela",
+      "nombre": "Canela"
+    },
+    {
+      "archivo": "etiqueta-limoncillo",
+      "nombre": "Limoncillo"
+    },
+    {
+      "archivo": "etiqueta-chile",
+      "nombre": "Chile"
+    },
+    {
+      "archivo": "etiqueta-menta",
+      "nombre": "Menta"
+    },
+    {
+      "archivo": "etiqueta-cardamomo",
+      "nombre": "Cardamomo"
+    },
+    {
+      "archivo": "etiqueta-cocoa-natural",
+      "nombre": "Cocoa natural"
+    },
+    {
+      "archivo": "etiqueta-cocoa-alcalina",
+      "nombre": "Cocoa alcalina"
+    }
+  ]
+}

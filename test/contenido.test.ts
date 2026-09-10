@@ -3,62 +3,164 @@
  *
  * El primero es la constitución de la carpeta: `src/contenido/**` tiene que
  * poder correr en TRES lugares —el navegador de la clienta, la función
- * serverless y vitest— así que no puede tocar `node:*`, ni Astro, ni el
- * alias `@/` (que solo resuelven el bundler y vitest, no el navegador).
- * Sin este guard, la primera vez que alguien importe `node:fs` para una
- * comodidad, el panel deja de compilar en el navegador y nadie sabe por qué.
+ * serverless y vitest—, y el spec dice qué se puede traer de afuera, no qué
+ * no: «dependencias externas permitidas: `zod`, `../tokens/color` y
+ * `../tokens/contrast`». Por eso el guard es LISTA BLANCA.
+ *
+ * Lo era al revés y no alcanzaba ni de cerca: prohibía `node:`, `astro` y
+ * `@/`, así que `from 'fs'`, `from 'path'` y `from 'lodash'` pasaban los
+ * tres sin que nada dijera nada — y cualquiera de esos rompe el panel en el
+ * navegador exactamente igual que `node:fs`. Una lista negra solo prohíbe
+ * las tres formas que alguien se acordó de escribir; la propiedad que hay
+ * que sostener es la otra.
  */
-import { describe, it, expect } from 'vitest'
-import { readFileSync, readdirSync } from 'node:fs'
+import { describe, it, expect, expectTypeOf } from 'vitest'
+import { readFileSync, readdirSync, existsSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { z } from 'zod'
 import { MARCA, MAQUETA, palabraProhibida } from '../src/contenido/vocabulario'
 import {
-  texto, medida, precio, tupla, lista, claveSabor,
-  numero, tokenColor, ruta, url, correo, slug, archivo, derivado, grupo, precioONada,
-  panel, UNIDADES_DE_MEDIDA,
+  texto, parrafo, medida, precio, tupla, lista, claveSabor, CLAVES_DE_SABOR,
+  numero, tokenColor, ruta, ancla, url, correo, slug, archivo, derivado, grupo, precioONada,
+  panel, UNIDADES_DE_MEDIDA, opcion, valorFijo,
 } from '../src/contenido/campos'
+import type { MetaCampo } from '../src/contenido/campos'
 import { recorre, cargar, serializa } from '../src/contenido/carga'
-import { cruzaConteo, enLetras } from '../src/contenido/conteos'
+import { cruzaConteo, enLetras, conteosDe } from '../src/contenido/conteos'
 import { contrasteSuficiente, resuelveColor, mejorTinta } from '../src/contenido/color-sabor'
-import { precioDesde, precioDe } from '../src/contenido/derivados'
-import { validarContra } from '../src/contenido/validacion'
+import { precioDesde, precioDe, DERIVADOS_DEL_SITIO, injerta } from '../src/contenido/derivados'
+import { validarContra, validar } from '../src/contenido/validacion'
+import { esquemaSabores } from '../src/contenido/esquema/sabores'
+import { esquemaFichas } from '../src/contenido/esquema/fichas'
+import { camposDeCabecera } from '../src/contenido/esquema/sitio/cabecera'
+import { camposDeProducto } from '../src/contenido/esquema/sitio/producto'
+import { camposDeExperiencia } from '../src/contenido/esquema/sitio/experiencia'
+import { camposDeNegocio } from '../src/contenido/esquema/sitio/negocio'
+import { camposDeContacto } from '../src/contenido/esquema/sitio/contacto'
+import { camposDePaginas } from '../src/contenido/esquema/sitio/paginas'
+import { esquemaSitio } from '../src/contenido/esquema/sitio'
+import { DOCUMENTOS } from '../src/contenido/esquema'
+import type { IdDocumento } from '../src/contenido/esquema'
+import { fichasBase } from '../src/fichas/base'
+// Las fachadas: lo que de verdad importa index.astro. `marca` para el
+// candado de las anclas del menú; `sabores`/`gotas` para injertar los
+// derivados del documento del sitio exactamente como lo hace
+// `src/copy/sitio-marca.ts`, sin repetir esa cuenta a mano acá.
+import { marca } from '../src/copy/sitio-marca'
+import { sabores, gotas } from '../src/copy/sabores'
 import * as tokens from '../src/tokens/color'
+// La foto congelada, no el módulo: el fixture no se mueve cuando la Tarea 13
+// reescriba la fachada, y estos tests validan CONTRA esa foto.
+import fixture from './fixtures/contenido-2026-09-10.json'
+
+/*
+ * Cuatro formas de traer un módulo, todas miradas por igual: el estático
+ * `from '...'` (cubre también el re-export, que conserva el `from`), el
+ * dinámico `import('...')`, el bare `import '...'` por efecto secundario y
+ * el `require('...')` de CommonJS. Un patrón que solo mirara `from` es un
+ * recordatorio, no un guard.
+ *
+ * El orden de la alternancia importa: `import(` va ANTES que `import ` —si
+ * no, `import('x')` se prueba primero contra la forma que exige un espacio
+ * y no matchea.
+ */
+const FORMAS_DE_IMPORTAR =
+  /(?:\bfrom\s+|\bimport\s*\(\s*|\bimport\s+|\brequire\s*\(\s*)['"]([^'"]+)['"]/g
+
+/** Todo lo que un archivo trae de afuera, sin los comentarios. */
+const especificadoresDe = (fuente: string): string[] => {
+  // Los comentarios quedan fuera: este mismo archivo los nombra.
+  const codigo = fuente
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '')
+  return [...codigo.matchAll(FORMAS_DE_IMPORTAR)].map((m) => m[1])
+}
+
+/**
+ * `null` si ese especificador se puede traer; si no, POR QUÉ no.
+ *
+ * La regla es la del spec, en positivo: `zod` —la única dependencia
+ * externa declarada— o una ruta relativa sin extensión, que es lo que
+ * resuelven por igual el navegador, la función serverless y vitest. Los
+ * `../tokens/color` y `../tokens/contrast` que el spec nombra entran por
+ * ser relativos, no por estar en una lista aparte.
+ *
+ * La excepción del `.json` de `datos/` va declarada y acotada: el contenido
+ * SÍ se importa con extensión porque es un JSON, y ningún otro archivo con
+ * extensión tiene por qué entrar por esa puerta.
+ */
+const porQueNoSePuede = (especificador: string): string | null => {
+  if (especificador === 'zod') return null
+  if (!/^\.\.?\//.test(especificador)) {
+    return 'no es «zod» ni una ruta relativa (./ o ../): en el navegador no lo resuelve nadie'
+  }
+  if (/\.json$/i.test(especificador)) {
+    return /(^|\/)datos\/[^/]+\.json$/.test(especificador)
+      ? null
+      : 'el único .json que esta carpeta importa es uno de datos/'
+  }
+  if (/\.[a-z]+$/i.test(especificador)) {
+    return 'las rutas relativas van sin extensión'
+  }
+  return null
+}
 
 describe('la capa de contenido', () => {
-  it('src/contenido/ no importa node:, ni Astro, ni el alias @/', () => {
+  it('src/contenido/ solo importa zod y rutas relativas sin extensión', () => {
     const infractores: string[] = []
     const archivos = readdirSync('src/contenido', { recursive: true, encoding: 'utf8' })
 
     for (const archivo of archivos) {
       if (!archivo.endsWith('.ts')) continue
-      const fuente = readFileSync(`src/contenido/${archivo}`, 'utf8')
-      // Los comentarios quedan fuera: este mismo archivo los nombra.
-      const codigo = fuente
-        .replace(/\/\*[\s\S]*?\*\//g, '')
-        .replace(/^\s*\/\/.*$/gm, '')
-
-      // Cuatro formas de traer un módulo, todas prohibidas por igual: el
-      // estático `from '...'` (cubre también el re-export, que conserva
-      // el `from`), el dinámico `import('...')`, el bare `import '...'`
-      // por efecto secundario, y el `require('...')` de CommonJS. Un
-      // patrón que solo mirara `from` es un recordatorio, no un guard.
-      const formasDeImportar = (prefijo: string) =>
-        new RegExp(
-          `(?:\\bfrom\\s+|\\bimport\\s*\\(\\s*|\\bimport\\s+|\\brequire\\s*\\(\\s*)['"]${prefijo}`,
-        )
-
-      const prohibidos = [
-        [formasDeImportar('node:'), 'node:'],
-        [formasDeImportar('astro'), 'astro'],
-        [formasDeImportar('@/'), 'el alias @/'],
-      ] as const
-
-      for (const [patron, motivo] of prohibidos) {
-        if (patron.test(codigo)) infractores.push(`${archivo} importa ${motivo}`)
+      for (const especificador of especificadoresDe(readFileSync(`src/contenido/${archivo}`, 'utf8'))) {
+        const motivo = porQueNoSePuede(especificador)
+        if (motivo !== null) infractores.push(`${archivo} importa «${especificador}»: ${motivo}`)
       }
     }
 
     expect(infractores).toEqual([])
+  })
+
+  it('el guard es lista blanca: lo que la lista negra dejaba pasar ahora no pasa', () => {
+    // Los tres que pasaban los tres prohibidos de la versión anterior. Cada
+    // uno rompe el panel en el navegador igual que un `node:fs`, y ninguno
+    // decía ni «node:», ni «astro», ni «@/».
+    const traidos = (fuente: string) =>
+      especificadoresDe(fuente).map((e) => [e, porQueNoSePuede(e)] as const)
+
+    expect(traidos(`import { readFileSync } from 'fs'`)).toEqual([
+      ['fs', 'no es «zod» ni una ruta relativa (./ o ../): en el navegador no lo resuelve nadie'],
+    ])
+    expect(traidos(`import path from 'path'`)).toEqual([
+      ['path', 'no es «zod» ni una ruta relativa (./ o ../): en el navegador no lo resuelve nadie'],
+    ])
+    expect(traidos(`import x from 'lodash'`)).toEqual([
+      ['lodash', 'no es «zod» ni una ruta relativa (./ o ../): en el navegador no lo resuelve nadie'],
+    ])
+
+    // Y lo legítimo sigue siendo legítimo: el import relativo de al lado,
+    // la única dependencia externa declarada, los tokens que el spec
+    // nombra, y el JSON de datos/ con su extensión.
+    for (const bueno of [
+      `import x from './carga'`,
+      `import { z } from 'zod'`,
+      `import { sabor } from '../tokens/color'`,
+      `import { grupo } from '../../campos'`,
+      `import datos from './datos/sitio.json'`,
+      `export * from './conteos'`,
+      `const x = await import('../color-sabor')`,
+      `import './efecto-secundario'`,
+    ]) {
+      expect(traidos(bueno).map(([, motivo]) => motivo), bueno).toEqual([null])
+    }
+
+    // La extensión de más y el .json fuera de datos/ también caen.
+    expect(traidos(`import x from './carga.ts'`)).toEqual([
+      ['./carga.ts', 'las rutas relativas van sin extensión'],
+    ])
+    expect(traidos(`import x from '../paquete.json'`)).toEqual([
+      ['../paquete.json', 'el único .json que esta carpeta importa es uno de datos/'],
+    ])
   })
 
   it('palabraProhibida encuentra la palabra, incluidas las formas en plural', () => {
@@ -259,6 +361,21 @@ describe('la capa de contenido', () => {
     expect(c.safeParse('inventado').success).toBe(false)
   })
 
+  it('claveSabor produce el tipo con el que index.astro indexa los tokens', () => {
+    // index.astro hace colorSabor[s.clave] y tintaClara(r.clave), con
+    // tintaClara tipada (clave: keyof typeof tintaSabor), en siete lugares.
+    // Con `clave` tipada `string` a secas son siete errores de astro check —
+    // y esta fase no puede tocar un solo .astro.
+    const campo = claveSabor({ etiqueta: 'Sabor', seccion: 'sabores', ayuda: 'Qué sabor pinta este bloque.' })
+    expectTypeOf<z.infer<typeof campo>>().toEqualTypeOf<keyof typeof tokens.sabor>()
+  })
+
+  it('las claves de sabor del esquema son exactamente las del token', () => {
+    // El cast de Object.keys() es lo único que sostiene el tipo de arriba.
+    // Si el token gana un sabor y esta lista no, el cast miente en silencio.
+    expect([...CLAVES_DE_SABOR].sort()).toEqual(Object.keys(tokens.sabor).sort())
+  })
+
   // Los diez constructores que siguen no tenían test propio: quedaban
   // cubiertos solo por el typecheck y por auditoría manual del revisor.
   // Eso no alcanza — que anden bien HOY y que la suite los agarre si se
@@ -279,18 +396,52 @@ describe('la capa de contenido', () => {
     expect(n.safeParse(11).success).toBe(false)
   })
 
-  it('tokenColor acepta un token declarado en `validos`', () => {
+  it('la lista cerrada de valores se llama igual en los dos constructores que la tienen', () => {
+    // `opcion` la llamaba `valores` y `tokenColor` la llamaba `validos`: un
+    // concepto con dos nombres, sin nada que los mantenga alineados. El panel
+    // lee este metadato para pintar el selector — con el nombre equivocado no
+    // pinta nada, sin excepción y sin error de tipos.
+    const base = { etiqueta: 'X', seccion: 'contacto', ayuda: 'Y' } as const
+    const conListaCerrada = [
+      opcion({ ...base, valores: ['personal', 'negocio'] }),
+      tokenColor({ ...base, valores: ['rojoHondo'] }),
+    ]
+    for (const esquema of conListaCerrada) {
+      const meta = panel.get(esquema) as MetaCampo
+      expect(Object.keys(meta).filter((k) => /^val(ores|idos)$/.test(k))).toEqual(['valores'])
+      expect(meta.valores).toBeDefined()
+    }
+  })
+
+  it('tokenColor acepta un token declarado en `valores`', () => {
     const t = tokenColor({
-      etiqueta: 'Color', seccion: 'sabores', ayuda: 'x', validos: ['rojo', 'azul'],
+      etiqueta: 'Color', seccion: 'sabores', ayuda: 'x', valores: ['rojo', 'azul'],
     })
     expect(t.safeParse('rojo').success).toBe(true)
   })
 
-  it('tokenColor rechaza un token que no está en `validos`', () => {
+  it('tokenColor rechaza un token que no está en `valores`', () => {
     const t = tokenColor({
-      etiqueta: 'Color', seccion: 'sabores', ayuda: 'x', validos: ['rojo', 'azul'],
+      etiqueta: 'Color', seccion: 'sabores', ayuda: 'x', valores: ['rojo', 'azul'],
     })
     expect(t.safeParse('verde').success).toBe(false)
+  })
+
+  it('cuenta lleva el sustantivo con el que ESE texto nombra la lista', () => {
+    // Contra el copy real, la colección y la palabra NO coinciden:
+    // negocios.tabs[2].cuerpo dice «Las 15 barras» y cuenta sabores;
+    // gotas.sabores dice «6 sabores» y cuenta gotas. Con `cuenta` como un
+    // string a secas, cruzaConteo() no sabe qué palabra buscar y el aviso
+    // no se puede producir.
+    const campo = texto({
+      etiqueta: 'Cuerpo del panel de barras',
+      seccion: 'negocios',
+      ayuda: 'El párrafo del panel «Chocolate en barras».',
+      maxCaracteres: 170,
+      cuenta: { de: 'sabores', sustantivo: 'barras' },
+    })
+    const meta = panel.get(campo) as MetaCampo
+    expect(meta.cuenta).toEqual({ de: 'sabores', sustantivo: 'barras' })
   })
 
   it('ruta acepta una ruta interna que empieza con «/»', () => {
@@ -301,6 +452,18 @@ describe('la capa de contenido', () => {
   it('ruta rechaza una cadena sin la barra inicial', () => {
     const r = ruta({ etiqueta: 'Ruta', seccion: 'buscadores', ayuda: 'x' })
     expect(r.safeParse('fichas-tecnicas').success).toBe(false)
+  })
+
+  it('ancla acepta un salto interno y una ruta, y rechaza lo demás', () => {
+    // nav.items[].ancla es '#sabores'; footer.productos[3].ancla es
+    // '/fichas-tecnicas'. Los dos son «a dónde lleva este enlace» y viven en
+    // la misma lista de campos, así que es un solo constructor. `ruta()` no
+    // sirve: exige empezar con «/» y rechaza los saltos.
+    const campo = ancla({ etiqueta: 'A dónde lleva', seccion: 'portada', ayuda: 'El destino del enlace.' })
+    expect(campo.parse('#sabores')).toBe('#sabores')
+    expect(campo.parse('/fichas-tecnicas')).toBe('/fichas-tecnicas')
+    expect(() => campo.parse('https://ejemplo.com')).toThrow()
+    expect(() => campo.parse('sabores')).toThrow()
   })
 
   it('url acepta una dirección web completa', () => {
@@ -386,6 +549,22 @@ describe('la capa de contenido', () => {
     expect(p.safeParse(108.5).success).toBe(false)
   })
 
+  it('valorFijo anota el literal que discrimina una forma de bloque', () => {
+    // Sin esto, el `tipo` de cada variante es un z.literal pelado: recorre()
+    // lo emite como hoja SIN metadato, y el candado «todo campo tiene
+    // etiqueta» de la Tarea 16 lo cuenta como un campo sin nombre.
+    const campo = valorFijo({
+      etiqueta: 'Forma del bloque',
+      seccion: 'fichas',
+      ayuda: 'Dice si este bloque es un párrafo, una lista o una tabla.',
+      valores: ['parrafo'],
+    })
+    expect((panel.get(campo) as MetaCampo).etiqueta).toBe('Forma del bloque')
+    expect(campo.parse('parrafo')).toBe('parrafo')
+    expect(() => campo.parse('lista')).toThrow()
+    expectTypeOf<z.infer<typeof campo>>().toEqualTypeOf<'parrafo'>()
+  })
+
   it('canario: las formas internas de Zod son las que recorre() supone', () => {
     // recorre() es lo ÚNICO que toca interna de Zod. Si una versión nueva
     // mueve estas claves, el recorrido devolvería rutas vacías y el panel
@@ -420,6 +599,27 @@ describe('la capa de contenido', () => {
     expect(tipo(du)).toBe('union')
   })
 
+  it('discriminatedUnion reporta type «union» y guarda discriminator + options', () => {
+    const u = z.discriminatedUnion('tipo', [
+      z.object({ tipo: z.literal('parrafo'), texto: z.string() }),
+      z.object({ tipo: z.literal('lista'), items: z.array(z.string()) }),
+    ])
+    const def = (u as unknown as { _zod: { def: Record<string, unknown> } })._zod.def
+    expect(def.type).toBe('union')
+    expect(Object.keys(def).sort()).toEqual(['discriminator', 'inclusive', 'options', 'type'])
+    expect(def.discriminator).toBe('tipo')
+    expect(Array.isArray(def.options)).toBe(true)
+  })
+
+  it('literal reporta type «literal» y guarda su valor en un ARRAY', () => {
+    // Un array aunque el literal sea uno solo. varianteDe() lo desarma
+    // asumiendo exactamente eso.
+    const def = (z.literal('parrafo') as unknown as { _zod: { def: Record<string, unknown> } })._zod.def
+    expect(def.type).toBe('literal')
+    expect(Object.keys(def).sort()).toEqual(['type', 'values'])
+    expect(def.values).toEqual(['parrafo'])
+  })
+
   it('recorre() emite la ruta punteada de cada hoja, con su metadato', () => {
     const esquema = grupo({
       etiqueta: 'Portada', seccion: 'portada', ayuda: 'x',
@@ -445,14 +645,18 @@ describe('la capa de contenido', () => {
     ])
   })
 
-  it('recorre() no trata una unión como hoja: truena y dice qué falta', () => {
+  it('recorre() no trata una unión SIN discriminante como hoja: truena y dice qué falta', () => {
     // Silencio es el peor resultado acá: una unión emitida como hoja deja
     // todos los campos de sus variantes invisibles para el panel, sin error.
-    const conUnion = z.discriminatedUnion('tipo', [
+    // Las discriminadas SÍ se recorren desde esta tarea (ver el describe de
+    // 'recorre() y serializa() sobre una unión discriminada' más abajo); lo
+    // que sigue sin soportarse es una unión a secas, que no dice cuál rama
+    // mirar y no se puede recorrer sin adivinar.
+    const sinDiscriminante = z.union([
       z.object({ tipo: z.literal('parrafo'), texto: z.string() }),
       z.object({ tipo: z.literal('lista'), items: z.array(z.string()) }),
     ])
-    expect(() => recorre(conUnion, () => {})).toThrow(/unión/i)
+    expect(() => recorre(sinDiscriminante, () => {})).toThrow(/unión/i)
   })
 
   it('un campo anotado y después envuelto en optional conserva su etiqueta', () => {
@@ -828,25 +1032,22 @@ describe('la capa de contenido', () => {
     expect(bytes.indexOf('"nombre"')).toBeLessThan(bytes.indexOf('"precio"'))
   })
 
-  // recorre() y ordenaSegun() caminan el MISMO árbol y hasta acá daban
-  // respuestas OPUESTAS a la misma pregunta: con una unión, recorre()
-  // tiraba y serializa() devolvía el bloque tal cual —con las claves que
-  // el esquema no declara adentro—. Era el cuarto mecanismo divergente del
-  // archivo, y el primero que la Parte B iba a pisar: los bloques de ficha
-  // se declaran como `discriminatedUnion`.
+  // recorre() y ordenaSegun() caminan el MISMO árbol y tienen que dar la
+  // MISMA respuesta a la misma pregunta. Las uniones DISCRIMINADAS ya se
+  // recorren de verdad (ver el describe de más abajo, y el caso 'union'
+  // de los dos switches en carga.ts); lo que ninguna de las dos sabe
+  // atravesar sigue siendo una unión SIN discriminante, que no dice cuál
+  // rama mirar. Las dos siguen contestando lo mismo ante ese caso.
 
-  it('serializa() tira con una unión, igual que recorre(): una sola respuesta', () => {
+  it('serializa() tira con una unión sin discriminante, igual que recorre(): una sola respuesta', () => {
     const esquema = z.object({
-      bloque: z.discriminatedUnion('t', [
+      bloque: z.union([
         z.object({ t: z.literal('a'), uno: z.string() }),
         z.object({ t: z.literal('b'), dos: z.string() }),
       ]),
     })
     expect(() => recorre(esquema, () => {})).toThrow(/unión/i)
-    // Antes esto devolvía {"bloque":{"t":"a","uno":"hola","BASURA":"…"}}:
-    // la clave no declarada viajaba al JSON sin un solo error.
-    expect(() => serializa(esquema, { bloque: { t: 'a', uno: 'hola', BASURA: 'no declarada' } }))
-      .toThrow(/unión/i)
+    expect(() => serializa(esquema, { bloque: { t: 'a', uno: 'hola' } })).toThrow(/unión/i)
   })
 
   it('una envoltura que no sabemos pelar es ruidosa en los DOS caminos, no una hoja permisiva', () => {
@@ -1194,5 +1395,923 @@ describe('la capa de contenido', () => {
     for (const p of problemas) {
       expect(p.titulo).not.toMatch(JERGA_PROHIBIDA)
     }
+  })
+
+  describe('validar() — los avisos de conteo', () => {
+    const esquemaDePrueba = grupo({
+      etiqueta: 'Prueba',
+      seccion: 'sabores',
+      ayuda: 'Un documento de prueba.',
+      campos: {
+        kicker: texto({
+          etiqueta: 'Antetítulo del anaquel',
+          seccion: 'sabores',
+          ayuda: 'La línea chiquita arriba de «Elige tu barra».',
+          maxCaracteres: 30,
+          cuenta: { de: 'sabores', sustantivo: 'sabores' },
+        }),
+      },
+    })
+
+    it('avisa cuando el texto dice un número distinto del real', () => {
+      const problemas = validar(esquemaDePrueba, { kicker: 'LOS 15 SABORES' }, { sabores: 16 })
+      expect(problemas).toEqual([
+        {
+          campo: 'kicker',
+          gravedad: 'avisa',
+          titulo: 'Este texto dice «15» pero hoy hay 16.',
+          detalle: 'Si agregaste o quitaste algo de la lista, este texto quedó viejo.',
+        },
+      ])
+    })
+
+    it('no avisa cuando el texto y la lista dicen lo mismo', () => {
+      expect(validar(esquemaDePrueba, { kicker: 'LOS 16 SABORES' }, { sabores: 16 })).toEqual([])
+    })
+
+    it('truena si el esquema declara un conteo que el llamador no pasó', () => {
+      // Es un error de cableado, no de contenido: las tres piezas del aviso
+      // existían desde la Parte A y nadie las ensamblaba. Si el silencio
+      // fuera aceptable acá, la feature podría volver a quedar muerta sin
+      // que un solo test lo note.
+      expect(() => validar(esquemaDePrueba, { kicker: 'LOS 15 SABORES' }, {})).toThrow(
+        /kicker.*«sabores».*no vino en los conteos/,
+      )
+    })
+
+    it('avisa dentro de una lista de listas: la ruta trae DOS corchetes seguidos (filas[][])', () => {
+      // 'filas[][]' es la forma real de la ruta de una celda de tabla: dos
+      // niveles de lista SIN una clave entre medio, porque recorre() arma
+      // esa parte así (ver el caso 'array' de carga.ts, que agrega `[]`
+      // sin punto). enRutas() tiene que poder instanciarla contra el dato,
+      // no solo el caso de UN corchete que ya cubrían los otros tests.
+      const esquemaTabla = grupo({
+        etiqueta: 'Tabla', seccion: 'productos', ayuda: 'x',
+        campos: {
+          filas: lista({
+            etiqueta: 'Filas', seccion: 'productos', ayuda: 'y',
+            minItems: 1, maxItems: 3,
+            elemento: lista({
+              etiqueta: 'Fila', seccion: 'productos', ayuda: 'z',
+              minItems: 1, maxItems: 3,
+              elemento: texto({
+                etiqueta: 'Celda', seccion: 'productos', ayuda: 'w', maxCaracteres: 30,
+                cuenta: { de: 'sabores', sustantivo: 'sabores' },
+              }),
+            }),
+          }),
+        },
+      })
+      const problemas = validar(esquemaTabla, { filas: [['LOS 15 SABORES']] }, { sabores: 16 })
+      expect(problemas).toEqual([
+        {
+          campo: 'filas.0.0',
+          gravedad: 'avisa',
+          titulo: 'Este texto dice «15» pero hoy hay 16.',
+          detalle: 'Si agregaste o quitaste algo de la lista, este texto quedó viejo.',
+        },
+      ])
+    })
+  })
+
+  describe('recorre() y serializa() sobre una unión discriminada', () => {
+    const bloque = z.discriminatedUnion('tipo', [
+      z.object({
+        tipo: z.literal('parrafo'),
+        texto: parrafo({ etiqueta: 'Párrafo', seccion: 'fichas', ayuda: 'Un párrafo de la ficha.', maxCaracteres: 600 }),
+      }),
+      z.object({
+        tipo: z.literal('lista'),
+        items: lista({
+          etiqueta: 'Viñetas', seccion: 'fichas', ayuda: 'Las viñetas de la ficha.',
+          minItems: 1, maxItems: 12,
+          elemento: texto({ etiqueta: 'Viñeta', seccion: 'fichas', ayuda: 'Una viñeta.', maxCaracteres: 300 }),
+        }),
+      }),
+    ])
+
+    it('emite una rama por variante, con la variante en la ruta', () => {
+      const rutas: string[] = []
+      recorre(bloque, (ruta) => rutas.push(ruta))
+      expect(rutas).toEqual([
+        '<tipo=parrafo>.tipo',
+        '<tipo=parrafo>.texto',
+        '<tipo=lista>.tipo',
+        '<tipo=lista>.items[]',
+      ])
+    })
+
+    it('cada hoja de una variante conserva su etiqueta', () => {
+      const etiquetas = new Map<string, string | undefined>()
+      recorre(bloque, (ruta, meta) => etiquetas.set(ruta, meta?.etiqueta))
+      expect(etiquetas.get('<tipo=parrafo>.texto')).toBe('Párrafo')
+      expect(etiquetas.get('<tipo=lista>.items[]')).toBe('Viñeta')
+    })
+
+    it('serializa() elige la variante que dice el dato y reordena adentro', () => {
+      const salida = serializa(bloque, { texto: 'Hola', tipo: 'parrafo' })
+      expect(JSON.parse(salida)).toEqual({ tipo: 'parrafo', texto: 'Hola' })
+      expect(Object.keys(JSON.parse(salida))).toEqual(['tipo', 'texto'])
+    })
+
+    it('serializa() truena si el discriminante no es ninguna variante', () => {
+      expect(() => serializa(bloque, { tipo: 'tabla', filas: [] })).toThrow(
+        /«tipo» dice «tabla», que no es ninguna de las variantes declaradas \(parrafo, lista\)/,
+      )
+    })
+
+    it('serializa() reclama una clave que la variante elegida no declara', () => {
+      // Este assert vivía en el caso de la unión SIN discriminante, donde
+      // `serializa()` tira antes de mirar ni una clave —así que probaba lo
+      // mismo que la línea de al lado y nada sobre claves sobrantes—,
+      // mientras su comentario decía justamente eso. Acá sí: la variante
+      // está elegida, se entra a mirar sus claves, y `BASURA` es una que el
+      // esquema no declara.
+      //
+      // Antes de que las uniones se recorrieran de verdad, esto devolvía
+      // {"tipo":"parrafo","texto":"Hola","BASURA":"…"}: la clave no
+      // declarada viajaba al JSON publicado sin un solo error.
+      expect(() => serializa(bloque, { tipo: 'parrafo', texto: 'Hola', BASURA: 'no declarada' }))
+        .toThrow(/BASURA/)
+    })
+  })
+
+  describe('los campos derivados no viajan al JSON', () => {
+    const conDerivado = grupo({
+      etiqueta: 'Gotas', seccion: 'productos', ayuda: 'El bloque de las gotas.',
+      campos: {
+        titulo: texto({ etiqueta: 'Título', seccion: 'productos', ayuda: 'El título del bloque.', maxCaracteres: 50 }),
+        precioDesde: derivado({
+          etiqueta: 'Precio desde', seccion: 'productos',
+          ayuda: 'El precio más bajo de las bolsas de gotas.',
+          saleDe: 'el precio más bajo de las bolsas de gotas',
+        }),
+      },
+    })
+
+    it('serializa() no escribe el derivado', () => {
+      const salida = JSON.parse(serializa(conDerivado, { titulo: 'Gotas', precioDesde: 258 }))
+      expect(salida).toEqual({ titulo: 'Gotas' })
+    })
+
+    it('cargar() SÍ lo exige: la fachada tiene que injertarlo antes', () => {
+      // Es el contrato con la fachada. Si cargar() lo dejara pasar, el sitio
+      // publicaría un `undefined` donde va un precio y nada avisaría.
+      expect(() => cargar('prueba.json', conDerivado, { titulo: 'Gotas' })).toThrow(/precioDesde/)
+    })
+  })
+
+  it('el fixture del árbol viejo está entero', async () => {
+    // Si este archivo se trunca o se regenera contra el árbol NUEVO, el
+    // certificado de la Tarea 14 se vuelve una comparación de algo contra sí
+    // mismo: verde y sin valor. Esto no lo impide, pero lo hace ruidoso.
+    const fixture = (await import('./fixtures/contenido-2026-09-10.json')).default
+    expect(Object.keys(fixture).sort()).toEqual(
+      ['fichas', 'gotas', 'marca', 'polvo', 'sabores', 'urlCatalogoBarras'],
+    )
+    expect(fixture.sabores).toHaveLength(15)
+    expect(fixture.fichas).toHaveLength(4)
+    expect(Object.keys(fixture.marca)).toHaveLength(21)
+  })
+
+  it('capturaFixture() se niega a correr si src/contenido/datos/ ya tiene un documento migrado', () => {
+    // Después de esta tarea, src/contenido/datos/sabores.json existe de
+    // verdad: si capturaFixture() corriera ahora, leería la FACHADA de
+    // sabores —que ya lee su propio JSON con cargar()— en vez de los
+    // módulos `as const` originales, y el fixture terminaría siendo una
+    // foto del árbol NUEVO contra sí mismo. Se corre como proceso real,
+    // igual que `pnpm migra fixture`, para probar el candado tal como se
+    // va a disparar de verdad — no una versión mockeada de node:fs.
+    let fallo = false
+    let salida = ''
+    try {
+      execFileSync('pnpm', ['exec', 'tsx', 'scripts/migra-contenido.ts', 'fixture'], { stdio: 'pipe' })
+    } catch (e) {
+      fallo = true
+      salida = String((e as { stderr: Buffer }).stderr)
+    }
+    expect(fallo).toBe(true)
+    expect(salida).toContain('ya tiene al menos un documento migrado')
+    // Y el mensaje explica el POR QUÉ, no solo que se niega: quien lo lea
+    // dentro de seis meses tiene que entender qué está protegiendo.
+    expect(salida).toMatch(/certificado de la Tarea 14/)
+  })
+
+  it('el documento de productos vuelve a salir idéntico', async () => {
+    // Bytes canónicos: si esto no se cumple, dos guardados seguidos producen
+    // diffs distintos sin que haya cambiado nada, y el historial del repo
+    // se llena de ruido que esconde los cambios de verdad.
+    const bytes = readFileSync('src/contenido/datos/sabores.json', 'utf8')
+    const cargado = cargar('src/contenido/datos/sabores.json', esquemaSabores, JSON.parse(bytes))
+    expect(serializa(esquemaSabores, cargado) + '\n').toBe(bytes)
+  })
+
+  describe('el documento de fichas', () => {
+    it('vuelve a salir idéntico', () => {
+      const bytes = readFileSync('src/contenido/datos/fichas.json', 'utf8')
+      const cargado = cargar('src/contenido/datos/fichas.json', esquemaFichas, JSON.parse(bytes))
+      expect(serializa(esquemaFichas, cargado) + '\n').toBe(bytes)
+    })
+
+    it('toda fila trae una celda por encabezado', () => {
+      // El esquema no puede expresar esto: `lista` no sabe cuánto mide su
+      // hermana. Y una fila con una celda de menos renderiza una tabla
+      // corrida — el modo de falla que el PDF le manda a las cafeterías.
+      for (const ficha of fichasBase) {
+        for (const seccion of ficha.secciones) {
+          for (const bloque of seccion.bloques) {
+            if (bloque.tipo !== 'tabla') continue
+            for (const fila of bloque.filas) {
+              expect(fila, `${ficha.archivo} · ${seccion.titulo}`).toHaveLength(bloque.encabezados.length)
+            }
+          }
+        }
+      }
+    })
+
+    it('el panel puede nombrar todas las hojas de las tres formas de bloque', () => {
+      // Es la prueba de que las uniones se recorren de verdad: si recorre()
+      // emitiera el bloque como hoja opaca, este test vería 1 ruta en vez de
+      // las 8 de las tres variantes.
+      const rutas: string[] = []
+      recorre(esquemaFichas, (r, meta) => {
+        expect(meta?.etiqueta, `sin etiqueta: ${r}`).toBeTruthy()
+        rutas.push(r)
+      })
+      const deBloques = rutas.filter((r) => r.includes('bloques[]'))
+      expect(deBloques).toEqual([
+        'fichas[].secciones[].bloques[]<tipo=parrafo>.tipo',
+        'fichas[].secciones[].bloques[]<tipo=parrafo>.texto',
+        'fichas[].secciones[].bloques[]<tipo=lista>.tipo',
+        'fichas[].secciones[].bloques[]<tipo=lista>.items[]',
+        'fichas[].secciones[].bloques[]<tipo=tabla>.tipo',
+        'fichas[].secciones[].bloques[]<tipo=tabla>.encabezados[]',
+        'fichas[].secciones[].bloques[]<tipo=tabla>.filas[][]',
+      ])
+    })
+  })
+
+  describe('el esquema de cabecera', () => {
+    const cabecera = grupo({
+      etiqueta: 'Cabecera', seccion: 'portada', ayuda: 'Prueba.',
+      campos: camposDeCabecera,
+    })
+
+    // Una fábrica y no una constante: cada test que muta necesita su propia
+    // copia. Compartir un objeto entre tests los acopla por orden de
+    // ejecución, que es el bug de test más difícil de ver.
+    const hoy = () => {
+      const m = JSON.parse(JSON.stringify(fixture.marca))
+      return {
+        titulo: m.titulo, descripcion: m.descripcion, skipLink: m.skipLink,
+        marca: m.marca, nav: m.nav, hero: m.hero,
+      }
+    }
+
+    it('valida el contenido de hoy', () => {
+      expect(validar(cabecera, hoy(), { sabores: 15 })).toEqual([])
+    })
+
+    it('toda hoja tiene etiqueta, ayuda y sección', () => {
+      recorre(cabecera, (ruta, meta) => {
+        expect(meta?.etiqueta, `sin etiqueta: ${ruta}`).toBeTruthy()
+        expect(meta?.ayuda, `sin ayuda: ${ruta}`).toBeTruthy()
+        expect(meta?.seccion, `sin sección: ${ruta}`).toBeTruthy()
+      })
+    })
+
+    it('el renglón 2 del titular exige una coma y solo una', () => {
+      // La plantilla le SACA la coma final y pinta una roja en su lugar. Con
+      // dos comas, la del medio se queda: «70% CACAO, DE VERDAD,,» en el h1.
+      //
+      // El valor de prueba tiene que caber en el tope de 20 caracteres, o el
+      // problema sale por LARGO y no por la coma — y entonces el test pasa
+      // igual con la regla de la coma rota. «70% CACAO, DE VERDAD,» mide 21 y
+      // hacía exactamente eso: afirmaba la ruta, que las dos reglas comparten.
+      const datos = hoy()
+      datos.hero.titular = ['CHOCOLATE', 'MEXICANO, RICO,', 'CACAO.']
+      const problemas = validar(cabecera, datos, { sabores: 15 })
+      // Y se afirma el MENSAJE, no solo la ruta: `hero.titular.1` es la misma
+      // para el tope de caracteres y para la coma, así que la ruta sola no
+      // distingue cuál de las dos reglas se disparó.
+      expect(problemas).toHaveLength(1)
+      expect(problemas[0].campo).toBe('hero.titular.1')
+      expect(problemas[0].titulo).toMatch(/coma/i)
+    })
+  })
+
+  describe('el esquema de producto', () => {
+    const producto = grupo({
+      etiqueta: 'Producto', seccion: 'productos', ayuda: 'Prueba.',
+      campos: camposDeProducto,
+    })
+    const hoy = () => {
+      const m = JSON.parse(JSON.stringify(fixture.marca))
+      // Los derivados NO están en el JSON, pero cargar() y validar() los
+      // exigen: es el contrato con la fachada. El fixture los tiene porque
+      // salió del módulo viejo, donde estaban escritos a mano.
+      return { postura: m.postura, anaquel: m.anaquel, minis: m.minis, gotas: m.gotas, polvoCard: m.polvoCard, polvo: m.polvo }
+    }
+    const CONTEOS = { sabores: 15, gotas: 6, polvo: 8, ingredientes: 5 }
+
+    it('valida el contenido de hoy, avisos incluidos', () => {
+      expect(validar(producto, hoy(), CONTEOS)).toEqual([])
+    })
+
+    it('toda hoja tiene etiqueta, ayuda y sección', () => {
+      recorre(producto, (ruta, meta) => {
+        expect(meta?.etiqueta, `sin etiqueta: ${ruta}`).toBeTruthy()
+        expect(meta?.ayuda, `sin ayuda: ${ruta}`).toBeTruthy()
+        expect(meta?.seccion, `sin sección: ${ruta}`).toBeTruthy()
+      })
+    })
+
+    it('avisa si el anaquel dice un número de sabores que ya no es', () => {
+      const problemas = validar(producto, hoy(), { ...CONTEOS, sabores: 16 })
+      expect(problemas).toContainEqual(
+        expect.objectContaining({ campo: 'anaquel.kicker', gravedad: 'avisa' }),
+      )
+    })
+
+    it('los tres espacios duros se exigen', () => {
+      // El modo de falla es invisible en el escritorio y evidente en el
+      // celular: la «g» sola en el renglón siguiente.
+      const roto = hoy()
+      roto.anaquel.pesoInsignia = '70 g' // espacio NORMAL, escrito a propósito
+      const problemas = validar(producto, roto, CONTEOS)
+      expect(problemas.map((p) => p.campo)).toContain('anaquel.pesoInsignia')
+    })
+  })
+
+  describe('el esquema de experiencia', () => {
+    const experiencia = grupo({
+      etiqueta: 'Experiencia', seccion: 'catar', ayuda: 'Prueba.',
+      campos: camposDeExperiencia,
+    })
+    const hoy = () => {
+      const m = JSON.parse(JSON.stringify(fixture.marca))
+      return { catar: m.catar, recetas: m.recetas, nosotros: m.nosotros }
+    }
+    const CONTEOS = { pasos: 6, recetas: 4 }
+
+    it('valida el contenido de hoy, avisos incluidos', () => {
+      expect(validar(experiencia, hoy(), CONTEOS)).toEqual([])
+    })
+
+    it('toda hoja tiene etiqueta, ayuda y sección', () => {
+      recorre(experiencia, (ruta, meta) => {
+        expect(meta?.etiqueta, `sin etiqueta: ${ruta}`).toBeTruthy()
+        expect(meta?.ayuda, `sin ayuda: ${ruta}`).toBeTruthy()
+        expect(meta?.seccion, `sin sección: ${ruta}`).toBeTruthy()
+      })
+    })
+
+    it('el chip de polvo puede faltar, y falta en tres de las cuatro recetas', () => {
+      const datos = hoy()
+      expect(datos.recetas.lista.filter((r: object) => 'chipPolvo' in r)).toHaveLength(1)
+      expect(validar(experiencia, datos, CONTEOS)).toEqual([])
+    })
+
+    it('el chip opcional conserva su etiqueta a través del .optional()', () => {
+      // `panel.get()` NO sigue la cadena de padres a través de .optional()
+      // —crea un tipo nuevo, sin `parent`— aunque sí la siga a través de
+      // .refine(). Si esto se rompe, el panel dibuja ese campo sin nombre y
+      // no hay ningún error que lo diga.
+      const etiquetas = new Map<string, string | undefined>()
+      recorre(experiencia, (ruta, meta) => etiquetas.set(ruta, meta?.etiqueta))
+      expect(etiquetas.get('recetas.lista[].chipPolvo')).toBe('Cápsula de polvo')
+    })
+  })
+
+  describe('el esquema de negocio', () => {
+    const negocio = grupo({
+      etiqueta: 'Negocio', seccion: 'negocios', ayuda: 'Prueba.',
+      campos: camposDeNegocio,
+    })
+    const hoy = () => {
+      const m = JSON.parse(JSON.stringify(fixture.marca))
+      return { negocios: m.negocios, preguntas: m.preguntas }
+    }
+    const CONTEOS = { sabores: 15, gotas: 6, polvo: 8, preguntas: 8 }
+
+    it('valida el contenido de hoy, avisos incluidos', () => {
+      expect(validar(negocio, hoy(), CONTEOS)).toEqual([])
+    })
+
+    it('toda hoja tiene etiqueta, ayuda y sección', () => {
+      recorre(negocio, (ruta, meta) => {
+        expect(meta?.etiqueta, `sin etiqueta: ${ruta}`).toBeTruthy()
+        expect(meta?.ayuda, `sin ayuda: ${ruta}`).toBeTruthy()
+        expect(meta?.seccion, `sin sección: ${ruta}`).toBeTruthy()
+      })
+    })
+
+    it('cada panel tiene su propia regla de conteo', () => {
+      // Es lo que la `tupla` compra y la `lista` no podía: tres reglas
+      // distintas sobre tres campos con la misma forma.
+      const cuentas = new Map<string, string | undefined>()
+      recorre(negocio, (ruta, meta) => cuentas.set(ruta, meta?.cuenta && `${meta.cuenta.de}/${meta.cuenta.sustantivo}`))
+      expect(cuentas.get('negocios.tabs.0.cuerpo')).toBe('polvo/variedades')
+      expect(cuentas.get('negocios.tabs.1.datos[]')).toBe('gotas/sabores')
+      expect(cuentas.get('negocios.tabs.2.cuerpo')).toBe('sabores/barras')
+    })
+
+    it('avisa en el panel de barras si cambia la cantidad de sabores', () => {
+      const problemas = validar(negocio, hoy(), { ...CONTEOS, sabores: 16 })
+      expect(problemas).toContainEqual(
+        expect.objectContaining({ campo: 'negocios.tabs.2.cuerpo', gravedad: 'avisa' }),
+      )
+    })
+  })
+
+  describe('el esquema de contacto', () => {
+    const contacto = grupo({
+      etiqueta: 'Contacto', seccion: 'contacto', ayuda: 'Prueba.',
+      campos: camposDeContacto,
+    })
+    const hoy = () => ({ contacto: JSON.parse(JSON.stringify(fixture.marca.contacto)) })
+
+    it('valida el contenido de hoy', () => {
+      expect(validar(contacto, hoy(), {})).toEqual([])
+    })
+
+    it('toda hoja tiene etiqueta, ayuda y sección', () => {
+      recorre(contacto, (ruta, meta) => {
+        expect(meta?.etiqueta, `sin etiqueta: ${ruta}`).toBeTruthy()
+        expect(meta?.ayuda, `sin ayuda: ${ruta}`).toBeTruthy()
+        expect(meta?.seccion, `sin sección: ${ruta}`).toBeTruthy()
+      })
+    })
+
+    it('el correo declara sus tres hermanas y rechaza lo que no es un correo', () => {
+      const metas = new Map<string, MetaCampo | undefined>()
+      recorre(contacto, (ruta, meta) => metas.set(ruta, meta))
+      expect(metas.get('contacto.correo')?.escribeTambien).toEqual(['nav.pie.1', 'negocios.correo'])
+
+      const roto = hoy()
+      roto.contacto.correo = 'maracacaomx arroba gmail punto com'
+      expect(validar(contacto, roto, {}).map((p) => p.campo)).toContain('contacto.correo')
+    })
+  })
+
+  describe('el esquema de páginas', () => {
+    const paginas = grupo({
+      etiqueta: 'Páginas', seccion: 'fichas', ayuda: 'Prueba.',
+      campos: camposDePaginas,
+    })
+    const hoy = () => {
+      const m = JSON.parse(JSON.stringify(fixture.marca))
+      return { fichasTecnicas: m.fichasTecnicas, noEncontrada: m.noEncontrada, footer: m.footer }
+    }
+
+    it('valida el contenido de hoy', () => {
+      expect(validar(paginas, hoy(), {})).toEqual([])
+    })
+
+    it('toda hoja tiene etiqueta, ayuda y sección', () => {
+      recorre(paginas, (ruta, meta) => {
+        expect(meta?.etiqueta, `sin etiqueta: ${ruta}`).toBeTruthy()
+        expect(meta?.ayuda, `sin ayuda: ${ruta}`).toBeTruthy()
+        expect(meta?.seccion, `sin sección: ${ruta}`).toBeTruthy()
+      })
+    })
+
+    it('los dos espacios duros de footer.productos se exigen', () => {
+      // El modo de falla es invisible en el escritorio y evidente en el
+      // celular: la «g» sola en el renglón siguiente.
+      const roto = hoy()
+      roto.footer.productos[0].texto = 'Barras 70 g' // espacio NORMAL, a propósito
+      const problemas = validar(paginas, roto, {})
+      expect(problemas.map((p) => p.campo)).toContain('footer.productos.0.texto')
+    })
+
+    it('footer.productos nombra el elemento con su texto, no con «Enlace» a secas', () => {
+      // Igual que el test de «el metadato dice lo que significa»: `elemento`
+      // guarda el ESQUEMA del elemento, y su propio registro trae `nombra`.
+      const metaLista = panel.get(camposDePaginas.footer.shape.productos) as MetaCampo
+      const nombra = (panel.get(metaLista.elemento as z.ZodType) as MetaCampo).nombra
+      expect(nombra?.({ texto: 'Fichas técnicas' })).toBe('Fichas técnicas')
+      expect(nombra?.({})).toBe('Enlace')
+    })
+  })
+
+  describe('el contraste de la banda de cada sabor', () => {
+    const unSabor = {
+      orden: 1, slug: 'canela', clave: 'canela', nombre: 'Canela', cacao: 'Cacao 70%',
+      precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural',
+      catalogo: null,
+    }
+    const doc = (sabor: object) => ({
+      urlCatalogoBarras: 'https://chocolateria.pulpos.shop',
+      sabores: [sabor], gotas: [{ clave: 'canela', nombre: 'Canela', precio: 258 }],
+      polvo: [{ archivo: 'etiqueta-canela', nombre: 'Canela' }],
+    })
+
+    it('los 15 sabores de hoy pasan la regla', () => {
+      const bytes = readFileSync('src/contenido/datos/sabores.json', 'utf8')
+      expect(validar(esquemaSabores, JSON.parse(bytes), {})).toEqual([])
+    })
+
+    it('hereda la excepción de los tokens en vez de reinventarla', () => {
+      // La hierbabuena da 4.41 —abajo del 4.5— y está declarada
+      // `saboresSoloDisplay` en src/tokens/color.ts a propósito. Si la regla
+      // tuviera su propia lista de excepciones, esta se le escaparía y el
+      // build no publicaría un contenido que hoy es correcto.
+      expect(tokens.saboresSoloDisplay).toContain('hierbabuena')
+      const hierbabuena = { ...unSabor, slug: 'hierbabuena', clave: 'hierbabuena', nombre: 'Hierbabuena' }
+      expect(validar(esquemaSabores, doc(hierbabuena), {})).toEqual([])
+    })
+  })
+
+  describe('el documento del sitio, entero', () => {
+    // Derivado del fixture y no escrito a mano: es un documento COMPLETO,
+    // así que el mapa se puede sacar del propio dato. Los mapas parciales
+    // de los fragmentos de más arriba sí se escriben, porque lo que
+    // documentan es qué colecciones necesita ESE fragmento.
+    const CONTEOS = conteosDe({ sitio: fixture.marca, sabores: fixture })
+
+    it('los 21 bloques están, en el orden de la página', () => {
+      // El orden de las claves del esquema es el orden del JSON y el orden
+      // en que el panel dibuja las secciones. Si alguien reordena los
+      // spread de sitio.ts, el JSON entero se reescribe y el diff del
+      // commit siguiente es de 900 líneas sin que haya cambiado nada.
+      const bloques = Object.keys((esquemaSitio as unknown as { _zod: { def: { shape: object } } })._zod.def.shape)
+      expect(bloques).toEqual([
+        'titulo', 'descripcion', 'skipLink', 'marca', 'nav', 'hero',
+        'postura', 'anaquel', 'minis', 'gotas', 'polvoCard', 'polvo',
+        'catar', 'recetas', 'nosotros',
+        'negocios', 'preguntas', 'contacto',
+        'fichasTecnicas', 'noEncontrada', 'footer',
+      ])
+    })
+
+    it('valida el contenido de hoy, entero y con avisos', () => {
+      // La prueba de que el esquema describe EXACTAMENTE lo que hay. Si
+      // sobra una clave o falta una, esto lo dice con la ruta.
+      expect(validar(esquemaSitio, JSON.parse(JSON.stringify(fixture.marca)), CONTEOS)).toEqual([])
+    })
+
+    it('todas las hojas tienen etiqueta, ayuda y sección', () => {
+      const rutas: string[] = []
+      recorre(esquemaSitio, (ruta, meta) => {
+        expect(meta?.etiqueta, `sin etiqueta: ${ruta}`).toBeTruthy()
+        expect(meta?.ayuda, `sin ayuda: ${ruta}`).toBeTruthy()
+        expect(meta?.seccion, `sin sección: ${ruta}`).toBeTruthy()
+        rutas.push(ruta)
+      })
+      expect(new Set(rutas).size, 'hay rutas repetidas').toBe(rutas.length)
+      expect(rutas.length).toBeGreaterThan(190)
+    })
+
+    it('ninguna etiqueta ni ayuda usa una palabra que la marca no usa', () => {
+      // El filtro de MARCA vale también para lo que lee la clienta en el
+      // panel. El de MAQUETA no: el panel necesita la palabra «Borrador».
+      recorre(esquemaSitio, (ruta, meta) => {
+        expect(palabraProhibida(meta?.etiqueta ?? ''), `en la etiqueta de ${ruta}`).toBeNull()
+        expect(palabraProhibida(meta?.ayuda ?? ''), `en la ayuda de ${ruta}`).toBeNull()
+      })
+    })
+  })
+
+  describe('los derivados del sitio', () => {
+    const FUENTES = {
+      sabores: [{ precio: 122 }, { precio: 108 }],
+      gotas: [{ clave: 'jengibreYNaranja', precio: 340 }, { clave: 'canela', precio: 258 }],
+    }
+
+    it('la tabla de derivados es exactamente la que el esquema declara', () => {
+      // ES EL CANDADO DE LA TAREA. Sin él, un campo marcado `derivado` en el
+      // esquema y ausente de esta tabla se queda sin valor: serializa() no
+      // lo escribe, injerta() no lo calcula, y cargar() truena en el build
+      // con «falta «precioDesde»» sin decir por qué. Y al revés —una entrada
+      // de más— escribe un valor en una ruta que el esquema no marca como
+      // derivada, y esa la clienta la puede editar creyendo que sirve.
+      const delEsquema: string[] = []
+      recorre(esquemaSitio, (ruta, meta) => {
+        if (meta?.control === 'derivado') delEsquema.push(ruta)
+      })
+      expect(DERIVADOS_DEL_SITIO.map((d) => d.ruta).sort()).toEqual(delEsquema.sort())
+    })
+
+    it('injerta escribe los cuatro valores en su ruta', () => {
+      const crudo = { gotas: {}, negocios: { tabs: [{}, {}, {}] } }
+      const con = injerta(crudo, FUENTES) as {
+        gotas: { precioDesde: number; precioJengibre: number }
+        negocios: { tabs: { precio?: number }[] }
+      }
+      expect(con.gotas.precioDesde).toBe(258)
+      expect(con.gotas.precioJengibre).toBe(340)
+      expect(con.negocios.tabs[1].precio).toBe(258)
+      expect(con.negocios.tabs[2].precio).toBe(108)
+      expect(con.negocios.tabs[0].precio).toBeUndefined()
+    })
+
+    it('injerta no toca el objeto que recibe', () => {
+      // El crudo viene del import del JSON, que en un bundle es un módulo
+      // COMPARTIDO: mutarlo le cambia el contenido a cualquier otro que lo
+      // importe, y el orden de los imports decide qué ve cada uno.
+      const crudo = { gotas: {}, negocios: { tabs: [{}, {}, {}] } }
+      injerta(crudo, FUENTES)
+      expect(crudo.gotas).toEqual({})
+    })
+  })
+})
+
+/*
+ * Los candados de la §11: los que no se podían escribir antes de que
+ * existiera un catálogo de campos que supiera nombrar TODO el contenido
+ * del sitio. Antes de la Tarea 12 no había `DOCUMENTOS` para recorrer, ni
+ * `recorre()` para caminarlo genéricamente sin saber de antemano la forma
+ * de cada documento — así que estos diez tests son nuevos, no reescritos.
+ */
+/*
+ * El caminante del candado 9. Vive afuera del `it` para que su mutación
+ * (el 9b) corra EXACTAMENTE el mismo código que se aplica a los documentos
+ * de verdad: un caminante de prueba aparte es un caminante que se
+ * desincroniza del que importa, y este candado existe justamente porque
+ * una norma que nadie puede ver se vuelve a romper.
+ */
+type DefDeZod = { type: string; [k: string]: unknown }
+const defDe = (e: unknown) => (e as { _zod: { def: DefDeZod } })._zod.def
+const metaDe = (e: unknown) => panel.get(e as z.ZodType) as MetaCampo | undefined
+
+/** La marca de variante que arma `recorre()` para la ruta: `<tipo=parrafo>`. */
+const marcaDeVariante = (opcion: z.ZodType, discriminante: string): string => {
+  const shape = defDe(opcion).shape as Record<string, z.ZodType> | undefined
+  const campo = shape?.[discriminante]
+  const valores = campo && (defDe(campo).values as unknown[] | undefined)
+  const valor = Array.isArray(valores) && typeof valores[0] === 'string' ? valores[0] : '?'
+  return `<${discriminante}=${valor}>`
+}
+
+const revisaNombra = (esquema: z.ZodType, ruta: string, mal: string[]): void => {
+  const d = defDe(esquema)
+  switch (d.type) {
+    case 'array': {
+      const elemento = d.element as z.ZodType
+      if (metaDe(esquema)?.nombra) {
+        mal.push(`${ruta}: el «nombra» cuelga de la lista; va en el grupo del elemento`)
+      }
+      const dentro = defDe(elemento)
+      if (dentro.type === 'object' && !metaDe(elemento)?.nombra) {
+        mal.push(`${ruta}[]: el grupo del elemento no declara «nombra»`)
+      }
+      // Una unión NO reporta `type: 'object'`, así que la versión anterior
+      // —que solo miraba el caso `object`— no veía las tres variantes de
+      // bloque de una ficha: las tres estaban sin `nombra` y el candado no
+      // decía nada. El reclamo va variante por variante porque lo que
+      // distingue una fila de otra es distinto en cada forma: el texto del
+      // párrafo, la primera viñeta de la lista, el primer encabezado de la
+      // tabla.
+      if (dentro.type === 'union') {
+        const discriminante = typeof dentro.discriminator === 'string' ? dentro.discriminator : '?'
+        for (const opcion of dentro.options as z.ZodType[]) {
+          if (metaDe(opcion)?.nombra) continue
+          mal.push(
+            `${ruta}[]${marcaDeVariante(opcion, discriminante)}: la variante del elemento no declara «nombra»`,
+          )
+        }
+      }
+      return revisaNombra(elemento, `${ruta}[]`, mal)
+    }
+    case 'object':
+      for (const [k, v] of Object.entries(d.shape as Record<string, z.ZodType>)) {
+        revisaNombra(v, ruta ? `${ruta}.${k}` : k, mal)
+      }
+      return
+    case 'tuple':
+      return (d.items as z.ZodType[]).forEach((it, i) => revisaNombra(it, `${ruta}.${i}`, mal))
+    case 'union':
+      return (d.options as z.ZodType[]).forEach((o) => revisaNombra(o, ruta, mal))
+    case 'optional':
+    case 'nullable':
+      return revisaNombra(d.innerType as z.ZodType, ruta, mal)
+    default:
+      return
+  }
+}
+
+describe('los candados del sistema de contenido', () => {
+  /** El dato crudo de cada documento, con los derivados ya injertados. */
+  const CRUDO: Record<IdDocumento, unknown> = {
+    sitio: injerta(JSON.parse(readFileSync('src/contenido/datos/sitio.json', 'utf8')), { sabores, gotas }),
+    sabores: JSON.parse(readFileSync('src/contenido/datos/sabores.json', 'utf8')),
+    fichas: JSON.parse(readFileSync('src/contenido/datos/fichas.json', 'utf8')),
+  }
+
+  // Los conteos salen del DATO, nunca de un mapa escrito acá. Escritos a
+  // mano, este candado quedaba ciego justo al revés de lo que hace falta:
+  // agregar una barra al JSON sin tocar los textos daba verde (el mapa
+  // seguía diciendo 15, igual que el kicker) y agregar la barra Y corregir
+  // el kicker a «16» daba rojo. Premiaba el error y castigaba el arreglo.
+  const CONTEOS = conteosDe({ sitio: CRUDO.sitio, sabores: CRUDO.sabores })
+
+  it('1 · los tres documentos están declarados', () => {
+    expect(Object.keys(DOCUMENTOS).sort()).toEqual(['fichas', 'sabores', 'sitio'])
+  })
+
+  it('2 · toda ruta del esquema existe en el dato, y toda clave del dato está en el esquema', () => {
+    // El candado anti-desincronización. `serializa()` ya lo verifica al
+    // escribir, pero eso pasa UNA vez, cuando alguien corre el script.
+    // Esto lo verifica en cada build, que es cuando importa: si alguien
+    // edita un JSON a mano y le agrega una clave, o le saca una, el build
+    // no publica.
+    for (const [id, esquema] of Object.entries(DOCUMENTOS)) {
+      expect(() => serializa(esquema, CRUDO[id as IdDocumento]), id).not.toThrow()
+    }
+  })
+
+  it('3 · bytes canónicos: lo que se lee y se vuelve a escribir es idéntico', () => {
+    // Si esto no se cumple, dos guardados seguidos producen diffs
+    // distintos sin que haya cambiado nada, y el historial se llena de
+    // ruido que esconde los cambios de verdad.
+    for (const id of Object.keys(DOCUMENTOS) as IdDocumento[]) {
+      const ruta = `src/contenido/datos/${id}.json`
+      const bytes = readFileSync(ruta, 'utf8')
+      const cargado = cargar(ruta, DOCUMENTOS[id], CRUDO[id])
+      expect(serializa(DOCUMENTOS[id], cargado) + '\n', id).toBe(bytes)
+    }
+  })
+
+  it('4 · el contenido publicado no tiene ni un problema, avisos incluidos', () => {
+    // El candado de conteos (Ruling F). `cargar()` no cruza conteos porque
+    // un aviso no impide publicar; acá sí se exige que no haya ninguno,
+    // porque este test corre adentro de `pnpm build` y el contenido que se
+    // publica no tiene por qué tener textos viejos.
+    for (const id of Object.keys(DOCUMENTOS) as IdDocumento[]) {
+      expect(validar(DOCUMENTOS[id], CRUDO[id], CONTEOS), id).toEqual([])
+    }
+  })
+
+  it('5 · todo campo de todo documento tiene etiqueta, ayuda y una sección válida', () => {
+    const SECCIONES = new Set<string>([
+      'portada', 'productos', 'sabores', 'negocios', 'recetas', 'nosotros', 'catar',
+      'preguntas', 'contacto', 'pie', 'fichas', 'buscadores', 'accesibilidad', 'no-encontrada',
+    ])
+    for (const [id, esquema] of Object.entries(DOCUMENTOS)) {
+      recorre(esquema, (ruta, meta) => {
+        expect(meta?.etiqueta, `${id} · ${ruta}`).toBeTruthy()
+        expect(meta?.ayuda, `${id} · ${ruta}`).toBeTruthy()
+        expect(SECCIONES.has(meta?.seccion ?? ''), `${id} · ${ruta}: sección «${meta?.seccion}»`).toBe(true)
+      })
+    }
+  })
+
+  it('6 · lo que la clienta lee en el panel pasa el filtro de la marca', () => {
+    // El de MARCA, no el de MAQUETA: el panel necesita la palabra
+    // «Borrador» para su concepto central.
+    for (const [id, esquema] of Object.entries(DOCUMENTOS)) {
+      recorre(esquema, (ruta, meta) => {
+        expect(palabraProhibida(meta?.etiqueta ?? ''), `${id} · ${ruta} · etiqueta`).toBeNull()
+        expect(palabraProhibida(meta?.ayuda ?? ''), `${id} · ${ruta} · ayuda`).toBeNull()
+      })
+    }
+  })
+
+  it('7 · lo que la clienta NO puede editar es exactamente lo declarado', () => {
+    // El reparto de permisos, escrito una vez y verificado. Si mañana
+    // alguien marca `quien: 'marcos'` en un campo de copy, la clienta se
+    // queda sin poder editar su propio texto y nadie se entera hasta que
+    // ella lo pide.
+    const deMarcos: string[] = []
+    recorre(DOCUMENTOS.sitio, (ruta, meta) => {
+      if (meta?.quien === 'marcos') deMarcos.push(ruta)
+    })
+    // Rutas estructurales: anclas, identificadores internos, colores,
+    // valores fijos, derivados y el honeypot. NINGUNA es copy.
+    //
+    // ANTES DE ACTUALIZAR ESTE SNAPSHOT CON `-u`, LEÉ LAS 26 RUTAS.
+    // No es una foto de una pantalla: es la LISTA DE PERMISOS de la
+    // clienta, y se lee al revés de como se lee un snapshot. Una ruta que
+    // aparece de más acá es un campo que ella deja de poder editar —un
+    // `quien: 'marcos'` puesto sin querer sobre un texto suyo la deja
+    // mirando un campo en gris que no puede tocar, y nadie se entera hasta
+    // que ella lo pide—. Una ruta que desaparece es al revés: un
+    // identificador interno o un derivado que quedó editable, y ahí lo que
+    // se rompe es la página.
+    //
+    // Un `-u` sin leer convierte las dos cosas en «el snapshot estaba
+    // viejo». Si el diff agrega o saca una ruta, la pregunta no es si el
+    // snapshot está actualizado: es si ESA ruta es copy o no lo es.
+    expect(deMarcos.sort()).toMatchInlineSnapshot(`
+      [
+        "anaquel.contadorDe",
+        "catar.pasos[].clave",
+        "contacto.catalogoUrl",
+        "contacto.formulario.tipoOpciones.0.valor",
+        "contacto.formulario.tipoOpciones.1.valor",
+        "contacto.formulario.trampa",
+        "fichasTecnicas.ruta",
+        "fichasTecnicas.rutaInicio",
+        "fichasTecnicas.rutaPdf",
+        "footer.productos[].ancla",
+        "gotas.precioDesde",
+        "gotas.precioJengibre",
+        "nav.items[].ancla",
+        "negocios.tabs.0.clave",
+        "negocios.tabs.0.ficha",
+        "negocios.tabs.0.id",
+        "negocios.tabs.1.clave",
+        "negocios.tabs.1.ficha",
+        "negocios.tabs.1.id",
+        "negocios.tabs.1.precio",
+        "negocios.tabs.2.clave",
+        "negocios.tabs.2.ficha",
+        "negocios.tabs.2.id",
+        "negocios.tabs.2.precio",
+        "noEncontrada.rutaInicio",
+        "recetas.lista[].clave",
+      ]
+    `)
+  })
+
+  // El mismo patrón que dejó la fase 0 en test/css-tokens.test.ts: se lee
+  // del dist/ construido —nunca se construye desde acá, sería recursión—
+  // y se saltea SOLO cuando no hay dist/ Y no estamos en CI. En Vercel
+  // corre siempre, porque `pnpm build` construye antes de testear, así
+  // que un dist/ ausente ahí es un fallo real y no una comodidad local.
+  const hayDist = existsSync('dist/index.html')
+  const automatizado = !!(process.env.CI || process.env.VERCEL)
+  if (!hayDist && !automatizado) {
+    // `build:sitio` y no el gate completo: es el mismo aviso que deja
+    // css-tokens.test.ts, y el guard de test/meta.test.ts prohíbe que
+    // cualquier test mencione el comando completo —ni siquiera en un
+    // string— porque ESE es el que corre la suite adentro de sí misma.
+    console.warn('\n[anclas] Falta dist/index.html: se salta el guard. Corré `pnpm build:sitio`.\n')
+  }
+
+  it.skipIf(!hayDist && !automatizado)(
+    '8 · cada entrada del menú apunta a una sección que existe en la página',
+    () => {
+      // Hoy nada lo vigila, y es lo que rompe un cliente reordenando el
+      // menú: el enlace queda y la sección no. Aserción dura, no
+      // condición de salto: si el artefacto no está cuando el test SÍ
+      // corre, es un fallo ruidoso.
+      expect(existsSync('dist/index.html')).toBe(true)
+      const html = readFileSync('dist/index.html', 'utf8')
+      for (const item of marca.nav.items) {
+        expect(html, `${item.texto} → ${item.ancla}`).toContain(`id="${item.ancla.slice(1)}"`)
+      }
+    },
+  )
+
+  it('9 · `nombra` vive en el grupo del elemento, nunca en la lista', () => {
+    // Esta norma se rompió DOS veces mientras se escribía la fase, y la
+    // segunda la rompió el mismo implementador que acababa de arreglar la
+    // primera, en el mismo trabajo. No es descuido: `recorre()` no visita
+    // los contenedores —salta del `array` directo al elemento— así que un
+    // `nombra` colgado del `lista` es INVISIBLE para todos los demás
+    // tests. Ningún rojo, ningún error de tipos, nada.
+    //
+    // Una convención que nadie puede ver es una convención que se vuelve a
+    // romper. Este candado es lo que la hace visible.
+    const mal: string[] = []
+    for (const [id, esquema] of Object.entries(DOCUMENTOS)) revisaNombra(esquema, id, mal)
+    expect(mal).toEqual([])
+  })
+
+  it('9b · el candado 9 ve las uniones: reclama el «nombra» en cada variante', () => {
+    // La versión anterior solo miraba el elemento cuando era `object`, y
+    // los bloques de una sección de ficha son una UNIÓN: las tres variantes
+    // estaban sin etiqueta, sin ayuda y sin `nombra` y el candado no decía
+    // nada. Consecuencia concreta: la clienta veía cuatro filas idénticas.
+    //
+    // Con la mutación adentro, no confiando en el contenido real: acá las
+    // dos variantes se fabrican, una con `nombra` y otra sin, y se exige
+    // que salga la que falta —y solo esa—.
+    const conNombre = grupo({
+      etiqueta: 'Variante con nombre', seccion: 'fichas', ayuda: 'x',
+      nombra: (v) => String((v as { a?: string }).a ?? ''),
+      campos: { tipo: valorFijo({ etiqueta: 'T', seccion: 'fichas', ayuda: 'x', valores: ['a'] }) },
+    })
+    const sinNombre = grupo({
+      etiqueta: 'Variante sin nombre', seccion: 'fichas', ayuda: 'x',
+      campos: { tipo: valorFijo({ etiqueta: 'T', seccion: 'fichas', ayuda: 'x', valores: ['b'] }) },
+    })
+    const conUnion = grupo({
+      etiqueta: 'Prueba', seccion: 'fichas', ayuda: 'x',
+      campos: {
+        bloques: lista({
+          etiqueta: 'Bloques', seccion: 'fichas', ayuda: 'x',
+          minItems: 1, maxItems: 9,
+          elemento: z.discriminatedUnion('tipo', [conNombre, sinNombre]),
+        }),
+      },
+    })
+
+    const mal: string[] = []
+    revisaNombra(conUnion, 'prueba', mal)
+    expect(mal).toEqual([
+      'prueba.bloques[]<tipo=b>: la variante del elemento no declara «nombra»',
+    ])
+  })
+
+  it('10 · todo correo escrito en el sitio es el correo de la marca', () => {
+    // El correo vive en CUATRO lugares y uno de ellos está en medio de la
+    // respuesta de una pregunta frecuente, donde no puede ser una ruta
+    // hermana de `escribeTambien`. Este candado lo cubre igual.
+    const texto = JSON.stringify(CRUDO.sitio)
+    const correos = new Set(texto.match(/[\w.+-]+@[\w-]+\.[\w.]+/g) ?? [])
+    expect([...correos]).toEqual([marca.contacto.correo])
   })
 })

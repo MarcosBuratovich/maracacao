@@ -68,10 +68,14 @@ describe('el head de la home', () => {
   })
 
   it('title de categoría + marca (≤60) y description ≤155, sin «construcción»', () => {
+    // Las tres palabras clave que este test exigía —«chocolate»,
+    // «coyoacán», «maracacao»— cayeron con la Fase 1: `marca.titulo` pasa a
+    // ser editable y no hay una «forma» razonable de pedir «tiene que
+    // mencionar estas tres palabras». Si la recomendación de SEO se quiere
+    // conservar, va como sugerencia en el panel, no como un test que rompe
+    // el build de la clienta. Lo que queda son los topes que Google impone
+    // de verdad y el guard anti-maqueta.
     const t = marca.titulo.toLowerCase()
-    expect(t).toContain('chocolate')
-    expect(t).toContain('coyoacán')
-    expect(t).toContain('maracacao')
     expect(t).not.toContain('construcción')
     expect(marca.titulo.length).toBeLessThanOrEqual(60)
     expect(marca.descripcion.length).toBeLessThanOrEqual(155)

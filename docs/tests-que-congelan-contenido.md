@@ -28,16 +28,24 @@ Criterio: un assert **congela contenido** si compara contra un valor concreto
 que alguien podría querer cambiar. Si compara contra una forma —que sea un
 número, que no esté vacío, que entre en el ancho— no congela nada y se queda.
 
-Tres destinos posibles:
+Tres destinos posibles, y un cuarto estado que no es un destino sino el
+registro de haberlo ejecutado:
 
 - **BORRAR** — el valor pasa a ser editable; la verdad histórica queda en el
   fixture de la migración, que es el acta, no la ley.
-- **A FORMA** — el assert se queda pero deja de mirar el valor.
+- **A FORMA** — el assert se queda pero deja de mirar el valor. Una forma que
+  repite lo que el esquema ya garantiza (no vacío, largo mínimo) NO es una
+  forma: da la impresión de proteger algo sin proteger nada, y el destino
+  correcto en ese caso es BORRAR — pasó con el lema del pie (`:193`).
 - **QUEDA** — no congela contenido; no se toca.
+- **BORRADA / TRANSFORMADA** — no es un destino a decidir: es la fila ya
+  ejecutada, con fecha y con el motivo de lo que se hizo. Este estado se
+  agregó a la leyenda en la ola final del 2026-09-10, cuando ya había filas
+  usándolo sin estar declarado.
 
 Alcance: "contenido" acá es lo que la clienta va a poder tocar desde el panel
 (`src/copy/sitio-marca.ts`, `src/copy/sabores.ts`, las fichas técnicas,
-`docs/envolturas.json`). Los tokens de diseño (`@/tokens/*`), la geometría de
+`src/contenido/datos/envolturas.json`). Los tokens de diseño (`@/tokens/*`), la geometría de
 los SVG de marca y el copy de `/presentacion` y `/manual` (candado puesto,
 usan `src/copy/marca.ts` y `src/copy/landing.ts`, que el panel no toca) NO
 son contenido en ese sentido aunque sus tests comparen contra valores
@@ -59,20 +67,20 @@ concretos — por eso quedan QUEDA con nota, no listados assert por assert.
 | `test/landing.test.ts` | (suite entera, incl. `toHaveLength(1)`/`toBe('Chocolate blanco y pistaches')` en L74-75, `toHaveLength(18/1/2)` en L176-178, `toHaveLength(8)` en L205) | Nada que la clienta pueda tocar desde el panel — todo el copy de este archivo (`@/copy/landing`, `@/copy/marca`) alimenta `/presentacion` y `/manual`, las dos con candado y fuera del alcance del panel (fases 0-6 solo cubren `sitio-marca`/`sabores`/fichas/envolturas) | QUEDA — copy privado, fuera del panel |
 | `test/lettering.test.ts` | conteo de letras por archivo (9/9/17, vía `toHaveLength(letras)`), `toBe('path')` por tag | Nada — es geometría de los SVG de marca (logotipo/descriptor), no copy | sin asserts de valor de contenido — QUEDA |
 | `test/manual.test.ts` | (suite entera) | Nada — cubre `/manual`, página con candado que consume `src/copy/marca.ts`, fuera del panel; el resto son guards estructurales (rutas, hex a mano) | QUEDA — copy privado, fuera del panel |
-| `test/marca-copy.test.ts:55` | lee `docs/envolturas.json` | Ninguna | QUEDA (Fase 1 lo mueve a `datos/`) |
+| `test/marca-copy.test.ts:55` | lee `src/contenido/datos/envolturas.json` | Ninguna | QUEDA (movido en la fase 1 parte B) |
 | `test/marca-copy.test.ts:61` | sabores `toHaveLength(15)` | Agregar un sabor | A FORMA en la **Fase 7**, no ahora |
 | `test/marca-copy.test.ts:62-64` | `sabores.map(orden).sort()` `toEqual([1..15])` | Agregar/quitar un sabor (deja huecos en el orden) | A FORMA en la **Fase 7** — pasa a "1..sabores.length sin huecos" (§9 del spec) |
-| `test/marca-copy.test.ts:91-92,99-100` | `impreso` `toBe('73%')`; `s.cacao` `toBe('Cacao 70%')` / `toBe('Chocolate blanco')` | Editar el % de cacao mostrado de mango/piña/chamoy/blanco | `:91` QUEDA (es el hecho impreso en la envoltura física, no copy del sitio) · `:92,99,100` BORRAR (Fase 1) — `s.cacao` es contenido de `sabores.ts`, el mismo tipo de valor que el precio |
-| `test/marca-copy.test.ts:105-111` | `nombres` `toContain('Jengibre y naranja')`/`'Fresas y chile'`/`'Hierbabuena'`/`'Tamarindo con chile')` y sus `not.toContain` | **Renombrar un sabor** (ej. "Hierbabuena" → "Menta") | BORRAR (Fase 1) — es exactamente el caso "nombre" del criterio; la verdad de qué dice la envoltura impresa queda en el fixture, no en un test que se lee en vivo |
+| `test/marca-copy.test.ts:91-92,99-100` | `impreso` `toBe('73%')`; `s.cacao` `toBe('Cacao 70%')` / `toBe('Chocolate blanco')` | Editar el % de cacao mostrado de mango/piña/chamoy/blanco | `:91` QUEDA (es el hecho impreso en la envoltura física, no copy del sitio) · `:92,99,100` **BORRADAS (ola final, 2026-09-10):** `s.cacao` es contenido de `sabores.ts`, el mismo tipo de valor que el precio. Cayeron las tres líneas, no el test: sigue en pie `:91` y sigue en pie la comparación contra lo impreso (`Cacao ${impreso}`), que NO es un valor congelado sino una regla entre dos cosas editables (el sitio y `envolturas.json`) |
+| `test/marca-copy.test.ts:105-111` | `nombres` `toContain('Jengibre y naranja')`/`'Fresas y chile'`/`'Hierbabuena'`/`'Tamarindo con chile')` y sus `not.toContain` | **Renombrar un sabor** (ej. "Hierbabuena" → "Menta") | **BORRADA (ola final, 2026-09-10):** el test entero cayó. Era exactamente el caso "nombre" del criterio; la verdad de qué dice la envoltura impresa queda en el fixture de la migración, no en un test que se lee en vivo |
 | `test/marca-copy.test.ts:118-129` | exige CINCO archivos por sabor | Alta de sabor con solo la foto de la barra | A FORMA en la **Fase 7** |
-| `test/marca-copy.test.ts:141` | precios `122` / `108` | Cambiar un precio | BORRAR (Fase 1) |
+| `test/marca-copy.test.ts:141` | precios `122` / `108` | Cambiar un precio | **BORRADA (Tarea 17, 2026-09-10):** el test entero cayó, no se aflojó. El esquema garantiza entero 1–99.999, y los derivados garantizan que los tres lugares donde el precio queda escrito no se separen |
 | `test/marca-copy.test.ts:149,152,154` | `sinProducto` (4 slugs hardcodeados) → `catalogo` `toBeNull()` / `toMatch(pulpos.shop)` | Dar de alta el producto de un sabor que hoy no tiene liga a catálogo | A FORMA en la **Fase 7** (§9 del spec: "catálogo null en 4 → null o URL de pulpos.shop") |
-| `test/marca-copy.test.ts:162-163` | gotas `toHaveLength(6)`; precios `340`/`258` | `:162` agregar una gota; `:163` **cambiar el precio de las gotas** | `:162` A FORMA en la **Fase 7** · `:163` BORRAR (Fase 1) — mismo caso que `:141`, confirmado en §0.4/§9 del spec ("precios 122/108 y 340/258") |
+| `test/marca-copy.test.ts:162-163` | gotas `toHaveLength(6)`; precios `340`/`258` | `:162` agregar una gota; `:163` **cambiar el precio de las gotas** | `:162` A FORMA en la **Fase 7**, sigue en pie · `:163` **BORRADA (ola final, 2026-09-10):** cayó la línea de los precios y el nombre del test dejó de prometer «jengibre y naranja a 340». Mismo caso que `:141`, confirmado en §0.4/§9 del spec ("precios 122/108 y 340/258"); el brief de la Tarea 17 se había quedado corto de alcance |
 | `test/marca-copy.test.ts:167` | polvo `toHaveLength(8)` | Agregar una etiqueta de polvo | A FORMA en la **Fase 7** |
-| `test/marca-copy.test.ts:176` | `marca.nav.items` `toContain('Nosotros')` | Renombrar ese ítem del menú | A FORMA (Fase 1) — mismo caso que el lema del pie (`:193`): cada ítem de nav no vacío, sin exigir el texto "Nosotros" |
+| `test/marca-copy.test.ts:176` | `marca.nav.items` `toContain('Nosotros')` | Renombrar ese ítem del menú | **TRANSFORMADA A FORMA (ola final, 2026-09-10):** ya no exige el texto "Nosotros". La forma que quedó NO es "cada ítem no vacío" —eso ya lo garantiza el esquema, y un assert que repite al esquema da la impresión de proteger sin proteger, que es justo por lo que el lema del pie (`:193`) terminó BORRADO en vez de aflojado—: es que ninguna entrada del menú repita su ancla ni su nombre. Eso el esquema no lo puede ver, porque valida cada ítem por separado, y dos entradas al mismo lugar es el error plausible del día que la clienta reordena el menú. La otra mitad —que cada ancla tenga una sección viva— la cubre el candado 8 |
 | `test/marca-copy.test.ts:180` | `marca.preguntas.items` `toHaveLength(8)` | Agregar/quitar una pregunta | A FORMA en la **Fase 7** |
 | `test/marca-copy.test.ts:184` | `marca.recetas.lista` `toHaveLength(4)` | Agregar/quitar una receta | A FORMA en la **Fase 7** |
-| `test/marca-copy.test.ts:193` | el lema del pie, string exacto | Editar el lema | A FORMA (Fase 1): min/max y no vacío |
+| `test/marca-copy.test.ts:193` | el lema del pie, string exacto | Editar el lema | **BORRADA (Tarea 17, 2026-09-10):** cayó entera, no se aflojó a forma como se había previsto — el esquema ya exige no vacío y ≤110 caracteres, así que un `toBeGreaterThan(10)` no hubiera protegido nada que el esquema no proteja ya. La frase de hoy queda congelada en el fixture de la migración |
 | `test/marca-tokens.test.ts` | (suite entera) | Nada — tokens de tinta por sabor, contraste, custom properties de fuente | sin asserts de valor de contenido — QUEDA |
 | `test/mascota-cabeza.test.ts` | (suite entera) | Nada — geometría/paleta del SVG de la mascota | sin asserts de valor de contenido — QUEDA |
 | `test/mascota-completa.test.ts:23` | granos en órbita `toHaveLength(14)` | Nada que la clienta edite — es arte de la mascota, no un ítem de catálogo | sin asserts de valor de contenido — QUEDA |
@@ -84,12 +92,12 @@ concretos — por eso quedan QUEDA con nota, no listados assert por assert.
 | `test/render.test.ts` | (suite entera) | Nada — prueba el script `render-svg.mjs` (rasterizado), no copy | sin asserts de valor de contenido — QUEDA |
 | `test/rive.test.ts` | (suite entera) | Nada — `docs/rig-spec.md` es documentación técnica para el rigger, no contenido del sitio | sin asserts de valor de contenido — QUEDA |
 | `test/scaffold.test.ts` | `toContain("defaultLocale: 'es-MX'")`, `toContain('lang="es-MX"')` | Nada — configuración de locale del sitio, no un campo editable | sin asserts de valor de contenido — QUEDA |
-| `test/seo.test.ts:71-73` | `t.toContain('chocolate'/'coyoacán'/'maracacao')` sobre `marca.titulo` | Reescribir el `<title>` del sitio sin esas palabras clave | BORRAR (Fase 1) — `marca.titulo` vive en `sitio-marca.ts` y pasa a ser editable; no hay una "forma" razonable para "debe mencionar estas tres palabras", así que el assert se va. Si Marcos quiere conservar la recomendación de SEO, va como sugerencia en el panel, no como test que rompe el build |
+| `test/seo.test.ts:71-73` | `t.toContain('chocolate'/'coyoacán'/'maracacao')` sobre `marca.titulo` | Reescribir el `<title>` del sitio sin esas palabras clave | **BORRADAS (ola final, 2026-09-10):** cayeron las tres líneas; el test sigue con los topes que Google impone de verdad (≤60 y ≤155) y con el guard anti-maqueta de «construcción». No hay una "forma" razonable para "debe mencionar estas tres palabras". Si Marcos quiere conservar la recomendación de SEO, va como sugerencia en el panel, no como test que rompe el build de la clienta |
 | `test/seo.test.ts:131` | `lista.itemListElement` `toHaveLength(15)` | Agregar/quitar un sabor | A FORMA en la **Fase 7** (§9 del spec: `sabores.length`) |
 | `test/seo.test.ts:219` | `new RegExp(...${esc(s.nombre)}</h3>)` | Un nombre con `(`, `?`, `+`, `.` | APLICADO (Tarea 2): ya interpola con `esc()` |
 | `test/seo.test.ts:116-117` | `negocio.address.streetAddress` `toContain('Mercado de Coyoacán')`, `postalCode` `toBe('04100')` | Cambiar la dirección del negocio | QUEDA por ahora — la dirección está hardcodeada en `src/seo/esquema.ts`, NO en `src/copy/sitio-marca.ts`: hoy la clienta no puede tocarla ni por error. El propio spec (Apéndice A) la lista como pendiente de "sacar al copy" en Fase 2 — cuando eso pase, este assert pasa a BORRAR |
-| `test/sitio.test.ts:34` | `toMatch(/\$\s?108/)` (dentro de "renderiza el contenido real...") | **Cambiar el precio de las barras** | BORRAR (Fase 1) — es el caso de uso n.º 1 del panel. (La cita original de esta fila decía "Tarea 5"; eso era el otro `$108`, el de `src/copy/sitio.ts` — ver fila borrada más abajo. Este es un assert distinto, sobre el HTML que sí se sigue publicando) |
-| `test/sitio.test.ts:35` | `toContain('Tabasco')` (misma prueba que la fila anterior) | Reescribir la sección "Nosotros" o el chip de origen sin mencionar Tabasco | BORRAR (Fase 1) — es contenido real de `marca.nosotros`/`marca.postura.chips` (texto libre), no un dato técnico; no hay forma razonable de exigir "debe decir Tabasco" |
+| `test/sitio.test.ts:34` | `toMatch(/\$\s?108/)` (dentro de "renderiza el contenido real...") | **Cambiar el precio de las barras** | **BORRADA (Tarea 17, 2026-09-10):** solo cayó esa línea; las otras cinco aserciones del test se quedan y el nombre del test se actualizó porque ya no enumera "precios". Lo reemplaza el certificado (Tarea 14, detecta cualquier cambio de contenido mostrando cuál) y el candado 4 (Tarea 16, valida el contenido); la aserción de forma 2 del certificado prueba que los precios se siguen renderizando |
+| `test/sitio.test.ts:35` | `toContain('Tabasco')` (misma prueba que la fila anterior) | Reescribir la sección "Nosotros" o el chip de origen sin mencionar Tabasco | **BORRADA (ola final, 2026-09-10):** cayó la línea y el nombre del test dejó de enumerar "Tabasco". Es contenido real de `marca.nosotros`/`marca.postura.chips` (texto libre), no un dato técnico; no hay forma razonable de exigir "debe decir Tabasco". Lo que queda del test son los campos leídos del copy, que siguen la edición solos |
 | `test/sitio.test.ts:52,58-60` | `recetas.lista` `toHaveLength(4)`; `<details class="receta-completa">` `toHaveLength(4)`; `preguntas.items` `toHaveLength(8)`; `<details class="pregunta">` `toHaveLength(8)` | Agregar/quitar una receta o una pregunta | A FORMA en la **Fase 7** — pasan a `toHaveLength(marca.X.length)` (§9 del spec) |
 | `test/sitio.test.ts:66-67` | `aria-label="Canela"`; `--fondo:#7D0303;--texto:#FFFFFF` | Reordenar los sabores o cambiar cuál abre el anaquel | A FORMA en la **Fase 2** — el propio spec (§8.5) ya identifica `sabores.find(slug === 'canela')!` en `index.astro:35` como una bomba de tiempo y planea reemplazarlo por `anaquel.saborInicial`; este test debería pasar a comparar contra ESE campo en vez de contra "Canela" a mano, pero no está en la lista de la §9 del spec — conviene sumarlo cuando se toque eso |
 | `test/sitio.test.ts:165-167` | `new RegExp(...${esc(marca.marca.wordmark)}<)` × 3 (cabecera, hero, pie) | Un wordmark con metacaracteres; y asume texto pegado al `>` | APLICADO en parte (Tarea 2): ya interpola con `esc()` en las tres líneas · sigue pendiente aflojar el `<` (Fase 2) |
@@ -99,6 +107,16 @@ concretos — por eso quedan QUEDA con nota, no listados assert por assert.
 | `test/variantes-logo.test.ts` | (suite entera, incl. `toHaveLength(3)`/`toHaveLength(2)` de `<svg>` en L211/234) | Nada — composición de los componentes de logo/sello, no copy | sin asserts de valor de contenido — QUEDA |
 
 ## Notas de esta auditoría
+
+- **La Fase 1 tenía SEIS filas, no tres (corregido 2026-09-10, ola final).**
+  La Tarea 17 ejecutó tres —`marca-copy:141`, `marca-copy:193` y
+  `sitio.test.ts:34`— porque su brief decía «son tres». El spec (línea 242)
+  nombra los CUATRO precios («precios 122/108 **y 340/258**») y esta misma
+  tabla ya asignaba a la Fase 1 seis filas vivas: `marca-copy:92,99,100`,
+  `marca-copy:105-111`, `marca-copy:163`, `marca-copy:176`, `seo:71-73` y
+  `sitio:35`. Las seis quedaron ejecutadas en la ola final; cada fila dice
+  qué se hizo con ella. Dos eran A FORMA y no BORRAR — `marca-copy:176` y la
+  mitad `:91` de la fila del cacao—, y eso se respetó.
 
 - **Hallazgo más importante, ya en el mensaje del commit:** `sitio.test.ts:34`
   (antes `:77`, corrido de línea — ver el encabezado de estado) congela el

@@ -9,6 +9,9 @@
  */
 import type { z } from 'zod'
 import { cifraUnidad } from './campos'
+import type { ColeccionContada } from './campos'
+import { cruzaConteo } from './conteos'
+import { recorre } from './carga'
 
 export interface Problema {
   /** Ruta punteada: 'sabores.3.nombre'. El panel la usa para llevarla al campo. */
@@ -124,4 +127,127 @@ export function validarContra(esquema: z.ZodType, crudo: unknown): Problema[] {
       arreglo: proponeArreglo(valor),
     }
   })
+}
+
+/** Cuántos hay de verdad en cada lista contada. Lo arma el llamador. */
+export type Conteos = Readonly<Partial<Record<ColeccionContada, number>>>
+
+/**
+ * Une un prefijo con una parte de la ruta. Misma regla que `con()` en
+ * carga.ts: la raíz no lleva punto adelante.
+ */
+const une = (a: string, b: string | number): string => (a === '' ? String(b) : `${a}.${b}`)
+
+/**
+ * `recorre()` devuelve rutas de ESQUEMA, con `[]` donde hay una lista
+ * ('negocios.tabs[].datos[]') y `<clave=valor>` donde hay una variante de
+ * unión ('bloques[]<tipo=parrafo>.texto'). Los avisos son sobre VALORES,
+ * así que hay que instanciar cada `[]` contra el dato real y filtrar cada
+ * `<...>` contra lo que el dato dice, y devolver una ruta concreta por
+ * elemento — que es la que el panel usa para llevar a la clienta al campo
+ * exacto.
+ */
+
+/**
+ * Una parte de ruta puede traer tres cosas: la clave (`bloques`), uno o
+ * más `[]` de lista y la marca de variante de una unión (`<tipo=parrafo>`).
+ * 'bloques[]<tipo=parrafo>' trae las tres; 'filas[][]' trae DOS `[]`
+ * seguidos, sin clave entre medio, porque una lista de listas —las filas
+ * de una tabla— se desenvuelve dos veces sin que haya una clave nueva
+ * entre un nivel y el otro (ver el caso 'array' de `recorre()` en
+ * carga.ts, que agrega `[]` sin punto).
+ */
+const PARTE = /^([^<[]*)((?:\[\])*)(?:<([^=>]+)=([^>]+)>)?$/
+
+const enRutas = (dato: unknown, ruta: string): { ruta: string; valor: unknown }[] => {
+  let actuales: { ruta: string; valor: unknown }[] = [{ ruta: '', valor: dato }]
+  for (const parte of ruta.split('.')) {
+    const m = PARTE.exec(parte)
+    if (!m) throw new Error(`enRutas(): no entiendo la parte «${parte}» de la ruta «${ruta}».`)
+    const [, clave, corchetes, discriminante, variante] = m
+    // Cada par de corchetes es UN nivel de lista a desenvolver: 'filas[][]'
+    // desenvuelve dos veces seguidas, sin una clave entre medio.
+    const niveles = corchetes.length / 2
+    const siguiente: { ruta: string; valor: unknown }[] = []
+    for (const { ruta: r, valor } of actuales) {
+      if (valor === null || valor === undefined) continue
+      const base = clave ? une(r, clave) : r
+      const dentro = clave ? (valor as Record<string, unknown>)[clave] : valor
+      // Sin corchetes hay un solo candidato; cada nivel de `[]` multiplica
+      // los candidatos por uno por elemento del nivel anterior.
+      let candidatos: { ruta: string; valor: unknown }[] = [{ ruta: base, valor: dentro }]
+      for (let nivel = 0; nivel < niveles; nivel++) {
+        const desenvueltos: { ruta: string; valor: unknown }[] = []
+        for (const { ruta: r2, valor: v2 } of candidatos) {
+          if (Array.isArray(v2)) v2.forEach((v, i) => desenvueltos.push({ ruta: une(r2, i), valor: v }))
+        }
+        candidatos = desenvueltos
+      }
+      for (const c of candidatos) {
+        // La variante FILTRA: la rama <tipo=parrafo> del esquema solo
+        // aplica a los bloques cuyo dato dice tipo: 'parrafo'.
+        if (discriminante !== undefined) {
+          const v = c.valor as Record<string, unknown> | null
+          if (v === null || typeof v !== 'object' || v[discriminante] !== variante) continue
+        }
+        siguiente.push(c)
+      }
+    }
+    actuales = siguiente
+  }
+  return actuales
+}
+
+/**
+ * Los avisos de conteo: el texto dice «15 sabores» y hoy hay 16.
+ *
+ * Esta función es el ÚNICO productor de `gravedad: 'avisa'` del sistema.
+ * Hasta acá las tres piezas existían por separado —el metadato `cuenta`,
+ * la regla `cruzaConteo()` y el valor `'avisa'` del tipo— y ninguna las
+ * juntaba: la clase de feature de tres piezas que se olvida.
+ */
+function avisosDeConteo(esquema: z.ZodType, crudo: unknown, conteos: Conteos): Problema[] {
+  const avisos: Problema[] = []
+  recorre(esquema, (ruta, meta) => {
+    const cuenta = meta?.cuenta
+    if (!cuenta) return
+    const esperado = conteos[cuenta.de]
+    // Callarse acá sería volver al estado anterior: la regla declarada y
+    // nadie ejecutándola. Un conteo que falta es un error de cableado del
+    // llamador, no un problema del contenido de la clienta.
+    if (esperado === undefined) {
+      throw new Error(
+        `validar(): el campo «${ruta}» declara un conteo sobre «${cuenta.de}», que no vino en los conteos.`,
+      )
+    }
+    for (const { ruta: concreta, valor } of enRutas(crudo, ruta)) {
+      if (typeof valor !== 'string') continue
+      const aviso = cruzaConteo(valor, esperado, cuenta.sustantivo)
+      if (aviso === null) continue
+      avisos.push({
+        campo: concreta,
+        gravedad: 'avisa',
+        titulo: `Este texto ${aviso}`,
+        detalle: 'Si agregaste o quitaste algo de la lista, este texto quedó viejo.',
+      })
+    }
+  })
+  return avisos
+}
+
+/**
+ * La verdad única de la validación, la que importan los cuatro
+ * consumidores: el navegador mientras la clienta escribe, la función
+ * antes de tocar GitHub, vitest, y `astro build` por el camino del import.
+ *
+ * Lo que IMPIDE publicar sale del esquema; lo que solo AVISA sale de
+ * cruzar los textos contra las listas reales.
+ */
+export function validar(esquema: z.ZodType, crudo: unknown, conteos: Conteos = {}): Problema[] {
+  const impiden = validarContra(esquema, crudo)
+  // Si el dato no pasa el esquema, cruzar conteos sobre él es ruido sobre
+  // ruido: la clienta ya tiene que arreglar algo, y los avisos se
+  // calculan sobre valores que pueden ni existir.
+  if (impiden.length > 0) return impiden
+  return avisosDeConteo(esquema, crudo, conteos)
 }

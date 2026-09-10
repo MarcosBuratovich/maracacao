@@ -18,6 +18,9 @@ dist/
 # Test artifacts
 test/tmp/
 
+# Caché de los scripts de Python (extrae-envolturas.py y compañía)
+scripts/__pycache__/
+
 # Infraestructura de agentes (worktrees, MCP)
 .claude/
 .playwright-mcp/

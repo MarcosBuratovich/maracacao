@@ -13,14 +13,14 @@ De cada archivo salen:
   · sabor, porcentaje de cacao e ingredientes, leídos del propio PDF
 
 Uso: python3 scripts/extrae-envolturas.py <carpeta-de-pdfs>
-Salida: public/sitio/envoltura/ + docs/envolturas.json
+Salida: public/sitio/envoltura/ + src/contenido/datos/envolturas.json
 """
 from PIL import Image
 import json, os, re, subprocess, sys, tempfile
 
 DPI = 300
 DESTINO = 'public/sitio/envoltura'
-FICHA = 'docs/envolturas.json'
+FICHA = 'src/contenido/datos/envolturas.json'
 
 
 def render(pdf, dpi=DPI):

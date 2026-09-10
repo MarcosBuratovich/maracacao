@@ -1,0 +1,1538 @@
+{
+  "marca": {
+    "titulo": "Chocolate mexicano 70% cacao en Coyoacán | Maracacao",
+    "descripcion": "Barras 70% cacao con 15 sabores mexicanos —chiles, frutas, hierbas— y gotas para repostería. Encuéntranos en el Mercado de Coyoacán o ve el catálogo.",
+    "skipLink": "Ir al contenido",
+    "marca": {
+      "nombre": "Maracacao",
+      "wordmark": "MARACACAO",
+      "descriptor": "CHOCOLATE MEXICANO"
+    },
+    "nav": {
+      "abrir": "Abrir menú",
+      "cerrar": "Cerrar menú",
+      "etiqueta": "Menú principal",
+      "items": [
+        {
+          "ancla": "#sabores",
+          "texto": "Sabores"
+        },
+        {
+          "ancla": "#recetas",
+          "texto": "Recetas"
+        },
+        {
+          "ancla": "#catar",
+          "texto": "Cómo catar"
+        },
+        {
+          "ancla": "#nosotros",
+          "texto": "Nosotros"
+        },
+        {
+          "ancla": "#negocios",
+          "texto": "Para negocios"
+        },
+        {
+          "ancla": "#preguntas",
+          "texto": "Preguntas"
+        },
+        {
+          "ancla": "#contacto",
+          "texto": "Contacto"
+        }
+      ],
+      "catalogo": "Catálogo en línea",
+      "pie": [
+        "MERCADO DE COYOACÁN · CDMX",
+        "maracacaomx@gmail.com"
+      ]
+    },
+    "hero": {
+      "titular": [
+        "CHOCOLATE",
+        "MEXICANO,",
+        "70% CACAO."
+      ],
+      "sub": "Hecho a mano con frutas, chiles, hierbas y especias. Más cacao, ingredientes sencillos y muchas maneras de disfrutarlo.",
+      "ctaCatalogo": "Ver catálogo en línea",
+      "ctaSabores": "Los 15 sabores ↓",
+      "marquesinaAria": "Barras de los quince sabores, decorativa"
+    },
+    "postura": {
+      "kicker": "LA RECETA COMPLETA",
+      "titulo": "¿Qué hay en una barra?",
+      "intro": "Cinco ingredientes que puedes leer de corrido. Cuando el cacao es de buena calidad, no hace falta nada más.",
+      "chips": [
+        "Cacao de Tabasco",
+        "Fundado en 2024",
+        "Hecho a mano"
+      ],
+      "tabSi": "Sí lleva",
+      "tabNo": "No lleva",
+      "lleva": [
+        "Licor de cacao",
+        "Azúcar de caña",
+        "Manteca de cacao",
+        "Lecitina de soya",
+        "El sabor: frutas, chiles, hierbas, especias o esencias naturales"
+      ],
+      "llevaNota": "Del cacao —licor y manteca— viene el 70% de cada barra. * Blanco con pistache: manteca de cacao, leche en polvo, azúcar, lecitina de soya y pistaches.",
+      "noLleva": [
+        "Saborizantes artificiales",
+        "Químicos",
+        "Aditivos innecesarios"
+      ],
+      "noLlevaCierre": "Cuando el cacao es de buena calidad, su sabor, aroma y carácter hablan por sí mismos."
+    },
+    "anaquel": {
+      "kicker": "LOS 15 SABORES",
+      "titulo": "Elige tu barra",
+      "contadorDe": "de 15",
+      "fichaEtiqueta": "Barra n.º",
+      "grupoAria": "Elige un sabor para ver su ficha",
+      "pesoInsignia": "70\u00a0g",
+      "manoInsignia": "hecho a mano",
+      "ingredientesEtiqueta": "Ingredientes",
+      "cta": "Ver en el catálogo",
+      "remate": "Hecho para comerse despacio.",
+      "ilustracionCaption": "El personaje de la etiqueta",
+      "ilustracionAltPrefijo": "Ilustración de la envoltura de",
+      "envolturaAltPrefijo": "Envoltura de"
+    },
+    "minis": {
+      "titulo": "Paquete de seis minis",
+      "precio": 118,
+      "cuerpo": "Seis minibarras surtidas de 10 g. Los sabores siempre cambian: es un surtido, no una selección fija.",
+      "nota": "Para probar la línea sin casarte con una sola barra."
+    },
+    "gotas": {
+      "titulo": "Gotas de chocolate · 250\u00a0g",
+      "precioDesde": 258,
+      "precioJengibre": 340,
+      "desdeEtiqueta": "desde",
+      "cuerpo": "Gotas de 10 g del mismo chocolate 70%: para hornear, fundir en taza o comer como botana.",
+      "sabores": "6 sabores",
+      "notaPrecio": "Jengibre y naranja"
+    },
+    "polvoCard": {
+      "titulo": "En polvo · 250\u00a0g",
+      "chip": "PRÓXIMAMENTE",
+      "cuerpo": "Para beber frío o caliente, con espuma, aroma y tradición."
+    },
+    "polvo": {
+      "kicker": "LO QUE VIENE",
+      "chip": "PRÓXIMAMENTE",
+      "titulo": "Chocolate para beber",
+      "cuerpo": "Ocho variedades hechas con cocoa natural, cocoa alcalina y pasta de cacao.",
+      "altPrefijo": "Etiqueta del chocolate en polvo sabor"
+    },
+    "catar": {
+      "kicker": "CÓMO CATAR CHOCOLATE",
+      "titulo": "Seis pasos para probarlo bien",
+      "pasos": [
+        {
+          "nombre": "Mira",
+          "texto": "Uniforme y, bien templado, con superficie lisa y ligeramente brillante.",
+          "clave": "mangoConChile"
+        },
+        {
+          "nombre": "Escucha",
+          "texto": "Al partirlo debe dar un crac limpio y seco.",
+          "clave": "pinaConChile"
+        },
+        {
+          "nombre": "Huele",
+          "texto": "Puede revelar aromas frutales, florales, tostados, especiados, terrosos o a nueces.",
+          "clave": "cardamomo"
+        },
+        {
+          "nombre": "Déjalo fundir",
+          "texto": "Un trozo en la lengua, sin masticarlo de inmediato. La manteca de cacao se funde casi a temperatura corporal.",
+          "clave": "jengibreYNaranja"
+        },
+        {
+          "nombre": "Encuentra los sabores",
+          "texto": "Acidez, dulzor, amargor, notas de fruta, café o especias.",
+          "clave": "limaYChile"
+        },
+        {
+          "nombre": "Observa el final",
+          "texto": "Debe permanecer: largo, limpio y complejo, no solo dulce.",
+          "clave": "fresasYChile"
+        }
+      ],
+      "cita": "El buen chocolate no se come de prisa: se mira, se escucha, se huele y se deja fundir.",
+      "porqueTitulo": "¿Por qué 70% cacao?",
+      "porque": "Un chocolate con 70% conserva más componentes naturales del cacao y lleva menos azúcar. No se trata de que sea más oscuro: se trata de que haya más cacao en cada mordida.",
+      "aporteTitulo": "Lo que aporta el cacao",
+      "aporte": "El cacao es una fuente natural de antioxidantes, gracias a sus flavonoides, y aporta minerales como magnesio, hierro y cobre. Contribuye al bienestar y al buen ánimo, y es una deliciosa fuente de energía."
+    },
+    "recetas": {
+      "kicker": "RECETAS",
+      "titulo": "Qué hacer con ellas",
+      "deslizaNota": "desliza →",
+      "verCompleta": "Ver la receta completa",
+      "etiquetaTip": "Tip Maracacao",
+      "listaAria": "Recetas, lista deslizable",
+      "lista": [
+        {
+          "kicker": "CON GOTAS · 1 TAZA",
+          "titulo": "Chocolate caliente de jengibre y naranja",
+          "resumen": "250 ml de leche caliente sin hervir, 30 g de gotas y un minuto de cáscara de naranja.",
+          "clave": "jengibreYNaranja",
+          "ingredientes": [
+            "250 ml de leche",
+            "30 g de gotas de chocolate con jengibre y naranja",
+            "Un trocito de cáscara de naranja"
+          ],
+          "pasos": "Calienta la leche sin hervir. Agrega las gotas y mueve hasta que se fundan. Deja la cáscara de naranja un minuto y retírala. Sirve caliente.",
+          "tip": "Espuma la leche al final para hacerlo más cremoso."
+        },
+        {
+          "kicker": "CON GOTAS · 1 VASO",
+          "titulo": "Chocolate frío de jengibre y naranja",
+          "resumen": "30 g de gotas fundidas, 200 ml de leche fría, bastante hielo y una rodaja de naranja.",
+          "clave": "pinaConChile",
+          "ingredientes": [
+            "30 g de gotas de chocolate con jengibre y naranja",
+            "50 ml de agua o leche caliente",
+            "200 ml de leche fría",
+            "Hielo",
+            "Una rodaja de naranja"
+          ],
+          "pasos": "Funde las gotas en el líquido caliente. Agrega la leche fría y mezcla bien. Sirve sobre mucho hielo y termina con la rodaja de naranja.",
+          "tip": "Una pizquita de canela le queda espectacular."
+        },
+        {
+          "kicker": "CON GOTAS · 2 PORCIONES",
+          "titulo": "Peras con chocolate y canela",
+          "resumen": "Gajos dorados en sartén, bañados con 50 g de gotas de canela fundidas y nuez picada.",
+          "clave": "canela",
+          "ingredientes": [
+            "2 peras",
+            "50 g de gotas de chocolate con canela",
+            "2 cucharadas de agua o leche",
+            "Nueces o almendras picadas"
+          ],
+          "pasos": "Corta las peras en gajos y dóralas ligeramente en un sartén. Funde las gotas con el agua o la leche y viértelas sobre las peras tibias. Termina con las nueces.",
+          "tip": "Sírvelas con yogur griego o una bola de helado de vainilla."
+        },
+        {
+          "kicker": "CON POLVO · 4 PORCIONES",
+          "titulo": "Mousse rápida de chocolate con cardamomo",
+          "resumen": "Crema batida firme, yogur griego y 80 g de chocolate en polvo de cardamomo. Una hora al frío.",
+          "clave": "cardamomo",
+          "chipPolvo": "USA EL POLVO · PRÓXIMAMENTE",
+          "ingredientes": [
+            "80 g de chocolate en polvo con cardamomo",
+            "200 ml de crema para batir bien fría",
+            "100 g de yogur griego natural",
+            "Frutos rojos o naranja para decorar"
+          ],
+          "pasos": "Bate la crema hasta que esté firme. Mezcla aparte el yogur con el chocolate en polvo. Incorpora la crema con suavidad y refrigera una hora.",
+          "tip": "El cardamomo hace que un postre sencillísimo sepa mucho más sofisticado."
+        }
+      ]
+    },
+    "nosotros": {
+      "kicker": "NOSOTROS",
+      "titulo": "Empezó en una cocina",
+      "parrafos": [
+        "Empezamos a explorar combinaciones de sabores, aromas y frutas en nuestra propia cocina. De ahí salió Maracacao: chocolates 70% cacao donde el cacao siempre es el protagonista, acompañado de frutas, chiles, hierbas y esencias naturales.",
+        "Somos un equipo de trabajo unido por el interés de promover buen chocolate mexicano: hecho con buenas prácticas ambientales, respetando la integridad del cacao y saborizado únicamente con ingredientes naturales."
+      ],
+      "cacaoTitulo": "El cacao.",
+      "cacao": "Nuestro chocolate se produce en Tabasco, la región cacaotera más grande de México, con granos cuidadosamente seleccionados. El proceso cuida la fermentación y el manejo del grano para lograr un sabor profundo, balanceado y aromático.",
+      "datos": [
+        "Coyoacán, Ciudad de México",
+        "desde 2024"
+      ],
+      "personajeAlt": "El personaje de Maracacao sentado y sonriendo"
+    },
+    "negocios": {
+      "kicker": "PARA CAFÉS Y NEGOCIOS",
+      "titulo": "¿Con qué trabajas?",
+      "intro": "Atendemos cafeterías, panaderías y cocinas de repostería.",
+      "correoEtiqueta": "Pedidos y mayoreo:",
+      "correo": "maracacaomx@gmail.com",
+      "fichasCta": "Ver las fichas técnicas",
+      "fichaEnlace": "Ver la ficha técnica",
+      "fichas": [
+        {
+          "dato": "Ingredientes y % de cacao",
+          "estado": "disponibles por sabor"
+        },
+        {
+          "dato": "Alérgenos",
+          "estado": "confirmados en ficha técnica"
+        },
+        {
+          "dato": "Tabla nutrimental y vida de anaquel",
+          "estado": "disponibles en ficha técnica"
+        }
+      ],
+      "tabs": [
+        {
+          "id": "polvo",
+          "ficha": "#chocolate-en-polvo",
+          "etiqueta": "Chocolate en polvo",
+          "titulo": "Chocolate en polvo · 250\u00a0g y 1\u00a0kg",
+          "precioNota": "próximamente",
+          "precio": null,
+          "clave": "salDeMar",
+          "cuerpo": "Ocho variedades para la taza, hechas con cocoa natural, cocoa alcalina y pasta de cacao.",
+          "datos": [
+            "Se disuelve en bebidas frías o calientes",
+            "También para licuados, repostería y postres",
+            "Aún no está a la venta: escríbenos si te interesa"
+          ]
+        },
+        {
+          "id": "gotas",
+          "ficha": "#barras-y-gotas",
+          "etiqueta": "Chocolate en gotas",
+          "titulo": "Chocolate en gotas · 250\u00a0g",
+          "precioNota": "desde",
+          "precio": 258,
+          "clave": "cardamomo",
+          "cuerpo": "Gotas de unos 10 g del mismo chocolate 70% de las barras. Listas para usar: sin picar, rallar ni trocear.",
+          "datos": [
+            "6 sabores: jengibre y naranja, hierbabuena, canela, menta, limoncillo y lima y chile",
+            "Para galletas, brownies, panes, ganaches y coberturas",
+            "También se comen solas, como botana",
+            "Vida de anaquel de dos años; no requieren refrigeración"
+          ]
+        },
+        {
+          "id": "barras",
+          "ficha": "#barras-y-gotas",
+          "etiqueta": "Chocolate en barras",
+          "titulo": "Chocolate en barras · 70\u00a0g",
+          "precioNota": "desde",
+          "precio": 108,
+          "clave": "canela",
+          "cuerpo": "Las 15 barras de la línea, para vitrina, regalo y mesa de postres.",
+          "datos": [
+            "Envueltas de a una, con el porcentaje de cacao impreso por sabor",
+            "Ingredientes disponibles por sabor",
+            "Contienen soya; pueden llevar trazas de leche y frutos de cáscara",
+            "Vida de anaquel de dos años; no requieren refrigeración"
+          ]
+        }
+      ]
+    },
+    "preguntas": {
+      "kicker": "PREGUNTAS FRECUENTES",
+      "titulo": "Lo que más nos preguntan",
+      "items": [
+        {
+          "p": "¿Dónde puedo comprar?",
+          "r": "En el Mercado de Coyoacán (Malintzin s/n, Col. del Carmen) y en nuestro catálogo en línea, con precios públicos en pesos."
+        },
+        {
+          "p": "¿Qué significa realmente 70% cacao?",
+          "r": "Es la parte de la barra que procede del cacao: licor y manteca. Más porcentaje significa más cacao y menos protagonismo del azúcar."
+        },
+        {
+          "p": "¿Qué azúcar usan?",
+          "r": "Azúcar de caña. Y menos de la que esperas: con 70% cacao, el azúcar no es la protagonista."
+        },
+        {
+          "p": "¿Qué alérgenos tienen?",
+          "r": "Todas las barras contienen soya y pueden contener trazas de leche y frutos de cáscara. El blanco con pistache contiene además leche en polvo y pistaches."
+        },
+        {
+          "p": "¿Por qué se derrite en la boca?",
+          "r": "La manteca de cacao se funde cerca de la temperatura corporal. Por eso un buen chocolate cambia tanto cuando dejas de masticarlo y permites que se funda."
+        },
+        {
+          "p": "¿Cómo guardo mi chocolate?",
+          "r": "En un lugar fresco y seco (lo ideal: entre 16 y 20 °C), lejos del sol y de olores fuertes. El refrigerador, en general, no es su amigo."
+        },
+        {
+          "p": "¿Y la capa blanca que a veces aparece?",
+          "r": "Es el bloom: no significa que el chocolate esté echado a perder. Suele deberse a cambios de temperatura o humedad."
+        },
+        {
+          "p": "¿Envíos, mayoreo o regalos?",
+          "r": "Escríbenos a maracacaomx@gmail.com y lo resolvemos contigo."
+        }
+      ]
+    },
+    "contacto": {
+      "kicker": "CONTACTO",
+      "titulo": "Estamos en Coyoacán",
+      "puestoEtiqueta": "NUESTRO PUESTO",
+      "puestoTitulo": [
+        "Mercado de",
+        "Coyoacán"
+      ],
+      "direccion": [
+        "Malintzin s/n, Col. del Carmen",
+        "Coyoacán, C.P. 04100, CDMX"
+      ],
+      "correoEtiqueta": "CORREO",
+      "correo": "maracacaomx@gmail.com",
+      "correoNota": "Pedidos, mayoreo, regalos y dudas.",
+      "copiar": "Copiar correo",
+      "copiado": "¡Copiado!",
+      "redesEtiqueta": "REDES",
+      "redes": "@maracacaomx",
+      "redesNota": "Búscanos en redes sociales.",
+      "catalogoEtiqueta": "CATÁLOGO EN LÍNEA",
+      "catalogoNombre": "chocolateria.pulpos.shop",
+      "catalogoUrl": "https://chocolateria.pulpos.shop",
+      "catalogoNota": "Precios públicos en pesos mexicanos.",
+      "personajeAlt": "El personaje de Maracacao batiendo chocolate con su molinillo",
+      "formulario": {
+        "titulo": "Escríbenos",
+        "nombre": "Tu nombre",
+        "correo": "Tu correo",
+        "tipo": "¿Qué tipo de contacto es?",
+        "tipoOpciones": [
+          {
+            "valor": "personal",
+            "texto": "Compra personal"
+          },
+          {
+            "valor": "negocio",
+            "texto": "Para mi negocio (cafetería, panadería, repostería)"
+          }
+        ],
+        "mensaje": "Tu mensaje",
+        "mensajeEjemplo": "Cuéntanos qué necesitas: pedidos, mayoreo, regalos, dudas…",
+        "enviar": "Enviar mensaje",
+        "enviando": "Enviando",
+        "nota": "Te respondemos al correo que nos dejes.",
+        "exitoTitulo": "¡Mensaje enviado!",
+        "exitoSub": "Te respondemos pronto al correo que dejaste.",
+        "otraVez": "Enviar otro mensaje",
+        "aviso": "No se pudo enviar en línea: se abre tu aplicación de correo con el mensaje listo.",
+        "trampa": "Apellido (no llenar)",
+        "asuntoPersonal": "Mensaje desde el sitio — compra personal",
+        "asuntoNegocio": "Mensaje desde el sitio — negocio"
+      }
+    },
+    "fichasTecnicas": {
+      "ruta": "/fichas-tecnicas",
+      "rutaInicio": "/",
+      "rutaPdf": "/fichas",
+      "titulo": "Fichas técnicas — Maracacao | Chocolate 70%, polvo y cocoas",
+      "descripcion": "Las fichas técnicas oficiales de Maracacao: chocolate 70% cacao (barras y gotas), chocolate en polvo, cocoa natural y cocoa alcalina. Legibles y en PDF.",
+      "kicker": "PARA CAFÉS Y NEGOCIOS",
+      "encabezado": "Fichas técnicas",
+      "sub": "Los datos oficiales de cada producto: descripción, ingredientes, alérgenos, información nutrimental y almacenamiento. Cada ficha está también en PDF tamaño carta, lista para imprimir o reenviar.",
+      "tipoDocumento": "Ficha técnica de producto",
+      "indiceAria": "Elige una ficha",
+      "descargar": "Descargar PDF",
+      "descargarNota": "carta · 1 página",
+      "volver": "Volver al sitio",
+      "contactoNota": "Pedidos y dudas:"
+    },
+    "noEncontrada": {
+      "titulo": "Página no encontrada — Maracacao",
+      "encabezado": "Esta página no existe",
+      "sub": "Puede que el enlace esté mal escrito o que la página ya no viva aquí.",
+      "cta": "Volver al inicio",
+      "rutaInicio": "/"
+    },
+    "footer": {
+      "lema": "Más cacao, ingredientes sencillos y muchas maneras de disfrutarlo",
+      "linea": "CACAO 70% · COYOACÁN · CDMX",
+      "seccionesTitulo": "Secciones",
+      "productosTitulo": "Productos",
+      "contactoTitulo": "Contacto",
+      "legalesTitulo": "Legales",
+      "productos": [
+        {
+          "ancla": "#sabores",
+          "texto": "Barras 70\u00a0g"
+        },
+        {
+          "ancla": "#sabores",
+          "texto": "Gotas de chocolate 250\u00a0g"
+        },
+        {
+          "ancla": "#polvo",
+          "texto": "Chocolate en polvo (próximamente)"
+        },
+        {
+          "ancla": "/fichas-tecnicas",
+          "texto": "Fichas técnicas"
+        }
+      ],
+      "legales": [
+        "Aviso de privacidad",
+        "Términos y condiciones"
+      ],
+      "legalesNota": "En preparación",
+      "derechos": "Maracacao · Chocolate mexicano · Hecho a mano en México"
+    }
+  },
+  "sabores": [
+    {
+      "orden": 1,
+      "slug": "jengibre-y-naranja",
+      "clave": "jengibreYNaranja",
+      "nombre": "Jengibre y naranja",
+      "cacao": "Cacao 70%",
+      "precio": 122,
+      "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural y jengibre",
+      "catalogo": null
+    },
+    {
+      "orden": 2,
+      "slug": "menta-intensa",
+      "clave": "mentaIntensa",
+      "nombre": "Menta intensa",
+      "cacao": "Cacao 70%",
+      "precio": 108,
+      "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural",
+      "catalogo": "https://chocolateria.pulpos.shop/product/cm2nojzhq000nvz0mmtsi6800"
+    },
+    {
+      "orden": 3,
+      "slug": "limoncillo",
+      "clave": "limoncillo",
+      "nombre": "Limoncillo",
+      "cacao": "Cacao 70%",
+      "precio": 108,
+      "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural",
+      "catalogo": "https://chocolateria.pulpos.shop/product/cm2rxaju500c91ngg2mu4v4h2"
+    },
+    {
+      "orden": 4,
+      "slug": "lima-y-chile",
+      "clave": "limaYChile",
+      "nombre": "Lima y chile",
+      "cacao": "Cacao 70%",
+      "precio": 108,
+      "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, chiles ahumados, esencia natural",
+      "catalogo": "https://chocolateria.pulpos.shop/product/cm2nolh8t00aq145fx80bvy6l"
+    },
+    {
+      "orden": 5,
+      "slug": "coriandro",
+      "clave": "coriandro",
+      "nombre": "Coriandro",
+      "cacao": "Cacao 70%",
+      "precio": 108,
+      "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural",
+      "catalogo": "https://chocolateria.pulpos.shop/product/cm2rx6zwv000ssl4kt6nzr9gc"
+    },
+    {
+      "orden": 6,
+      "slug": "fresas-y-chile",
+      "clave": "fresasYChile",
+      "nombre": "Fresas y chile",
+      "cacao": "Cacao 70%",
+      "precio": 108,
+      "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, fresas, esencia natural de mandarina y chile chipotle",
+      "catalogo": "https://chocolateria.pulpos.shop/product/cm2rx9x2y003vsl4kr0wlxcpq"
+    },
+    {
+      "orden": 7,
+      "slug": "hierbabuena",
+      "clave": "hierbabuena",
+      "nombre": "Hierbabuena",
+      "cacao": "Cacao 70%",
+      "precio": 108,
+      "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural",
+      "catalogo": "https://chocolateria.pulpos.shop/product/cmcf6crlb02yjgexdoxvcwuvs"
+    },
+    {
+      "orden": 8,
+      "slug": "canela",
+      "clave": "canela",
+      "nombre": "Canela",
+      "cacao": "Cacao 70%",
+      "precio": 108,
+      "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural",
+      "catalogo": "https://chocolateria.pulpos.shop/product/cmccepnd403es13pcu2jmmyxf"
+    },
+    {
+      "orden": 9,
+      "slug": "sal-de-mar",
+      "clave": "salDeMar",
+      "nombre": "Sal de mar",
+      "cacao": "Cacao 70%",
+      "precio": 108,
+      "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, sal de mar",
+      "catalogo": "https://chocolateria.pulpos.shop/product/cmcnofnzl02o3tzxx9slblmuc"
+    },
+    {
+      "orden": 10,
+      "slug": "tamarindo",
+      "clave": "tamarindo",
+      "nombre": "Tamarindo con chile",
+      "cacao": "Cacao 70%",
+      "precio": 108,
+      "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, tamarindo con chile",
+      "catalogo": "https://chocolateria.pulpos.shop/product/cmcnogojx05eujzgzz2tochyc"
+    },
+    {
+      "orden": 11,
+      "slug": "pina-con-chile",
+      "clave": "pinaConChile",
+      "nombre": "Piña con chile",
+      "cacao": "Cacao 70%",
+      "precio": 108,
+      "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, piña con chile",
+      "catalogo": "https://chocolateria.pulpos.shop/product/cmgu5lmw00ft4563yncetf7xa"
+    },
+    {
+      "orden": 12,
+      "slug": "cardamomo",
+      "clave": "cardamomo",
+      "nombre": "Cardamomo",
+      "cacao": "Cacao 70%",
+      "precio": 108,
+      "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, cardamomo",
+      "catalogo": "https://chocolateria.pulpos.shop/product/cmqzcygiu0og3cbzjtbyhaa6p"
+    },
+    {
+      "orden": 13,
+      "slug": "blanco-con-pistache",
+      "clave": "blancoConPistache",
+      "nombre": "Blanco con pistache",
+      "cacao": "Chocolate blanco",
+      "precio": 108,
+      "ingredientes": "Manteca de cacao, leche en polvo, azúcar, lecitina de soya, pistaches",
+      "catalogo": null
+    },
+    {
+      "orden": 14,
+      "slug": "mango-con-chile",
+      "clave": "mangoConChile",
+      "nombre": "Mango con chile",
+      "cacao": "Cacao 70%",
+      "precio": 108,
+      "ingredientes": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya, mango con chile",
+      "catalogo": null
+    },
+    {
+      "orden": 15,
+      "slug": "chamoy",
+      "clave": "chamoy",
+      "nombre": "Chamoy",
+      "cacao": "Cacao 70%",
+      "precio": 108,
+      "ingredientes": "Licor de cacao, manteca de cacao, azúcar, lecitina de soya, chamoy",
+      "catalogo": null
+    }
+  ],
+  "gotas": [
+    {
+      "clave": "jengibreYNaranja",
+      "nombre": "Jengibre y naranja",
+      "precio": 340
+    },
+    {
+      "clave": "hierbabuena",
+      "nombre": "Hierbabuena",
+      "precio": 258
+    },
+    {
+      "clave": "canela",
+      "nombre": "Canela",
+      "precio": 258
+    },
+    {
+      "clave": "mentaIntensa",
+      "nombre": "Menta",
+      "precio": 258
+    },
+    {
+      "clave": "limoncillo",
+      "nombre": "Limoncillo",
+      "precio": 258
+    },
+    {
+      "clave": "limaYChile",
+      "nombre": "Lima y chile",
+      "precio": 258
+    }
+  ],
+  "polvo": [
+    {
+      "archivo": "etiqueta-naranja-jengibre",
+      "nombre": "Naranja y jengibre"
+    },
+    {
+      "archivo": "etiqueta-canela",
+      "nombre": "Canela"
+    },
+    {
+      "archivo": "etiqueta-limoncillo",
+      "nombre": "Limoncillo"
+    },
+    {
+      "archivo": "etiqueta-chile",
+      "nombre": "Chile"
+    },
+    {
+      "archivo": "etiqueta-menta",
+      "nombre": "Menta"
+    },
+    {
+      "archivo": "etiqueta-cardamomo",
+      "nombre": "Cardamomo"
+    },
+    {
+      "archivo": "etiqueta-cocoa-natural",
+      "nombre": "Cocoa natural"
+    },
+    {
+      "archivo": "etiqueta-cocoa-alcalina",
+      "nombre": "Cocoa alcalina"
+    }
+  ],
+  "urlCatalogoBarras": "https://chocolateria.pulpos.shop/products?c=cmbrdybsb01o3ckpojgkdphjh&s=bestSellers",
+  "fichas": [
+    {
+      "archivo": "ficha-tecnica-barras-y-gotas",
+      "producto": "Chocolate 70% cacao",
+      "denominacion": "Chocolate oscuro 70% cacao saborizado con esencias naturales y/o especias",
+      "acento": "#7D0303",
+      "meta": [
+        [
+          "Marca",
+          "Maracacao"
+        ],
+        [
+          "País de elaboración",
+          "México"
+        ],
+        [
+          "Presentaciones",
+          "Barra 70 g · Gotas 250 g (piezas de ±10 g)"
+        ],
+        [
+          "Vida de anaquel",
+          "Dos años en condiciones sugeridas"
+        ]
+      ],
+      "secciones": [
+        {
+          "titulo": "Descripción del producto",
+          "bloques": [
+            {
+              "tipo": "parrafo",
+              "texto": "Chocolate oscuro con 70% de cacao, elaborado a partir de chocolate extra oscuro 70% cacao y adicionado con esencias naturales grado alimenticio y/o especias naturales seleccionadas."
+            },
+            {
+              "tipo": "parrafo",
+              "texto": "Producto de sabor intenso a cacao, con notas aromáticas características de la esencia o especia utilizada. Las diferentes variedades Maracacao mantienen como base el mismo chocolate 70% cacao y se diferencian por la esencia natural, especia o combinación utilizada."
+            }
+          ]
+        },
+        {
+          "titulo": "Ingredientes base",
+          "bloques": [
+            {
+              "tipo": "parrafo",
+              "texto": "Licor de cacao, azúcar, manteca de cacao, lecitina de soya y extracto natural de vainilla. Según la variedad se adicionan esencias naturales grado alimenticio y/o especias naturales. Los ingredientes específicos del sabor se declaran en la etiqueta de cada variedad."
+            }
+          ]
+        },
+        {
+          "titulo": "Alérgenos",
+          "bloques": [
+            {
+              "tipo": "parrafo",
+              "texto": "Contiene soya. Puede contener leche y frutos de cáscara."
+            }
+          ]
+        },
+        {
+          "titulo": "Características organolépticas",
+          "bloques": [
+            {
+              "tipo": "lista",
+              "items": [
+                "Color: marrón oscuro.",
+                "Aroma: característico a chocolate, complementado por las notas propias de la esencia o especia utilizada.",
+                "Sabor: característico a chocolate oscuro 70% cacao, libre de sabores anormales y con notas propias de la variedad.",
+                "Textura: sólida, firme y homogénea a temperatura ambiente.",
+                "Formato: barras (tableta sólida de 70 g) y gotas (piezas de ±10 g en presentación de 250 g)."
+              ]
+            }
+          ]
+        },
+        {
+          "titulo": "Información nutrimental de referencia",
+          "bloques": [
+            {
+              "tipo": "parrafo",
+              "texto": "Valores promedio por 100 g de chocolate base:"
+            },
+            {
+              "tipo": "tabla",
+              "encabezados": [
+                "Nutrimento",
+                "Por 100 g"
+              ],
+              "filas": [
+                [
+                  "Contenido energético",
+                  "600 kcal / 2,510 kJ"
+                ],
+                [
+                  "Grasas totales",
+                  "44 g"
+                ],
+                [
+                  "Grasas saturadas",
+                  "27 g"
+                ],
+                [
+                  "Grasas trans",
+                  "0 g"
+                ],
+                [
+                  "Carbohidratos",
+                  "45 g"
+                ],
+                [
+                  "Azúcares totales",
+                  "30 g"
+                ],
+                [
+                  "Azúcares añadidos",
+                  "29 g"
+                ],
+                [
+                  "Proteínas",
+                  "8 g"
+                ],
+                [
+                  "Fibra dietética",
+                  "15 g"
+                ],
+                [
+                  "Sodio",
+                  "0 g"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "titulo": "Parámetros de la materia prima",
+          "bloques": [
+            {
+              "tipo": "lista",
+              "items": [
+                "Humedad: menor a 1%.",
+                "Micrometría: 18–22 µm.",
+                "Viscosidad Casson: 500–1,100 mPa·s.",
+                "Límite de fluencia Casson: 5–13 Pa."
+              ]
+            }
+          ]
+        },
+        {
+          "titulo": "Usos",
+          "bloques": [
+            {
+              "tipo": "lista",
+              "items": [
+                "Barras de 70 g: producto listo para consumo directo.",
+                "Gotas de 10 g: consumo directo y aplicaciones en bebidas, repostería, chocolatería y postres."
+              ]
+            }
+          ]
+        },
+        {
+          "titulo": "Almacenamiento",
+          "bloques": [
+            {
+              "tipo": "parrafo",
+              "texto": "Conservar en un lugar limpio, fresco y seco, protegido de la luz directa, olores fuertes y fuentes de calor. Temperatura recomendada: 16–20 °C. Humedad relativa: inferior al 60%. Mantener bien cerrado después de abrir. No requiere refrigeración en condiciones normales."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "archivo": "ficha-tecnica-chocolate-en-polvo",
+      "producto": "Chocolate en polvo",
+      "denominacion": "Mezcla en polvo para preparar bebida de chocolate",
+      "acento": "#4C2C16",
+      "meta": [
+        [
+          "Marca",
+          "Maracacao"
+        ],
+        [
+          "País de origen",
+          "México"
+        ],
+        [
+          "Presentaciones",
+          "250 g · 1 kg"
+        ],
+        [
+          "Vida de anaquel",
+          "Dos años en condiciones sugeridas"
+        ]
+      ],
+      "secciones": [
+        {
+          "titulo": "Descripción del producto",
+          "bloques": [
+            {
+              "tipo": "parrafo",
+              "texto": "Chocolate en polvo elaborado con azúcar, cocoa natural, pasta de cacao y cocoa alcalina. La combinación de cocoa natural, cocoa alcalinizada y pasta de cacao aporta color oscuro, aroma y sabor característicos del cacao. Producto diseñado para preparación de bebidas calientes con leche o agua."
+            }
+          ]
+        },
+        {
+          "titulo": "Fórmula del producto",
+          "bloques": [
+            {
+              "tipo": "tabla",
+              "encabezados": [
+                "Ingrediente",
+                "Porcentaje",
+                "Por 1 kg"
+              ],
+              "filas": [
+                [
+                  "Azúcar",
+                  "70.60%",
+                  "706 g"
+                ],
+                [
+                  "Cocoa natural",
+                  "12.00%",
+                  "120 g"
+                ],
+                [
+                  "Pasta de cacao",
+                  "11.00%",
+                  "110 g"
+                ],
+                [
+                  "Cocoa alcalina",
+                  "6.00%",
+                  "60 g"
+                ],
+                [
+                  "Dióxido de silicio (antiaglomerante)",
+                  "0.40%",
+                  "4 g"
+                ],
+                [
+                  "Total",
+                  "100.00%",
+                  "1,000 g"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "titulo": "Ingredientes",
+          "bloques": [
+            {
+              "tipo": "parrafo",
+              "texto": "Azúcar, cocoa natural, pasta de cacao, cocoa alcalina y dióxido de silicio (antiaglomerante)."
+            }
+          ]
+        },
+        {
+          "titulo": "Información nutrimental calculada",
+          "bloques": [
+            {
+              "tipo": "parrafo",
+              "texto": "Por 100 g de producto:"
+            },
+            {
+              "tipo": "tabla",
+              "encabezados": [
+                "Nutrimento",
+                "Cantidad"
+              ],
+              "filas": [
+                [
+                  "Contenido energético",
+                  "396 kcal / 1,672 kJ"
+                ],
+                [
+                  "Proteínas",
+                  "6.0 g"
+                ],
+                [
+                  "Grasas totales",
+                  "7.8 g"
+                ],
+                [
+                  "Grasas saturadas",
+                  "4.5 g"
+                ],
+                [
+                  "Grasas trans",
+                  "0 mg"
+                ],
+                [
+                  "Hidratos de carbono disponibles",
+                  "75.4 g"
+                ],
+                [
+                  "Azúcares",
+                  "70.6 g"
+                ],
+                [
+                  "Azúcares añadidos",
+                  "70.6 g"
+                ],
+                [
+                  "Fibra dietética",
+                  "7.7 g"
+                ],
+                [
+                  "Sodio",
+                  "13 mg"
+                ]
+              ]
+            },
+            {
+              "tipo": "parrafo",
+              "texto": "Valores calculados a partir de la fórmula del producto y de las declaraciones nutrimentales por 100 g de las materias primas utilizadas."
+            }
+          ]
+        },
+        {
+          "titulo": "Características organolépticas",
+          "bloques": [
+            {
+              "tipo": "parrafo",
+              "texto": "Polvo fino, seco, fluido y homogéneo, de color café oscuro. Aroma característico de cacao y chocolate; sabor dulce, intenso y característico del cacao. Materia extraña: ausente bajo condiciones adecuadas de elaboración y manejo."
+            }
+          ]
+        },
+        {
+          "titulo": "Modo de preparación sugerido",
+          "bloques": [
+            {
+              "tipo": "parrafo",
+              "texto": "Agregar aproximadamente 30 g de chocolate en polvo a 200 ml de leche o agua caliente y mezclar hasta obtener una bebida homogénea. La concentración puede ajustarse al gusto."
+            }
+          ]
+        },
+        {
+          "titulo": "Conservación y control",
+          "bloques": [
+            {
+              "tipo": "parrafo",
+              "texto": "Mantener el envase bien cerrado, en lugar fresco y seco, protegido de humedad, sol directo, fuentes de calor y olores fuertes. Lote y consumo preferente: identificados en el envase. La formulación y la información nutrimental por 100 g son las mismas para ambas presentaciones."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "archivo": "ficha-tecnica-cocoa-natural",
+      "producto": "Cocoa natural",
+      "denominacion": "Sólidos 100% de cacao en polvo — especificación COCOAMX2604",
+      "acento": "#4C2C16",
+      "meta": [
+        [
+          "Marca",
+          "Maracacao"
+        ],
+        [
+          "Código",
+          "COCOAMX2604"
+        ],
+        [
+          "Presentaciones",
+          "250 g · 1 kg"
+        ],
+        [
+          "Vida de anaquel",
+          "24 meses en condiciones sugeridas"
+        ]
+      ],
+      "secciones": [
+        {
+          "titulo": "Descripción general",
+          "bloques": [
+            {
+              "tipo": "parrafo",
+              "texto": "Sólidos 100% de cacao que presentan la apariencia de un polvo muy fino y liso, libre de manchas o cualquier otro material extraño. El color es café, sin colorantes, conservantes ni aditivos."
+            }
+          ]
+        },
+        {
+          "titulo": "Uso previsto y almacenamiento",
+          "bloques": [
+            {
+              "tipo": "parrafo",
+              "texto": "Uso industrial, como materia prima en la elaboración de chocolates, confitería y afines. Almacenar en lugar seco, fresco, libre de sustancias contaminantes y en su envase original sellado."
+            }
+          ]
+        },
+        {
+          "titulo": "Parámetros fisicoquímicos",
+          "bloques": [
+            {
+              "tipo": "tabla",
+              "encabezados": [
+                "Parámetro",
+                "Límites",
+                "Resultado"
+              ],
+              "filas": [
+                [
+                  "Humedad (g/100 g)",
+                  "máx 5",
+                  "3"
+                ],
+                [
+                  "Cenizas (g/100 g)",
+                  "máx 8.5",
+                  "7"
+                ],
+                [
+                  "Grasas totales (g/100 g)",
+                  "10–12",
+                  "12"
+                ],
+                [
+                  "pH (sol. 1%)",
+                  "5–6",
+                  "5"
+                ],
+                [
+                  "Finura (%)",
+                  "mín 88",
+                  "88"
+                ],
+                [
+                  "Sedimentación (%)",
+                  "máx 2",
+                  "2"
+                ]
+              ]
+            },
+            {
+              "tipo": "parrafo",
+              "texto": "Ensayos según NOM-116-SSA1-1994, NMX-F-NORMEX-2020, NMX-F-615-NORMEX-2018, NOM-F-412-S-1981 y NOM-186-SSA1/SCFI-2013."
+            }
+          ]
+        },
+        {
+          "titulo": "Parámetros microbiológicos",
+          "bloques": [
+            {
+              "tipo": "tabla",
+              "encabezados": [
+                "Parámetro",
+                "Límite",
+                "Resultado"
+              ],
+              "filas": [
+                [
+                  "E. coli (NMP/g)",
+                  "ausente",
+                  "ausente"
+                ],
+                [
+                  "Salmonella spp. (UFC/25 g)",
+                  "ausente",
+                  "ausente"
+                ],
+                [
+                  "Hongos (UFC/g)",
+                  "máx 10",
+                  "< 10"
+                ],
+                [
+                  "Levaduras (UFC/g)",
+                  "máx 10",
+                  "< 10"
+                ],
+                [
+                  "Coliformes totales (UFC/g)",
+                  "máx 10",
+                  "< 10"
+                ],
+                [
+                  "Mesófilos aerobios (UFC/g)",
+                  "máx 10,000",
+                  "< 1,000"
+                ]
+              ]
+            },
+            {
+              "tipo": "parrafo",
+              "texto": "Métodos: NOM-210-SSA1-2014, NOM-111-SSA1-1994, NOM-113-SSA1-1994 y NOM-092-SSA1-1994."
+            }
+          ]
+        },
+        {
+          "titulo": "Características sensoriales",
+          "bloques": [
+            {
+              "tipo": "lista",
+              "items": [
+                "Apariencia: polvo fino.",
+                "Color: café.",
+                "Sabor y olor: característicos a cacao."
+              ]
+            }
+          ]
+        },
+        {
+          "titulo": "Otros análisis (NOM-186-SSA1/SCFI-2013)",
+          "bloques": [
+            {
+              "tipo": "tabla",
+              "encabezados": [
+                "Parámetro",
+                "Límite",
+                "Resultado"
+              ],
+              "filas": [
+                [
+                  "Plomo (mg/kg)",
+                  "1",
+                  "< LOQ"
+                ],
+                [
+                  "Arsénico (mg/kg)",
+                  "1",
+                  "< LOQ"
+                ],
+                [
+                  "Aflatoxinas (µg/kg)",
+                  "15",
+                  "< LOQ"
+                ],
+                [
+                  "Insectos y fragmentos",
+                  "según norma",
+                  "ausente"
+                ],
+                [
+                  "Pelos de roedor",
+                  "según norma",
+                  "ausente"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "titulo": "Declaración nutrimental",
+          "bloques": [
+            {
+              "tipo": "parrafo",
+              "texto": "Por 100 g de producto:"
+            },
+            {
+              "tipo": "tabla",
+              "encabezados": [
+                "Nutrimento",
+                "Cantidad"
+              ],
+              "filas": [
+                [
+                  "Contenido energético",
+                  "284 kcal / 1,193 kJ"
+                ],
+                [
+                  "Proteínas",
+                  "26 g"
+                ],
+                [
+                  "Grasas totales",
+                  "12 g"
+                ],
+                [
+                  "Grasas saturadas",
+                  "4 g"
+                ],
+                [
+                  "Grasas trans",
+                  "0 mg"
+                ],
+                [
+                  "Hidratos de carbono disponibles",
+                  "18 g"
+                ],
+                [
+                  "Azúcares / añadidos",
+                  "0 g"
+                ],
+                [
+                  "Fibra dietética",
+                  "34 g"
+                ],
+                [
+                  "Sodio",
+                  "7 mg"
+                ]
+              ]
+            },
+            {
+              "tipo": "parrafo",
+              "texto": "VNR (NOM-051-SCFI/SSA1-2010): calcio 25% · hierro 230% · potasio 2,220 mg."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "archivo": "ficha-tecnica-cocoa-alcalina",
+      "producto": "Cocoa alcalina",
+      "denominacion": "Sólidos de cacao alcalinizados en polvo — especificación COCMX2604",
+      "acento": "#4C2C16",
+      "meta": [
+        [
+          "Marca",
+          "Maracacao"
+        ],
+        [
+          "Código",
+          "COCMX2604"
+        ],
+        [
+          "Presentaciones",
+          "250 g · 1 kg"
+        ],
+        [
+          "Vida de anaquel",
+          "24 meses en condiciones sugeridas"
+        ]
+      ],
+      "secciones": [
+        {
+          "titulo": "Descripción general",
+          "bloques": [
+            {
+              "tipo": "parrafo",
+              "texto": "Sólidos de cacao en polvo sometidos a un proceso de alcalinización con carbonato de potasio, que reduce la acidez natural del cacao y le brinda mejor solubilidad y un color más oscuro. Polvo fino, libre de grumos o material extraño, de color café y sin conservadores, con el sabor característico del cacao, libre de impurezas y de olores o sabores extraños."
+            }
+          ]
+        },
+        {
+          "titulo": "Uso previsto y almacenamiento",
+          "bloques": [
+            {
+              "tipo": "parrafo",
+              "texto": "Uso industrial, como materia prima en la elaboración de chocolates, confitería y afines. Almacenar en lugar seco, fresco, libre de sustancias contaminantes y en su envase original sellado."
+            }
+          ]
+        },
+        {
+          "titulo": "Parámetros fisicoquímicos",
+          "bloques": [
+            {
+              "tipo": "tabla",
+              "encabezados": [
+                "Parámetro",
+                "Límites",
+                "Resultado"
+              ],
+              "filas": [
+                [
+                  "Humedad (%)",
+                  "máx 5",
+                  "2"
+                ],
+                [
+                  "Cenizas (%)",
+                  "máx 7",
+                  "7"
+                ],
+                [
+                  "pH (sol. 1%)",
+                  "7.0–8.5",
+                  "7.5"
+                ],
+                [
+                  "Finura (%)",
+                  "mín 88",
+                  "88"
+                ],
+                [
+                  "Sedimentación (%)",
+                  "máx 2",
+                  "2"
+                ]
+              ]
+            },
+            {
+              "tipo": "parrafo",
+              "texto": "Ensayos según NOM-116-SSA1-1994, NMX-F-NORMEX-2020, NOM-F-412-S-1981 y NOM-186-SSA1/SCFI-2013."
+            }
+          ]
+        },
+        {
+          "titulo": "Parámetros microbiológicos",
+          "bloques": [
+            {
+              "tipo": "tabla",
+              "encabezados": [
+                "Parámetro",
+                "Límite",
+                "Resultado"
+              ],
+              "filas": [
+                [
+                  "E. coli (NMP/g)",
+                  "ausente",
+                  "ausente"
+                ],
+                [
+                  "Salmonella spp. (UFC/25 g)",
+                  "ausente",
+                  "ausente"
+                ],
+                [
+                  "Hongos (UFC/g)",
+                  "máx 10",
+                  "< 10"
+                ],
+                [
+                  "Levaduras (UFC/g)",
+                  "máx 10",
+                  "< 10"
+                ],
+                [
+                  "Coliformes totales (UFC/g)",
+                  "máx 10",
+                  "< 10"
+                ],
+                [
+                  "Mesófilos aerobios (UFC/g)",
+                  "máx 1,000",
+                  "< 1,000"
+                ]
+              ]
+            },
+            {
+              "tipo": "parrafo",
+              "texto": "Métodos: NOM-210-SSA1-2014, NOM-111-SSA1-1994, NOM-113-SSA1-1994 y NOM-092-SSA1-1994."
+            }
+          ]
+        },
+        {
+          "titulo": "Características sensoriales",
+          "bloques": [
+            {
+              "tipo": "lista",
+              "items": [
+                "Apariencia: polvo fino.",
+                "Color: café.",
+                "Sabor y olor: característicos a cacao."
+              ]
+            }
+          ]
+        },
+        {
+          "titulo": "Otros análisis (NOM-186-SSA1/SCFI-2013)",
+          "bloques": [
+            {
+              "tipo": "tabla",
+              "encabezados": [
+                "Parámetro",
+                "Límite",
+                "Resultado"
+              ],
+              "filas": [
+                [
+                  "Plomo (mg/kg)",
+                  "1",
+                  "< LOQ"
+                ],
+                [
+                  "Arsénico (mg/kg)",
+                  "1",
+                  "< LOQ"
+                ],
+                [
+                  "Aflatoxinas (µg/kg)",
+                  "15",
+                  "negativo"
+                ],
+                [
+                  "Insectos y fragmentos",
+                  "según norma",
+                  "negativo"
+                ],
+                [
+                  "Pelos y excretas de roedor",
+                  "según norma",
+                  "negativo"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "titulo": "Declaración nutrimental",
+          "bloques": [
+            {
+              "tipo": "parrafo",
+              "texto": "Por 100 g de producto:"
+            },
+            {
+              "tipo": "tabla",
+              "encabezados": [
+                "Nutrimento",
+                "Cantidad"
+              ],
+              "filas": [
+                [
+                  "Contenido energético",
+                  "262 kcal / 1,102 kJ"
+                ],
+                [
+                  "Proteínas",
+                  "22 g"
+                ],
+                [
+                  "Grasas totales",
+                  "11 g"
+                ],
+                [
+                  "Grasas saturadas",
+                  "7 g"
+                ],
+                [
+                  "Grasas trans",
+                  "14 mg"
+                ],
+                [
+                  "Hidratos de carbono disponibles",
+                  "20 g"
+                ],
+                [
+                  "Azúcares / añadidos",
+                  "0 g"
+                ],
+                [
+                  "Fibra dietética",
+                  "32 g"
+                ],
+                [
+                  "Sodio",
+                  "189 mg"
+                ]
+              ]
+            },
+            {
+              "tipo": "parrafo",
+              "texto": "VNR (NOM-051-SCFI/SSA1-2010): calcio 25% · hierro 220% · potasio 2,480 mg."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -14,6 +14,19 @@ import { z } from 'zod'
 import { palabraProhibida } from './vocabulario'
 import { sabor } from '../tokens/color'
 
+/**
+ * Las listas cuya cantidad aparece escrita en algún texto del sitio. El
+ * «15» está en nueve lugares; el «6» de las gotas, en dos.
+ */
+export type ColeccionContada =
+  | 'sabores'
+  | 'gotas'
+  | 'polvo'
+  | 'recetas'
+  | 'preguntas'
+  | 'pasos'
+  | 'ingredientes'
+
 /** Las secciones tal como las va a ver la clienta en el panel. */
 export type Seccion =
   | 'portada'
@@ -29,6 +42,8 @@ export type Seccion =
   | 'fichas'
   | 'buscadores'
   | 'accesibilidad'
+  /** La página que se ve cuando un enlace está roto. */
+  | 'no-encontrada'
 
 /**
  * Cómo se rompe el slot si el texto no entra. Lo usa el medidor (fase 4)
@@ -89,16 +104,32 @@ export interface MetaCampo {
   campos?: unknown
   /** Las partes de una `tupla`, en orden y en cantidad fija. */
   partes?: unknown
-  /** La lista cerrada de valores que acepta una `opcion`. */
+  /**
+   * La lista cerrada de valores que acepta el campo. La usan `opcion` (las
+   * dos opciones del formulario) y `tokenColor` (los tokens de color
+   * declarados). Era el mismo concepto con dos nombres —`valores` y
+   * `validos`— y el panel dibuja el selector leyendo esta clave: con el
+   * nombre equivocado no dibuja nada, sin excepción y sin error de tipos.
+   */
   valores?: readonly string[]
-  /** Los tokens de color que acepta un `tokenColor`. */
-  validos?: readonly string[]
   /** De dónde sale el valor de un `derivado`. El panel lo dibuja en gris. */
   saleDe?: string
   /** El ':' o el '.' que agrega la plantilla. El panel lo dibuja gris. */
   sufijo?: string
-  /** El texto menciona una cantidad que sale de una lista: hay que cruzarla. */
-  cuenta?: 'sabores' | 'gotas' | 'polvo' | 'recetas' | 'preguntas'
+  /**
+   * El texto menciona una cantidad que sale de una lista.
+   *
+   * Son DOS datos y no uno porque contra el copy real no coinciden: el
+   * cuerpo del panel de barras dice «Las 15 barras» y la lista que cuenta
+   * es la de sabores; el de las gotas dice «6 sabores» y la lista que
+   * cuenta es la de gotas. `de` dice de qué lista sale el número;
+   * `sustantivo` dice con qué palabra lo nombra ESTE texto, que es lo que
+   * `cruzaConteo()` necesita para no marcar cualquier número suelto.
+   *
+   * Y van juntos y no separados porque por separado no sirven: un
+   * sustantivo sin colección no cruza nada.
+   */
+  cuenta?: { de: ColeccionContada; sustantivo: string }
   /** Rutas hermanas que reciben el mismo valor (el correo vive en cuatro). */
   escribeTambien?: string[]
   /** Cómo nombrar un elemento de lista en el panel («Receta: peras al vino»). */
@@ -231,6 +262,83 @@ export const medida = (meta: Base & { maxCaracteres: number }) =>
     { control: 'medida', ...meta },
   )
 
+/*
+ * Las DOS reglas de carácter del spec §1.2, en un solo lugar.
+ *
+ * Son reglas de DATO, no de diseño: bloquean desde el esquema porque el
+ * carácter no se escapa solo en el lugar al que ese campo viaja. Viven
+ * juntas —y no cada una en el archivo que la estrenó— porque son la misma
+ * familia con dos alcances distintos, y una familia repartida es una
+ * familia que se desalinea: el día que haya que tocar el mecanismo, se
+ * toca en un lado y no en el otro.
+ *
+ * El cast existe porque `.refine()` de Zod devuelve el mismo tipo pero
+ * TypeScript no lo sabe a través de un genérico tan amplio. Y va como
+ * `.refine()` y no como un constructor nuevo a propósito: el registro del
+ * panel SÍ sigue la cadena de padres a través de `.refine()` (a diferencia
+ * de `.optional()`), así que la etiqueta y la ayuda sobreviven.
+ */
+const conRegla = <T extends { refine: unknown }>(
+  campo: T,
+  pasa: (v: string) => boolean,
+  mensaje: string,
+): T => (campo as unknown as { refine: (p: (v: string) => boolean, m: string) => T }).refine(pasa, mensaje)
+
+/** Ni `&` ni `<` ni `>` ni `"` en lo que viaja al <head>. */
+export const SIN_CARACTERES_DE_HTML = /^[^&<>"]*$/
+
+/**
+ * Para el <title> y la meta descripción, que se escriben dentro de
+ * atributos y elementos del <head>, donde ninguno de esos cuatro se escapa
+ * solo: el resultado es una etiqueta rota y Google mostrando basura.
+ */
+export const sinHtml = <T extends { refine: unknown }>(campo: T) =>
+  conRegla(
+    campo,
+    (v) => SIN_CARACTERES_DE_HTML.test(v),
+    'No se pueden usar los signos & < > ni las comillas dobles: rompen la ficha que ve Google.',
+  )
+
+/** Ningún `<` en lo que viaja adentro de un `<script>`. */
+export const SIN_MENOR_QUE = /^[^<]*$/
+
+/**
+ * Para los campos que se imprimen adentro de un `<script>`: el JSON del
+ * anaquel (`<script type="application/json" id="datos-anaquel">`) y el
+ * JSON-LD de los buscadores.
+ *
+ * Un `</script` en cualquiera de ellos CIERRA la etiqueta, mata todo el JS
+ * de la página y deja los seis pasos de «Cómo catar» invisibles para
+ * siempre. `jsonParaHtml()` (fase 0) ya escapa el `<` al renderizar, así
+ * que la mina está desactivada — pero el spec pide la regla de DATO
+ * ADEMÁS del escape, en profundidad: el escape lo puede revertir alguien
+ * que no sepa para qué estaba, y entonces el dato ya guardado explota.
+ *
+ * Solo el `<` y no los cuatro de `sinHtml`: adentro de un `<script>` un
+ * `&`, un `>` o una comilla no rompen nada, y prohibirlos sería prohibirle
+ * a la clienta escribir «Jengibre & naranja» sin ninguna razón.
+ */
+export const sinMenorQue = <T extends { refine: unknown }>(campo: T) =>
+  conRegla(
+    campo,
+    (v) => SIN_MENOR_QUE.test(v),
+    'No se puede usar el signo «<»: rompe la página donde este texto se publica.',
+  )
+
+/**
+ * El valor FIJO que dice de qué forma es un bloque: 'parrafo', 'lista',
+ * 'tabla'. No es un campo que se edite —la clienta elige la forma al
+ * insertar el bloque y el panel la dibuja como el nombre del bloque, no
+ * como un input— pero lleva etiqueta y ayuda igual, porque es una hoja
+ * del esquema y toda hoja del esquema tiene que poder nombrarse.
+ *
+ * `valores` con un solo elemento y no un `valor` suelto: es la misma
+ * pregunta que contestan `opcion` y `tokenColor` —qué valores acepta este
+ * campo— y ya pagamos una vez el precio de contestarla con dos nombres.
+ */
+export const valorFijo = <const V extends string>(meta: Base & { valores: readonly [V] }) =>
+  anota(z.literal(meta.valores[0]), { control: 'oculto', quien: 'marcos', ...meta })
+
 /** Un valor de una lista cerrada (el `valor` de las opciones del formulario). */
 export const opcion = <const V extends readonly [string, ...string[]]>(
   meta: Base & { valores: V },
@@ -290,19 +398,38 @@ export const numero = (meta: Base & { minValor: number; maxValor: number }) =>
   )
 
 /**
+ * Las claves del token `sabor`, con su tipo literal conservado.
+ *
+ * El cast es lo que hace que `z.enum` infiera la unión de literales en vez
+ * de `string`, y eso es lo que `index.astro` necesita: indexa `colorSabor`
+ * y `tintaSabor` con esta clave en siete lugares, y `tintaClara` la pide
+ * tipada. Un test afirma que esta lista y las claves del token son la
+ * misma, porque el cast por sí solo no lo garantiza.
+ */
+export const CLAVES_DE_SABOR = Object.keys(sabor) as [
+  keyof typeof sabor,
+  ...Array<keyof typeof sabor>,
+]
+
+/**
  * Una clave del token `sabor`. No es texto: nombra el color de la banda,
  * la tinta medida y seis archivos de imagen. La clienta no la ve.
+ *
+ * `z.enum` y no `z.string().refine()` por el TIPO: refine devuelve
+ * `string`, y con eso `astro check` da siete errores en index.astro que
+ * esta fase no puede arreglar porque no toca .astro.
  */
 export const claveSabor = (meta: Base) =>
-  anota(
-    z.string().refine((v) => v in sabor, 'No es un sabor del sistema de color.'),
-    { control: 'oculto', quien: 'marcos', ...meta },
-  )
+  anota(z.enum(CLAVES_DE_SABOR, 'No es un sabor del sistema de color.'), {
+    control: 'oculto',
+    quien: 'marcos',
+    ...meta,
+  })
 
 /** Igual que claveSabor pero para cualquier token de color declarado. */
-export const tokenColor = (meta: Base & { validos: readonly string[] }) =>
+export const tokenColor = (meta: Base & { valores: readonly string[] }) =>
   anota(
-    z.string().refine((v) => meta.validos.includes(v), 'No es un token de color del sistema.'),
+    z.string().refine((v) => meta.valores.includes(v), 'No es un token de color del sistema.'),
     { control: 'oculto', quien: 'marcos', ...meta },
   )
 
@@ -311,6 +438,18 @@ export const ruta = (meta: Base) =>
   anota(z.string().regex(/^\/[\w\-/]*$/, 'Tiene que empezar con «/».'), {
     control: 'oculto', quien: 'marcos', ...meta,
   })
+
+/**
+ * A dónde lleva un enlace del sitio: un salto dentro de la página
+ * ('#sabores') o una ruta interna ('/fichas-tecnicas'). Nunca una
+ * dirección externa — para eso está `url`, y mezclarlas es cómo un menú
+ * termina sacando a la visitante del sitio sin querer.
+ */
+export const ancla = (meta: Base) =>
+  anota(
+    z.string().regex(/^[#/][\w\-/]*$/, 'Tiene que empezar con «#» (un salto) o con «/» (una página).'),
+    { control: 'oculto', quien: 'marcos', ...meta },
+  )
 
 /** Una dirección web completa. */
 export const url = (meta: Base) =>
@@ -322,7 +461,16 @@ export const correo = (meta: Base) =>
     control: 'texto', ...meta,
   })
 
-/** El identificador de un sabor. INMUTABLE: nombra seis archivos. */
+/**
+ * Un identificador interno, en minúsculas con guiones. INMUTABLE: algo de
+ * afuera del contenido lo usa como nombre.
+ *
+ * El slug de un sabor nombra las seis fotos de esa barra; el `id` de una
+ * pestaña de «Para negocios» (Tarea 10) no nombra ningún archivo, pero es
+ * con lo que la página recuerda qué pestaña estaba abierta. En los dos
+ * casos, cambiarlo rompe algo que no está escrito en el contenido — por eso
+ * va con `quien: 'marcos'` y `control: 'oculto'`.
+ */
 export const slug = (meta: Base) =>
   anota(z.string().regex(/^[a-z0-9-]+$/, 'Solo minúsculas, números y guiones.'), {
     control: 'oculto', quien: 'marcos', ...meta,
