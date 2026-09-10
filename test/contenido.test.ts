@@ -27,6 +27,7 @@ import { validarContra, validar } from '../src/contenido/validacion'
 import { esquemaSabores } from '../src/contenido/esquema/sabores'
 import { esquemaFichas } from '../src/contenido/esquema/fichas'
 import { camposDeCabecera } from '../src/contenido/esquema/sitio/cabecera'
+import { camposDeProducto } from '../src/contenido/esquema/sitio/producto'
 import { fichasBase } from '../src/fichas/base'
 import * as tokens from '../src/tokens/color'
 // La foto congelada, no el módulo: el fixture no se mueve cuando la Tarea 13
@@ -1592,6 +1593,49 @@ describe('la capa de contenido', () => {
       expect(problemas).toHaveLength(1)
       expect(problemas[0].campo).toBe('hero.titular.1')
       expect(problemas[0].titulo).toMatch(/coma/i)
+    })
+  })
+
+  describe('el esquema de producto', () => {
+    const producto = grupo({
+      etiqueta: 'Producto', seccion: 'productos', ayuda: 'Prueba.',
+      campos: camposDeProducto,
+    })
+    const hoy = () => {
+      const m = JSON.parse(JSON.stringify(fixture.marca))
+      // Los derivados NO están en el JSON, pero cargar() y validar() los
+      // exigen: es el contrato con la fachada. El fixture los tiene porque
+      // salió del módulo viejo, donde estaban escritos a mano.
+      return { postura: m.postura, anaquel: m.anaquel, minis: m.minis, gotas: m.gotas, polvoCard: m.polvoCard, polvo: m.polvo }
+    }
+    const CONTEOS = { sabores: 15, gotas: 6, polvo: 8, ingredientes: 5 }
+
+    it('valida el contenido de hoy, avisos incluidos', () => {
+      expect(validar(producto, hoy(), CONTEOS)).toEqual([])
+    })
+
+    it('toda hoja tiene etiqueta, ayuda y sección', () => {
+      recorre(producto, (ruta, meta) => {
+        expect(meta?.etiqueta, `sin etiqueta: ${ruta}`).toBeTruthy()
+        expect(meta?.ayuda, `sin ayuda: ${ruta}`).toBeTruthy()
+        expect(meta?.seccion, `sin sección: ${ruta}`).toBeTruthy()
+      })
+    })
+
+    it('avisa si el anaquel dice un número de sabores que ya no es', () => {
+      const problemas = validar(producto, hoy(), { ...CONTEOS, sabores: 16 })
+      expect(problemas).toContainEqual(
+        expect.objectContaining({ campo: 'anaquel.kicker', gravedad: 'avisa' }),
+      )
+    })
+
+    it('los tres espacios duros se exigen', () => {
+      // El modo de falla es invisible en el escritorio y evidente en el
+      // celular: la «g» sola en el renglón siguiente.
+      const roto = hoy()
+      roto.anaquel.pesoInsignia = '70 g' // espacio NORMAL, escrito a propósito
+      const problemas = validar(producto, roto, CONTEOS)
+      expect(problemas.map((p) => p.campo)).toContain('anaquel.pesoInsignia')
     })
   })
 
