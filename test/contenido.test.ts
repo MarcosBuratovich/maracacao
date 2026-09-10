@@ -1047,10 +1047,7 @@ describe('la capa de contenido', () => {
       ]),
     })
     expect(() => recorre(esquema, () => {})).toThrow(/unión/i)
-    // Antes esto devolvía {"bloque":{"t":"a","uno":"hola","BASURA":"…"}}:
-    // la clave no declarada viajaba al JSON sin un solo error.
-    expect(() => serializa(esquema, { bloque: { t: 'a', uno: 'hola', BASURA: 'no declarada' } }))
-      .toThrow(/unión/i)
+    expect(() => serializa(esquema, { bloque: { t: 'a', uno: 'hola' } })).toThrow(/unión/i)
   })
 
   it('una envoltura que no sabemos pelar es ruidosa en los DOS caminos, no una hoja permisiva', () => {
@@ -1521,6 +1518,21 @@ describe('la capa de contenido', () => {
       expect(() => serializa(bloque, { tipo: 'tabla', filas: [] })).toThrow(
         /«tipo» dice «tabla», que no es ninguna de las variantes declaradas \(parrafo, lista\)/,
       )
+    })
+
+    it('serializa() reclama una clave que la variante elegida no declara', () => {
+      // Este assert vivía en el caso de la unión SIN discriminante, donde
+      // `serializa()` tira antes de mirar ni una clave —así que probaba lo
+      // mismo que la línea de al lado y nada sobre claves sobrantes—,
+      // mientras su comentario decía justamente eso. Acá sí: la variante
+      // está elegida, se entra a mirar sus claves, y `BASURA` es una que el
+      // esquema no declara.
+      //
+      // Antes de que las uniones se recorrieran de verdad, esto devolvía
+      // {"tipo":"parrafo","texto":"Hola","BASURA":"…"}: la clave no
+      // declarada viajaba al JSON publicado sin un solo error.
+      expect(() => serializa(bloque, { tipo: 'parrafo', texto: 'Hola', BASURA: 'no declarada' }))
+        .toThrow(/BASURA/)
     })
   })
 
@@ -2167,6 +2179,20 @@ describe('los candados del sistema de contenido', () => {
     })
     // Rutas estructurales: anclas, identificadores internos, colores,
     // valores fijos, derivados y el honeypot. NINGUNA es copy.
+    //
+    // ANTES DE ACTUALIZAR ESTE SNAPSHOT CON `-u`, LEÉ LAS 26 RUTAS.
+    // No es una foto de una pantalla: es la LISTA DE PERMISOS de la
+    // clienta, y se lee al revés de como se lee un snapshot. Una ruta que
+    // aparece de más acá es un campo que ella deja de poder editar —un
+    // `quien: 'marcos'` puesto sin querer sobre un texto suyo la deja
+    // mirando un campo en gris que no puede tocar, y nadie se entera hasta
+    // que ella lo pide—. Una ruta que desaparece es al revés: un
+    // identificador interno o un derivado que quedó editable, y ahí lo que
+    // se rompe es la página.
+    //
+    // Un `-u` sin leer convierte las dos cosas en «el snapshot estaba
+    // viejo». Si el diff agrega o saca una ruta, la pregunta no es si el
+    // snapshot está actualizado: es si ESA ruta es copy o no lo es.
     expect(deMarcos.sort()).toMatchInlineSnapshot(`
       [
         "anaquel.contadorDe",
