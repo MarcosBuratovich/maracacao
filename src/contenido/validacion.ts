@@ -140,24 +140,46 @@ const une = (a: string, b: string | number): string => (a === '' ? String(b) : `
 
 /**
  * `recorre()` devuelve rutas de ESQUEMA, con `[]` donde hay una lista
- * ('negocios.tabs[].datos[]'). Los avisos son sobre VALORES, así que hay
- * que instanciar cada `[]` contra el dato real y devolver una ruta
- * concreta por elemento — que es la que el panel usa para llevar a la
- * clienta al campo exacto.
+ * ('negocios.tabs[].datos[]') y `<clave=valor>` donde hay una variante de
+ * unión ('bloques[]<tipo=parrafo>.texto'). Los avisos son sobre VALORES,
+ * así que hay que instanciar cada `[]` contra el dato real y filtrar cada
+ * `<...>` contra lo que el dato dice, y devolver una ruta concreta por
+ * elemento — que es la que el panel usa para llevar a la clienta al campo
+ * exacto.
  */
+
+/**
+ * Una parte de ruta puede traer tres cosas: la clave (`bloques`), el `[]`
+ * de una lista y la marca de variante de una unión (`<tipo=parrafo>`).
+ * 'bloques[]<tipo=parrafo>' trae las tres.
+ */
+const PARTE = /^([^<[]*)(\[\])?(?:<([^=>]+)=([^>]+)>)?$/
+
 const enRutas = (dato: unknown, ruta: string): { ruta: string; valor: unknown }[] => {
   let actuales: { ruta: string; valor: unknown }[] = [{ ruta: '', valor: dato }]
   for (const parte of ruta.split('.')) {
+    const m = PARTE.exec(parte)
+    if (!m) throw new Error(`enRutas(): no entiendo la parte «${parte}» de la ruta «${ruta}».`)
+    const [, clave, corchetes, discriminante, variante] = m
     const siguiente: { ruta: string; valor: unknown }[] = []
     for (const { ruta: r, valor } of actuales) {
       if (valor === null || valor === undefined) continue
-      if (parte.endsWith('[]')) {
-        const clave = parte.slice(0, -2)
-        const lista = clave ? (valor as Record<string, unknown>)[clave] : valor
-        const base = clave ? une(r, clave) : r
-        if (Array.isArray(lista)) lista.forEach((v, i) => siguiente.push({ ruta: une(base, i), valor: v }))
-      } else {
-        siguiente.push({ ruta: une(r, parte), valor: (valor as Record<string, unknown>)[parte] })
+      const base = clave ? une(r, clave) : r
+      const dentro = clave ? (valor as Record<string, unknown>)[clave] : valor
+      // Sin corchetes hay un solo candidato; con corchetes, uno por elemento.
+      const candidatos = corchetes
+        ? Array.isArray(dentro)
+          ? dentro.map((v, i) => ({ ruta: une(base, i), valor: v }))
+          : []
+        : [{ ruta: base, valor: dentro }]
+      for (const c of candidatos) {
+        // La variante FILTRA: la rama <tipo=parrafo> del esquema solo
+        // aplica a los bloques cuyo dato dice tipo: 'parrafo'.
+        if (discriminante !== undefined) {
+          const v = c.valor as Record<string, unknown> | null
+          if (v === null || typeof v !== 'object' || v[discriminante] !== variante) continue
+        }
+        siguiente.push(c)
       }
     }
     actuales = siguiente

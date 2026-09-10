@@ -45,8 +45,6 @@ const todaviaNo = (quien: string, que: string, donde: string, cola: string): nev
   throw new Error(`${quien}(): todavía no sé recorrer ${que} (en «${donde || '(raíz)'}»). ${cola}`)
 }
 
-const PORQUE_UNION = 'Lo agrega la fase 1 parte B, con los bloques de ficha.'
-
 /**
  * Las envolturas que este archivo SÍ sabe pelar son `optional` y
  * `nullable`, y tienen caso propio en los dos switches. Zod trae varias
@@ -132,6 +130,51 @@ const desenvuelve = (
 }
 
 /**
+ * El valor literal del discriminante de una variante: 'parrafo' para el
+ * bloque de párrafo de una ficha.
+ *
+ * Toca interna de Zod —`literal` guarda su valor en `def.values`, que es
+ * un ARRAY aunque el literal sea uno solo— así que el canario de
+ * `test/contenido.test.ts` lo afirma junto con las otras seis formas: si
+ * una versión de Zod lo mueve, falla ahí y no adentro del panel.
+ */
+const varianteDe = (opcion: z.ZodType, discriminante: string, donde: string): string => {
+  const shape = definicion(opcion).shape as Record<string, z.ZodType> | undefined
+  const campo = shape?.[discriminante]
+  const valores = campo && (definicion(campo).values as unknown[] | undefined)
+  if (!Array.isArray(valores) || valores.length !== 1 || typeof valores[0] !== 'string') {
+    throw new Error(
+      `La variante de «${donde || '(raíz)'}» no declara «${discriminante}» como un valor fijo de texto.`,
+    )
+  }
+  return valores[0]
+}
+
+/**
+ * La marca de variante que va en la ruta: `<tipo=parrafo>`. Lleva la CLAVE
+ * además del valor para que la ruta se pueda instanciar contra el dato sin
+ * volver a mirar el esquema — es lo que hace `enRutas()` en validacion.ts
+ * y lo que va a hacer el panel cuando pinte un bloque.
+ */
+const marcaDeVariante = (discriminante: string, valor: string): string =>
+  `<${discriminante}=${valor}>`
+
+/**
+ * El discriminante de una unión, o el mensaje de por qué no se puede
+ * recorrer. Las uniones del sistema son TODAS discriminadas; una unión a
+ * secas no dice cuál de sus ramas mirar y no se puede ni recorrer ni
+ * ordenar sin adivinar.
+ */
+const discriminanteDe = (quien: string, def: Def, donde: string): string => {
+  const d = def.discriminator
+  if (typeof d !== 'string') {
+    todaviaNo(quien, 'una unión sin discriminante', donde,
+      'Las uniones del sistema son discriminadas: la de bloques de ficha, por «tipo».')
+  }
+  return d as string
+}
+
+/**
  * Recorre el árbol del esquema y llama a `visita` en cada HOJA, con su
  * ruta punteada ('hero.titular.1'), el metadato del panel y el esquema
  * que de verdad hay que usar para validar ese valor.
@@ -182,18 +225,18 @@ export function recorre(
       // cuando pinta la lista, y el dato real dice cuántos hay.
       recorre(def.element as z.ZodType, visita, `${prefijo}[]`)
       return
-    case 'union':
+    case 'union': {
       // `z.discriminatedUnion` reporta `def.type === 'union'`, así que sin
       // este caso caería en `default` y se emitiría como HOJA: todos los
-      // campos de cada variante quedarían invisibles para el panel, sin un
-      // solo error. La fase 1 parte B lo va a necesitar de verdad —los
-      // bloques de las fichas técnicas son una unión discriminada— y ahí se
-      // decide cómo se nombra la ruta de cada variante, con el esquema real
-      // delante. Hasta entonces, ruidoso antes que mudo.
-      // `return` para que el caso no caiga en `default:`: `todaviaNo()`
-      // siempre tira, pero un `case` sin salida explícita es una trampa
-      // para el que agregue una línea abajo.
-      return todaviaNo('recorre', 'una unión', prefijo, PORQUE_UNION)
+      // campos de todas las variantes quedarían invisibles para el panel,
+      // sin un solo error.
+      const discriminante = discriminanteDe('recorre', def, prefijo)
+      for (const opcion of def.options as z.ZodType[]) {
+        const variante = marcaDeVariante(discriminante, varianteDe(opcion, discriminante, prefijo))
+        recorre(opcion, visita, `${prefijo}${variante}`)
+      }
+      return
+    }
     default:
       exigeEnvolturaConocida('recorre', def, prefijo)
       visita(prefijo, panel.get(esquema), esquema)
@@ -333,16 +376,27 @@ function ordenaSegun(esquema: z.ZodType, valor: unknown, ruta: string): unknown 
       return valor.map((v, i) => ordenaSegun(def.element as z.ZodType, v, con(ruta, i)))
     }
 
-    case 'union':
-      // La MISMA respuesta que recorre(), a propósito. `esContenedor()`
-      // incluye 'union', así que la envoltura se atravesaba y el fondo caía
-      // en el `default:` de acá abajo, que devuelve el valor tal cual:
-      // `serializa()` escribía la unión entera sin reordenar y sin mirar
-      // completitud, dejando pasar claves que el esquema no declara —
-      // mientras `recorre()`, en el mismo archivo, tiraba por lo mismo. Es
-      // justo lo que la Parte B va a pisar, porque los bloques de ficha se
-      // declaran como `discriminatedUnion`.
-      return todaviaNo('serializa', 'una unión', ruta, PORQUE_UNION)
+    case 'union': {
+      // La MISMA respuesta que recorre(), a propósito: las dos caminan el
+      // mismo árbol y tienen que contestar lo mismo. Cuando no lo hacían
+      // —recorre() tiraba y ordenaSegun() devolvía la unión cruda, dejando
+      // pasar claves que el esquema no declara— la que callaba era justo
+      // la que esta parte iba a pisar.
+      const discriminante = discriminanteDe('serializa', def, ruta)
+      if (valor === null || typeof valor !== 'object' || Array.isArray(valor)) {
+        throw new Error(`${donde}: el esquema espera un bloque y el dato trae ${typeof valor}.`)
+      }
+      const opciones = def.options as z.ZodType[]
+      const nombres = opciones.map((o) => varianteDe(o, discriminante, ruta))
+      const dice = (valor as Record<string, unknown>)[discriminante]
+      const i = nombres.indexOf(dice as string)
+      if (i === -1) {
+        throw new Error(
+          `${donde}: «${discriminante}» dice «${String(dice)}», que no es ninguna de las variantes declaradas (${nombres.join(', ')}).`,
+        )
+      }
+      return ordenaSegun(opciones[i], valor, ruta)
+    }
 
     default:
       exigeEnvolturaConocida('serializa', def, ruta)

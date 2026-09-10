@@ -13,7 +13,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { z } from 'zod'
 import { MARCA, MAQUETA, palabraProhibida } from '../src/contenido/vocabulario'
 import {
-  texto, medida, precio, tupla, lista, claveSabor,
+  texto, parrafo, medida, precio, tupla, lista, claveSabor,
   numero, tokenColor, ruta, url, correo, slug, archivo, derivado, grupo, precioONada,
   panel, UNIDADES_DE_MEDIDA, opcion,
 } from '../src/contenido/campos'
@@ -455,6 +455,27 @@ describe('la capa de contenido', () => {
     expect(tipo(du)).toBe('union')
   })
 
+  it('discriminatedUnion reporta type «union» y guarda discriminator + options', () => {
+    const u = z.discriminatedUnion('tipo', [
+      z.object({ tipo: z.literal('parrafo'), texto: z.string() }),
+      z.object({ tipo: z.literal('lista'), items: z.array(z.string()) }),
+    ])
+    const def = (u as unknown as { _zod: { def: Record<string, unknown> } })._zod.def
+    expect(def.type).toBe('union')
+    expect(Object.keys(def).sort()).toEqual(['discriminator', 'inclusive', 'options', 'type'])
+    expect(def.discriminator).toBe('tipo')
+    expect(Array.isArray(def.options)).toBe(true)
+  })
+
+  it('literal reporta type «literal» y guarda su valor en un ARRAY', () => {
+    // Un array aunque el literal sea uno solo. varianteDe() lo desarma
+    // asumiendo exactamente eso.
+    const def = (z.literal('parrafo') as unknown as { _zod: { def: Record<string, unknown> } })._zod.def
+    expect(def.type).toBe('literal')
+    expect(Object.keys(def).sort()).toEqual(['type', 'values'])
+    expect(def.values).toEqual(['parrafo'])
+  })
+
   it('recorre() emite la ruta punteada de cada hoja, con su metadato', () => {
     const esquema = grupo({
       etiqueta: 'Portada', seccion: 'portada', ayuda: 'x',
@@ -480,14 +501,18 @@ describe('la capa de contenido', () => {
     ])
   })
 
-  it('recorre() no trata una unión como hoja: truena y dice qué falta', () => {
+  it('recorre() no trata una unión SIN discriminante como hoja: truena y dice qué falta', () => {
     // Silencio es el peor resultado acá: una unión emitida como hoja deja
     // todos los campos de sus variantes invisibles para el panel, sin error.
-    const conUnion = z.discriminatedUnion('tipo', [
+    // Las discriminadas SÍ se recorren desde esta tarea (ver el describe de
+    // 'recorre() y serializa() sobre una unión discriminada' más abajo); lo
+    // que sigue sin soportarse es una unión a secas, que no dice cuál rama
+    // mirar y no se puede recorrer sin adivinar.
+    const sinDiscriminante = z.union([
       z.object({ tipo: z.literal('parrafo'), texto: z.string() }),
       z.object({ tipo: z.literal('lista'), items: z.array(z.string()) }),
     ])
-    expect(() => recorre(conUnion, () => {})).toThrow(/unión/i)
+    expect(() => recorre(sinDiscriminante, () => {})).toThrow(/unión/i)
   })
 
   it('un campo anotado y después envuelto en optional conserva su etiqueta', () => {
@@ -863,16 +888,16 @@ describe('la capa de contenido', () => {
     expect(bytes.indexOf('"nombre"')).toBeLessThan(bytes.indexOf('"precio"'))
   })
 
-  // recorre() y ordenaSegun() caminan el MISMO árbol y hasta acá daban
-  // respuestas OPUESTAS a la misma pregunta: con una unión, recorre()
-  // tiraba y serializa() devolvía el bloque tal cual —con las claves que
-  // el esquema no declara adentro—. Era el cuarto mecanismo divergente del
-  // archivo, y el primero que la Parte B iba a pisar: los bloques de ficha
-  // se declaran como `discriminatedUnion`.
+  // recorre() y ordenaSegun() caminan el MISMO árbol y tienen que dar la
+  // MISMA respuesta a la misma pregunta. Las uniones DISCRIMINADAS ya se
+  // recorren de verdad (ver el describe de más abajo, y el caso 'union'
+  // de los dos switches en carga.ts); lo que ninguna de las dos sabe
+  // atravesar sigue siendo una unión SIN discriminante, que no dice cuál
+  // rama mirar. Las dos siguen contestando lo mismo ante ese caso.
 
-  it('serializa() tira con una unión, igual que recorre(): una sola respuesta', () => {
+  it('serializa() tira con una unión sin discriminante, igual que recorre(): una sola respuesta', () => {
     const esquema = z.object({
-      bloque: z.discriminatedUnion('t', [
+      bloque: z.union([
         z.object({ t: z.literal('a'), uno: z.string() }),
         z.object({ t: z.literal('b'), dos: z.string() }),
       ]),
@@ -1270,6 +1295,53 @@ describe('la capa de contenido', () => {
       // que un solo test lo note.
       expect(() => validar(esquemaDePrueba, { kicker: 'LOS 15 SABORES' }, {})).toThrow(
         /kicker.*«sabores».*no vino en los conteos/,
+      )
+    })
+  })
+
+  describe('recorre() y serializa() sobre una unión discriminada', () => {
+    const bloque = z.discriminatedUnion('tipo', [
+      z.object({
+        tipo: z.literal('parrafo'),
+        texto: parrafo({ etiqueta: 'Párrafo', seccion: 'fichas', ayuda: 'Un párrafo de la ficha.', maxCaracteres: 600 }),
+      }),
+      z.object({
+        tipo: z.literal('lista'),
+        items: lista({
+          etiqueta: 'Viñetas', seccion: 'fichas', ayuda: 'Las viñetas de la ficha.',
+          minItems: 1, maxItems: 12,
+          elemento: texto({ etiqueta: 'Viñeta', seccion: 'fichas', ayuda: 'Una viñeta.', maxCaracteres: 300 }),
+        }),
+      }),
+    ])
+
+    it('emite una rama por variante, con la variante en la ruta', () => {
+      const rutas: string[] = []
+      recorre(bloque, (ruta) => rutas.push(ruta))
+      expect(rutas).toEqual([
+        '<tipo=parrafo>.tipo',
+        '<tipo=parrafo>.texto',
+        '<tipo=lista>.tipo',
+        '<tipo=lista>.items[]',
+      ])
+    })
+
+    it('cada hoja de una variante conserva su etiqueta', () => {
+      const etiquetas = new Map<string, string | undefined>()
+      recorre(bloque, (ruta, meta) => etiquetas.set(ruta, meta?.etiqueta))
+      expect(etiquetas.get('<tipo=parrafo>.texto')).toBe('Párrafo')
+      expect(etiquetas.get('<tipo=lista>.items[]')).toBe('Viñeta')
+    })
+
+    it('serializa() elige la variante que dice el dato y reordena adentro', () => {
+      const salida = serializa(bloque, { texto: 'Hola', tipo: 'parrafo' })
+      expect(JSON.parse(salida)).toEqual({ tipo: 'parrafo', texto: 'Hola' })
+      expect(Object.keys(JSON.parse(salida))).toEqual(['tipo', 'texto'])
+    })
+
+    it('serializa() truena si el discriminante no es ninguna variante', () => {
+      expect(() => serializa(bloque, { tipo: 'tabla', filas: [] })).toThrow(
+        /«tipo» dice «tabla», que no es ninguna de las variantes declaradas \(parrafo, lista\)/,
       )
     })
   })
