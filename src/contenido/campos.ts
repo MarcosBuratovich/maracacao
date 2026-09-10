@@ -89,10 +89,14 @@ export interface MetaCampo {
   campos?: unknown
   /** Las partes de una `tupla`, en orden y en cantidad fija. */
   partes?: unknown
-  /** La lista cerrada de valores que acepta una `opcion`. */
+  /**
+   * La lista cerrada de valores que acepta el campo. La usan `opcion` (las
+   * dos opciones del formulario) y `tokenColor` (los tokens de color
+   * declarados). Era el mismo concepto con dos nombres —`valores` y
+   * `validos`— y el panel dibuja el selector leyendo esta clave: con el
+   * nombre equivocado no dibuja nada, sin excepción y sin error de tipos.
+   */
   valores?: readonly string[]
-  /** Los tokens de color que acepta un `tokenColor`. */
-  validos?: readonly string[]
   /** De dónde sale el valor de un `derivado`. El panel lo dibuja en gris. */
   saleDe?: string
   /** El ':' o el '.' que agrega la plantilla. El panel lo dibuja gris. */
@@ -300,9 +304,9 @@ export const claveSabor = (meta: Base) =>
   )
 
 /** Igual que claveSabor pero para cualquier token de color declarado. */
-export const tokenColor = (meta: Base & { validos: readonly string[] }) =>
+export const tokenColor = (meta: Base & { valores: readonly string[] }) =>
   anota(
-    z.string().refine((v) => meta.validos.includes(v), 'No es un token de color del sistema.'),
+    z.string().refine((v) => meta.valores.includes(v), 'No es un token de color del sistema.'),
     { control: 'oculto', quien: 'marcos', ...meta },
   )
 

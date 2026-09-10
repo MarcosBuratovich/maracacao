@@ -15,8 +15,9 @@ import { MARCA, MAQUETA, palabraProhibida } from '../src/contenido/vocabulario'
 import {
   texto, medida, precio, tupla, lista, claveSabor,
   numero, tokenColor, ruta, url, correo, slug, archivo, derivado, grupo, precioONada,
-  panel, UNIDADES_DE_MEDIDA,
+  panel, UNIDADES_DE_MEDIDA, opcion,
 } from '../src/contenido/campos'
+import type { MetaCampo } from '../src/contenido/campos'
 import { recorre, cargar, serializa } from '../src/contenido/carga'
 import { cruzaConteo, enLetras } from '../src/contenido/conteos'
 import { contrasteSuficiente, resuelveColor, mejorTinta } from '../src/contenido/color-sabor'
@@ -279,16 +280,33 @@ describe('la capa de contenido', () => {
     expect(n.safeParse(11).success).toBe(false)
   })
 
-  it('tokenColor acepta un token declarado en `validos`', () => {
+  it('la lista cerrada de valores se llama igual en los dos constructores que la tienen', () => {
+    // `opcion` la llamaba `valores` y `tokenColor` la llamaba `validos`: un
+    // concepto con dos nombres, sin nada que los mantenga alineados. El panel
+    // lee este metadato para pintar el selector — con el nombre equivocado no
+    // pinta nada, sin excepción y sin error de tipos.
+    const base = { etiqueta: 'X', seccion: 'contacto', ayuda: 'Y' } as const
+    const conListaCerrada = [
+      opcion({ ...base, valores: ['personal', 'negocio'] }),
+      tokenColor({ ...base, valores: ['rojoHondo'] }),
+    ]
+    for (const esquema of conListaCerrada) {
+      const meta = panel.get(esquema) as MetaCampo
+      expect(Object.keys(meta).filter((k) => /^val(ores|idos)$/.test(k))).toEqual(['valores'])
+      expect(meta.valores).toBeDefined()
+    }
+  })
+
+  it('tokenColor acepta un token declarado en `valores`', () => {
     const t = tokenColor({
-      etiqueta: 'Color', seccion: 'sabores', ayuda: 'x', validos: ['rojo', 'azul'],
+      etiqueta: 'Color', seccion: 'sabores', ayuda: 'x', valores: ['rojo', 'azul'],
     })
     expect(t.safeParse('rojo').success).toBe(true)
   })
 
-  it('tokenColor rechaza un token que no está en `validos`', () => {
+  it('tokenColor rechaza un token que no está en `valores`', () => {
     const t = tokenColor({
-      etiqueta: 'Color', seccion: 'sabores', ayuda: 'x', validos: ['rojo', 'azul'],
+      etiqueta: 'Color', seccion: 'sabores', ayuda: 'x', valores: ['rojo', 'azul'],
     })
     expect(t.safeParse('verde').success).toBe(false)
   })
