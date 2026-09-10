@@ -49,11 +49,17 @@ export const camposDeCabecera = {
     parrafo({
       ...enBuscadores,
       etiqueta: 'Descripción en Google',
-      ayuda: 'El párrafo gris debajo del título en el resultado de búsqueda.',
+      ayuda: 'El párrafo gris debajo del título en el resultado de búsqueda. Dice cuántos sabores hay.',
       // Misma razón: Google corta en 155.
       maxCaracteres: 155,
       enAtributo: 'content',
       falla: ['ninguno'],
+      // «Barras 70% cacao con 15 sabores mexicanos…»: menciona el conteo y
+      // hasta acá no lo declaraba. Es el único texto del sitio cuya versión
+      // vieja se sigue sirviendo después de cambiarla —desde el índice del
+      // buscador—, así que quedarse con un número viejo acá dura más que en
+      // cualquier otro campo.
+      cuenta: { de: 'sabores', sustantivo: 'sabores' },
     }),
   ),
   skipLink: texto({
