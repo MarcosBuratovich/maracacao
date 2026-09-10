@@ -10,6 +10,7 @@
  */
 import { describe, it, expect, expectTypeOf } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { z } from 'zod'
 import { MARCA, MAQUETA, palabraProhibida } from '../src/contenido/vocabulario'
 import {
@@ -23,6 +24,7 @@ import { cruzaConteo, enLetras } from '../src/contenido/conteos'
 import { contrasteSuficiente, resuelveColor, mejorTinta } from '../src/contenido/color-sabor'
 import { precioDesde, precioDe } from '../src/contenido/derivados'
 import { validarContra, validar } from '../src/contenido/validacion'
+import { esquemaSabores } from '../src/contenido/esquema/sabores'
 import * as tokens from '../src/tokens/color'
 
 describe('la capa de contenido', () => {
@@ -1431,5 +1433,65 @@ describe('la capa de contenido', () => {
     expect(fixture.sabores).toHaveLength(15)
     expect(fixture.fichas).toHaveLength(4)
     expect(Object.keys(fixture.marca)).toHaveLength(21)
+  })
+
+  it('capturaFixture() se niega a correr si src/contenido/datos/ ya tiene un documento migrado', () => {
+    // Después de esta tarea, src/contenido/datos/sabores.json existe de
+    // verdad: si capturaFixture() corriera ahora, leería la FACHADA de
+    // sabores —que ya lee su propio JSON con cargar()— en vez de los
+    // módulos `as const` originales, y el fixture terminaría siendo una
+    // foto del árbol NUEVO contra sí mismo. Se corre como proceso real,
+    // igual que `pnpm migra fixture`, para probar el candado tal como se
+    // va a disparar de verdad — no una versión mockeada de node:fs.
+    let fallo = false
+    let salida = ''
+    try {
+      execFileSync('pnpm', ['exec', 'tsx', 'scripts/migra-contenido.ts', 'fixture'], { stdio: 'pipe' })
+    } catch (e) {
+      fallo = true
+      salida = String((e as { stderr: Buffer }).stderr)
+    }
+    expect(fallo).toBe(true)
+    expect(salida).toContain('ya tiene al menos un documento migrado')
+    // Y el mensaje explica el POR QUÉ, no solo que se niega: quien lo lea
+    // dentro de seis meses tiene que entender qué está protegiendo.
+    expect(salida).toMatch(/certificado de la Tarea 14/)
+  })
+
+  it('el documento de productos vuelve a salir idéntico', async () => {
+    // Bytes canónicos: si esto no se cumple, dos guardados seguidos producen
+    // diffs distintos sin que haya cambiado nada, y el historial del repo
+    // se llena de ruido que esconde los cambios de verdad.
+    const bytes = readFileSync('src/contenido/datos/sabores.json', 'utf8')
+    const cargado = cargar('src/contenido/datos/sabores.json', esquemaSabores, JSON.parse(bytes))
+    expect(serializa(esquemaSabores, cargado) + '\n').toBe(bytes)
+  })
+
+  describe('el contraste de la banda de cada sabor', () => {
+    const unSabor = {
+      orden: 1, slug: 'canela', clave: 'canela', nombre: 'Canela', cacao: 'Cacao 70%',
+      precio: 108, ingredientes: 'Licor de cacao, azúcar, manteca de cacao, lecitina de soya, esencia natural',
+      catalogo: null,
+    }
+    const doc = (sabor: object) => ({
+      urlCatalogoBarras: 'https://chocolateria.pulpos.shop',
+      sabores: [sabor], gotas: [{ clave: 'canela', nombre: 'Canela', precio: 258 }],
+      polvo: [{ archivo: 'etiqueta-canela', nombre: 'Canela' }],
+    })
+
+    it('los 15 sabores de hoy pasan la regla', () => {
+      const bytes = readFileSync('src/contenido/datos/sabores.json', 'utf8')
+      expect(validar(esquemaSabores, JSON.parse(bytes), {})).toEqual([])
+    })
+
+    it('hereda la excepción de los tokens en vez de reinventarla', () => {
+      // La hierbabuena da 4.41 —abajo del 4.5— y está declarada
+      // `saboresSoloDisplay` en src/tokens/color.ts a propósito. Si la regla
+      // tuviera su propia lista de excepciones, esta se le escaparía y el
+      // build no publicaría un contenido que hoy es correcto.
+      expect(tokens.saboresSoloDisplay).toContain('hierbabuena')
+      const hierbabuena = { ...unSabor, slug: 'hierbabuena', clave: 'hierbabuena', nombre: 'Hierbabuena' }
+      expect(validar(esquemaSabores, doc(hierbabuena), {})).toEqual([])
+    })
   })
 })
