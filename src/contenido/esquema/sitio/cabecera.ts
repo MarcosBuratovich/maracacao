@@ -17,8 +17,12 @@ import { grupo, lista, tupla, texto, parrafo, ancla, correo } from '../../campos
  * resultado es una etiqueta rota y Google mostrando basura. La regla es de
  * DATO, no de diseño, así que bloquea desde el esquema.
  */
-const SIN_CARACTERES_DE_HTML = /^[^&<>"]*$/
-const sinHtml = <T extends { refine: unknown }>(campo: T) =>
+export const SIN_CARACTERES_DE_HTML = /^[^&<>"]*$/
+// Exportada: los dos campos SEO de la ficha técnica (Tarea 12) necesitan la
+// misma regla. Escribirla de nuevo ahí sería pagar otra vez el patrón que
+// esta capa ya pagó cuatro veces — la misma regla en dos lugares que se
+// desalinean sin que nada avise.
+export const sinHtml = <T extends { refine: unknown }>(campo: T) =>
   (campo as unknown as { refine: (p: (v: string) => boolean, m: string) => T }).refine(
     (v) => SIN_CARACTERES_DE_HTML.test(v),
     'No se pueden usar los signos & < > ni las comillas dobles: rompen la ficha que ve Google.',
@@ -68,8 +72,9 @@ export const camposDeCabecera = {
       nombre: texto({
         ...enPortada,
         etiqueta: 'Nombre',
-        ayuda: 'El nombre tal cual, con mayúscula y minúsculas.',
+        ayuda: 'El nombre de la marca que lee Google en la ficha de datos de la página. No se ve escrito en el sitio.',
         maxCaracteres: 20,
+        falla: ['ninguno'],
       }),
       wordmark: texto({
         ...enPortada,
