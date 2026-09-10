@@ -1404,4 +1404,17 @@ describe('la capa de contenido', () => {
       expect(() => cargar('prueba.json', conDerivado, { titulo: 'Gotas' })).toThrow(/precioDesde/)
     })
   })
+
+  it('el fixture del árbol viejo está entero', async () => {
+    // Si este archivo se trunca o se regenera contra el árbol NUEVO, el
+    // certificado de la Tarea 14 se vuelve una comparación de algo contra sí
+    // mismo: verde y sin valor. Esto no lo impide, pero lo hace ruidoso.
+    const fixture = (await import('./fixtures/contenido-2026-09-10.json')).default
+    expect(Object.keys(fixture).sort()).toEqual(
+      ['fichas', 'gotas', 'marca', 'polvo', 'sabores', 'urlCatalogoBarras'],
+    )
+    expect(fixture.sabores).toHaveLength(15)
+    expect(fixture.fichas).toHaveLength(4)
+    expect(Object.keys(fixture.marca)).toHaveLength(21)
+  })
 })
