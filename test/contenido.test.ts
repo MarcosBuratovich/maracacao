@@ -8,12 +8,12 @@
  * Sin este guard, la primera vez que alguien importe `node:fs` para una
  * comodidad, el panel deja de compilar en el navegador y nadie sabe por qué.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, expectTypeOf } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { z } from 'zod'
 import { MARCA, MAQUETA, palabraProhibida } from '../src/contenido/vocabulario'
 import {
-  texto, parrafo, medida, precio, tupla, lista, claveSabor,
+  texto, parrafo, medida, precio, tupla, lista, claveSabor, CLAVES_DE_SABOR,
   numero, tokenColor, ruta, url, correo, slug, archivo, derivado, grupo, precioONada,
   panel, UNIDADES_DE_MEDIDA, opcion,
 } from '../src/contenido/campos'
@@ -258,6 +258,21 @@ describe('la capa de contenido', () => {
     const c = claveSabor({ etiqueta: 'Sabor', seccion: 'sabores', ayuda: 'x' })
     expect(c.safeParse('canela').success).toBe(true)
     expect(c.safeParse('inventado').success).toBe(false)
+  })
+
+  it('claveSabor produce el tipo con el que index.astro indexa los tokens', () => {
+    // index.astro hace colorSabor[s.clave] y tintaClara(r.clave), con
+    // tintaClara tipada (clave: keyof typeof tintaSabor), en siete lugares.
+    // Con `clave` tipada `string` a secas son siete errores de astro check —
+    // y esta fase no puede tocar un solo .astro.
+    const campo = claveSabor({ etiqueta: 'Sabor', seccion: 'sabores', ayuda: 'Qué sabor pinta este bloque.' })
+    expectTypeOf<z.infer<typeof campo>>().toEqualTypeOf<keyof typeof tokens.sabor>()
+  })
+
+  it('las claves de sabor del esquema son exactamente las del token', () => {
+    // El cast de Object.keys() es lo único que sostiene el tipo de arriba.
+    // Si el token gana un sabor y esta lista no, el cast miente en silencio.
+    expect([...CLAVES_DE_SABOR].sort()).toEqual(Object.keys(tokens.sabor).sort())
   })
 
   // Los diez constructores que siguen no tenían test propio: quedaban

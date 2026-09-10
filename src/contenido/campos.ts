@@ -319,14 +319,33 @@ export const numero = (meta: Base & { minValor: number; maxValor: number }) =>
   )
 
 /**
+ * Las claves del token `sabor`, con su tipo literal conservado.
+ *
+ * El cast es lo que hace que `z.enum` infiera la unión de literales en vez
+ * de `string`, y eso es lo que `index.astro` necesita: indexa `colorSabor`
+ * y `tintaSabor` con esta clave en siete lugares, y `tintaClara` la pide
+ * tipada. Un test afirma que esta lista y las claves del token son la
+ * misma, porque el cast por sí solo no lo garantiza.
+ */
+export const CLAVES_DE_SABOR = Object.keys(sabor) as [
+  keyof typeof sabor,
+  ...Array<keyof typeof sabor>,
+]
+
+/**
  * Una clave del token `sabor`. No es texto: nombra el color de la banda,
  * la tinta medida y seis archivos de imagen. La clienta no la ve.
+ *
+ * `z.enum` y no `z.string().refine()` por el TIPO: refine devuelve
+ * `string`, y con eso `astro check` da siete errores en index.astro que
+ * esta fase no puede arreglar porque no toca .astro.
  */
 export const claveSabor = (meta: Base) =>
-  anota(
-    z.string().refine((v) => v in sabor, 'No es un sabor del sistema de color.'),
-    { control: 'oculto', quien: 'marcos', ...meta },
-  )
+  anota(z.enum(CLAVES_DE_SABOR, 'No es un sabor del sistema de color.'), {
+    control: 'oculto',
+    quien: 'marcos',
+    ...meta,
+  })
 
 /** Igual que claveSabor pero para cualquier token de color declarado. */
 export const tokenColor = (meta: Base & { valores: readonly string[] }) =>
