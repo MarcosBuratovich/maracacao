@@ -311,6 +311,23 @@ describe('la capa de contenido', () => {
     expect(t.safeParse('verde').success).toBe(false)
   })
 
+  it('cuenta lleva el sustantivo con el que ESE texto nombra la lista', () => {
+    // Contra el copy real, la colección y la palabra NO coinciden:
+    // negocios.tabs[2].cuerpo dice «Las 15 barras» y cuenta sabores;
+    // gotas.sabores dice «6 sabores» y cuenta gotas. Con `cuenta` como un
+    // string a secas, cruzaConteo() no sabe qué palabra buscar y el aviso
+    // no se puede producir.
+    const campo = texto({
+      etiqueta: 'Cuerpo del panel de barras',
+      seccion: 'negocios',
+      ayuda: 'El párrafo del panel «Chocolate en barras».',
+      maxCaracteres: 170,
+      cuenta: { de: 'sabores', sustantivo: 'barras' },
+    })
+    const meta = panel.get(campo) as MetaCampo
+    expect(meta.cuenta).toEqual({ de: 'sabores', sustantivo: 'barras' })
+  })
+
   it('ruta acepta una ruta interna que empieza con «/»', () => {
     const r = ruta({ etiqueta: 'Ruta', seccion: 'buscadores', ayuda: 'x' })
     expect(r.safeParse('/fichas-tecnicas').success).toBe(true)

@@ -14,6 +14,19 @@ import { z } from 'zod'
 import { palabraProhibida } from './vocabulario'
 import { sabor } from '../tokens/color'
 
+/**
+ * Las listas cuya cantidad aparece escrita en algún texto del sitio. El
+ * «15» está en nueve lugares; el «6» de las gotas, en dos.
+ */
+export type ColeccionContada =
+  | 'sabores'
+  | 'gotas'
+  | 'polvo'
+  | 'recetas'
+  | 'preguntas'
+  | 'pasos'
+  | 'ingredientes'
+
 /** Las secciones tal como las va a ver la clienta en el panel. */
 export type Seccion =
   | 'portada'
@@ -101,8 +114,20 @@ export interface MetaCampo {
   saleDe?: string
   /** El ':' o el '.' que agrega la plantilla. El panel lo dibuja gris. */
   sufijo?: string
-  /** El texto menciona una cantidad que sale de una lista: hay que cruzarla. */
-  cuenta?: 'sabores' | 'gotas' | 'polvo' | 'recetas' | 'preguntas'
+  /**
+   * El texto menciona una cantidad que sale de una lista.
+   *
+   * Son DOS datos y no uno porque contra el copy real no coinciden: el
+   * cuerpo del panel de barras dice «Las 15 barras» y la lista que cuenta
+   * es la de sabores; el de las gotas dice «6 sabores» y la lista que
+   * cuenta es la de gotas. `de` dice de qué lista sale el número;
+   * `sustantivo` dice con qué palabra lo nombra ESTE texto, que es lo que
+   * `cruzaConteo()` necesita para no marcar cualquier número suelto.
+   *
+   * Y van juntos y no separados porque por separado no sirven: un
+   * sustantivo sin colección no cruza nada.
+   */
+  cuenta?: { de: ColeccionContada; sustantivo: string }
   /** Rutas hermanas que reciben el mismo valor (el correo vive en cuatro). */
   escribeTambien?: string[]
   /** Cómo nombrar un elemento de lista en el panel («Receta: peras al vino»). */
