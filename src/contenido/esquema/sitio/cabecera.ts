@@ -2,16 +2,15 @@
  * Lo primero que ve la visitante y lo que ve Google: el <title> y la
  * descripción de los buscadores, el logotipo, el menú y la portada.
  *
- * Los cinco archivos de `esquema/sitio/` exportan CLAVES, no grupos: son
+ * Los seis archivos de `esquema/sitio/` exportan CLAVES, no grupos: son
  * bloques del mismo documento, y envolverlos agregaría un nivel de
  * anidamiento que no existe en el contenido (`cabecera.hero.sub` en vez de
  * `hero.sub`), cambiando todas las rutas del sistema.
  */
-// `sinHtml` sale de `campos.ts`, junto a `sinMenorQue`: las dos reglas de
-// carácter del spec §1.2 viven en el mismo lugar. Vivía acá porque este
-// archivo fue el primero en necesitarla, y así el día que apareció la
-// segunda regla —la del `<` de los campos del anaquel— iban a quedar en
-// dos archivos distintos, que es como se desalinean.
+// `sinHtml` vivía acá, porque este archivo fue el primero en necesitarla.
+// Ahora sale de `campos.ts`, junto a `sinMenorQue`: las dos reglas de
+// carácter del spec §1.2 en el mismo lugar, que es lo contrario de tener la
+// misma familia repartida en dos archivos.
 import { grupo, lista, tupla, texto, parrafo, ancla, correo, sinHtml } from '../../campos'
 
 const enBuscadores = { seccion: 'buscadores' } as const

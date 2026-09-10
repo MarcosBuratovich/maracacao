@@ -5,7 +5,7 @@
  * roto, y el pie que se repite en todas las páginas del sitio.
  *
  * Este archivo exporta CLAVES, no un `grupo`, por la misma razón que los
- * otros cuatro de esta carpeta: `fichasTecnicas`, `noEncontrada` y `footer`
+ * otros cinco de esta carpeta: `fichasTecnicas`, `noEncontrada` y `footer`
  * son bloques del mismo documento `marca`, y envolverlos en un `grupo`
  * agregaría un nivel de anidamiento que no existe en el contenido
  * (`paginas.fichasTecnicas.titulo` en vez de `fichasTecnicas.titulo`).

@@ -461,7 +461,16 @@ export const correo = (meta: Base) =>
     control: 'texto', ...meta,
   })
 
-/** El identificador de un sabor. INMUTABLE: nombra seis archivos. */
+/**
+ * Un identificador interno, en minúsculas con guiones. INMUTABLE: algo de
+ * afuera del contenido lo usa como nombre.
+ *
+ * El slug de un sabor nombra las seis fotos de esa barra; el `id` de una
+ * pestaña de «Para negocios» (Tarea 10) no nombra ningún archivo, pero es
+ * con lo que la página recuerda qué pestaña estaba abierta. En los dos
+ * casos, cambiarlo rompe algo que no está escrito en el contenido — por eso
+ * va con `quien: 'marcos'` y `control: 'oculto'`.
+ */
 export const slug = (meta: Base) =>
   anota(z.string().regex(/^[a-z0-9-]+$/, 'Solo minúsculas, números y guiones.'), {
     control: 'oculto', quien: 'marcos', ...meta,
