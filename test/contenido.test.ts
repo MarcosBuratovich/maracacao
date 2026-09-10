@@ -22,7 +22,7 @@ import type { MetaCampo } from '../src/contenido/campos'
 import { recorre, cargar, serializa } from '../src/contenido/carga'
 import { cruzaConteo, enLetras } from '../src/contenido/conteos'
 import { contrasteSuficiente, resuelveColor, mejorTinta } from '../src/contenido/color-sabor'
-import { precioDesde, precioDe } from '../src/contenido/derivados'
+import { precioDesde, precioDe, DERIVADOS_DEL_SITIO, injerta } from '../src/contenido/derivados'
 import { validarContra, validar } from '../src/contenido/validacion'
 import { esquemaSabores } from '../src/contenido/esquema/sabores'
 import { esquemaFichas } from '../src/contenido/esquema/fichas'
@@ -1867,6 +1867,49 @@ describe('la capa de contenido', () => {
         expect(palabraProhibida(meta?.etiqueta ?? ''), `en la etiqueta de ${ruta}`).toBeNull()
         expect(palabraProhibida(meta?.ayuda ?? ''), `en la ayuda de ${ruta}`).toBeNull()
       })
+    })
+  })
+
+  describe('los derivados del sitio', () => {
+    const FUENTES = {
+      sabores: [{ precio: 122 }, { precio: 108 }],
+      gotas: [{ clave: 'jengibreYNaranja', precio: 340 }, { clave: 'canela', precio: 258 }],
+    }
+
+    it('la tabla de derivados es exactamente la que el esquema declara', () => {
+      // ES EL CANDADO DE LA TAREA. Sin él, un campo marcado `derivado` en el
+      // esquema y ausente de esta tabla se queda sin valor: serializa() no
+      // lo escribe, injerta() no lo calcula, y cargar() truena en el build
+      // con «falta «precioDesde»» sin decir por qué. Y al revés —una entrada
+      // de más— escribe un valor en una ruta que el esquema no marca como
+      // derivada, y esa la clienta la puede editar creyendo que sirve.
+      const delEsquema: string[] = []
+      recorre(esquemaSitio, (ruta, meta) => {
+        if (meta?.control === 'derivado') delEsquema.push(ruta)
+      })
+      expect(DERIVADOS_DEL_SITIO.map((d) => d.ruta).sort()).toEqual(delEsquema.sort())
+    })
+
+    it('injerta escribe los cuatro valores en su ruta', () => {
+      const crudo = { gotas: {}, negocios: { tabs: [{}, {}, {}] } }
+      const con = injerta(crudo, FUENTES) as {
+        gotas: { precioDesde: number; precioJengibre: number }
+        negocios: { tabs: { precio?: number }[] }
+      }
+      expect(con.gotas.precioDesde).toBe(258)
+      expect(con.gotas.precioJengibre).toBe(340)
+      expect(con.negocios.tabs[1].precio).toBe(258)
+      expect(con.negocios.tabs[2].precio).toBe(108)
+      expect(con.negocios.tabs[0].precio).toBeUndefined()
+    })
+
+    it('injerta no toca el objeto que recibe', () => {
+      // El crudo viene del import del JSON, que en un bundle es un módulo
+      // COMPARTIDO: mutarlo le cambia el contenido a cualquier otro que lo
+      // importe, y el orden de los imports decide qué ve cada uno.
+      const crudo = { gotas: {}, negocios: { tabs: [{}, {}, {}] } }
+      injerta(crudo, FUENTES)
+      expect(crudo.gotas).toEqual({})
     })
   })
 })

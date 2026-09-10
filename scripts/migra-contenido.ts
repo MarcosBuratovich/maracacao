@@ -17,6 +17,7 @@ import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs'
 import { escapaInvisibles, serializa } from '../src/contenido/carga'
 import { esquemaSabores } from '../src/contenido/esquema/sabores'
 import { esquemaFichas } from '../src/contenido/esquema/fichas'
+import { esquemaSitio } from '../src/contenido/esquema/sitio'
 import { marca } from '../src/copy/sitio-marca'
 import { sabores, gotas, polvo, urlCatalogoBarras } from '../src/copy/sabores'
 import { fichasBase } from '../src/fichas/base'
@@ -139,11 +140,25 @@ function migraFichas(): void {
   )
 }
 
+/**
+ * Escribe el documento del sitio.
+ *
+ * Los derivados NO se escriben (serializa() los omite), pero SÍ tienen
+ * que estar en el objeto que se serializa: `ordenaSegun()` recorre el
+ * esquema y reclama toda clave que el esquema declare y el dato no
+ * traiga. El módulo viejo los tiene escritos a mano, así que alcanza con
+ * pasarle `marca` tal cual.
+ */
+function migraSitio(): void {
+  escribe('src/contenido/datos/sitio.json', serializa(esquemaSitio, estructura(marca)))
+}
+
 const modo = process.argv[2]
 if (modo === 'fixture') capturaFixture()
 else if (modo === 'sabores') migraSabores()
 else if (modo === 'fichas') migraFichas()
+else if (modo === 'sitio') migraSitio()
 else {
-  console.error(`Modo desconocido: «${modo ?? '(ninguno)'}». Modos: fixture, sabores, fichas`)
+  console.error(`Modo desconocido: «${modo ?? '(ninguno)'}». Modos: fixture, sabores, fichas, sitio`)
   process.exit(1)
 }

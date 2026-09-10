@@ -40,7 +40,14 @@ const panelDeProducto = (p: {
   topeDatos: number
   cuentaCuerpo?: MetaCampo['cuenta']
   cuentaDatos?: MetaCampo['cuenta']
-  precio: z.ZodType       // derivado(...) o precioONada(...)
+  // Tipado por el OUTPUT (number | null) y no `z.ZodType` a secas: con el
+  // genérico vacío, z.object() infiere `precio` como `unknown` y
+  // index.astro —que hace `t.precio === null ? … : precioMXN(t.precio)`—
+  // no puede angostarlo a `number` en la rama del else. Los tres paneles
+  // conviven en una sola `tupla`; el que no tiene precio todavía usa
+  // `precioONada` (number | null), los otros dos usan `derivado` (number),
+  // y `number` es subtipo de `number | null`, así que los tres calzan acá.
+  precio: z.ZodType<number | null>       // derivado(...) o precioONada(...)
 }) =>
   grupo({
     seccion: 'negocios',
