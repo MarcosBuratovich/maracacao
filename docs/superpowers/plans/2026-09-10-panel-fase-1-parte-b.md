@@ -44,6 +44,25 @@ Valen para toda tarea de este plan.
   Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
   ```
 
+### Cómo se prueba el rojo de una aserción de TIPO
+
+**Vitest no tipa.** Transpila con esbuild y tira los tipos, así que un test que afirma
+una forma de TIPO —que `tokenColor` no acepta `valores`, que `cuenta` no acepta un
+objeto, que `z.infer<>` da la unión de literales— **pasa en verde bajo `vitest run` desde
+antes de implementar nada**. Y `expectTypeOf()` de vitest se borra en runtime: sin un
+bloque `typecheck` en `vitest.config.ts` (no lo hay), no afirma nada al correr.
+
+Eso no las deja sin poder de detección: `pnpm typecheck` es `astro check`, y el
+`tsconfig.json` del repo no tiene `include` ni `exclude`, así que **cubre `test/`**. El
+rojo existe — vive en otro comando.
+
+> **Donde un paso diga «FAIL en compilación», el comando es `pnpm typecheck`, no
+> `vitest run`.** Capturá esa salida como evidencia de rojo. Los tests de comportamiento
+> en runtime se prueban con `vitest run`, como siempre.
+
+(Lo encontró el implementador de la Tarea 1 y tenía razón; el plan decía el comando
+equivocado en dos pasos.)
+
 ### La regla de método, otra vez, porque sigue siendo la más importante
 
 > **Todo test que se escriba tiene que venir con su prueba de que falla.** No alcanza con verlo pasar. Hay que romper a propósito lo que el test dice cuidar, verlo dar **rojo**, restaurar, y pegar las dos salidas en el reporte.
@@ -196,8 +215,10 @@ it('la lista cerrada de valores se llama igual en los dos constructores que la t
 
 - [ ] **Paso 2: Correrlo y verlo fallar**
 
-Run: `pnpm exec vitest run test/contenido.test.ts -t 'lista cerrada'`
-Expected: FAIL en compilación — `tokenColor` no acepta `valores` (espera `validos`). Pegá la salida en el reporte.
+Es una aserción de TIPO, así que el rojo NO sale en vitest (ver «Cómo se prueba el rojo de una aserción de tipo»).
+
+Run: `pnpm typecheck`
+Expected: FAIL — `tokenColor` no acepta `valores` (espera `validos`). Pegá la salida en el reporte.
 
 - [ ] **Paso 3: El renombre**
 
@@ -270,8 +291,10 @@ it('cuenta lleva el sustantivo con el que ESE texto nombra la lista', () => {
 
 - [ ] **Paso 7: Correrlo y verlo fallar**
 
-Run: `pnpm exec vitest run test/contenido.test.ts -t 'sustantivo'`
-Expected: FAIL en compilación — `cuenta` está tipado como un string union, no acepta un objeto.
+Otra aserción de TIPO: el rojo sale en `pnpm typecheck`, no en vitest.
+
+Run: `pnpm typecheck`
+Expected: FAIL — `cuenta` está tipado como un string union, no acepta un objeto.
 
 - [ ] **Paso 8: La forma nueva de `cuenta`**
 
@@ -1161,7 +1184,7 @@ Donde sí tiene que fallar es en el **build**, y ahí llega igual: `pnpm build` 
 
 - [ ] **Paso 1: El test del tipo de `claveSabor`, que hoy falla**
 
-En `test/contenido.test.ts` (agregá `expectTypeOf` al import de vitest):
+En `test/contenido.test.ts` (agregá `expectTypeOf` al import de vitest). **El primero de los dos es una aserción de TIPO: `expectTypeOf` se borra en runtime, así que su rojo sale en `pnpm typecheck`, no en `vitest run`.** El segundo sí es de runtime.
 
 ```ts
 it('claveSabor produce el tipo con el que index.astro indexa los tokens', () => {
@@ -1182,8 +1205,8 @@ it('las claves de sabor del esquema son exactamente las del token', () => {
 
 - [ ] **Paso 2: Correrlos y verlos fallar**
 
-Run: `pnpm exec vitest run test/contenido.test.ts -t 'claveSabor produce el tipo'`
-Expected: FAIL — el tipo inferido es `string`, y `CLAVES_DE_SABOR` no existe.
+Run: `pnpm typecheck` (para el del tipo) y `pnpm exec vitest run test/contenido.test.ts -t 'claves de sabor del esquema'` (para el de runtime).
+Expected: los dos FAIL — el tipo inferido es `string`, y `CLAVES_DE_SABOR` no existe. Pegá las dos salidas.
 
 - [ ] **Paso 3: `claveSabor` pasa de `refine` a `enum`**
 
@@ -1725,8 +1748,8 @@ it('valorFijo anota el literal que discrimina una forma de bloque', () => {
 
 - [ ] **Paso 2: Correrlo y verlo fallar**
 
-Run: `pnpm exec vitest run test/contenido.test.ts -t 'valorFijo'`
-Expected: FAIL — `valorFijo` no existe.
+Run: `pnpm exec vitest run test/contenido.test.ts -t 'valorFijo'` y después `pnpm typecheck`.
+Expected: los dos FAIL — `valorFijo` no existe. La aserción `expectTypeOf` de este test solo se evalúa en el typecheck; el resto del test sí corre en vitest.
 
 - [ ] **Paso 3: El constructor**
 
@@ -2667,7 +2690,7 @@ Expected: PASS los tres.
 
 Mutaciones, una por vez:
 1. Bajá `maxCaracteres` de `hero.sub` a 50 → el primero rojo, con el mensaje que va a leer la clienta.
-2. Sacá la `ayuda` de `nav.catalogo` → **no compila** (es obligatoria: ese es el punto del diseño). Pegá el error del compilador; eso ES la prueba.
+2. Sacá la `ayuda` de `nav.catalogo` → **`pnpm typecheck` da error** (la ayuda es obligatoria: ese es el punto del diseño, y vitest no lo vería). Pegá el error del compilador; eso ES la prueba.
 3. Cambiá el regex del renglón 2 a `/,$/` → el tercero rojo.
 
 - [ ] **Paso 8: Compuerta y commit**
