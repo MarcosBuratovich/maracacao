@@ -26,8 +26,12 @@ import { precioDesde, precioDe } from '../src/contenido/derivados'
 import { validarContra, validar } from '../src/contenido/validacion'
 import { esquemaSabores } from '../src/contenido/esquema/sabores'
 import { esquemaFichas } from '../src/contenido/esquema/fichas'
+import { camposDeCabecera } from '../src/contenido/esquema/sitio/cabecera'
 import { fichasBase } from '../src/fichas/base'
 import * as tokens from '../src/tokens/color'
+// La foto congelada, no el módulo: el fixture no se mueve cuando la Tarea 13
+// reescriba la fachada, y estos tests validan CONTRA esa foto.
+import fixture from './fixtures/contenido-2026-09-10.json'
 
 describe('la capa de contenido', () => {
   it('src/contenido/ no importa node:, ni Astro, ni el alias @/', () => {
@@ -1539,6 +1543,45 @@ describe('la capa de contenido', () => {
         'fichas[].secciones[].bloques[]<tipo=tabla>.encabezados[]',
         'fichas[].secciones[].bloques[]<tipo=tabla>.filas[][]',
       ])
+    })
+  })
+
+  describe('el esquema de cabecera', () => {
+    const cabecera = grupo({
+      etiqueta: 'Cabecera', seccion: 'portada', ayuda: 'Prueba.',
+      campos: camposDeCabecera,
+    })
+
+    // Una fábrica y no una constante: cada test que muta necesita su propia
+    // copia. Compartir un objeto entre tests los acopla por orden de
+    // ejecución, que es el bug de test más difícil de ver.
+    const hoy = () => {
+      const m = JSON.parse(JSON.stringify(fixture.marca))
+      return {
+        titulo: m.titulo, descripcion: m.descripcion, skipLink: m.skipLink,
+        marca: m.marca, nav: m.nav, hero: m.hero,
+      }
+    }
+
+    it('valida el contenido de hoy', () => {
+      expect(validar(cabecera, hoy(), { sabores: 15 })).toEqual([])
+    })
+
+    it('toda hoja tiene etiqueta, ayuda y sección', () => {
+      recorre(cabecera, (ruta, meta) => {
+        expect(meta?.etiqueta, `sin etiqueta: ${ruta}`).toBeTruthy()
+        expect(meta?.ayuda, `sin ayuda: ${ruta}`).toBeTruthy()
+        expect(meta?.seccion, `sin sección: ${ruta}`).toBeTruthy()
+      })
+    })
+
+    it('el renglón 2 del titular exige una coma y solo una', () => {
+      // La plantilla le SACA la coma final y pinta una roja en su lugar. Con
+      // dos comas, la del medio se queda: «70% CACAO, DE VERDAD,,» en el h1.
+      const datos = hoy()
+      datos.hero.titular = ['CHOCOLATE', '70% CACAO, DE VERDAD,', 'MEXICANO.']
+      const problemas = validar(cabecera, datos, { sabores: 15 })
+      expect(problemas.map((p) => p.campo)).toContain('hero.titular.1')
     })
   })
 
