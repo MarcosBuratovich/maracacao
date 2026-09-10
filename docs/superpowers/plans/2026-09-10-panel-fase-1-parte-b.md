@@ -2337,6 +2337,23 @@ productos, y el bloque grande de más abajo— y no por el nombre de la clave.
 **Listá en tu reporte los que hayas escrito**, para que se revisen como se revisa todo lo
 demás que la clienta lee.
 
+**Y si el `grupo` es el ELEMENTO de una `lista`, lleva además `nombra`.** Es la función con
+la que el panel nombra cada fila de la lista. Sin ella, la clienta ve cuatro filas que dicen
+«Receta, Receta, Receta, Receta» y ninguna forma de saber cuál es cuál; con ella, cada fila
+dice su título. Los cinco que hay en todo el documento del sitio:
+
+| Lista | `nombra` | Cae en |
+|---|---|---|
+| `nav.items[]` | `(v) => (v as { texto?: string }).texto ?? 'Entrada'` | ya escrito, Tarea 7 |
+| `catar.pasos[]` | `(v) => (v as { nombre?: string }).nombre ?? 'Paso'` | Tarea 9 |
+| `recetas.lista[]` | `(v) => (v as { titulo?: string }).titulo ?? 'Receta'` | Tarea 9 |
+| `negocios.fichas[]` | `(v) => (v as { dato?: string }).dato ?? 'Dato'` | Tarea 10 |
+| `preguntas.items[]` | `(v) => (v as { p?: string }).p ?? 'Pregunta'` | Tarea 10 |
+| `footer.productos[]` | `(v) => (v as { texto?: string }).texto ?? 'Enlace'` | Tarea 12 |
+
+El `?? '…'` no es decorativo: es lo que el panel muestra mientras la fila está vacía, justo
+después de que la clienta toca «agregar».
+
 **Los topes son el largo medido hoy × 1,6 redondeado a la decena, con piso de 20.** Son techo de cordura. Las dos excepciones —`titulo` y `descripcion`— llevan el tope de lo que corta Google, y están explicadas donde aparecen.
 
 ---
