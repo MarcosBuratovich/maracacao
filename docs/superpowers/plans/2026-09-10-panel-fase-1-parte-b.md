@@ -3798,8 +3798,8 @@ Create `src/contenido/esquema/sitio.ts`:
 /*
  * El documento del sitio: 21 bloques.
  *
- * Está partido en cinco archivos por tema —cabecera, producto,
- * experiencia, negocio, contacto y páginas— y este los junta. Los cinco
+ * Está partido en SEIS archivos por tema —cabecera, producto,
+ * experiencia, negocio, contacto y páginas— y este los junta. Los seis
  * exportan CLAVES y no grupos: si cada uno devolviera un `grupo`, el
  * documento tendría cinco niveles de anidamiento que no existen en el
  * contenido y todas las rutas del sistema cambiarían.
