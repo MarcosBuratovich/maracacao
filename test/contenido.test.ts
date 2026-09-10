@@ -1578,10 +1578,20 @@ describe('la capa de contenido', () => {
     it('el renglón 2 del titular exige una coma y solo una', () => {
       // La plantilla le SACA la coma final y pinta una roja en su lugar. Con
       // dos comas, la del medio se queda: «70% CACAO, DE VERDAD,,» en el h1.
+      //
+      // El valor de prueba tiene que caber en el tope de 20 caracteres, o el
+      // problema sale por LARGO y no por la coma — y entonces el test pasa
+      // igual con la regla de la coma rota. «70% CACAO, DE VERDAD,» mide 21 y
+      // hacía exactamente eso: afirmaba la ruta, que las dos reglas comparten.
       const datos = hoy()
-      datos.hero.titular = ['CHOCOLATE', '70% CACAO, DE VERDAD,', 'MEXICANO.']
+      datos.hero.titular = ['CHOCOLATE', 'MEXICANO, RICO,', 'CACAO.']
       const problemas = validar(cabecera, datos, { sabores: 15 })
-      expect(problemas.map((p) => p.campo)).toContain('hero.titular.1')
+      // Y se afirma el MENSAJE, no solo la ruta: `hero.titular.1` es la misma
+      // para el tope de caracteres y para la coma, así que la ruta sola no
+      // distingue cuál de las dos reglas se disparó.
+      expect(problemas).toHaveLength(1)
+      expect(problemas[0].campo).toBe('hero.titular.1')
+      expect(problemas[0].titulo).toMatch(/coma/i)
     })
   })
 
