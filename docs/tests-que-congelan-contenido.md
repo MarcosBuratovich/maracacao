@@ -37,7 +37,7 @@ Tres destinos posibles:
 
 Alcance: "contenido" acá es lo que la clienta va a poder tocar desde el panel
 (`src/copy/sitio-marca.ts`, `src/copy/sabores.ts`, las fichas técnicas,
-`docs/envolturas.json`). Los tokens de diseño (`@/tokens/*`), la geometría de
+`src/contenido/datos/envolturas.json`). Los tokens de diseño (`@/tokens/*`), la geometría de
 los SVG de marca y el copy de `/presentacion` y `/manual` (candado puesto,
 usan `src/copy/marca.ts` y `src/copy/landing.ts`, que el panel no toca) NO
 son contenido en ese sentido aunque sus tests comparen contra valores
@@ -59,7 +59,7 @@ concretos — por eso quedan QUEDA con nota, no listados assert por assert.
 | `test/landing.test.ts` | (suite entera, incl. `toHaveLength(1)`/`toBe('Chocolate blanco y pistaches')` en L74-75, `toHaveLength(18/1/2)` en L176-178, `toHaveLength(8)` en L205) | Nada que la clienta pueda tocar desde el panel — todo el copy de este archivo (`@/copy/landing`, `@/copy/marca`) alimenta `/presentacion` y `/manual`, las dos con candado y fuera del alcance del panel (fases 0-6 solo cubren `sitio-marca`/`sabores`/fichas/envolturas) | QUEDA — copy privado, fuera del panel |
 | `test/lettering.test.ts` | conteo de letras por archivo (9/9/17, vía `toHaveLength(letras)`), `toBe('path')` por tag | Nada — es geometría de los SVG de marca (logotipo/descriptor), no copy | sin asserts de valor de contenido — QUEDA |
 | `test/manual.test.ts` | (suite entera) | Nada — cubre `/manual`, página con candado que consume `src/copy/marca.ts`, fuera del panel; el resto son guards estructurales (rutas, hex a mano) | QUEDA — copy privado, fuera del panel |
-| `test/marca-copy.test.ts:55` | lee `docs/envolturas.json` | Ninguna | QUEDA (Fase 1 lo mueve a `datos/`) |
+| `test/marca-copy.test.ts:55` | lee `src/contenido/datos/envolturas.json` | Ninguna | QUEDA (movido en la fase 1 parte B) |
 | `test/marca-copy.test.ts:61` | sabores `toHaveLength(15)` | Agregar un sabor | A FORMA en la **Fase 7**, no ahora |
 | `test/marca-copy.test.ts:62-64` | `sabores.map(orden).sort()` `toEqual([1..15])` | Agregar/quitar un sabor (deja huecos en el orden) | A FORMA en la **Fase 7** — pasa a "1..sabores.length sin huecos" (§9 del spec) |
 | `test/marca-copy.test.ts:91-92,99-100` | `impreso` `toBe('73%')`; `s.cacao` `toBe('Cacao 70%')` / `toBe('Chocolate blanco')` | Editar el % de cacao mostrado de mango/piña/chamoy/blanco | `:91` QUEDA (es el hecho impreso en la envoltura física, no copy del sitio) · `:92,99,100` BORRAR (Fase 1) — `s.cacao` es contenido de `sabores.ts`, el mismo tipo de valor que el precio |

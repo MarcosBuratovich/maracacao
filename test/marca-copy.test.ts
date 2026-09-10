@@ -52,7 +52,7 @@ describe('registro y retro vigentes', () => {
 })
 
 describe('sabores — fuente única sincronizada con el arte de imprenta', () => {
-  const json = JSON.parse(readFileSync('docs/envolturas.json', 'utf8')) as Record<
+  const json = JSON.parse(readFileSync('src/contenido/datos/envolturas.json', 'utf8')) as Record<
     string,
     { color: string; cacao: string | null; ingredientes: string }
   >
