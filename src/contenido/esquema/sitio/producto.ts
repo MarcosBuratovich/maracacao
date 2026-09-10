@@ -136,7 +136,9 @@ export const camposDeProducto = {
       // «de 15». No lleva `cuenta`: cruzaConteo() exige que el número sea
       // vecino inmediato de un sustantivo y acá no hay ninguno (la
       // plantilla arma «n.º 3 de 15» pegando este texto al número). Lo
-      // cubre una aserción de forma de la Tarea 14. Va como
+      // cubre la aserción de forma 9 de `test/contenido-fachada.test.ts`,
+      // que exige que este texto termine en `sabores.length` — sin ella,
+      // agregar una barra deja publicado un «n.º 16 de 15». Va como
       // `quien: 'marcos'`: si la clienta lo edita a mano, el contador
       // miente y nada en el panel se lo avisa.
       contadorDe: texto({
