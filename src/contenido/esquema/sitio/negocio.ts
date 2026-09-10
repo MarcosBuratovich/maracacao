@@ -213,11 +213,11 @@ export const camposDeNegocio = {
         ayuda: 'Qué información técnica hay disponible hoy.',
         minItems: 1,
         maxItems: 8,
-        nombra: (v) => (v as { dato?: string }).dato ?? 'Dato',
         elemento: grupo({
           ...enNegocios,
           etiqueta: 'Dato técnico',
           ayuda: 'Un renglón del semáforo de datos técnicos.',
+          nombra: (v) => (v as { dato?: string }).dato ?? 'Dato',
           campos: {
             dato: texto({
               ...enNegocios,
@@ -261,11 +261,11 @@ export const camposDeNegocio = {
         ayuda: 'Las preguntas frecuentes, en orden. Cada una se abre al tocarla.',
         minItems: 3,
         maxItems: 20,
-        nombra: (v) => (v as { p?: string }).p ?? 'Pregunta',
         elemento: grupo({
           ...enPreguntas,
           etiqueta: 'Pregunta frecuente',
           ayuda: 'Una de las preguntas, con su respuesta.',
+          nombra: (v) => (v as { p?: string }).p ?? 'Pregunta',
           campos: {
             p: texto({
               ...enPreguntas,
