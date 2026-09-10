@@ -2012,6 +2012,73 @@ describe('la capa de contenido', () => {
  * `recorre()` para caminarlo genéricamente sin saber de antemano la forma
  * de cada documento — así que estos diez tests son nuevos, no reescritos.
  */
+/*
+ * El caminante del candado 9. Vive afuera del `it` para que su mutación
+ * (el 9b) corra EXACTAMENTE el mismo código que se aplica a los documentos
+ * de verdad: un caminante de prueba aparte es un caminante que se
+ * desincroniza del que importa, y este candado existe justamente porque
+ * una norma que nadie puede ver se vuelve a romper.
+ */
+type DefDeZod = { type: string; [k: string]: unknown }
+const defDe = (e: unknown) => (e as { _zod: { def: DefDeZod } })._zod.def
+const metaDe = (e: unknown) => panel.get(e as z.ZodType) as MetaCampo | undefined
+
+/** La marca de variante que arma `recorre()` para la ruta: `<tipo=parrafo>`. */
+const marcaDeVariante = (opcion: z.ZodType, discriminante: string): string => {
+  const shape = defDe(opcion).shape as Record<string, z.ZodType> | undefined
+  const campo = shape?.[discriminante]
+  const valores = campo && (defDe(campo).values as unknown[] | undefined)
+  const valor = Array.isArray(valores) && typeof valores[0] === 'string' ? valores[0] : '?'
+  return `<${discriminante}=${valor}>`
+}
+
+const revisaNombra = (esquema: z.ZodType, ruta: string, mal: string[]): void => {
+  const d = defDe(esquema)
+  switch (d.type) {
+    case 'array': {
+      const elemento = d.element as z.ZodType
+      if (metaDe(esquema)?.nombra) {
+        mal.push(`${ruta}: el «nombra» cuelga de la lista; va en el grupo del elemento`)
+      }
+      const dentro = defDe(elemento)
+      if (dentro.type === 'object' && !metaDe(elemento)?.nombra) {
+        mal.push(`${ruta}[]: el grupo del elemento no declara «nombra»`)
+      }
+      // Una unión NO reporta `type: 'object'`, así que la versión anterior
+      // —que solo miraba el caso `object`— no veía las tres variantes de
+      // bloque de una ficha: las tres estaban sin `nombra` y el candado no
+      // decía nada. El reclamo va variante por variante porque lo que
+      // distingue una fila de otra es distinto en cada forma: el texto del
+      // párrafo, la primera viñeta de la lista, el primer encabezado de la
+      // tabla.
+      if (dentro.type === 'union') {
+        const discriminante = typeof dentro.discriminator === 'string' ? dentro.discriminator : '?'
+        for (const opcion of dentro.options as z.ZodType[]) {
+          if (metaDe(opcion)?.nombra) continue
+          mal.push(
+            `${ruta}[]${marcaDeVariante(opcion, discriminante)}: la variante del elemento no declara «nombra»`,
+          )
+        }
+      }
+      return revisaNombra(elemento, `${ruta}[]`, mal)
+    }
+    case 'object':
+      for (const [k, v] of Object.entries(d.shape as Record<string, z.ZodType>)) {
+        revisaNombra(v, ruta ? `${ruta}.${k}` : k, mal)
+      }
+      return
+    case 'tuple':
+      return (d.items as z.ZodType[]).forEach((it, i) => revisaNombra(it, `${ruta}.${i}`, mal))
+    case 'union':
+      return (d.options as z.ZodType[]).forEach((o) => revisaNombra(o, ruta, mal))
+    case 'optional':
+    case 'nullable':
+      return revisaNombra(d.innerType as z.ZodType, ruta, mal)
+    default:
+      return
+  }
+}
+
 describe('los candados del sistema de contenido', () => {
   /** El dato crudo de cada documento, con los derivados ya injertados. */
   const CRUDO: Record<IdDocumento, unknown> = {
@@ -2172,43 +2239,45 @@ describe('los candados del sistema de contenido', () => {
     //
     // Una convención que nadie puede ver es una convención que se vuelve a
     // romper. Este candado es lo que la hace visible.
-    type Def = { type: string; [k: string]: unknown }
-    const def = (e: unknown) => (e as { _zod: { def: Def } })._zod.def
-    const meta = (e: unknown) => panel.get(e as z.ZodType) as MetaCampo | undefined
     const mal: string[] = []
-
-    const anda = (esquema: z.ZodType, ruta: string): void => {
-      const d = def(esquema)
-      switch (d.type) {
-        case 'array': {
-          const elemento = d.element as z.ZodType
-          if (meta(esquema)?.nombra) {
-            mal.push(`${ruta}: el «nombra» cuelga de la lista; va en el grupo del elemento`)
-          }
-          if (def(elemento).type === 'object' && !meta(elemento)?.nombra) {
-            mal.push(`${ruta}[]: el grupo del elemento no declara «nombra»`)
-          }
-          return anda(elemento, `${ruta}[]`)
-        }
-        case 'object':
-          for (const [k, v] of Object.entries(d.shape as Record<string, z.ZodType>)) {
-            anda(v, ruta ? `${ruta}.${k}` : k)
-          }
-          return
-        case 'tuple':
-          return (d.items as z.ZodType[]).forEach((it, i) => anda(it, `${ruta}.${i}`))
-        case 'union':
-          return (d.options as z.ZodType[]).forEach((o) => anda(o, ruta))
-        case 'optional':
-        case 'nullable':
-          return anda(d.innerType as z.ZodType, ruta)
-        default:
-          return
-      }
-    }
-
-    for (const [id, esquema] of Object.entries(DOCUMENTOS)) anda(esquema, id)
+    for (const [id, esquema] of Object.entries(DOCUMENTOS)) revisaNombra(esquema, id, mal)
     expect(mal).toEqual([])
+  })
+
+  it('9b · el candado 9 ve las uniones: reclama el «nombra» en cada variante', () => {
+    // La versión anterior solo miraba el elemento cuando era `object`, y
+    // los bloques de una sección de ficha son una UNIÓN: las tres variantes
+    // estaban sin etiqueta, sin ayuda y sin `nombra` y el candado no decía
+    // nada. Consecuencia concreta: la clienta veía cuatro filas idénticas.
+    //
+    // Con la mutación adentro, no confiando en el contenido real: acá las
+    // dos variantes se fabrican, una con `nombra` y otra sin, y se exige
+    // que salga la que falta —y solo esa—.
+    const conNombre = grupo({
+      etiqueta: 'Variante con nombre', seccion: 'fichas', ayuda: 'x',
+      nombra: (v) => String((v as { a?: string }).a ?? ''),
+      campos: { tipo: valorFijo({ etiqueta: 'T', seccion: 'fichas', ayuda: 'x', valores: ['a'] }) },
+    })
+    const sinNombre = grupo({
+      etiqueta: 'Variante sin nombre', seccion: 'fichas', ayuda: 'x',
+      campos: { tipo: valorFijo({ etiqueta: 'T', seccion: 'fichas', ayuda: 'x', valores: ['b'] }) },
+    })
+    const conUnion = grupo({
+      etiqueta: 'Prueba', seccion: 'fichas', ayuda: 'x',
+      campos: {
+        bloques: lista({
+          etiqueta: 'Bloques', seccion: 'fichas', ayuda: 'x',
+          minItems: 1, maxItems: 9,
+          elemento: z.discriminatedUnion('tipo', [conNombre, sinNombre]),
+        }),
+      },
+    })
+
+    const mal: string[] = []
+    revisaNombra(conUnion, 'prueba', mal)
+    expect(mal).toEqual([
+      'prueba.bloques[]<tipo=b>: la variante del elemento no declara «nombra»',
+    ])
   })
 
   it('10 · todo correo escrito en el sitio es el correo de la marca', () => {

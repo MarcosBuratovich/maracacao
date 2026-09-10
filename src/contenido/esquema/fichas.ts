@@ -10,6 +10,15 @@
  * Los bloques son una unión discriminada de tres formas —párrafo, lista y
  * tabla— y son el caso real para el que la Tarea 2 enseñó a recorrer
  * uniones.
+ *
+ * DATO QUE NO SE «CORRIGE» DE VUELTA: la tabla «Información nutrimental
+ * calculada» de la ficha del chocolate en polvo dice 396 kcal / 1,672 kJ y
+ * 0 mg de grasas trans. Corregido con el docx (1) del cliente, 2026-08-19:
+ * la versión anterior decía 395 kcal/1,654 kJ y 2.2 mg trans. El comentario
+ * vivía pegado a esas filas en `src/fichas/base.ts` y se perdió al pasar el
+ * contenido a `datos/fichas.json`, que no admite comentarios. Se declara
+ * ante COFEPRIS: sin este contexto, el próximo que compare la ficha con un
+ * documento viejo la «arregla» al revés.
  */
 import { z } from 'zod'
 import { marca as tokensMarca } from '../../tokens/color'
@@ -17,83 +26,122 @@ import { grupo, lista, tupla, texto, parrafo, archivo, tokenColor, valorFijo } f
 
 const enFichas = { seccion: 'fichas' } as const
 
-const bloqueParrafo = z.object({
-  tipo: valorFijo({
-    ...enFichas,
-    etiqueta: 'Forma del bloque',
-    ayuda: 'Este bloque es un párrafo corrido.',
-    valores: ['parrafo'],
-  }),
-  texto: parrafo({
-    ...enFichas,
-    etiqueta: 'Texto del párrafo',
-    ayuda: 'Un párrafo de la ficha, tal como aparece en el documento oficial.',
-    maxCaracteres: 580,
-  }),
+/**
+ * Un recorte del texto para nombrar la fila en el panel.
+ *
+ * Sin esto, los cuatro bloques de una sección se ven como cuatro filas
+ * idénticas y la clienta tiene que abrirlas de a una para saber cuál es
+ * cuál. Corta en palabra entera y agrega puntos suspensivos.
+ */
+const recorte = (valor: unknown, largo = 42): string => {
+  const t = typeof valor === 'string' ? valor.trim() : ''
+  if (t.length <= largo) return t
+  const cortado = t.slice(0, largo)
+  const espacio = cortado.lastIndexOf(' ')
+  return `${(espacio > largo / 2 ? cortado.slice(0, espacio) : cortado).trimEnd()}…`
+}
+
+/** «Párrafo: «Producto elaborado…»», o solo «Párrafo» si todavía está vacío. */
+const nombreDeBloque = (forma: string, contenido: string): string =>
+  contenido === '' ? forma : `${forma}: «${contenido}»`
+
+const bloqueParrafo = grupo({
+  ...enFichas,
+  etiqueta: 'Bloque de párrafo',
+  ayuda: 'Un párrafo corrido, dentro de una sección de la ficha.',
+  nombra: (v) => nombreDeBloque('Párrafo', recorte((v as { texto?: string }).texto)),
+  campos: {
+    tipo: valorFijo({
+      ...enFichas,
+      etiqueta: 'Forma del bloque',
+      ayuda: 'Este bloque es un párrafo corrido.',
+      valores: ['parrafo'],
+    }),
+    texto: parrafo({
+      ...enFichas,
+      etiqueta: 'Texto del párrafo',
+      ayuda: 'Un párrafo de la ficha, tal como aparece en el documento oficial.',
+      maxCaracteres: 580,
+    }),
+  },
 })
 
-const bloqueLista = z.object({
-  tipo: valorFijo({
-    ...enFichas,
-    etiqueta: 'Forma del bloque',
-    ayuda: 'Este bloque es una lista de viñetas.',
-    valores: ['lista'],
-  }),
-  items: lista({
-    ...enFichas,
-    etiqueta: 'Viñetas',
-    ayuda: 'Cada renglón de la lista, en orden.',
-    minItems: 1,
-    maxItems: 20,
-    elemento: texto({
+const bloqueLista = grupo({
+  ...enFichas,
+  etiqueta: 'Bloque de lista',
+  ayuda: 'Una lista de viñetas, dentro de una sección de la ficha.',
+  nombra: (v) =>
+    nombreDeBloque('Lista', recorte((v as { items?: unknown[] }).items?.[0])),
+  campos: {
+    tipo: valorFijo({
       ...enFichas,
-      etiqueta: 'Viñeta',
-      ayuda: 'Un renglón de la lista.',
-      maxCaracteres: 190,
+      etiqueta: 'Forma del bloque',
+      ayuda: 'Este bloque es una lista de viñetas.',
+      valores: ['lista'],
     }),
-  }),
+    items: lista({
+      ...enFichas,
+      etiqueta: 'Viñetas',
+      ayuda: 'Cada renglón de la lista, en orden.',
+      minItems: 1,
+      maxItems: 20,
+      elemento: texto({
+        ...enFichas,
+        etiqueta: 'Viñeta',
+        ayuda: 'Un renglón de la lista.',
+        maxCaracteres: 190,
+      }),
+    }),
+  },
 })
 
-const bloqueTabla = z.object({
-  tipo: valorFijo({
-    ...enFichas,
-    etiqueta: 'Forma del bloque',
-    ayuda: 'Este bloque es una tabla con encabezados.',
-    valores: ['tabla'],
-  }),
-  encabezados: lista({
-    ...enFichas,
-    etiqueta: 'Encabezados de la tabla',
-    ayuda: 'Los títulos de las columnas. Cada fila tiene que traer esta misma cantidad de celdas.',
-    minItems: 1,
-    maxItems: 6,
-    elemento: texto({
+const bloqueTabla = grupo({
+  ...enFichas,
+  etiqueta: 'Bloque de tabla',
+  ayuda: 'Una tabla con encabezados, dentro de una sección de la ficha.',
+  nombra: (v) =>
+    nombreDeBloque('Tabla', recorte((v as { encabezados?: unknown[] }).encabezados?.[0])),
+  campos: {
+    tipo: valorFijo({
       ...enFichas,
-      etiqueta: 'Encabezado',
-      ayuda: 'El título de una columna.',
-      maxCaracteres: 20,
+      etiqueta: 'Forma del bloque',
+      ayuda: 'Este bloque es una tabla con encabezados.',
+      valores: ['tabla'],
     }),
-  }),
-  filas: lista({
-    ...enFichas,
-    etiqueta: 'Filas de la tabla',
-    ayuda: 'Cada fila, con una celda por columna.',
-    minItems: 1,
-    maxItems: 40,
-    elemento: lista({
+    encabezados: lista({
       ...enFichas,
-      etiqueta: 'Fila',
-      ayuda: 'Las celdas de una fila, en el orden de los encabezados.',
+      etiqueta: 'Encabezados de la tabla',
+      ayuda: 'Los títulos de las columnas. Cada fila tiene que traer esta misma cantidad de celdas.',
       minItems: 1,
       maxItems: 6,
       elemento: texto({
         ...enFichas,
-        etiqueta: 'Celda',
-        ayuda: 'El contenido de una celda.',
-        maxCaracteres: 60,
+        etiqueta: 'Encabezado',
+        ayuda: 'El título de una columna.',
+        maxCaracteres: 20,
       }),
     }),
-  }),
+    filas: lista({
+      ...enFichas,
+      etiqueta: 'Filas de la tabla',
+      ayuda: 'Cada fila, con una celda por columna.',
+      minItems: 1,
+      maxItems: 40,
+      elemento: lista({
+        ...enFichas,
+        etiqueta: 'Fila',
+        ayuda: 'Las celdas de una fila, en el orden de los encabezados.',
+        minItems: 1,
+        maxItems: 6,
+        elemento: texto({
+          ...enFichas,
+          etiqueta: 'Celda',
+          ayuda: 'El contenido de una celda.',
+          maxCaracteres: 60,
+        }),
+      }),
+    }),
+  },
 })
 
 /**
