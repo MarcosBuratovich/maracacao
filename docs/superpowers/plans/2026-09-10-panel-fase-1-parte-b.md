@@ -2354,6 +2354,13 @@ dice su título. Los cinco que hay en todo el documento del sitio:
 El `?? '…'` no es decorativo: es lo que el panel muestra mientras la fila está vacía, justo
 después de que la clienta toca «agregar».
 
+**Y va en el `grupo` del elemento, no en el `lista` que lo contiene.** `nombra` nombra UN
+ELEMENTO, y el elemento es el grupo; ponerlo en la lista es indirección —«la lista sabe cómo
+llamar a sus hijos» en vez de «el hijo sabe cómo se llama»—. Importa más de lo que parece
+porque `recorre()` **no emite los contenedores**, solo las hojas: el panel de la fase 6 va a
+necesitar su propio recorrido para leer `nombra`, y si ese recorrido tiene que mirar en dos
+lugares según el archivo, el bug es seguro.
+
 **Los topes son el largo medido hoy × 1,6 redondeado a la decena, con piso de 20.** Son techo de cordura. Las dos excepciones —`titulo` y `descripcion`— llevan el tope de lo que corta Google, y están explicadas donde aparecen.
 
 ---
@@ -2567,11 +2574,11 @@ export const camposDeCabecera = {
         ayuda: 'En el orden en que aparecen, arriba y en el pie.',
         minItems: 3,
         maxItems: 12,
-        nombra: (v) => (v as { texto?: string }).texto ?? 'Entrada',
         elemento: grupo({
           ...enPortada,
           etiqueta: 'Entrada del menú',
           ayuda: 'Un renglón del menú.',
+          nombra: (v) => (v as { texto?: string }).texto ?? 'Entrada',
           campos: {
             ancla: ancla({
               ...enPortada,
