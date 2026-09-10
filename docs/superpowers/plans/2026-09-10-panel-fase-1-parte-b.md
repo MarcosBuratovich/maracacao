@@ -4893,9 +4893,13 @@ python3 - <<'EOF'
 import json, io
 p = 'src/contenido/datos/sabores.json'
 d = json.loads(io.open(p, encoding='utf-8').read())
+# TODAS, no solo las de 108: `jengibre-y-naranja` vale 122 y es la única
+# distinta. Si se sube solo el resto, ella pasa a ser la más barata y el
+# «desde» derivado da 122 en vez de 130 — el mecanismo se prueba igual,
+# pero el número deja de ser el que uno predice, y un número predicho que
+# no sale obliga a parar y averiguar por qué.
 for s in d['sabores']:
-    if s['precio'] == 108:
-        s['precio'] = 130
+    s['precio'] = 130
 io.open(p, 'w', encoding='utf-8').write(json.dumps(d, ensure_ascii=False, indent=2) + '\n')
 EOF
 
@@ -4914,7 +4918,7 @@ grep -A 2 '"id": "barras"' dist/index.html | head   # o buscá «desde $130» en
 grep -c '\$130' dist/index.html
 ```
 
-La pestaña «Para negocios» tiene que decir **$130**, no $108. Ese número no lo escribió nadie: salió de `precioDesde(sabores)`. **Es la fase entera en una línea.**
+La pestaña «Para negocios» tiene que decir **$130**, no $108. Ese número no lo escribió nadie: salió de `precioDesde(sabores)` — el mínimo de las quince barras, recalculado solo. **Es la fase entera en una línea.**
 
 Después, restaurá:
 
