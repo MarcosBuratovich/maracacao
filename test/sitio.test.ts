@@ -24,14 +24,18 @@ import Canela from '@/components/sitio/Canela.astro'
 const container = await AstroContainer.create()
 
 describe('la página / (rediseño de marca, 2026-08-13; en la raíz desde 2026-08-20)', () => {
-  it('renderiza el contenido real: los 15 sabores, correo, catálogo, Tabasco y punto de venta', async () => {
+  it('renderiza el contenido real: los 15 sabores, correo, catálogo y punto de venta', async () => {
     const html = await container.renderToString(Borrador)
     // Los quince están presentes: en el anaquel cada barra es un radio
     // con su nombre como aria-label.
     for (const s of sabores) expect(html).toContain(`aria-label="${s.nombre}"`)
     expect(html).toContain(marca.contacto.correo)
     expect(html).toContain(marca.contacto.catalogoUrl)
-    expect(html).toContain('Tabasco')
+    // El `toContain('Tabasco')` cayó con la Fase 1: es texto libre de
+    // `marca.nosotros` y de `postura.chips`, y no hay forma razonable de
+    // exigir «tiene que decir Tabasco» sobre contenido que la clienta
+    // reescribe. Lo que queda son los campos leídos del copy, que siguen la
+    // edición sola.
     expect(html).toContain(marca.contacto.direccion[0])
   })
 

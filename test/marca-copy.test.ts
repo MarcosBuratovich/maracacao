@@ -88,27 +88,18 @@ describe('sabores — fuente única sincronizada con el arte de imprenta', () =>
   it.each([...sabores])('el cacao de $nombre sale de lo impreso (salvo la decisión del cliente)', (s) => {
     const impreso = json[s.slug].cacao
     if (decididos70.includes(s.slug)) {
-      expect(impreso).toBe('73%') // lo impreso sigue diciendo 73…
-      expect(s.cacao).toBe('Cacao 70%') // …y el sitio muestra la decisión
+      // Solo el HECHO IMPRESO en la envoltura física, que no es copy del
+      // sitio. Lo que el sitio MUESTRA para estos dos («Cacao 70%») era un
+      // assert de valor y cayó con la Fase 1: es contenido de la clienta,
+      // igual que el precio.
+      expect(impreso).toBe('73%')
     } else if (impreso !== null) {
       expect(s.cacao).toBe(`Cacao ${impreso}`)
     }
     // chamoy y blanco vienen null en el JSON (el dato vive en la línea
-    // combinada): chamoy es 70% según su propia línea, el blanco no es
-    // chocolate oscuro.
-    else if (s.slug === 'chamoy') expect(s.cacao).toBe('Cacao 70%')
-    else expect(s.cacao).toBe('Chocolate blanco')
-  })
-
-  it('los nombres son los IMPRESOS en la envoltura (decisión 2026-08-13)', () => {
-    const nombres = sabores.map((s) => s.nombre)
-    expect(nombres).toContain('Jengibre y naranja') // no «Naranja con jengibre»
-    expect(nombres).toContain('Fresas y chile') // no «Fresas enchiladas»
-    expect(nombres).toContain('Hierbabuena') // no «Yerbabuena»
-    expect(nombres).toContain('Tamarindo con chile') // no «Tamarindo» a secas
-    expect(nombres).not.toContain('Naranja con jengibre')
-    expect(nombres).not.toContain('Fresas enchiladas')
-    expect(nombres).not.toContain('Yerbabuena')
+    // combinada), así que acá no hay nada impreso contra qué comparar: los
+    // dos asserts que fijaban «Cacao 70%» y «Chocolate blanco» a mano
+    // cayeron con la Fase 1 por el mismo motivo.
   })
 
   it('cada clave apunta a un token de color real', () => {
@@ -152,9 +143,12 @@ describe('sabores — fuente única sincronizada con el arte de imprenta', () =>
 })
 
 describe('gotas y polvo', () => {
-  it('las gotas son 6 sabores del catálogo, jengibre y naranja a 340', () => {
+  it('las gotas son 6 sabores del catálogo', () => {
+    // El conteo se queda hasta la Fase 7: hasta que exista el alta de ítems
+    // nadie lo puede violar, así que es un guard gratis. Los precios
+    // exactos (340 / 258) no: eran el mismo assert de valor que los 122/108
+    // de las barras y cayeron con ellos en la Fase 1.
     expect(gotas).toHaveLength(6)
-    for (const g of gotas) expect(g.precio).toBe(g.clave === 'jengibreYNaranja' ? 340 : 258)
   })
 
   it('la línea de polvo trae las OCHO etiquetas (el canvas mostraba 4)', () => {
@@ -166,8 +160,21 @@ describe('gotas y polvo', () => {
 })
 
 describe('estructura de la página', () => {
-  it('el menú incluye Nosotros (faltaba en el canvas)', () => {
-    expect(marca.nav.items.map((i) => i.texto)).toContain('Nosotros')
+  it('el menú: ninguna entrada repite su nombre ni su destino', () => {
+    // A FORMA (Fase 1). Exigía el texto «Nosotros», que es exactamente lo
+    // que la clienta va a poder renombrar desde el panel.
+    //
+    // Lo que queda NO es «cada texto no está vacío»: eso ya lo garantiza el
+    // esquema, y un assert que repite al esquema da la impresión de
+    // proteger algo sin proteger nada. Es que ninguna entrada repita su
+    // ancla ni su nombre — el esquema no lo puede ver, porque valida cada
+    // ítem por separado, y dos entradas al mismo lugar es el error
+    // plausible del día que ella reordena el menú. La otra mitad, que cada
+    // ancla tenga una sección viva, la cubre el candado 8.
+    const items = marca.nav.items
+    expect(items.length).toBeGreaterThan(0)
+    expect(new Set(items.map((i) => i.ancla)).size, 'dos entradas al mismo lugar').toBe(items.length)
+    expect(new Set(items.map((i) => i.texto)).size, 'dos entradas con el mismo nombre').toBe(items.length)
   })
 
   it('el FAQ quedó fusionado en 8 preguntas', () => {
