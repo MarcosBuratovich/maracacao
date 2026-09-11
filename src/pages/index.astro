@@ -445,7 +445,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
             <p class="mono receta-kicker">{r.kicker}</p>
             <h3 class="receta-titulo">{r.titulo}</h3>
             <p class="receta-resumen">{r.resumen}</p>
-            {'chipPolvo' in r && <p class="mono receta-chip">{r.chipPolvo}</p>}
+            {r.chipPolvo && <p class="mono receta-chip">{r.chipPolvo}</p>}
             <div class="receta-tip mano"><b>{marca.recetas.etiquetaTip}:</b> {r.tip}</div>
             <details class="receta-completa">
               <summary>{marca.recetas.verCompleta}</summary>
@@ -535,7 +535,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
             >
               <div class="negocio-encabezado">
                 <h3>{t.titulo}</h3>
-                <span class="mono">{t.precio === null ? t.precioNota : `${t.precioNota} ${precioMXN(t.precio)}`}</span>
+                <span class="mono">{t.precio == null ? t.precioNota : `${t.precioNota} ${precioMXN(t.precio)}`}</span>
               </div>
               <p class="negocio-cuerpo">{t.cuerpo}</p>
               <ul class="negocio-datos">
