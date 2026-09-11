@@ -49,6 +49,7 @@ import { fichasBase } from '../src/fichas/base'
 import { marca } from '../src/copy/sitio-marca'
 import { sabores, gotas } from '../src/copy/sabores'
 import * as tokens from '../src/tokens/color'
+import { TEXTOS_UI, textosUi } from '../src/contenido/textos-ui'
 // La foto congelada, no el módulo: el fixture no se mueve cuando la Tarea 13
 // reescriba la fachada, y estos tests validan CONTRA esa foto.
 import fixture from './fixtures/contenido-2026-09-10.json'
@@ -2314,5 +2315,35 @@ describe('los candados del sistema de contenido', () => {
     const texto = JSON.stringify(CRUDO.sitio)
     const correos = new Set(texto.match(/[\w.+-]+@[\w-]+\.[\w.]+/g) ?? [])
     expect([...correos]).toEqual([marca.contacto.correo])
+  })
+})
+
+describe('los textos que el script pinta en runtime', () => {
+  it('arma el objeto con los seis textos, sacados del contenido', () => {
+    const t = textosUi(fixture.marca as never)
+    expect(Object.keys(t).sort()).toEqual([
+      'copiado', 'enviando', 'envolturaAltPrefijo', 'ilustracionAltPrefijo', 'navAbrir', 'navCerrar',
+    ])
+    expect(t.copiado).toBe(fixture.marca.contacto.copiado)
+    expect(t.navCerrar).toBe(fixture.marca.nav.cerrar)
+  })
+
+  it('truena si una ruta declarada no da un texto', () => {
+    // Un texto de UI vacío se ve como un botón sin palabras, y averiguar
+    // por qué cuesta una tarde. Mejor que reviente el build.
+    const roto = JSON.parse(JSON.stringify(fixture.marca))
+    delete roto.contacto.copiado
+    expect(() => textosUi(roto)).toThrow(/contacto\.copiado/)
+  })
+
+  it('ninguna ruta de TEXTOS_UI está inventada: todas existen en el esquema', () => {
+    // El modo de falla que este test ataja: alguien renombra un campo del
+    // esquema y esta lista queda apuntando a una ruta muerta. El build no
+    // se entera hasta que el botón sale sin texto en producción.
+    const delEsquema = new Set<string>()
+    recorre(esquemaSitio, (ruta) => delEsquema.add(ruta))
+    for (const ruta of Object.values(TEXTOS_UI)) {
+      expect(delEsquema.has(ruta), `«${ruta}» no existe en el esquema del sitio`).toBe(true)
+    }
   })
 })

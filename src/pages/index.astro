@@ -26,6 +26,7 @@ import { sabores, gotas, polvo, urlCatalogoBarras } from '@/copy/sabores'
 import { sabor as colorSabor, tintaSabor, marca as paletaMarca } from '@/tokens/color'
 import { esquemaNegocio, esquemaPreguntas, esquemaBarras, origenCanonico } from '@/seo/esquema'
 import { jsonParaHtml } from '@/lib/json-en-html'
+import { textosUi } from '@/contenido/textos-ui'
 import '@/styles/global.css'
 import '@/styles/marca.css'
 
@@ -776,6 +777,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
     <script is:inline src="https://challenges.cloudflare.com/turnstile/api.js" async defer></script>
   )}
   <script type="application/json" id="datos-anaquel" set:html={jsonParaHtml(datosAnaquel)} />
+  <script type="application/json" id="textos-ui" set:html={jsonParaHtml(textosUi(marca))} />
   <script>
     import '@/scripts/marca'
   </script>

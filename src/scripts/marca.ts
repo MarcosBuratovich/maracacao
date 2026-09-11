@@ -2,9 +2,9 @@
  *
  * Todo es mejora progresiva: sin JS la página se ve completa y quieta
  * (los paneles de pestañas se apilan, el menú es una fila de enlaces,
- * el anaquel muestra la canela). Con `prefers-reduced-motion` no se
- * registran cursor, imanes, parallax ni marquesinas — la regla es
- * apagar, no atenuar. */
+ * el anaquel muestra el sabor con el que abre el build). Con
+ * `prefers-reduced-motion` no se registran cursor, imanes, parallax ni
+ * marquesinas — la regla es apagar, no atenuar. */
 
 export {} // módulo: si no, TypeScript trata el archivo como script global
 
@@ -100,6 +100,62 @@ async function montarBarra3D(caja: HTMLElement, alt: string): Promise<(slug: str
   return (slug) => { void aplica(slug) }
 }
 
+/* ---------- Los textos de UI que este script pinta ----------
+   `index.astro` publica `#textos-ui` con `textosUi(marca)` (ver
+   src/contenido/textos-ui.ts). Acá NO se importa ese módulo: es parte
+   de la capa de contenido, pensada para el build y para el panel, y
+   traerla completa metería esquemas y validación en el bundle del
+   navegador por seis strings. En vez de eso, este archivo declara su
+   propia lista de respaldo con las claves que necesita — es la
+   contraparte runtime de esa lista, no una importación de ella.
+
+   Igual que `#datos-anaquel`, un JSON roto no puede matar el módulo: un
+   menú que diga «Abrir menú» aunque esté abierto es molesto, pero un
+   script muerto deja los seis pasos de «Cómo catar» invisibles para
+   siempre. Acá el respaldo es POR CLAVE: si UNA sola ruta del contenido
+   viniera rota, las otras cinco (probablemente buenas) igual se
+   publican, en vez de tirar el objeto entero por una. */
+
+interface TextosUi {
+  navAbrir: string
+  navCerrar: string
+  copiado: string
+  enviando: string
+  envolturaAltPrefijo: string
+  ilustracionAltPrefijo: string
+}
+
+const RESPALDO_TEXTOS_UI: TextosUi = {
+  navAbrir: 'Abrir menú',
+  navCerrar: 'Cerrar menú',
+  copiado: '¡Copiado!',
+  enviando: 'Enviando',
+  envolturaAltPrefijo: 'Envoltura de',
+  ilustracionAltPrefijo: 'Ilustración de la envoltura de',
+}
+
+const textosCrudos = document.getElementById('textos-ui')?.textContent
+let textos: TextosUi = RESPALDO_TEXTOS_UI
+if (textosCrudos) {
+  try {
+    const parseado: unknown = JSON.parse(textosCrudos)
+    // No alcanza con que parsee: `JSON.parse` devuelve `any`, y un `{}`,
+    // un número o un array son truthy y pasarían un chequeo más flojo.
+    // Por clave: solo se reemplaza el texto de respaldo cuando la ruta
+    // dio de verdad un string.
+    if (parseado && typeof parseado === 'object' && !Array.isArray(parseado)) {
+      const crudo = parseado as Record<string, unknown>
+      const salida = { ...RESPALDO_TEXTOS_UI }
+      for (const clave of Object.keys(RESPALDO_TEXTOS_UI) as (keyof TextosUi)[]) {
+        if (typeof crudo[clave] === 'string') salida[clave] = crudo[clave]
+      }
+      textos = salida
+    }
+  } catch {
+    /* textos se queda en RESPALDO_TEXTOS_UI, ya asignado arriba. */
+  }
+}
+
 /* ---------- 1. Menú overlay ---------- */
 
 const menuBoton = document.querySelector<HTMLButtonElement>('[data-menu-boton]')
@@ -115,7 +171,7 @@ if (menuBoton && menu) {
     menu.classList.toggle('abierto', abierto)
     raiz.classList.toggle('menu-abierto', abierto)
     menuBoton.setAttribute('aria-expanded', String(abierto))
-    if (menuTexto) menuTexto.textContent = abierto ? 'Cerrar menú' : 'Abrir menú'
+    if (menuTexto) menuTexto.textContent = abierto ? textos.navCerrar : textos.navAbrir
     document.body.style.overflow = abierto ? 'hidden' : ''
     // El overlay no es una sección [data-tono], así que el cursor de
     // sello conservaría la tinta anterior (invisible sobre el fondo
@@ -217,8 +273,14 @@ if (datos && anaquel) {
   // cuál se ve; sin JS se apilan las quince, completas.
   const fichas = [...document.querySelectorAll<HTMLElement>('[data-ficha-de]')]
 
+  // `saborInicial` es una CLAVE de sabor (anaquel.saborInicial), no un
+  // slug: coinciden por casualidad en canela. El build ya publica la
+  // decisión con `aria-checked="true"` en el radio correspondiente
+  // (index.astro), así que este `??` solo corre si ese render vino roto
+  // — y ahí el respaldo es el primer sabor del anaquel, sea cual sea.
   let slugActual =
-    radios.find((r) => r.getAttribute('aria-checked') === 'true')?.dataset.anaquelRadio ?? 'canela'
+    radios.find((r) => r.getAttribute('aria-checked') === 'true')?.dataset.anaquelRadio ??
+    datos[0]?.slug ?? ''
   // El visor 3D se engancha acá cuando termina de cargar (sección 3c).
   let visorElige: ((slug: string) => void) | null = null
 
@@ -242,11 +304,11 @@ if (datos && anaquel) {
     fichas.forEach((f) => { f.hidden = f.dataset.fichaDe !== slug })
     if (envoltura) {
       envoltura.src = `/sitio/marca/barra-${d.slug}.webp`
-      envoltura.alt = `Envoltura de ${d.nombre}`
+      envoltura.alt = `${textos.envolturaAltPrefijo} ${d.nombre}`
     }
     if (ilustracion) {
       ilustracion.src = `/sitio/marca/ilustracion-${d.slug}.webp`
-      ilustracion.alt = `Ilustración de la envoltura de ${d.nombre}`
+      ilustracion.alt = `${textos.ilustracionAltPrefijo} ${d.nombre}`
     }
   }
 
@@ -298,7 +360,7 @@ for (const boton of document.querySelectorAll<HTMLButtonElement>('[data-copiar]'
   boton.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(boton.dataset.copiar ?? '')
-      if (texto) texto.textContent = '¡Copiado!'
+      if (texto) texto.textContent = textos.copiado
       setTimeout(() => { if (texto) texto.textContent = original }, 1600)
     } catch {
       /* sin permiso de portapapeles: el mailto sigue ahí */
@@ -352,7 +414,7 @@ if (formulario) {
     if (aviso) aviso.hidden = true
     if (boton) boton.disabled = true
     formulario.dataset.estado = 'enviando'
-    if (botonTexto) botonTexto.textContent = 'Enviando'
+    if (botonTexto) botonTexto.textContent = textos.enviando
     try {
       const respuesta = await fetch('/api/contacto', {
         method: 'POST',
