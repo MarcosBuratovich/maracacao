@@ -97,9 +97,10 @@ body {
   background: linear-gradient(172deg, #5a3316 0%, var(--mrc-marca-tinta) 45%, var(--mrc-marca-oscuro) 100%);
 }
 [data-tono='sabor'] {
-  /* Valores por defecto = canela (la selección inicial del anaquel). */
-  --fondo: var(--mrc-sabor-canela);
-  --texto: var(--mrc-tinta-sabor-canela);
+  /* --fondo/--texto no tienen valor acá: el único elemento con este tono
+     (`index.astro`, el anaquel) siempre los trae en el `style` inline,
+     calculados a partir de `anaquel.saborInicial`. El script del anaquel
+     los reescribe cuando la visitante elige otra barra. */
   --suave: var(--texto);
   transition: background 0.45s ease-out;
 }

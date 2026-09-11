@@ -10,7 +10,7 @@
  * `grupo` agregaría un nivel de anidamiento que no existe en el contenido
  * (`producto.postura.titulo` en vez de `postura.titulo`).
  */
-import { grupo, lista, texto, parrafo, precio, medida, derivado } from '../../campos'
+import { grupo, lista, texto, parrafo, precio, medida, derivado, claveSabor } from '../../campos'
 
 const enProductos = { seccion: 'productos' } as const
 const enSabores = { seccion: 'sabores' } as const
@@ -132,6 +132,17 @@ export const camposDeProducto = {
         etiqueta: 'Título del anaquel',
         ayuda: 'El título grande de la sección de sabores.',
         maxCaracteres: 30,
+      }),
+      // Con qué barra abre el anaquel antes de que la visitante elija.
+      // Estaba escrito a mano en TRES lugares —index.astro, marca.ts y
+      // marca.css— y ninguno se llamaba igual, así que dar de baja ese
+      // sabor en la fase 7 rompía el sitio en tres puntos sin relación
+      // aparente. `quien: 'marcos'` porque es una decisión de diseño del
+      // anaquel, no copy: la clienta no la ve escrita en ningún lado.
+      saborInicial: claveSabor({
+        ...enSabores,
+        etiqueta: 'Sabor con el que abre el anaquel',
+        ayuda: 'La barra que se muestra al llegar a la sección, antes de que la visitante elija otra.',
       }),
       // «de 15». No lleva `cuenta`: cruzaConteo() exige que el número sea
       // vecino inmediato de un sustantivo y acá no hay ninguno (la

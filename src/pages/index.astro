@@ -31,8 +31,9 @@ import '@/styles/marca.css'
 
 const sello = selloRaw.replace('<svg', '<svg aria-hidden="true" focusable="false"')
 
-// La selección inicial del anaquel: canela (contraste AAA con blanco).
-const inicial = sabores.find((s) => s.slug === 'canela')!
+// La selección inicial del anaquel sale del dato, no de un literal acá:
+// la decide `marca.anaquel.saborInicial`.
+const inicial = sabores.find((s) => s.clave === marca.anaquel.saborInicial)!
 
 // La marquesina del hero lleva los QUINCE sabores, dos veces por tramo:
 // con ocho, en pantallas muy anchas el tramo quedaba más angosto que la

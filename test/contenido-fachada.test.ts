@@ -111,13 +111,11 @@ describe('las nueve aserciones de forma', () => {
   })
 
   it('7 · el sabor con el que abre el anaquel existe', () => {
-    // index.astro:35 hace `sabores.find((s) => s.slug === 'canela')!` — con
-    // el `!` puesto. Si ese slug dejara de existir, TypeScript no dice
-    // nada y la portada del anaquel se pinta con `undefined`: banda sin
-    // color y nombre vacío. El slug va como `quien: 'marcos'`, así que la
-    // clienta no puede romperlo — pero un candado de una línea sobre algo
-    // que hoy solo sostiene un `!` es barato.
-    expect(sabores.find((s) => s.slug === 'canela')).toBeDefined()
+    // index.astro:35 hace `sabores.find((s) => s.clave === marca.anaquel
+    // .saborInicial)!` — con el `!` puesto. Si ese sabor dejara de existir,
+    // TypeScript no dice nada y la portada del anaquel se pinta con
+    // `undefined`: banda sin color y nombre vacío.
+    expect(sabores.find((s) => s.clave === marca.anaquel.saborInicial)).toBeDefined()
   })
 
   it('8 · los nueve espacios duros siguen siendo espacios duros', () => {

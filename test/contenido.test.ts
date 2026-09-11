@@ -2196,6 +2196,7 @@ describe('los candados del sistema de contenido', () => {
     expect(deMarcos.sort()).toMatchInlineSnapshot(`
       [
         "anaquel.contadorDe",
+        "anaquel.saborInicial",
         "catar.pasos[].clave",
         "contacto.catalogoUrl",
         "contacto.formulario.tipoOpciones.0.valor",
