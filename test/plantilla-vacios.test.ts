@@ -1,5 +1,5 @@
 /*
- * Los dos arreglos de index.astro:448 y :538 (fix round 1 de la Tarea 2)
+ * Los dos arreglos de index.astro:448 y :538 (fase 2 del panel)
  * son sobre un caso que HOY no puede ocurrir —`texto()` rechaza el string
  * vacío tras trim, y `precioONada()` da `null`, nunca `undefined`— pero que
  * el panel de la fase 6 puede llegar a provocar: guardar '' al vaciar un
@@ -51,7 +51,7 @@ import { marca } from '@/copy/sitio-marca'
 
 const container = await AstroContainer.create()
 
-describe('la plantilla ante vacíos que el panel puede provocar (fase 2, tarea 2, fix round 1)', () => {
+describe('la plantilla ante vacíos que el panel puede provocar', () => {
   it('el chip vacío no renderiza la cajita, y las recetas con chip siguen mostrando el suyo', async () => {
     const html = await container.renderToString(Borrador)
     // index.astro:448 — con la vieja `'chipPolvo' in r`, la receta que en

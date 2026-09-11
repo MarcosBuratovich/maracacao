@@ -222,7 +222,7 @@ export const camposDeExperiencia = {
             //
             // LA TRAMPA, YA ARREGLADA: index.astro:448 hoy hace
             // `{r.chipPolvo && …}`, que mira el CONTENIDO, no si la CLAVE
-            // existe (fix round 1 de la Tarea 2 de la fase 2, sobre el viejo
+            // existe (arreglado en la fase 2 del panel, sobre el viejo
             // `'chipPolvo' in r`). Con el viejo, un '' guardado por el panel
             // renderizaba `<p class="mono receta-chip"></p>`: una cajita
             // amarilla vacía de 6×10 px con 12 px de margen, y como las
