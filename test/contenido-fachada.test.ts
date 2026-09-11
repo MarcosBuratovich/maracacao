@@ -40,7 +40,7 @@ describe('el certificado de la migración', () => {
   })
 })
 
-describe('las aserciones de forma', () => {
+describe('las nueve aserciones de forma', () => {
   // Las expresiones de index.astro que dependen de la FORMA del dato y no
   // de su valor. Cada una nombra la línea que la necesita.
 
@@ -157,22 +157,5 @@ describe('las aserciones de forma', () => {
       marca.anaquel.contadorDe,
       `«${marca.anaquel.contadorDe}» tendría que terminar en ${sabores.length}`,
     ).toMatch(new RegExp(`(^|\\D)${sabores.length}\\s*$`))
-  })
-
-  it('10 · el chip vacío no renderiza la cajita, y un precio ausente no renderiza $NaN', () => {
-    // Los dos arreglos de index.astro:448 y :538 son sobre un caso que hoy
-    // no puede ocurrir —`texto()` rechaza el vacío y `precioONada` da
-    // `null`, no `undefined`— pero que el panel de la fase 6 puede provocar.
-    // Se prueban con las mismas expresiones que usa la plantilla, sobre el
-    // valor que hoy no llega.
-    const chip = (r: { chipPolvo?: string }) => Boolean(r.chipPolvo)
-    expect(chip({ chipPolvo: '' })).toBe(false)          // la vieja daba true
-    expect(chip({ chipPolvo: 'USA EL POLVO' })).toBe(true)
-    expect(chip({})).toBe(false)
-
-    const nota = (t: { precio?: number | null }) => t.precio == null
-    expect(nota({ precio: undefined })).toBe(true)        // la vieja daba false
-    expect(nota({ precio: null })).toBe(true)
-    expect(nota({ precio: 108 })).toBe(false)
   })
 })

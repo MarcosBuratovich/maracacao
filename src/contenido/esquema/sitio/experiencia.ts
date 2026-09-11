@@ -220,18 +220,20 @@ export const camposDeExperiencia = {
             // `anota()` recibe siempre el esquema TERMINADO, antes de
             // envolverlo).
             //
-            // LA TRAMPA, MEDIDA: index.astro:448 hace `{'chipPolvo' in r &&
-            // …}`, que pregunta si la CLAVE existe, no si tiene contenido.
-            // En zod 4.4.3, `.optional()` sobre `{chipPolvo: ''}` devuelve
-            // el objeto CON la clave. Si el panel guardara '' al vaciar el
-            // campo, se renderizaría `<p class="mono receta-chip"></p>`:
-            // una cajita amarilla vacía de 6×10 px con 12 px de margen, y
-            // como las cuatro tarjetas se estiran a la más alta, crecen las
-            // cuatro.
+            // LA TRAMPA, YA ARREGLADA: index.astro:448 hoy hace
+            // `{r.chipPolvo && …}`, que mira el CONTENIDO, no si la CLAVE
+            // existe (fix round 1 de la Tarea 2 de la fase 2, sobre el viejo
+            // `'chipPolvo' in r`). Con el viejo, un '' guardado por el panel
+            // renderizaba `<p class="mono receta-chip"></p>`: una cajita
+            // amarilla vacía de 6×10 px con 12 px de margen, y como las
+            // cuatro tarjetas se estiran a la más alta, crecían las cuatro.
             //
-            // El arreglo de index.astro es de la FASE 2 (esta fase no toca
-            // .astro). Lo que sí se clava acá es la forma que hoy lo hace
-            // imposible: la clave NO existe en las tres recetas sin chip.
+            // Lo que sí se clava acá es la forma que la aserción 1 del
+            // certificado (`test/contenido-fachada.test.ts`) sigue pinneando:
+            // la clave NO existe en las tres recetas sin chip. Con
+            // `.optional()` eso alcanza para que `r.chipPolvo` sea
+            // `undefined` —y por lo tanto falsy— sin depender de que
+            // `texto()` siga rechazando el string vacío.
             chipPolvo: texto({
               ...enRecetas,
               etiqueta: 'Cápsula de polvo',
