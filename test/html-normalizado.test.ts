@@ -11,6 +11,14 @@ describe('el normalizador de HTML de la fase 2', () => {
     const antes = env('<p class="mono">Hola</p>')
     const despues = env('<p class="mono" data-campo="hero.sub">Hola</p>')
     expect(normaliza(despues)).toBe(normaliza(antes))
+
+    // Y el de atributo, que es el que la Parte B va a usar en los quince
+    // campos que viven adentro de un `alt`, un `aria-label`, un
+    // `data-copiar` o un `content`. Sin este caso, la línea que lo borra
+    // no la probaba nada.
+    const conAttr = env('<img src="x.webp" alt="Envoltura de canela" data-campo-attr="alt:anaquel.envolturaAltPrefijo">')
+    const sinAttr = env('<img src="x.webp" alt="Envoltura de canela">')
+    expect(normaliza(conAttr)).toBe(normaliza(sinAttr))
   })
 
   it('desenvuelve el span que la fase 2 inventó', () => {
