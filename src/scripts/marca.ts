@@ -8,6 +8,15 @@
 
 export {} // módulo: si no, TypeScript trata el archivo como script global
 
+// Import DE SOLO TIPO: `import type` se borra del todo al compilar, así
+// que el bundle del navegador no carga ni un byte de src/contenido/ (ver
+// el comentario de abajo, en RESPALDO_TEXTOS_UI). Lo que sí cruza es la
+// garantía del compilador: si alguien agrega una séptima clave a
+// TEXTOS_UI y no la agrega acá, `Record<ClaveTextoUi, string>` la exige y
+// `pnpm typecheck` avisa — antes de esto, nada ataba a las dos listas y
+// una clave nueva se pintaba en silencio con el literal de respaldo.
+import type { ClaveTextoUi } from '../contenido/textos-ui'
+
 interface DatoSabor {
   slug: string
   orden: number
@@ -102,12 +111,14 @@ async function montarBarra3D(caja: HTMLElement, alt: string): Promise<(slug: str
 
 /* ---------- Los textos de UI que este script pinta ----------
    `index.astro` publica `#textos-ui` con `textosUi(marca)` (ver
-   src/contenido/textos-ui.ts). Acá NO se importa ese módulo: es parte
-   de la capa de contenido, pensada para el build y para el panel, y
-   traerla completa metería esquemas y validación en el bundle del
-   navegador por seis strings. En vez de eso, este archivo declara su
-   propia lista de respaldo con las claves que necesita — es la
-   contraparte runtime de esa lista, no una importación de ella.
+   src/contenido/textos-ui.ts). Acá NO se importa ese módulo EN VALOR: es
+   parte de la capa de contenido, pensada para el build y para el panel,
+   y traerla completa metería esquemas y validación en el bundle del
+   navegador por seis strings. Lo único que cruza es el TIPO
+   `ClaveTextoUi` (import type, arriba del archivo) — se borra al
+   compilar, así que no pesa nada en el bundle, pero ata el objeto de
+   respaldo de abajo a la lista real: agregar una clave a TEXTOS_UI y no
+   acá es un error de `pnpm typecheck`, no un silencio.
 
    Igual que `#datos-anaquel`, un JSON roto no puede matar el módulo: un
    menú que diga «Abrir menú» aunque esté abierto es molesto, pero un
@@ -116,16 +127,7 @@ async function montarBarra3D(caja: HTMLElement, alt: string): Promise<(slug: str
    viniera rota, las otras cinco (probablemente buenas) igual se
    publican, en vez de tirar el objeto entero por una. */
 
-interface TextosUi {
-  navAbrir: string
-  navCerrar: string
-  copiado: string
-  enviando: string
-  envolturaAltPrefijo: string
-  ilustracionAltPrefijo: string
-}
-
-const RESPALDO_TEXTOS_UI: TextosUi = {
+const RESPALDO_TEXTOS_UI: Record<ClaveTextoUi, string> = {
   navAbrir: 'Abrir menú',
   navCerrar: 'Cerrar menú',
   copiado: '¡Copiado!',
@@ -135,7 +137,7 @@ const RESPALDO_TEXTOS_UI: TextosUi = {
 }
 
 const textosCrudos = document.getElementById('textos-ui')?.textContent
-let textos: TextosUi = RESPALDO_TEXTOS_UI
+let textos: Record<ClaveTextoUi, string> = RESPALDO_TEXTOS_UI
 if (textosCrudos) {
   try {
     const parseado: unknown = JSON.parse(textosCrudos)
@@ -146,7 +148,7 @@ if (textosCrudos) {
     if (parseado && typeof parseado === 'object' && !Array.isArray(parseado)) {
       const crudo = parseado as Record<string, unknown>
       const salida = { ...RESPALDO_TEXTOS_UI }
-      for (const clave of Object.keys(RESPALDO_TEXTOS_UI) as (keyof TextosUi)[]) {
+      for (const clave of Object.keys(RESPALDO_TEXTOS_UI) as ClaveTextoUi[]) {
         if (typeof crudo[clave] === 'string') salida[clave] = crudo[clave]
       }
       textos = salida
