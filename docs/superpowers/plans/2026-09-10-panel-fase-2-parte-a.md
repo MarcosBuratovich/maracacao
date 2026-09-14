@@ -1258,3 +1258,65 @@ EOF
 - Los cuatro campos cuyo valor no aparece literal porque la plantilla lo transforma (`hero.titular.1`, `footer.legalesNota`, y los precios que `precioMXN` formatea).
 - El `alt` del visor 3D, que necesita un campo de esquema que hoy no existe (Ruling D).
 - `Insignia.astro` y `EtiquetaSabor.astro` reciben una prop `campo`, porque el nodo a marcar vive adentro de ellos. Están en `src/components/marca/`, no en `sitio/` como dice el spec.
+
+---
+
+## Cierre de la Parte A (2026-09-14)
+
+Las siete tareas se ejecutaron con subagent-driven-development sobre la rama
+`panel-fase-2-parte-a`. Cada una pasó su propia revisión; la revisión final de
+toda la rama (opus) dio «ready to merge with fixes», con dos Critical que se
+arreglaron acá y el resto anotado abajo. Estado al cerrar: **901 tests verdes
+en 35 archivos, `astro check` 0 errores / 0 warnings / 4 hints.**
+
+**Lo que la revisión final encontró y se arregló en esta rama:**
+
+- **La regla del `<span>` del verificador nunca se disparaba.** Astro estampa
+  `data-astro-cid-<hash>` en todo elemento de un componente con `<style>`, así
+  que un `<span data-campo="x">` de la Parte B llega con ese atributo y la
+  regla vieja —«¿quedó en cero atributos?»— no lo desenvolvía nunca: cada span
+  inventado iba a aparecer como un cambio estructural. La regla nueva
+  desenvuelve solo los `<span>` que TRAJERON `data-campo` y a los que, sacando
+  el estampado de Astro, no les queda nada. (commits `f1109c7`, `8cdb402`)
+- **Los tests del normalizador usaban HTML a mano sin ese estampado**, una
+  forma que Astro no emite — por eso el defecto pasó cuatro revisiones.
+
+**Lo que la Parte B tiene que absorber, además de la lista de arriba:**
+
+- `src/layouts/Base.astro:96` — `og:site_name="Maracacao"` es un literal de
+  `marca.marca.nombre`, que la clienta edita. La revisión barrió todas las
+  hojas del esquema contra todos los accesos de `src/`: es el **último**
+  huérfano de su clase. Cambia el HTML de las once páginas, así que va con su
+  recaptura declarada.
+- `index.astro:737` — `aria-label="Mapa del sitio"` no tiene campo de esquema:
+  a la lista de cierre, al lado del `alt` del visor 3D (Ruling D).
+- **El retiro del verificador**: la última tarea de la Parte B lo borra o lo
+  saca del camino de deploy. Ver `docs/tests-que-congelan-contenido.md`.
+- El candado cruzado de la dirección (`contacto.ts`) compara con `.includes()`
+  sensible a acentos y mayúsculas: «Coyoacan» sin tilde le rompe el build a la
+  clienta. Normalizar los dos lados antes de comparar.
+- `contacto.direccionPostal.estado` no tiene candado — candidato a selector de
+  los 32 estados en vez de texto libre.
+- `src/scripts/marca.ts` — `datos.get('tipo') === 'negocio'` duplica
+  `contacto.formulario.tipoOpciones.1.valor` (es `quien: 'marcos'`, así que no
+  es el modo de falla de la clienta, pero es el mismo acoplamiento escondido).
+- `src/scripts/marca.ts` — `d.ilustracion ?? true` es rama muerta y su
+  comentario enseña un modelo equivocado: el HTML viejo siempre carga el JS
+  viejo, así que un JSON cacheado sin la clave no puede pasar.
+- `test/anaquel-ilustracion.test.ts` congela el slug `'canela'`: que salga del
+  dato (`marca.anaquel.saborInicial`) en vez de estar clavado.
+- `src/lib/ilustraciones.ts` — si algún día se agrega un adapter de servidor,
+  `public/` no existe en tiempo de request, `tieneIlustracion` da `false` para
+  los quince y las ilustraciones desaparecen sin que ningún test se entere.
+  Falta una aserción de que al menos un sabor tiene dibujo.
+- `test/fixtures/html-antes-fase-2/` ya no se llama como lo que es: se
+  recapturó tres veces con cambios declarados. Renombrar o poner un README.
+- El verificador recorre la carpeta de fixtures, no `dist/`: una página nueva
+  se escapa de la verificación sin que nada avise.
+- El test nuevo de `seo.test.ts` pasa igual si alguien vuelve a literales
+  iguales a los de hoy. Con `test/plantilla-vacios.test.ts` como patrón, hay
+  una respuesta barata: mockear el copy con otra dirección y re-renderizar.
+- **Aparcado de la fase 1, sigue abierto:** en la fase 7 (baja de un sabor),
+  `anaquel.saborInicial` puede quedar apuntando a un sabor que ya no está. El
+  chequeo tiene que ser cruzado entre documentos y vivir en la carga, no en un
+  test.
