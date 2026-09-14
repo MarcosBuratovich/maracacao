@@ -26,6 +26,7 @@ import { sabores, gotas, polvo, urlCatalogoBarras } from '@/copy/sabores'
 import { sabor as colorSabor, tintaSabor, marca as paletaMarca } from '@/tokens/color'
 import { esquemaNegocio, esquemaPreguntas, esquemaBarras, origenCanonico } from '@/seo/esquema'
 import { jsonParaHtml } from '@/lib/json-en-html'
+import { tieneIlustracion } from '@/lib/ilustraciones'
 import { textosUi } from '@/contenido/textos-ui'
 import '@/styles/global.css'
 import '@/styles/marca.css'
@@ -35,6 +36,13 @@ const sello = selloRaw.replace('<svg', '<svg aria-hidden="true" focusable="false
 // La selección inicial del anaquel sale del dato, no de un literal acá:
 // la decide `marca.anaquel.saborInicial`.
 const inicial = sabores.find((s) => s.clave === marca.anaquel.saborInicial)!
+
+// Si el sabor de arranque no tiene ilustración dibujada todavía (fase 7:
+// la clienta da de alta un sabor nuevo, y ese sabor no la tiene hasta que
+// alguien la dibuje), el <figure> de abajo nace `hidden` y sin `src` roto
+// — ver `src/lib/ilustraciones.ts`. Hoy los quince la tienen, así que
+// esto no cambia nada visible.
+const inicialTieneIlustracion = tieneIlustracion(inicial.slug)
 
 // La marquesina del hero lleva los QUINCE sabores, dos veces por tramo:
 // con ocho, en pantallas muy anchas el tramo quedaba más angosto que la
@@ -56,6 +64,11 @@ const datosAnaquel = sabores.map((s) => ({
   // La página del producto; las barras que aún no existen en el
   // catálogo caen a la categoría de barras.
   url: s.catalogo ?? urlCatalogoBarras,
+  // Viaja al script del anaquel: cuando el visitante elige otro sabor,
+  // `marca.ts` tiene que saber si ESE sabor tiene ilustración antes de
+  // pintar el <figure> — la condición de build sola no alcanza, porque
+  // el sabor que la clienta agregue casi seguro no es el de arranque.
+  ilustracion: tieneIlustracion(s.slug),
 }))
 
 // La tinta de un sabor es blanca o la de impreso: con distinguir la
@@ -324,10 +337,10 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
                 </div>
               </div>
             ))}
-            <figure class="ficha-ilustracion">
+            <figure class="ficha-ilustracion" hidden={!inicialTieneIlustracion}>
               <img
                 class="flota"
-                src={`/sitio/marca/ilustracion-${inicial.slug}.webp`}
+                src={inicialTieneIlustracion ? `/sitio/marca/ilustracion-${inicial.slug}.webp` : undefined}
                 alt={`${marca.anaquel.ilustracionAltPrefijo} ${inicial.nombre}`}
                 width="400"
                 height="450"

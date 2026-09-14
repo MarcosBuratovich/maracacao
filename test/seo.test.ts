@@ -242,8 +242,12 @@ describe('los sabores son texto servido, no solo aria-labels', () => {
   })
 
   it('sin `hidden` servido en las fichas: sin JS se ven las quince (el script esconde al tomar control)', () => {
+    // El corte termina en `ficha-ilustracion`, no en `ficha-extras`: el
+    // <figure> de la ilustración (Tarea 7) SÍ puede traer `hidden` de
+    // build cuando el sabor no tiene dibujo — no es una de las quince
+    // fichas de este test, que solo cubre los divs `data-ficha-de`.
     const fuente = readFileSync('src/pages/index.astro', 'utf8')
-    const bloque = fuente.slice(fuente.indexOf('data-ficha-de'), fuente.indexOf('ficha-extras'))
+    const bloque = fuente.slice(fuente.indexOf('data-ficha-de'), fuente.indexOf('ficha-ilustracion'))
     expect(bloque).not.toContain('hidden')
   })
 })

@@ -70,6 +70,23 @@ describe('la página / (rediseño de marca, 2026-08-13; en la raíz desde 2026-0
     expect(html).toMatch(/data-anaquel-banda[^>]*--fondo:#7D0303;--texto:#FFFFFF/)
   })
 
+  it('la ilustración no se renderiza si el sabor no tiene dibujo', async () => {
+    // Hoy los quince lo tienen, así que este test no protege de nada
+    // todavía: protege de la fase 7, cuando la clienta pueda dar de alta
+    // un sabor. Sin la condición, ese sabor publica un <img> roto y un
+    // pie de foto sobre nada.
+    //
+    // Se prueba sobre el sabor de arranque real, que sí tiene dibujo: el
+    // <figure> tiene que estar. La otra dirección se prueba en
+    // test/anaquel-ilustracion.test.ts, mockeando src/lib/ilustraciones
+    // (no hay forma de fabricar un sabor sin archivo sin borrar uno del
+    // repo — eso lo prueba el paso 3 del task-7-report.md, como
+    // integración real).
+    const html = await container.renderToString(Borrador)
+    expect(html).toContain('ficha-ilustracion')
+    expect(html).toMatch(/ilustracion-[a-z0-9-]+\.webp/)
+  })
+
   it('sin marcas de maqueta: ni aviso de borrador ni chips de pendiente', async () => {
     const html = await container.renderToString(Borrador)
     expect(html).not.toContain('Borrador')

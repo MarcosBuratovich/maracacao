@@ -28,6 +28,12 @@ interface DatoSabor {
   tinta: string
   /** Página del producto en el catálogo (o la categoría de barras). */
   url: string
+  /** Si el sabor tiene ilustración de la envoltura (index.astro la calcula
+   *  contra el disco en build, ver src/lib/ilustraciones.ts). Opcional:
+   *  un `#datos-anaquel` de una build vieja en caché puede no traer esta
+   *  clave todavía — `elige()` la trata como `true` en ese caso, para no
+   *  apagar de golpe una ilustración que el sabor sí tiene. */
+  ilustracion?: boolean
 }
 
 const raiz = document.documentElement
@@ -309,8 +315,17 @@ if (datos && anaquel) {
       envoltura.alt = `${textos.envolturaAltPrefijo} ${d.nombre}`
     }
     if (ilustracion) {
-      ilustracion.src = `/sitio/marca/ilustracion-${d.slug}.webp`
-      ilustracion.alt = `${textos.ilustracionAltPrefijo} ${d.nombre}`
+      // `d.ilustracion` ausente (JSON viejo en caché) se trata como
+      // `true` — ver el comentario de DatoSabor.
+      const tiene = d.ilustracion ?? true
+      const figura = ilustracion.closest<HTMLElement>('figure')
+      if (figura) figura.hidden = !tiene
+      // Sin dibujo: no se toca `src` — mantenerlo intacto (o vacío, si
+      // nunca hubo uno) es mejor que apuntar a un .webp que no existe.
+      if (tiene) {
+        ilustracion.src = `/sitio/marca/ilustracion-${d.slug}.webp`
+        ilustracion.alt = `${textos.ilustracionAltPrefijo} ${d.nombre}`
+      }
     }
   }
 
