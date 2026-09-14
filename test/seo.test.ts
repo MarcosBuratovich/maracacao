@@ -114,14 +114,31 @@ describe('JSON-LD — datos reales, nada inventado', () => {
     expect(tipos).toEqual(expect.arrayContaining(['LocalBusiness', 'FAQPage', 'ItemList']))
   })
 
-  it('el negocio: dirección real de Coyoacán, el correo del cliente y la home como url', () => {
+  it('el negocio: el correo del cliente y la home como url', () => {
     const negocio = esquemaNegocio(ORIGEN)
     expect(negocio.url).toBe(`${ORIGEN}/`)
-    expect(negocio.address.streetAddress).toContain('Mercado de Coyoacán')
-    expect(negocio.address.postalCode).toBe('04100')
     expect(negocio.email).toBe(marca.contacto.correo)
     // Sin redes en sameAs hasta confirmar dónde vive @maracacaomx.
     expect(negocio.sameAs).toEqual([marca.contacto.catalogoUrl])
+  })
+
+  it('la dirección del JSON-LD sale del copy y no de cinco literales', () => {
+    // El mismo dato estaba escrito en dos lugares: si el puesto se muda,
+    // ella edita el copy y Google sigue mostrando la dirección vieja en su
+    // ficha de negocio. Este test exige las dos cosas: que el JSON-LD siga
+    // diciendo exactamente lo mismo que hoy, y que lo diga leyendo el
+    // copy — comparado contra EL COPY, no contra un literal, porque un
+    // literal acá es el mismo bug que esta tarea corrige, solo que ahora
+    // vive en el test y bloquea `pnpm build` el día que ella edite la
+    // dirección de verdad.
+    const negocio = esquemaNegocio(ORIGEN)
+    expect(negocio.address.streetAddress).toBe(
+      `${marca.contacto.puestoTitulo.join(' ')}, ${marca.contacto.direccion[0]}`,
+    )
+    expect(negocio.address.addressLocality).toBe(marca.contacto.direccionPostal.localidad)
+    expect(negocio.address.addressRegion).toBe(marca.contacto.direccionPostal.estado)
+    expect(negocio.address.postalCode).toBe(marca.contacto.direccionPostal.codigoPostal)
+    expect(negocio.address.addressCountry).toBe('MX')
   })
 
   it('las preguntas del FAQPage son las 8 de la sección, textuales', () => {

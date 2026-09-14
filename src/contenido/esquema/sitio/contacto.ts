@@ -77,6 +77,45 @@ export const camposDeContacto = {
           }),
         ],
       }),
+      // ── La dirección que lee Google, no la que lee la persona ──────
+      //
+      // El JSON-LD (`PostalAddress`, src/seo/esquema.ts) necesita la
+      // localidad, el estado y el código postal como VALORES SUELTOS, y
+      // `direccion` de arriba no los tiene así: «Coyoacán» en
+      // `puestoTitulo` es el nombre del MERCADO, no la alcaldía —coincide
+      // con ella de pura casualidad—, y el CP y el estado viven adentro
+      // de la segunda línea de `direccion` como texto libre («Coyoacán,
+      // C.P. 04100, CDMX», con «CDMX» ≠ «Ciudad de México»). Sacarlos de
+      // ahí con un regex es adivinar, y la clienta puede reescribir esa
+      // línea mañana sin saber que algo más la está leyendo. Por eso son
+      // TRES campos propios, con su propio candado más abajo
+      // (`.superRefine()`) que avisa si esta línea y esos campos dejan
+      // de decir lo mismo.
+      direccionPostal: grupo({
+        ...enContacto,
+        etiqueta: 'Dirección para Google',
+        ayuda: 'No se ve en la página: es la dirección que Google usa en la ficha del negocio y en los buscadores.',
+        campos: {
+          localidad: texto({
+            ...enContacto,
+            etiqueta: 'Localidad (para Google)',
+            ayuda: 'No se ve en la página: es la localidad que Google muestra en la ficha del negocio. Si cambias la dirección del pie de página, cambia también esta.',
+            maxCaracteres: 30,
+          }),
+          estado: texto({
+            ...enContacto,
+            etiqueta: 'Estado (para Google)',
+            ayuda: 'No se ve en la página: es el estado que Google muestra en la ficha del negocio. Si cambias la dirección del pie de página, cambia también esta.',
+            maxCaracteres: 30,
+          }),
+          codigoPostal: texto({
+            ...enContacto,
+            etiqueta: 'Código postal (para Google)',
+            ayuda: 'No se ve en la página: es el código postal que Google muestra en la ficha del negocio. Si cambias la dirección del pie de página, cambia también este.',
+            maxCaracteres: 5,
+          }).refine((v) => /^\d{5}$/.test(v), 'El código postal va con 5 dígitos, por ejemplo 04100.'),
+        },
+      }),
       correoEtiqueta: texto({
         ...enContacto,
         etiqueta: 'Etiqueta del correo',
@@ -338,5 +377,36 @@ export const camposDeContacto = {
         },
       }),
     },
+  }).superRefine((v, ctx) => {
+    // El candado cruzado: `direccion[1]` («Coyoacán, C.P. 04100, CDMX») y
+    // `direccionPostal` cuentan la MISMA dirección en dos formas — si se
+    // desalinean, el pie de página y la ficha de Google dicen cosas
+    // distintas y nadie se entera hasta que alguien busca el puesto y no
+    // lo encuentra donde el sitio dice. `.includes()` y no un regex: la
+    // pregunta es «¿la segunda línea SIGUE mencionando esto?», no «¿tiene
+    // esta forma exacta?» — así la clienta puede reordenar o puntuar esa
+    // línea distinto sin que el candado se dispare en falso.
+    //
+    // Verificado contra zod 4.4.3 (con el mismo patrón que
+    // `saborConContraste` en sabores.ts): `.superRefine()` sobre un objeto
+    // conserva `def.type === 'object'`, así que `recorre()` y `serializa()`
+    // lo siguen atravesando, y el problema se reporta en el campo nuevo
+    // —`direccionPostal.codigoPostal` o `.localidad`—, que es el que la
+    // clienta tendría que revisar.
+    const segundaLinea = v.direccion[1]
+    if (!segundaLinea.includes(v.direccionPostal.codigoPostal)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['direccionPostal', 'codigoPostal'],
+        message: 'Este código postal no aparece en la segunda línea de la dirección de arriba («Alcaldía, código postal y ciudad»): revisa que las dos digan lo mismo.',
+      })
+    }
+    if (!segundaLinea.includes(v.direccionPostal.localidad)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['direccionPostal', 'localidad'],
+        message: 'Esta localidad no aparece en la segunda línea de la dirección de arriba («Alcaldía, código postal y ciudad»): revisa que las dos digan lo mismo.',
+      })
+    }
   }),
 }

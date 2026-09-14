@@ -1853,6 +1853,38 @@ describe('la capa de contenido', () => {
       roto.contacto.correo = 'maracacaomx arroba gmail punto com'
       expect(validar(contacto, roto, {}).map((p) => p.campo)).toContain('contacto.correo')
     })
+
+    describe('la dirección postal para Google, cruzada contra el pie de página', () => {
+      // `direccionPostal` (JSON-LD) y `direccion[1]` (el pie de página)
+      // cuentan la MISMA dirección en dos formas. Si se desalinean, Google
+      // y la página dicen cosas distintas y nadie se entera hasta que
+      // alguien busca el puesto donde el sitio dice y no lo encuentra ahí.
+
+      it('el contenido de hoy no dispara el candado', () => {
+        expect(validar(contacto, hoy(), {})).toEqual([])
+      })
+
+      it('rechaza cuando la segunda línea de la dirección deja de traer el código postal', () => {
+        const roto = hoy()
+        roto.contacto.direccion[1] = 'Coyoacán, CDMX' // sin el «C.P. 04100»
+        expect(validar(contacto, roto, {}).map((p) => p.campo))
+          .toContain('contacto.direccionPostal.codigoPostal')
+      })
+
+      it('rechaza cuando la segunda línea de la dirección deja de traer la localidad', () => {
+        const roto = hoy()
+        roto.contacto.direccion[1] = 'C.P. 04100, CDMX' // sin «Coyoacán»
+        expect(validar(contacto, roto, {}).map((p) => p.campo))
+          .toContain('contacto.direccionPostal.localidad')
+      })
+
+      it('el código postal tiene que ser de 5 dígitos', () => {
+        const roto = hoy()
+        roto.contacto.direccionPostal.codigoPostal = '4100'
+        expect(validar(contacto, roto, {}).map((p) => p.campo))
+          .toContain('contacto.direccionPostal.codigoPostal')
+      })
+    })
   })
 
   describe('el esquema de páginas', () => {

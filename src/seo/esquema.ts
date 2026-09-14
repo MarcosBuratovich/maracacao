@@ -27,10 +27,18 @@ export function esquemaNegocio(origen: string) {
     image: `${origen}/social/tarjeta.png`,
     address: {
       '@type': 'PostalAddress',
-      streetAddress: 'Mercado de Coyoacán, Malintzin s/n, Col. del Carmen',
-      addressLocality: 'Coyoacán',
-      addressRegion: 'Ciudad de México',
-      postalCode: '04100',
+      // streetAddress SE RECONSTRUYE del copy: es el mismo texto que ya
+      // imprime el pie de página, pegado en el mismo orden. Los otros tres
+      // NO se pueden reconstruir sin adivinar —«Coyoacán» en puestoTitulo
+      // es el nombre del MERCADO, no la alcaldía, y el CP/estado viven
+      // adentro de texto libre («Coyoacán, C.P. 04100, CDMX», con «CDMX» ≠
+      // «Ciudad de México»)— así que son campos propios del contenido, con
+      // su candado cruzado contra esta misma línea (ver
+      // src/contenido/esquema/sitio/contacto.ts).
+      streetAddress: `${marca.contacto.puestoTitulo.join(' ')}, ${marca.contacto.direccion[0]}`,
+      addressLocality: marca.contacto.direccionPostal.localidad,
+      addressRegion: marca.contacto.direccionPostal.estado,
+      postalCode: marca.contacto.direccionPostal.codigoPostal,
       addressCountry: 'MX',
     },
     sameAs: [marca.contacto.catalogoUrl],
