@@ -10,7 +10,9 @@
  * `grupo` agregaría un nivel de anidamiento que no existe en el contenido
  * (`producto.postura.titulo` en vez de `postura.titulo`).
  */
-import { grupo, lista, texto, parrafo, precio, medida, derivado, claveSabor } from '../../campos'
+import {
+  grupo, lista, texto, parrafo, precio, medida, derivado, derivadoTexto, claveSabor,
+} from '../../campos'
 
 const enProductos = { seccion: 'productos' } as const
 const enSabores = { seccion: 'sabores' } as const
@@ -144,20 +146,19 @@ export const camposDeProducto = {
         etiqueta: 'Sabor con el que abre el anaquel',
         ayuda: 'La barra que se muestra al llegar a la sección, antes de que la visitante elija otra.',
       }),
-      // «de 15». No lleva `cuenta`: cruzaConteo() exige que el número sea
-      // vecino inmediato de un sustantivo y acá no hay ninguno (la
-      // plantilla arma «n.º 3 de 15» pegando este texto al número). Lo
-      // cubre la aserción de forma 9 de `test/contenido-fachada.test.ts`,
-      // que exige que este texto termine en `sabores.length` — sin ella,
-      // agregar una barra deja publicado un «n.º 16 de 15». Va como
-      // `quien: 'marcos'`: si la clienta lo edita a mano, el contador
-      // miente y nada en el panel se lo avisa.
-      contadorDe: texto({
+      // «de 15». No se edita: se calcula de cuántas barras hay.
+      //
+      // No lleva `cuenta` porque `cruzaConteo()` exige que el número sea
+      // vecino inmediato de un sustantivo, y acá no hay ninguno — la
+      // plantilla renderiza «n.º 3 de 15». Forzar esa regla pediría
+      // inventar un sustantivo falso; derivarlo lo vuelve imposible de
+      // tener viejo, que es mejor que vigilarlo.
+      contadorDe: derivadoTexto({
         ...enSabores,
         etiqueta: 'Final del contador',
-        ayuda: 'Lo que va después del número: «n.º 3 de 15». Cambia cuando cambia la cantidad de barras.',
+        ayuda: 'Lo que va después del número: «n.º 3 de 15». Sale solo de cuántas barras hay.',
+        saleDe: 'la cantidad de barras del anaquel',
         maxCaracteres: 20,
-        quien: 'marcos',
         falla: ['nowrap'],
       }),
       fichaEtiqueta: texto({

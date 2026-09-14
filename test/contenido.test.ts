@@ -2026,24 +2026,26 @@ describe('la capa de contenido', () => {
       expect(DERIVADOS_DEL_SITIO.map((d) => d.ruta).sort()).toEqual(delEsquema.sort())
     })
 
-    it('injerta escribe los cuatro valores en su ruta', () => {
-      const crudo = { gotas: {}, negocios: { tabs: [{}, {}, {}] } }
+    it('injerta escribe los cinco valores en su ruta', () => {
+      const crudo = { gotas: {}, negocios: { tabs: [{}, {}, {}] }, anaquel: {} }
       const con = injerta(crudo, FUENTES) as {
         gotas: { precioDesde: number; precioJengibre: number }
         negocios: { tabs: { precio?: number }[] }
+        anaquel: { contadorDe: string }
       }
       expect(con.gotas.precioDesde).toBe(258)
       expect(con.gotas.precioJengibre).toBe(340)
       expect(con.negocios.tabs[1].precio).toBe(258)
       expect(con.negocios.tabs[2].precio).toBe(108)
       expect(con.negocios.tabs[0].precio).toBeUndefined()
+      expect(con.anaquel.contadorDe).toBe('de 2')
     })
 
     it('injerta no toca el objeto que recibe', () => {
       // El crudo viene del import del JSON, que en un bundle es un módulo
       // COMPARTIDO: mutarlo le cambia el contenido a cualquier otro que lo
       // importe, y el orden de los imports decide qué ve cada uno.
-      const crudo = { gotas: {}, negocios: { tabs: [{}, {}, {}] } }
+      const crudo = { gotas: {}, negocios: { tabs: [{}, {}, {}] }, anaquel: {} }
       injerta(crudo, FUENTES)
       expect(crudo.gotas).toEqual({})
     })

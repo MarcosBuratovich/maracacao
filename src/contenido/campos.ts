@@ -495,6 +495,20 @@ export const derivado = (meta: Base & { saleDe: string }) =>
     { control: 'derivado', quien: 'marcos', ...meta },
   )
 
+/**
+ * Un valor de TEXTO que no se edita porque se calcula. Hermano de
+ * `derivado`, que solo admite enteros porque nació para los precios.
+ *
+ * Existe para «de 15»: una frase armada con un número que sale de una
+ * lista. Comparte el `control: 'derivado'`, que es lo que hace que
+ * `serializa()` no lo escriba al JSON y que el panel lo dibuje en gris.
+ */
+export const derivadoTexto = (meta: Base & { saleDe: string; maxCaracteres: number }) =>
+  anota(
+    z.string().trim().max(meta.maxCaracteres, mensajeMax(meta.maxCaracteres)),
+    { control: 'derivado', quien: 'marcos', ...meta },
+  )
+
 /** Un bloque con campos nombrados. */
 export const grupo = <T extends z.ZodRawShape>(meta: Base & { campos: T }) =>
   anota(z.object(meta.campos), { control: 'oculto', ...meta })
