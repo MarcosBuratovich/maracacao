@@ -17,33 +17,54 @@ import { parseHTML } from 'linkedom'
 export function normaliza(html: string): string {
   const { document } = parseHTML(html)
 
-  // 1. Los dos atributos que la fase 2 agrega.
+  // Un solo recorrido hace dos cosas: (a) borra los dos atributos que la
+  // fase 2 tiene permitido agregar, en cualquier elemento; (b) mientras
+  // los borra, anota qué <span> hay que desenvolver después —porque no
+  // era un elemento real, era puro percha para el data-campo.
+  //
+  // El candidato a desenvolver NO es «quedó sin atributos». Eso sería
+  // cierto en HTML escrito a mano, pero no en lo que Astro construye: todo
+  // elemento que sale de un componente con `<style>` —index.astro tiene
+  // uno— se estampa con un `data-astro-cid-<hash>` propio del componente,
+  // sin excepción. Un <span> inventado, `<span data-campo="x">`, nunca
+  // llega pelado entonces: Astro le cuelga el mismo hash que a cualquier
+  // otro elemento del componente, `data-astro-cid-lcdefpme` o el que
+  // toque. Contar atributos después de sacar data-campo daba siempre 1
+  // (el hash), así que la regla vieja —«¿quedó en cero?»— nunca disparaba
+  // contra HTML de verdad: solo contra los tests unitarios, que usaban
+  // markup a mano sin ese hash, una forma que Astro no emite.
+  //
+  // «Pelado» entonces tiene que leerse después de descontar el hash de
+  // Astro, no antes: no queda nada más que ver ahí, es ruido del
+  // compilador, no algo que haya escrito nadie. Y hace falta además que el
+  // elemento HAYA TRAÍDO `data-campo` —esa es la marca de que la fase 2 lo
+  // tocó. Un <span> que ya existía puede recibir data-campo también (por
+  // ejemplo uno con `class`), pero eso no lo inventó, y por eso NO se
+  // desenvuelve aunque después de sacarle data-campo y el hash no le quede
+  // nada: si solo tenía el hash de Astro para empezar —ni data-campo ni
+  // ningún otro atributo—, ya era un <span> pelado ANTES de la fase 2, y
+  // desenvolverlo escondería que alguien lo borró por error.
+  const inventados: Element[] = []
   for (const el of document.querySelectorAll('[data-campo], [data-campo-attr]')) {
+    const teniaCampo = el.hasAttribute('data-campo')
     el.removeAttribute('data-campo')
     el.removeAttribute('data-campo-attr')
+    if (
+      teniaCampo &&
+      el.tagName === 'SPAN' &&
+      [...el.attributes].every((a) => a.name.startsWith('data-astro-cid-'))
+    ) {
+      inventados.push(el)
+    }
   }
-
-  // 2. Un <span> que quedó SIN NINGÚN atributo después del paso 1 es un
-  //    span que solo existía para colgar el `data-campo`: se lo reemplaza
-  //    por sus hijos. Uno que ya traía `class` u otra cosa NO se toca,
-  //    aunque le hayan puesto data-campo encima — ese ya existía.
-  //
-  //    La regla es exacta y no una aproximación: [MEDIDO] de los 248
-  //    <span> de las tres páginas de contenido de hoy, los 248 tienen
-  //    atributos. Cero pelados. Así que cualquiera que aparezca sin
-  //    atributos es necesariamente obra de la fase 2. El test
-  //    «el HTML de antes no tiene ningún span pelado» clava ese supuesto.
-  //
-  //    El snapshot con el spread queda a propósito, aunque MEDIDO (mutación
-  //    del paso 4.3: sacar el spread y recorrer con `<p><span
-  //    data-campo="a"><span data-campo="b">x</span></span></p>`) NO dio
-  //    rojo — linkedom ya devuelve de `querySelectorAll` una lista estática,
-  //    no una NodeList viva, así que ningún nodo se salteó ni con el
-  //    iterador puesto directo. El spread es defensivo, no necesario hoy:
-  //    se deja igual como cinturón, por si esa garantía de linkedom cambia
-  //    de versión.
-  for (const span of [...document.querySelectorAll('span')]) {
-    if (span.attributes.length > 0) continue
+  // El desenvolver se hace en un segundo paso, sobre `inventados`, en vez
+  // de adentro del for de arriba: mutar el árbol (replaceWith) mientras
+  // todavía se lo recorre buscando más candidatos es innecesariamente
+  // arriesgado, aunque `querySelectorAll` de linkedom ya haya devuelto una
+  // lista estática y no una NodeList viva —eso alcanza para que el primer
+  // for no se salte elementos, pero no hace falta apoyarse en eso además
+  // para el reemplazo.
+  for (const span of inventados) {
     span.replaceWith(...span.childNodes)
   }
 
