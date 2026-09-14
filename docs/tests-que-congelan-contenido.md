@@ -164,3 +164,30 @@ concretos — por eso quedan QUEDA con nota, no listados assert por assert.
   envolturas). Sus `toBe`/`toContain`/`toHaveLength` son reales pero
   irrelevantes para esta auditoría: ninguna edición de la clienta los toca
   porque la clienta nunca va a poder editar esas páginas.
+
+---
+
+## Actualización 2026-09-14 — Fase 2, Parte A (rama `panel-fase-2-parte-a`)
+
+- **La fila de la dirección del negocio quedó EJECUTADA.** `seo.test.ts:116-117`
+  congelaba «Mercado de Coyoacán» y «04100» porque la dirección vivía
+  hardcodeada en `src/seo/esquema.ts`. La Tarea 5 la movió al copy: la calle se
+  reconstruye de `contacto.puestoTitulo` + `contacto.direccion[0]`, y la
+  localidad, el estado y el código postal son campos nuevos
+  (`contacto.direccionPostal`). El assert pasó de QUEDA a **A FORMA**: ahora
+  compara el JSON-LD contra el copy, no contra literales. Lo que garantiza que
+  el valor de hoy no cambió es el verificador de HTML, no el test.
+- **Hay un test nuevo que congela TODO el contenido renderizado, a propósito y
+  con fecha de vencimiento:** `test/html-normalizado.test.ts` compara las once
+  páginas construidas contra `test/fixtures/html-antes-fase-2/`, byte a byte
+  salvo los atributos `data-campo`/`data-campo-attr` y los `<span>` que la fase
+  2 inventa. Existe para que los ~200 atributos de la Parte B no puedan mover
+  la visual sin que se note.
+  **Corre en el camino de deploy** (`vercel.json` → `pnpm build` → vitest), así
+  que mientras exista, cualquier edición de contenido deja el build en rojo
+  hasta que alguien recapture la línea base con `pnpm captura:html`. Hoy eso es
+  tolerable porque solo Marcos edita. **La última tarea de la Parte B tiene que
+  borrarlo** —el verificador, `test/lib/html-normalizado.ts`,
+  `scripts/captura-html.ts`, la carpeta de fixtures y la línea `@source not` de
+  `global.css`— o sacarlo del camino de Vercel. No puede seguir ahí el día que
+  la clienta entre al panel.
