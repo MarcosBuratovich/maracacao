@@ -38,12 +38,18 @@ export function normaliza(html: string): string {
   // Astro, no antes: no queda nada más que ver ahí, es ruido del
   // compilador, no algo que haya escrito nadie. Y hace falta además que el
   // elemento HAYA TRAÍDO `data-campo` —esa es la marca de que la fase 2 lo
-  // tocó. Un <span> que ya existía puede recibir data-campo también (por
-  // ejemplo uno con `class`), pero eso no lo inventó, y por eso NO se
-  // desenvuelve aunque después de sacarle data-campo y el hash no le quede
-  // nada: si solo tenía el hash de Astro para empezar —ni data-campo ni
-  // ningún otro atributo—, ya era un <span> pelado ANTES de la fase 2, y
-  // desenvolverlo escondería que alguien lo borró por error.
+  // tocó. Un <span> que ya existía y lleva `class` (o cualquier otro
+  // atributo que no sea el hash) queda a salvo aunque le cuelguen un
+  // data-campo encima: ese atributo propio dice que no lo inventó nadie.
+  //
+  // LO QUE LA REGLA NO PUEDE DISTINGUIR, y conviene saberlo: un <span>
+  // que YA EXISTÍA sin ningún atributo propio (solo el hash de Astro) y
+  // que la fase 2 marque directo con data-campo se ve exactamente igual
+  // que uno inventado, así que se desenvuelve — y si alguien lo borrara
+  // por error, el diff no lo mostraría. La Parte B no debería llegar a ese
+  // caso: su regla es ENVOLVER en un <span> nuevo, no marcar uno pelado
+  // que ya estaba. Si algún día hace falta marcar uno, que lleve también
+  // una `class`: con eso vuelve a quedar del lado protegido.
   const inventados: Element[] = []
   for (const el of document.querySelectorAll('[data-campo], [data-campo-attr]')) {
     const teniaCampo = el.hasAttribute('data-campo')

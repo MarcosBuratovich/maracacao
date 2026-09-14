@@ -65,6 +65,13 @@ describe('el normalizador de HTML de la fase 2', () => {
     // es que ESTE nunca trajo `data-campo`. Sin el `teniaCampo &&` de la
     // condición, este span se desenvolvería igual que el de la Parte B, y
     // un <span> real se perdería sin que el verificador lo note.
+    //
+    // Ojo: la combinación es de laboratorio, no un patrón que la Parte B
+    // vaya a escribir —un `data-campo-attr` de verdad va sobre un elemento
+    // que ya tiene el atributo que se marca (`alt`, `title`), así que algo
+    // le queda. Está acá porque es la ÚNICA forma de clavar el
+    // `teniaCampo &&`: un span pelado sin ningún data-* ni siquiera entra
+    // al recorrido, así que con ese no se puede probar nada.
     const conAttr = env(`<p ${CID}><span data-campo-attr="title:x" ${CID}>10</span></p>`)
     const sinAttr = env(`<p ${CID}><span ${CID}>10</span></p>`)
     expect(normaliza(conAttr)).toBe(normaliza(sinAttr))
