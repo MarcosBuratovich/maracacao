@@ -111,13 +111,11 @@ describe('las nueve aserciones de forma', () => {
   })
 
   it('7 · el sabor con el que abre el anaquel existe', () => {
-    // index.astro:35 hace `sabores.find((s) => s.slug === 'canela')!` — con
-    // el `!` puesto. Si ese slug dejara de existir, TypeScript no dice
-    // nada y la portada del anaquel se pinta con `undefined`: banda sin
-    // color y nombre vacío. El slug va como `quien: 'marcos'`, así que la
-    // clienta no puede romperlo — pero un candado de una línea sobre algo
-    // que hoy solo sostiene un `!` es barato.
-    expect(sabores.find((s) => s.slug === 'canela')).toBeDefined()
+    // index.astro:35 hace `sabores.find((s) => s.clave === marca.anaquel
+    // .saborInicial)!` — con el `!` puesto. Si ese sabor dejara de existir,
+    // TypeScript no dice nada y la portada del anaquel se pinta con
+    // `undefined`: banda sin color y nombre vacío.
+    expect(sabores.find((s) => s.clave === marca.anaquel.saborInicial)).toBeDefined()
   })
 
   it('8 · los nueve espacios duros siguen siendo espacios duros', () => {
@@ -142,20 +140,10 @@ describe('las nueve aserciones de forma', () => {
     expect(total, 'son nueve, medidos').toBe(9)
   })
 
-  it('9 · el final del contador termina en cuántas barras hay', () => {
-    // `anaquel.contadorDe` vale «de 15» y la plantilla arma «n.º 3 de 15»
-    // pegándole el número adelante. No lleva la regla `cuenta` porque
-    // `cruzaConteo()` exige que el número sea vecino inmediato de un
-    // sustantivo y acá no hay ninguno — el esquema decía que «lo cubre una
-    // aserción de forma de la Tarea 14», y esa aserción NO EXISTÍA. Hoy,
-    // sin ella, agregar una barra deja el anaquel imprimiendo «n.º 16 de
-    // 15» en la página publicada y nada lo detecta.
-    //
-    // La frontera `\D` es lo que separa «de 15» de un «de 115» que termina
-    // en los mismos dos dígitos.
-    expect(
-      marca.anaquel.contadorDe,
-      `«${marca.anaquel.contadorDe}» tendría que terminar en ${sabores.length}`,
-    ).toMatch(new RegExp(`(^|\\D)${sabores.length}\\s*$`))
+  it('9 · el contador del anaquel sale de cuántas barras hay', () => {
+    // index.astro:305 renderiza «{fichaEtiqueta} {orden} {contadorDe}» →
+    // «Barra n.º 3 de 15». Cuando era texto a mano, agregar una barra
+    // imprimía «n.º 16 de 15» en la página publicada.
+    expect(marca.anaquel.contadorDe).toBe(`de ${sabores.length}`)
   })
 })

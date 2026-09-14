@@ -87,7 +87,7 @@
   "anaquel": {
     "kicker": "LOS 15 SABORES",
     "titulo": "Elige tu barra",
-    "contadorDe": "de 15",
+    "saborInicial": "canela",
     "fichaEtiqueta": "Barra n.º",
     "grupoAria": "Elige un sabor para ver su ficha",
     "pesoInsignia": "70\u00a0g",
@@ -367,6 +367,11 @@
       "Malintzin s/n, Col. del Carmen",
       "Coyoacán, C.P. 04100, CDMX"
     ],
+    "direccionPostal": {
+      "localidad": "Coyoacán",
+      "estado": "Ciudad de México",
+      "codigoPostal": "04100"
+    },
     "correoEtiqueta": "CORREO",
     "correo": "maracacaomx@gmail.com",
     "correoNota": "Pedidos, mayoreo, regalos y dudas.",

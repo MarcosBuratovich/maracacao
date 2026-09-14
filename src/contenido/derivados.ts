@@ -39,12 +39,13 @@ export interface FuentesDeDerivados {
 interface Derivado {
   /** La ruta punteada dentro del documento del sitio. */
   ruta: string
-  calcula: (fuentes: FuentesDeDerivados) => number
+  calcula: (fuentes: FuentesDeDerivados) => number | string
 }
 
 /**
- * Los cuatro valores del documento del sitio que se calculan en vez de
- * editarse.
+ * Los cinco valores del documento del sitio que se calculan en vez de
+ * editarse. Cuatro son precios; el quinto —«de 15»— es el final del
+ * contador del anaquel, texto armado con cuántas barras hay.
  *
  * Esta tabla y el metadato `control: 'derivado'` del esquema tienen que
  * decir exactamente lo mismo, y un test lo exige. Son dos declaraciones de
@@ -61,6 +62,7 @@ export const DERIVADOS_DEL_SITIO: readonly Derivado[] = [
   { ruta: 'gotas.precioJengibre', calcula: (f) => precioDe(f.gotas, 'jengibreYNaranja') },
   { ruta: 'negocios.tabs.1.precio', calcula: (f) => precioDesde(f.gotas) },
   { ruta: 'negocios.tabs.2.precio', calcula: (f) => precioDesde(f.sabores) },
+  { ruta: 'anaquel.contadorDe', calcula: (f) => `de ${f.sabores.length}` },
 ]
 
 /**

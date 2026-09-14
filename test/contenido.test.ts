@@ -49,6 +49,7 @@ import { fichasBase } from '../src/fichas/base'
 import { marca } from '../src/copy/sitio-marca'
 import { sabores, gotas } from '../src/copy/sabores'
 import * as tokens from '../src/tokens/color'
+import { TEXTOS_UI, textosUi } from '../src/contenido/textos-ui'
 // La foto congelada, no el módulo: el fixture no se mueve cuando la Tarea 13
 // reescriba la fachada, y estos tests validan CONTRA esa foto.
 import fixture from './fixtures/contenido-2026-09-10.json'
@@ -1852,6 +1853,38 @@ describe('la capa de contenido', () => {
       roto.contacto.correo = 'maracacaomx arroba gmail punto com'
       expect(validar(contacto, roto, {}).map((p) => p.campo)).toContain('contacto.correo')
     })
+
+    describe('la dirección postal para Google, cruzada contra el pie de página', () => {
+      // `direccionPostal` (JSON-LD) y `direccion[1]` (el pie de página)
+      // cuentan la MISMA dirección en dos formas. Si se desalinean, Google
+      // y la página dicen cosas distintas y nadie se entera hasta que
+      // alguien busca el puesto donde el sitio dice y no lo encuentra ahí.
+
+      it('el contenido de hoy no dispara el candado', () => {
+        expect(validar(contacto, hoy(), {})).toEqual([])
+      })
+
+      it('rechaza cuando la segunda línea de la dirección deja de traer el código postal', () => {
+        const roto = hoy()
+        roto.contacto.direccion[1] = 'Coyoacán, CDMX' // sin el «C.P. 04100»
+        expect(validar(contacto, roto, {}).map((p) => p.campo))
+          .toContain('contacto.direccionPostal.codigoPostal')
+      })
+
+      it('rechaza cuando la segunda línea de la dirección deja de traer la localidad', () => {
+        const roto = hoy()
+        roto.contacto.direccion[1] = 'C.P. 04100, CDMX' // sin «Coyoacán»
+        expect(validar(contacto, roto, {}).map((p) => p.campo))
+          .toContain('contacto.direccionPostal.localidad')
+      })
+
+      it('el código postal tiene que ser de 5 dígitos', () => {
+        const roto = hoy()
+        roto.contacto.direccionPostal.codigoPostal = '4100'
+        expect(validar(contacto, roto, {}).map((p) => p.campo))
+          .toContain('contacto.direccionPostal.codigoPostal')
+      })
+    })
   })
 
   describe('el esquema de páginas', () => {
@@ -1993,24 +2026,26 @@ describe('la capa de contenido', () => {
       expect(DERIVADOS_DEL_SITIO.map((d) => d.ruta).sort()).toEqual(delEsquema.sort())
     })
 
-    it('injerta escribe los cuatro valores en su ruta', () => {
-      const crudo = { gotas: {}, negocios: { tabs: [{}, {}, {}] } }
+    it('injerta escribe los cinco valores en su ruta', () => {
+      const crudo = { gotas: {}, negocios: { tabs: [{}, {}, {}] }, anaquel: {} }
       const con = injerta(crudo, FUENTES) as {
         gotas: { precioDesde: number; precioJengibre: number }
         negocios: { tabs: { precio?: number }[] }
+        anaquel: { contadorDe: string }
       }
       expect(con.gotas.precioDesde).toBe(258)
       expect(con.gotas.precioJengibre).toBe(340)
       expect(con.negocios.tabs[1].precio).toBe(258)
       expect(con.negocios.tabs[2].precio).toBe(108)
       expect(con.negocios.tabs[0].precio).toBeUndefined()
+      expect(con.anaquel.contadorDe).toBe('de 2')
     })
 
     it('injerta no toca el objeto que recibe', () => {
       // El crudo viene del import del JSON, que en un bundle es un módulo
       // COMPARTIDO: mutarlo le cambia el contenido a cualquier otro que lo
       // importe, y el orden de los imports decide qué ve cada uno.
-      const crudo = { gotas: {}, negocios: { tabs: [{}, {}, {}] } }
+      const crudo = { gotas: {}, negocios: { tabs: [{}, {}, {}] }, anaquel: {} }
       injerta(crudo, FUENTES)
       expect(crudo.gotas).toEqual({})
     })
@@ -2196,6 +2231,7 @@ describe('los candados del sistema de contenido', () => {
     expect(deMarcos.sort()).toMatchInlineSnapshot(`
       [
         "anaquel.contadorDe",
+        "anaquel.saborInicial",
         "catar.pasos[].clave",
         "contacto.catalogoUrl",
         "contacto.formulario.tipoOpciones.0.valor",
@@ -2313,5 +2349,35 @@ describe('los candados del sistema de contenido', () => {
     const texto = JSON.stringify(CRUDO.sitio)
     const correos = new Set(texto.match(/[\w.+-]+@[\w-]+\.[\w.]+/g) ?? [])
     expect([...correos]).toEqual([marca.contacto.correo])
+  })
+})
+
+describe('los textos que el script pinta en runtime', () => {
+  it('arma el objeto con los seis textos, sacados del contenido', () => {
+    const t = textosUi(fixture.marca as never)
+    expect(Object.keys(t).sort()).toEqual([
+      'copiado', 'enviando', 'envolturaAltPrefijo', 'ilustracionAltPrefijo', 'navAbrir', 'navCerrar',
+    ])
+    expect(t.copiado).toBe(fixture.marca.contacto.copiado)
+    expect(t.navCerrar).toBe(fixture.marca.nav.cerrar)
+  })
+
+  it('truena si una ruta declarada no da un texto', () => {
+    // Un texto de UI vacío se ve como un botón sin palabras, y averiguar
+    // por qué cuesta una tarde. Mejor que reviente el build.
+    const roto = JSON.parse(JSON.stringify(fixture.marca))
+    delete roto.contacto.copiado
+    expect(() => textosUi(roto)).toThrow(/contacto\.copiado/)
+  })
+
+  it('ninguna ruta de TEXTOS_UI está inventada: todas existen en el esquema', () => {
+    // El modo de falla que este test ataja: alguien renombra un campo del
+    // esquema y esta lista queda apuntando a una ruta muerta. El build no
+    // se entera hasta que el botón sale sin texto en producción.
+    const delEsquema = new Set<string>()
+    recorre(esquemaSitio, (ruta) => delEsquema.add(ruta))
+    for (const ruta of Object.values(TEXTOS_UI)) {
+      expect(delEsquema.has(ruta), `«${ruta}» no existe en el esquema del sitio`).toBe(true)
+    }
   })
 })

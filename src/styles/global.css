@@ -1,5 +1,24 @@
 /* src/styles/global.css */
 @import "tailwindcss";
+/* Tailwind v4 detecta contenido automáticamente en todo el repo (lo que no
+ * está en .gitignore). test/fixtures/html-antes-fase-2/ son páginas YA
+ * renderizadas — HTML completo con class="..." de las once páginas — que
+ * el verificador de diff normalizado (fase 2, tarea 1) captura para
+ * comparar un antes y un después. Sin esta exclusión, Tailwind las trata
+ * como plantilla más, detecta ahí clases que ninguna página usa
+ * directamente y el bundle de CSS inline crece en TODAS las páginas del
+ * build siguiente: cada build después de capturar la línea base quedaría
+ * falsamente distinto de la foto, sin que la fase 2 haya tocado nada.
+ * [MEDIDO: moviendo la carpeta afuera, dist/404.html vuelve a salir byte
+ * a byte igual a la captura; con la carpeta puesta, deja de serlo.]
+ *
+ * La ruta es relativa a ESTE archivo (src/styles/), no a la raíz del
+ * repo — por eso el `../../`. Con la ruta sin ese prefijo, `@source not`
+ * no tira error pero tampoco excluye nada: se resuelve contra
+ * src/styles/test/... (que no existe) y el bundle sigue creciendo en
+ * silencio. Ya mordió una vez acá mismo.
+ */
+@source not "../../test/fixtures/html-antes-fase-2";
 @import "./tokens.generated.css";
 @import "./fuentes.css";
 

@@ -4,10 +4,12 @@
  * `src/contenido/esquema/sitio.ts`, que es también el catálogo de campos
  * que el panel lee para pintarse.
  *
- * Los cuatro precios derivados NO están en el JSON: se calculan acá, antes
- * de validar, porque el mismo número está escrito en hasta tres lugares y
- * pedirle a la clienta que los mantenga sincronizados es pedirle que se
- * equivoque. Ver `derivados.ts`.
+ * Los cinco valores derivados NO están en el JSON: se calculan acá, antes
+ * de validar. Cuatro son precios, y el mismo número está escrito en hasta
+ * tres lugares; el quinto es el «de 15» del contador del anaquel, que no
+ * es un precio sino cuántas barras hay. Pedirle a la clienta que los
+ * mantenga sincronizados a mano es pedirle que se equivoque. Ver
+ * `derivados.ts`.
  *
  * `cargar()` corre en el camino del import de index.astro: un JSON
  * inválido revienta `astro build` y Vercel deja servido el deploy
