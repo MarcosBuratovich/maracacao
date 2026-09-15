@@ -37,21 +37,46 @@ export function hayPaginasConstruidas(): boolean {
 }
 
 /**
- * Colapsa los índices de lista para poder comparar contra el esquema:
- * 'recetas.lista.2.titulo' → 'recetas.lista[].titulo'.
+ * Si una ruta CONCRETA del HTML (`fichas.2.meta.0.1`) es una instancia del
+ * patrón que emite `recorre()` para el esquema (`fichas[].meta[].1`).
  *
- * El `[]` se le pega al segmento ANTERIOR porque así lo emite `recorre()`
- * (`lista[]`, no `lista.[]`). Ojo: las TUPLAS del esquema tienen índice
- * numérico propio y fijo (`hero.titular.0`), así que quien compare tiene
- * que probar primero la ruta tal cual y recién después la colapsada.
+ * Se compara segmento por segmento, no colapsando números: `x[]` consume la
+ * clave `x` más UN índice, `x[][]` consume `x` más DOS (las filas de una
+ * tabla), y un segmento numérico del esquema es el índice FIJO de una tupla
+ * y exige ese mismo número. Colapsar todo número a `[]` —que es lo que hacía
+ * la primera versión— no distingue el índice fijo de una tupla del índice de
+ * una lista, y por eso no podía emparejar `fichas[].meta[].0` ni
+ * `negocios.tabs.0.datos[]`.
  */
-export function colapsaIndices(ruta: string): string {
-  const salida: string[] = []
-  for (const parte of ruta.split('.')) {
-    if (/^\d+$/.test(parte) && salida.length > 0) salida[salida.length - 1] += '[]'
-    else salida.push(parte)
+export function coincideConPatron(concreta: string, patron: string): boolean {
+  const segmentosConcretos = concreta.split('.')
+  const segmentosPatron = patron.split('.')
+  let i = 0 // cursor sobre segmentosConcretos: el patrón lo va empujando.
+
+  for (const segmento of segmentosPatron) {
+    const base = segmento.replace(/(\[\])+$/, '')
+    const corchetes = segmento.length - base.length
+    const indices = corchetes / 2 // cuántos índices consume este segmento: 0, 1 (lista) o 2 (tabla).
+
+    if (indices === 0) {
+      // Nombre de clave a secas, o el índice FIJO de una tupla ('0', '1'):
+      // en los dos casos el segmento concreto tiene que ser IDÉNTICO.
+      if (segmentosConcretos[i] !== segmento) return false
+      i += 1
+      continue
+    }
+
+    if (segmentosConcretos[i] !== base) return false
+    i += 1
+    for (let k = 0; k < indices; k++) {
+      if (!/^\d+$/.test(segmentosConcretos[i] ?? '')) return false
+      i += 1
+    }
   }
-  return salida.join('.')
+
+  // Los dos tienen que terminar juntos: sobrar segmentos de un lado es el
+  // mismo desajuste de longitud que faltar del otro.
+  return i === segmentosConcretos.length
 }
 
 const partiendoEnDosPuntos = (valor: string): [string, string] | null => {

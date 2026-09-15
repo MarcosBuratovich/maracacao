@@ -20,7 +20,7 @@ import { esquemaFichas } from '../src/contenido/esquema/fichas'
 import { marca } from '@/copy/sitio-marca'
 import { sabores, gotas, polvo, urlCatalogoBarras } from '@/copy/sabores'
 import { fichasBase } from '@/fichas/base'
-import { todasLasReferencias, colapsaIndices, hayPaginasConstruidas } from './lib/campos-en-html'
+import { todasLasReferencias, coincideConPatron, hayPaginasConstruidas } from './lib/campos-en-html'
 
 /**
  * LO QUE FALTA MARCAR. Cada tarea de la fase 2 Parte B borra de acá las
@@ -284,17 +284,14 @@ describe('la biyección campo ↔ data-campo (spec §3.1)', () => {
 
   it('(a) todo campo que la clienta edita tiene al menos un nodo en alguna página', () => {
     if (sinDist && !enCI) return
-    const marcadas = new Set(
-      referencias.flatMap((r) => [
-        `${r.documento}:${r.ruta}`,
-        `${r.documento}:${colapsaIndices(r.ruta)}`,
-      ]),
-    )
     const huerfanas: string[] = []
     for (const id of Object.keys(DOCUMENTOS) as IdDocumento[]) {
       for (const ruta of rutasEditables(id)) {
         const clave = `${id}:${ruta}`
-        if (marcadas.has(clave)) continue
+        const tieneNodo = referencias.some(
+          (r) => r.documento === id && coincideConPatron(r.ruta, ruta),
+        )
+        if (tieneNodo) continue
         if (PENDIENTES.has(clave)) continue
         huerfanas.push(clave)
       }
@@ -304,10 +301,8 @@ describe('la biyección campo ↔ data-campo (spec §3.1)', () => {
 
   it('(b) todo data-campo del HTML existe en el esquema y resuelve a un valor', () => {
     if (sinDist && !enCI) return
-    const editables = new Set(
-      (Object.keys(DOCUMENTOS) as IdDocumento[]).flatMap((id) =>
-        rutasEditables(id).map((ruta) => `${id}:${ruta}`),
-      ),
+    const editablesPorDocumento = new Map(
+      (Object.keys(DOCUMENTOS) as IdDocumento[]).map((id) => [id, rutasEditables(id)] as const),
     )
     const rotas: string[] = []
     for (const r of referencias) {
@@ -316,8 +311,9 @@ describe('la biyección campo ↔ data-campo (spec §3.1)', () => {
         continue
       }
       const id = r.documento as IdDocumento
-      const enEsquema =
-        editables.has(`${id}:${r.ruta}`) || editables.has(`${id}:${colapsaIndices(r.ruta)}`)
+      const enEsquema = (editablesPorDocumento.get(id) ?? []).some((ruta) =>
+        coincideConPatron(r.ruta, ruta),
+      )
       if (!enEsquema) {
         rotas.push(`${r.pagina}: «${r.crudo}» no es un campo editable del esquema`)
         continue
@@ -337,14 +333,13 @@ describe('la biyección campo ↔ data-campo (spec §3.1)', () => {
         rutasEditables(id).map((ruta) => `${id}:${ruta}`),
       ),
     )
-    const marcadas = new Set(
-      referencias.flatMap((r) => [
-        `${r.documento}:${r.ruta}`,
-        `${r.documento}:${colapsaIndices(r.ruta)}`,
-      ]),
-    )
     const inventadas = [...PENDIENTES].filter((clave) => !editables.has(clave))
-    const yaHechas = [...PENDIENTES].filter((clave) => marcadas.has(clave))
+    const yaHechas = [...PENDIENTES].filter((clave) => {
+      const corte = clave.indexOf(':')
+      const id = clave.slice(0, corte) as IdDocumento
+      const ruta = clave.slice(corte + 1)
+      return referencias.some((r) => r.documento === id && coincideConPatron(r.ruta, ruta))
+    })
     expect({ inventadas, yaHechas }).toEqual({ inventadas: [], yaHechas: [] })
   })
 })
