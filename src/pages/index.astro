@@ -640,10 +640,9 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
               <label>
                 {/* El <span> ya existía y no lleva ninguna otra marca propia
                     (ni class, ni data-*): colgarle data-campo directo lo deja
-                    indistinguible de uno inventado y el normalizador lo
-                    desenvuelve al comparar. Se envuelve el texto en un span
-                    nuevo adentro, como pide el comentario de
-                    test/lib/html-normalizado.ts. */}
+                    indistinguible de un span inventado por esta fase. Se
+                    envuelve el texto en un span nuevo adentro para no tocar
+                    el que ya estaba. */}
                 <span><span data-campo="sitio:contacto.formulario.nombre">{marca.contacto.formulario.nombre}</span></span>
                 <input type="text" name="nombre" autocomplete="name" required />
               </label>

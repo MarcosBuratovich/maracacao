@@ -23,32 +23,35 @@ import { fichasBase } from '@/fichas/base'
 import { todasLasReferencias, coincideConPatron, hayPaginasConstruidas } from './lib/campos-en-html'
 
 /**
- * LO QUE FALTA MARCAR. Cada tarea de la fase 2 Parte B borra de acá las
- * rutas que marcó; la última tarea borra la lista entera y este archivo
- * pasa a exigir la biyección completa.
- *
- * El test falla de las dos maneras a propósito: una ruta editable sin
- * nodo que NO esté acá es una regresión, y una ruta que está acá pero ya
- * tiene nodo es una lista podrida que le miente al que la lee.
+ * Los campos editables que NO tienen ningún nodo en el HTML, con su razón.
+ * No es una lista de pendientes: es la lista de excepciones, y cada línea
+ * tiene que poder defenderse sola. Agregar una es una decisión, no un
+ * atajo — el panel de la fase 6 tiene que tratar a estos campos distinto
+ * (vista previa textual, sin resaltado), y esta lista es de dónde lo saca.
  */
-const PENDIENTES = new Set<string>([
+const SIN_NODO = new Set<string>([
   // El polvo todavía no tiene precio (`null`), así que la plantilla no
-  // renderiza ningún nodo. Cuando la clienta le ponga uno, el nodo aparece
-  // con su data-campo y esta línea se borra. Antes no.
+  // renderiza ningún nodo. El día que la clienta le ponga uno, el nodo
+  // aparece con su data-campo y esta línea se borra.
   'sitio:negocios.tabs.0.precio',
+
+  // Es un campo editable, pero ninguna plantilla lo renderiza: el precio
+  // que se ve del bloque de gotas es el derivado `gotas.precioDesde` (el
+  // mínimo de los seis), nunca el precio suelto de una gota individual. No
+  // hay texto de este campo en ninguna página al que colgarle un nodo.
+  'sabores:gotas[].precio',
+
+  // El <form> lleva los dos asuntos en data-asunto-*, y `data-campo-attr`
+  // es un solo atributo por elemento. El panel los edita juntos desde la
+  // ficha del formulario.
+  'sitio:contacto.formulario.asuntoNegocio',
+
   // Los tres viven solo adentro del JSON-LD del <head>, que es un bloque
-  // de JSON y no un nodo de texto. El panel los edita desde la ficha de
-  // «Dirección para Google», con vista previa textual y sin resaltado en
-  // la página — spec §1.7, los campos que son atributo no se miden.
+  // de JSON y no un nodo de texto. Vista previa textual, sin resaltado
+  // (spec §1.7).
   'sitio:contacto.direccionPostal.localidad',
   'sitio:contacto.direccionPostal.estado',
   'sitio:contacto.direccionPostal.codigoPostal',
-  // El <form> lleva los dos asuntos en data-asunto-*; `data-campo-attr` es
-  // un solo atributo por elemento. Se resuelve en la fase 6, cuando el
-  // panel tenga la ficha del formulario: ahí los dos se editan juntos y
-  // ninguno de los dos necesita nodo propio. Ver spec §1.7.
-  'sitio:contacto.formulario.asuntoNegocio',
-  'sabores:gotas[].precio',
 ])
 
 const DOCUMENTOS = {
@@ -111,7 +114,7 @@ describe('la biyección campo ↔ data-campo (spec §3.1)', () => {
           (r) => r.documento === id && coincideConPatron(r.ruta, ruta),
         )
         if (tieneNodo) continue
-        if (PENDIENTES.has(clave)) continue
+        if (SIN_NODO.has(clave)) continue
         huerfanas.push(clave)
       }
     }
@@ -145,20 +148,34 @@ describe('la biyección campo ↔ data-campo (spec §3.1)', () => {
     expect(rotas).toEqual([])
   })
 
-  it('la lista de pendientes no está podrida: todo lo que dice existe y falta de verdad', () => {
+  it('la lista de excepciones no está podrida: todo lo que dice existe y de verdad no tiene nodo', () => {
     if (sinDist && !enCI) return
     const editables = new Set(
       (Object.keys(DOCUMENTOS) as IdDocumento[]).flatMap((id) =>
         rutasEditables(id).map((ruta) => `${id}:${ruta}`),
       ),
     )
-    const inventadas = [...PENDIENTES].filter((clave) => !editables.has(clave))
-    const yaHechas = [...PENDIENTES].filter((clave) => {
+    const inventadas = [...SIN_NODO].filter((clave) => !editables.has(clave))
+    const yaHechas = [...SIN_NODO].filter((clave) => {
       const corte = clave.indexOf(':')
       const id = clave.slice(0, corte) as IdDocumento
       const ruta = clave.slice(corte + 1)
       return referencias.some((r) => r.documento === id && coincideConPatron(r.ruta, ruta))
     })
     expect({ inventadas, yaHechas }).toEqual({ inventadas: [], yaHechas: [] })
+  })
+
+  it('las excepciones son exactamente estas seis y ninguna más', () => {
+    // Si alguien agrega un campo editable y no lo marca, la salida más
+    // barata es meterlo acá. Este test hace que esa salida cueste: hay
+    // que editar la lista Y editar este número, y el diff lo muestra.
+    expect([...SIN_NODO].sort()).toEqual([
+      'sabores:gotas[].precio',
+      'sitio:contacto.direccionPostal.codigoPostal',
+      'sitio:contacto.direccionPostal.estado',
+      'sitio:contacto.direccionPostal.localidad',
+      'sitio:contacto.formulario.asuntoNegocio',
+      'sitio:negocios.tabs.0.precio',
+    ])
   })
 })

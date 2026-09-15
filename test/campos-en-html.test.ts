@@ -1,7 +1,6 @@
 /*
  * Unidad de `test/lib/campos-en-html.ts`: acá viven las pruebas de
- * `coincideConPatron()` sola, sin `dist/` de por medio — mismo patrón que
- * `test/html-normalizado.test.ts` para `test/lib/html-normalizado.ts`.
+ * `coincideConPatron()` sola, sin `dist/` de por medio.
  *
  * `test/panel.test.ts` prueba el todo (esquema + HTML construido); este
  * archivo prueba la pieza que hace el emparejamiento, con los dos casos

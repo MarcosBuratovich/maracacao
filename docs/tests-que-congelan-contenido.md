@@ -191,3 +191,15 @@ concretos — por eso quedan QUEDA con nota, no listados assert por assert.
   `scripts/captura-html.ts`, la carpeta de fixtures y la línea `@source not` de
   `global.css`— o sacarlo del camino de Vercel. No puede seguir ahí el día que
   la clienta entre al panel.
+
+## Actualización 2026-09-15 — Fase 2, Parte B, Tarea 14 (cierre)
+
+- **BORRADO, como estaba prometido arriba.** El commit «feat: la biyección
+  campo ↔ HTML está completa, y el verificador se retira» borra
+  `test/html-normalizado.test.ts`, `test/lib/html-normalizado.ts`,
+  `scripts/captura-html.ts`, `test/fixtures/html-antes-fase-2/`, el script
+  `captura:html` de `package.json` y la línea `@source not` (con su
+  comentario) de `global.css`. Las catorce tareas de la Parte B pasaron por
+  él en verde sin recapturar ni una vez; su reemplazo es el medidor
+  diferencial de la fase 4 — hasta que exista, lo que protege la visual son
+  los topes de caracteres del esquema, puestos desde la fase 1.
