@@ -359,35 +359,35 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
           <div class="ficha-extras">
             <div class="extra-ticket">
               <TicketPanel>
-                <p class="extra-titulo">{marca.minis.titulo} · {precioMXN(marca.minis.precio)}</p>
-                <p class="extra-cuerpo">{marca.minis.cuerpo}</p>
-                <p class="mano">{marca.minis.nota}</p>
+                <p class="extra-titulo"><span data-campo="sitio:minis.titulo">{marca.minis.titulo}</span> · <span data-campo="sitio:minis.precio">{precioMXN(marca.minis.precio)}</span></p>
+                <p class="extra-cuerpo" data-campo="sitio:minis.cuerpo">{marca.minis.cuerpo}</p>
+                <p class="mano" data-campo="sitio:minis.nota">{marca.minis.nota}</p>
               </TicketPanel>
             </div>
             <div class="extra-carta">
               <div class="extra-encabezado">
-                <h4>{marca.gotas.titulo}</h4>
-                <span class="mono extra-precio">{marca.gotas.desdeEtiqueta} {precioMXN(marca.gotas.precioDesde)}</span>
+                <h4 data-campo="sitio:gotas.titulo">{marca.gotas.titulo}</h4>
+                <span class="mono extra-precio"><span data-campo="sitio:gotas.desdeEtiqueta">{marca.gotas.desdeEtiqueta}</span> {precioMXN(marca.gotas.precioDesde)}</span>
               </div>
-              <p class="extra-cuerpo suave">{marca.gotas.cuerpo}</p>
+              <p class="extra-cuerpo suave" data-campo="sitio:gotas.cuerpo">{marca.gotas.cuerpo}</p>
               <ul class="gotas-puntos" aria-label={`${marca.gotas.sabores} de gotas`}>
-                {gotas.map((g) => (
+                {gotas.map((g, i) => (
                   <li>
                     <span class="gota-punto" style={`background:${colorSabor[g.clave]}`} aria-hidden="true"></span>
-                    <span class="sr-only">{g.nombre}</span>
+                    <span class="sr-only" data-campo={`sabores:gotas.${i}.nombre`}>{g.nombre}</span>
                   </li>
                 ))}
-                <li class="mono gotas-cifra" aria-hidden="true">{marca.gotas.sabores}</li>
+                <li class="mono gotas-cifra" aria-hidden="true" data-campo="sitio:gotas.sabores">{marca.gotas.sabores}</li>
               </ul>
-              <p class="mono extra-nota suave">{marca.gotas.notaPrecio}: {precioMXN(marca.gotas.precioJengibre)}</p>
+              <p class="mono extra-nota suave"><span data-campo="sitio:gotas.notaPrecio">{marca.gotas.notaPrecio}</span>: {precioMXN(marca.gotas.precioJengibre)}</p>
             </div>
             <div class="extra-carta">
               <div class="extra-encabezado">
-                <h4>{marca.polvoCard.titulo}</h4>
-                <span class="mono extra-chip">{marca.polvoCard.chip}</span>
+                <h4 data-campo="sitio:polvoCard.titulo">{marca.polvoCard.titulo}</h4>
+                <span class="mono extra-chip" data-campo="sitio:polvoCard.chip">{marca.polvoCard.chip}</span>
               </div>
-              <p class="extra-cuerpo suave">{marca.polvoCard.cuerpo}</p>
-              <p class="mono extra-lista">{polvo.map((p) => p.nombre.toLowerCase()).join(' · ')}</p>
+              <p class="extra-cuerpo suave" data-campo="sitio:polvoCard.cuerpo">{marca.polvoCard.cuerpo}</p>
+              <p class="mono extra-lista">{polvo.flatMap((p, i) => i === 0 ? [<span data-campo={`sabores:polvo.${i}.nombre`}>{p.nombre.toLowerCase()}</span>] : [' · ', <span data-campo={`sabores:polvo.${i}.nombre`}>{p.nombre.toLowerCase()}</span>])}</p>
             </div>
           </div>
         </article>
@@ -399,14 +399,15 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
       <div class="contenedor polvo-fila">
         <div class="polvo-texto">
           <div class="polvo-encabezado">
-            <EtiquetaSabor texto={marca.polvo.kicker} />
-            <span class="sello-pronto mano" aria-hidden="true">{marca.polvo.chip}</span>
-            <span class="sr-only">{marca.polvo.chip}</span>
+            <EtiquetaSabor texto={marca.polvo.kicker} campo="sitio:polvo.kicker" />
+            <span class="sello-pronto mano" aria-hidden="true" data-campo="sitio:polvo.chip">{marca.polvo.chip}</span>
+            <span class="sr-only" data-campo="sitio:polvo.chip">{marca.polvo.chip}</span>
           </div>
-          <h2 class="titular">{marca.polvo.titulo}</h2>
-          <p class="suave">{marca.polvo.cuerpo}</p>
+          <h2 class="titular" data-campo="sitio:polvo.titulo">{marca.polvo.titulo}</h2>
+          <p class="suave" data-campo="sitio:polvo.cuerpo">{marca.polvo.cuerpo}</p>
         </div>
-        <div class="polvo-riel" role="region" aria-label={marca.polvo.titulo} tabindex="0" data-parallax="0.05">
+        <div class="polvo-riel" role="region" aria-label={marca.polvo.titulo} tabindex="0" data-parallax="0.05"
+             data-campo-attr="aria-label:sitio:polvo.titulo">
           {polvo.map((p) => (
             <img
               src={`/sitio/${p.archivo}.webp`}
@@ -414,6 +415,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
               width="832"
               height="1600"
               loading="lazy"
+              data-campo-attr="alt:sitio:polvo.altPrefijo"
             />
           ))}
         </div>
