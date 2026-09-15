@@ -210,39 +210,39 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
     <section class="seccion" data-tono="calida">
       <div class="contenedor postura">
         <div>
-          <EtiquetaSabor texto={marca.postura.kicker} />
-          <h2 class="titular">{marca.postura.titulo}</h2>
-          <p class="postura-intro">{marca.postura.intro}</p>
+          <EtiquetaSabor texto={marca.postura.kicker} campo="sitio:postura.kicker" />
+          <h2 class="titular" data-campo="sitio:postura.titulo">{marca.postura.titulo}</h2>
+          <p class="postura-intro" data-campo="sitio:postura.intro">{marca.postura.intro}</p>
           <div class="chips">
-            {marca.postura.chips.map((chip) => <Insignia tono="cacao">{chip}</Insignia>)}
+            {marca.postura.chips.map((chip, i) => <Insignia tono="cacao" campo={`sitio:postura.chips.${i}`}>{chip}</Insignia>)}
           </div>
         </div>
         <div data-tabs>
-          <div class="conmutador" role="tablist" aria-label={marca.postura.titulo}>
-            <button type="button" role="tab" id="tab-si" aria-selected="true" aria-controls="panel-si" data-tab>
+          <div class="conmutador" role="tablist" aria-label={marca.postura.titulo} data-campo-attr="aria-label:sitio:postura.titulo">
+            <button type="button" role="tab" id="tab-si" aria-selected="true" aria-controls="panel-si" data-tab data-campo="sitio:postura.tabSi">
               {marca.postura.tabSi}
             </button>
-            <button type="button" role="tab" id="tab-no" aria-selected="false" aria-controls="panel-no" data-tab>
+            <button type="button" role="tab" id="tab-no" aria-selected="false" aria-controls="panel-no" data-tab data-campo="sitio:postura.tabNo">
               {marca.postura.tabNo}
             </button>
           </div>
           <div class="panel panel-si" id="panel-si" role="tabpanel" aria-labelledby="tab-si" tabindex="0" data-panel>
             <ul class="panel-lista">
-              {marca.postura.lleva.map((item) => (
-                <li><span class="mano panel-marca" aria-hidden="true">✓</span>{item}</li>
+              {marca.postura.lleva.map((item, i) => (
+                <li><span class="mano panel-marca" aria-hidden="true">✓</span><span data-campo={`sitio:postura.lleva.${i}`}>{item}</span></li>
               ))}
             </ul>
-            <p class="panel-nota mono">{marca.postura.llevaNota}</p>
+            <p class="panel-nota mono" data-campo="sitio:postura.llevaNota">{marca.postura.llevaNota}</p>
           </div>
           {/* Sin `hidden` en el HTML: sin JS los dos paneles se apilan
               visibles; el script esconde el inactivo al tomar control. */}
           <div class="panel panel-no" id="panel-no" role="tabpanel" aria-labelledby="tab-no" tabindex="0" data-panel>
             <ul class="panel-lista">
-              {marca.postura.noLleva.map((item) => (
-                <li><span class="mano panel-marca" aria-hidden="true">✕</span><s>{item}</s></li>
+              {marca.postura.noLleva.map((item, i) => (
+                <li><span class="mano panel-marca" aria-hidden="true">✕</span><s data-campo={`sitio:postura.noLleva.${i}`}>{item}</s></li>
               ))}
             </ul>
-            <p class="panel-cierre">{marca.postura.noLlevaCierre}</p>
+            <p class="panel-cierre" data-campo="sitio:postura.noLlevaCierre">{marca.postura.noLlevaCierre}</p>
           </div>
         </div>
       </div>
