@@ -99,15 +99,15 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
       (módulo diferido) y el menú se pintaba un instante como fila
       estática empujando todo hacia abajo (CLS 0.035 en desktop). */}
   <script is:inline>document.documentElement.classList.add('js')</script>
-  <a href="#contenido" class="salto">{marca.skipLink}</a>
+  <a href="#contenido" class="salto" data-campo="sitio:skipLink">{marca.skipLink}</a>
 
   <header class="cabecera" data-tono="crema">
     <div class="contenedor cabecera-fila">
       <a class="lockup" href="#contenido">
         <span class="lockup-sello" set:html={sello} />
         <span>
-          <span class="lockup-nombre">{marca.marca.wordmark}</span>
-          <span class="lockup-descriptor mono">{marca.marca.descriptor}</span>
+          <span class="lockup-nombre" data-campo="sitio:marca.wordmark">{marca.marca.wordmark}</span>
+          <span class="lockup-descriptor mono" data-campo="sitio:marca.descriptor">{marca.marca.descriptor}</span>
         </span>
       </a>
       <button
@@ -117,7 +117,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
         aria-controls="menu-principal"
         data-menu-boton
       >
-        <span class="sr-only" data-menu-texto>{marca.nav.abrir}</span>
+        <span class="sr-only" data-menu-texto data-campo="sitio:nav.abrir">{marca.nav.abrir}</span>
         <span class="hamburguesa-linea" aria-hidden="true"></span>
         <span class="hamburguesa-linea" aria-hidden="true"></span>
         <span class="hamburguesa-linea" aria-hidden="true"></span>
@@ -126,26 +126,27 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
   </header>
 
   {/* Sin JS es una fila de enlaces bajo la cabecera; con JS, el overlay. */}
-  <nav id="menu-principal" class="menu" aria-label={marca.nav.etiqueta} data-menu>
+  <nav id="menu-principal" class="menu" aria-label={marca.nav.etiqueta} data-menu
+       data-campo-attr="aria-label:sitio:nav.etiqueta">
     <div class="menu-interior">
       <ol class="menu-lista">
         {marca.nav.items.map((item, i) => (
           <li style={`--orden:${i}`}>
             <a href={item.ancla} data-menu-enlace>
               <span class="menu-numero mono" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
-              {item.texto}
+              <span data-campo={`sitio:nav.items.${i}.texto`}>{item.texto}</span>
             </a>
           </li>
         ))}
         <li class="menu-catalogo" style={`--orden:${marca.nav.items.length}`}>
           <a href={marca.contacto.catalogoUrl} target="_blank" rel="noopener" data-menu-enlace>
             <span class="menu-numero mano" aria-hidden="true">↗</span>
-            {marca.nav.catalogo}<span class="sr-only"> (se abre en pestaña nueva)</span>
+            <span data-campo="sitio:nav.catalogo">{marca.nav.catalogo}</span><span class="sr-only"> (se abre en pestaña nueva)</span>
           </a>
         </li>
       </ol>
       <div class="menu-pie">
-        {marca.nav.pie.map((linea) => <span class="mono">{linea}</span>)}
+        {marca.nav.pie.map((linea, i) => <span class="mono" data-campo={`sitio:nav.pie.${i}`}>{linea}</span>)}
       </div>
       <img class="menu-personaje flota" src="/sitio/personaje-sentado-t.webp" alt="" width="300" height="352" loading="lazy" />
     </div>
@@ -157,16 +158,16 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
       <div class="contenedor portada-fila">
         <div class="portada-texto">
           <h1 class="portada-titular">
-            {marca.hero.titular[0]}<br />
-            {marca.hero.titular[1].replace(/,$/, '')}<span class="acento">,</span><br />
-            <span class="acento">{marca.hero.titular[2]}</span>
+            <span data-campo="sitio:hero.titular.0">{marca.hero.titular[0]}</span><br />
+            <span data-campo="sitio:hero.titular.1">{marca.hero.titular[1].replace(/,$/, '')}</span><span class="acento">,</span><br />
+            <span class="acento" data-campo="sitio:hero.titular.2">{marca.hero.titular[2]}</span>
           </h1>
-          <p class="portada-sub">{marca.hero.sub}</p>
+          <p class="portada-sub" data-campo="sitio:hero.sub">{marca.hero.sub}</p>
           <div class="portada-ctas">
             {/* A la categoría de barras por más vendidas (pedido de
                 Marcos), no a la portada general del catálogo. */}
-            <BotonMarca href={urlCatalogoBarras} externo>{marca.hero.ctaCatalogo}</BotonMarca>
-            <a class="enlace-sabores" href="#sabores">{marca.hero.ctaSabores}</a>
+            <BotonMarca href={urlCatalogoBarras} externo><span data-campo="sitio:hero.ctaCatalogo">{marca.hero.ctaCatalogo}</span></BotonMarca>
+            <a class="enlace-sabores" href="#sabores" data-campo="sitio:hero.ctaSabores">{marca.hero.ctaSabores}</a>
           </div>
         </div>
         {/* El lockup del sistema anterior, que a Marcos le gustaba: el
@@ -177,7 +178,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
             titular de al lado y en la cabecera — repetirlo era ruido. */}
         <div class="portada-logo">
           <span class="portada-sello" set:html={sello} />
-          <p class="portada-wordmark">{marca.marca.wordmark}</p>
+          <p class="portada-wordmark" data-campo="sitio:marca.wordmark">{marca.marca.wordmark}</p>
         </div>
       </div>
       <div class="portada-tira" data-parallax="0.045">
@@ -186,7 +187,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
         {/* Las primeras cuatro barras entran en el primer pantallazo móvil
             y una de ellas es el LCP: prioridad alta; el resto, baja para
             no pelearle ancho de banda a las fuentes. */}
-        <Marquesina aria={marca.hero.marquesinaAria} dur="140s" rotacion={-3}>
+        <Marquesina aria={marca.hero.marquesinaAria} campoAria="sitio:hero.marquesinaAria" dur="140s" rotacion={-3}>
           {enMarquesina.map((s, i) => (
             <img
               class="tira-barra"
