@@ -76,9 +76,9 @@ const ancla = (archivo: string) => archivo.replace('ficha-tecnica-', '')
           <div class="doc-secciones">
             {f.secciones.map((seccion, k) => (
               <section>
-                <h3 data-campo={`fichas:fichas.${i}.secciones.${k}.titulo`}>
+                <h3>
                   <span class="n mono" aria-hidden="true">{String(k + 1).padStart(2, '0')}</span>
-                  {seccion.titulo}
+                  <span data-campo={`fichas:fichas.${i}.secciones.${k}.titulo`}>{seccion.titulo}</span>
                 </h3>
                 {seccion.bloques.map((b, m) =>
                   b.tipo === 'parrafo' ? (
