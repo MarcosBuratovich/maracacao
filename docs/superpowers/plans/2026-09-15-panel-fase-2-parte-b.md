@@ -2560,3 +2560,60 @@ Parte A, y no se resuelve acá):
 - `test/anaquel-ilustracion.test.ts` congela el slug `'canela'`. **Fase 7.**
 - `src/lib/ilustraciones.ts` falla en silencio si algún día se agrega un
   adapter de servidor. **Fase 5**, cuando se toque el deploy.
+
+---
+
+## Cierre de la Parte B (2026-09-15)
+
+Las catorce tareas se ejecutaron con subagent-driven-development sobre la rama
+`panel-fase-2-parte-b` (23 commits). Cada una pasó su revisión; la revisión
+final de toda la rama (opus) dio «ready to merge with fixes», con cuatro
+Important que se arreglaron acá. Estado al cerrar: **908 tests verdes en 37
+archivos, `astro check` 0 errores / 0 warnings / 3 hints**, y en el HTML
+construido **784 `data-campo`, 45 `data-campo-attr` y 4 `data-campo-alterno`**
+repartidos en las tres páginas públicas.
+
+**Lo que corrigió la revisión final:**
+
+- **Doce nodos marcados muestran algo distinto del valor del campo**, no tres
+  como decía la D5 de este plan —y tres de esos doce no los había visto nadie:
+  el nombre del polvo en minúsculas, el punto de `catar.aporteTitulo` y los dos
+  puntos de `recetas.etiquetaTip`. Ahora están declarados uno por uno en
+  `TRANSFORMADOS` (`test/panel.test.ts`) con lo que la plantilla les hace, y un
+  test exige que cada nodo marcado muestre el valor crudo salvo que su ruta
+  esté declarada. **Ese test es además el reemplazo del verificador retirado**
+  para esta clase de regresión: compara el HTML contra el CONTENIDO, no contra
+  una foto, así que no se pone rojo cuando la clienta edita.
+- El comentario de la excepción `negocios.tabs.0.precio` prometía algo falso
+  (que el nodo aparecería solo el día que hubiera precio); ahora la plantilla
+  lo marca condicionalmente y el comentario dice la verdad.
+- `data-campo-attr` acepta varias referencias separadas por espacio, así que
+  `contacto.formulario.asuntoNegocio` dejó de ser excepción: quedan **cinco**.
+- El `data-campo-alterno` del visor 3D nombra su atributo
+  (`alt:sitio:anaquel.visorAlt`), para que la fase 6 pueda distinguir por
+  máquina —y no por comentario— los alternos de texto de los de atributo. Sin
+  eso, la implementación obvia le borraba la imagen de respaldo a la ficha.
+
+**Las cinco excepciones que quedan**, cada una con su razón en
+`test/panel.test.ts`: el precio del polvo (hoy `null`, no hay nodo), el precio
+suelto de cada bolsa de gotas (ninguna plantilla lo muestra), y los tres campos
+de la dirección de Google (viven solo adentro del JSON-LD).
+
+**Lo que hereda la fase 6 (el panel):**
+
+- **`TRANSFORMADOS` es su lista de trabajo.** Para esos doce campos, `inyecta.ts`
+  tiene que aplicar la misma transformación en la vista previa, o va a publicar
+  el valor crudo encima de un nodo transformado.
+- **La D5 de este plan quedó mal medida** (decía tres, son doce). Si en la fase 6
+  la lista sigue creciendo, conviene declarar la transformación en el esquema en
+  vez de mantenerla a mano.
+- **Hay nodos marcados invisibles en reposo:** las catorce fichas de sabor que el
+  script esconde, los bloques `hidden` del formulario, los `sr-only` y los
+  `aria-hidden`. El panel tiene que mostrarlos o desplazarse hasta ellos antes de
+  resaltarlos, y los cuatro alternos necesitan simular la interacción.
+- `valorAtributo` no distingue «atributo ausente» de «atributo vacío», y el
+  parser nuevo (lista separada por espacios) no tiene test unitario propio: la
+  fase 6 va a escribir los suyos sobre ese mismo código.
+- El test (c) detecta «muestra algo distinto y no está declarado», pero no lo
+  inverso (un nodo que debería transformar y no transforma). Eso lo cubre el
+  medidor de la fase 4, que mide el texto renderizado.
