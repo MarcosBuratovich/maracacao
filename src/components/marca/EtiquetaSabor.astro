@@ -5,12 +5,16 @@
 // currentColor; el de las chispas lo pone `--chispa` (amarillo por
 // defecto). El texto compensa el tracking final con translateX, la
 // lección del wordmark centrado.
-interface Props { texto: string }
-const { texto } = Astro.props
+interface Props {
+  texto: string
+  /** Ruta del campo, «documento:ruta», para que el panel sepa qué texto es este. */
+  campo?: string
+}
+const { texto, campo } = Astro.props
 ---
 <span class="etiqueta-sabor">
   <span class="chispa" aria-hidden="true"><i></i><i></i><i></i></span>
-  <span class="texto">{texto}</span>
+  <span class="texto" data-campo={campo}>{texto}</span>
   <span class="chispa" aria-hidden="true"><i></i><i></i><i></i></span>
 </span>
 
