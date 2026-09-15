@@ -1,7 +1,17 @@
 /*
  * Lee las páginas CONSTRUIDAS y devuelve qué campos dice el HTML que
  * muestra: cada `data-campo`, cada `data-campo-attr` y cada
- * `data-campo-alterno` que encuentra, partido en documento + ruta.
+ * `data-campo-alterno` que encuentra, partido en documento + ruta (más el
+ * texto o el valor de atributo que ese nodo muestra hoy — spec §3.1, D1/D2).
+ *
+ * `data-campo-attr` acepta una lista de referencias separadas por espacio
+ * (un elemento puede tener que editar más de un atributo a la vez, como el
+ * <form> de contacto) y `data-campo-alterno` acepta la forma de atributo
+ * de D2 («atributo:documento:ruta») para el caso en que el script no
+ * reemplaza el textContent del nodo marcado sino que le pone el valor a
+ * un atributo de un elemento que crea adentro (el visor 3D). Los dos
+ * casos se parten con la misma regla de D2: PRIMER `:` el atributo, el
+ * resto una referencia de D1.
  *
  * Vive en test/lib/ y no en src/ porque hoy lo usa solo la suite. Cuando
  * la fase 4 traiga el medidor, ese va a necesitar exactamente esto sobre
@@ -26,10 +36,35 @@ export interface Referencia {
   documento: string
   /** La ruta con índices concretos: 'recetas.lista.2.titulo'. */
   ruta: string
-  /** El atributo, cuando vino de `data-campo-attr`. Si no, null. */
+  /**
+   * El nombre del atributo, cuando la referencia lo nombra: siempre para
+   * `data-campo-attr`, y para el único `data-campo-alterno` que también
+   * lo nombra (el visor 3D, `alt:documento:ruta`). `null` para un
+   * `data-campo` liso o un `data-campo-alterno` que reemplaza textContent.
+   */
   atributo: string | null
-  /** El valor crudo del atributo, para que un error diga qué leyó. */
+  /** El valor crudo de ESTA referencia (un token, si el atributo traía varias separadas por espacio). */
   crudo: string
+  /**
+   * El `textContent` del nodo marcado, tal cual quedó en el HTML
+   * construido. `test/panel.test.ts` lo usa para medir si la plantilla
+   * transforma el valor del campo antes de mostrarlo.
+   */
+  texto: string
+  /**
+   * El valor del atributo que nombra `atributo`, o `null` cuando
+   * `atributo` es `null`. Mismo uso que `texto`, pero para `data-campo-attr`.
+   */
+  valorAtributo: string | null
+  /**
+   * De qué atributo HTML salió esta referencia. `atributo !== null` NO
+   * alcanza para saber si es un `data-campo-attr` o el único
+   * `data-campo-alterno` con forma de atributo (el visor 3D) — los dos
+   * nombran un atributo. `test/panel.test.ts` necesita esta distinción
+   * para no comparar un alterno (que el script pinta DESPUÉS) contra el
+   * HTML de build, que todavía no lo tiene.
+   */
+  fuente: 'data-campo' | 'data-campo-attr' | 'data-campo-alterno'
 }
 
 export function hayPaginasConstruidas(): boolean {
@@ -85,6 +120,21 @@ const partiendoEnDosPuntos = (valor: string): [string, string] | null => {
   return [valor.slice(0, corte), valor.slice(corte + 1)]
 }
 
+/**
+ * Partir 'atributo:documento:ruta' (D2) en sus tres partes: se parte por
+ * el PRIMER `:` (el atributo) y lo que queda se vuelve a partir por su
+ * propio primer `:` (documento y ruta, como D1). `null` si no hay
+ * segundo `:` — o sea, si `valor` no tiene la forma de atributo.
+ */
+const partiendoEnTres = (
+  valor: string,
+): { atributo: string; documento: string; ruta: string } | null => {
+  const primero = partiendoEnDosPuntos(valor)
+  const segundo = primero ? partiendoEnDosPuntos(primero[1]) : null
+  if (!primero || !segundo) return null
+  return { atributo: primero[0], documento: segundo[0], ruta: segundo[1] }
+}
+
 export function referenciasDe(pagina: Pagina): Referencia[] {
   const { document } = parseHTML(readFileSync(PAGINAS[pagina], 'utf8'))
   const salida: Referencia[] = []
@@ -98,40 +148,73 @@ export function referenciasDe(pagina: Pagina): Referencia[] {
       ruta: partes?.[1] ?? '',
       atributo: null,
       crudo,
+      texto: el.textContent ?? '',
+      valorAtributo: null,
+      fuente: 'data-campo',
     })
   }
 
   for (const el of document.querySelectorAll('[data-campo-attr]')) {
     const crudo = el.getAttribute('data-campo-attr') ?? ''
-    // Se parte DOS veces: 'alt:sitio:anaquel.envolturaAltPrefijo' →
-    // atributo 'alt', y el resto es una referencia como la de data-campo.
-    const primero = partiendoEnDosPuntos(crudo)
-    const segundo = primero ? partiendoEnDosPuntos(primero[1]) : null
-    salida.push({
-      pagina,
-      documento: segundo?.[0] ?? '',
-      ruta: segundo?.[1] ?? '',
-      atributo: primero?.[0] ?? '',
-      crudo,
-    })
+    // Un elemento puede necesitar más de UNA referencia — el <form> de
+    // contacto marca data-asunto-personal Y data-asunto-negocio a la vez,
+    // y `data-campo-attr` es un solo atributo HTML — así que se parte por
+    // espacios primero: cada token es una referencia independiente, con
+    // la forma 'atributo:documento:ruta' de `partiendoEnTres`.
+    for (const token of crudo.split(/\s+/).filter(Boolean)) {
+      const tercias = partiendoEnTres(token)
+      salida.push({
+        pagina,
+        documento: tercias?.documento ?? '',
+        ruta: tercias?.ruta ?? '',
+        atributo: tercias?.atributo ?? '',
+        crudo: token,
+        texto: el.textContent ?? '',
+        valorAtributo: tercias ? el.getAttribute(tercias.atributo) ?? '' : null,
+        fuente: 'data-campo-attr',
+      })
+    }
   }
 
   for (const el of document.querySelectorAll('[data-campo-alterno]')) {
     const crudo = el.getAttribute('data-campo-alterno') ?? ''
+    // La mayoría de los alternos reemplazan el textContent del nodo
+    // marcado («Cerrar menú», «¡Copiado!», «Enviando») y llevan la forma
+    // lisa de D1 ('documento:ruta'). El visor 3D es distinto: el script
+    // no toca el textContent de este contenedor, crea un <model-viewer>
+    // ADENTRO y le pone el alt ahí — así que ese lleva la forma de
+    // atributo de D2 ('alt:documento:ruta'), y se intenta primero: si
+    // `partiendoEnTres` encuentra el segundo `:`, es la forma de
+    // atributo y `atributo` queda con nombre; si no, es la forma lisa.
+    // Con esto, «la referencia nombra un atributo ⇒ nunca tocar el
+    // textContent» se lee del dato en vez de acordarse de un caso
+    // especial. Cuenta para la biyección igual que un data-campo de
+    // todos modos: el panel tiene que saber que la vista previa no lo va
+    // a mostrar sin simular la interacción.
+    const tercias = partiendoEnTres(crudo)
+    if (tercias) {
+      salida.push({
+        pagina,
+        documento: tercias.documento,
+        ruta: tercias.ruta,
+        atributo: tercias.atributo,
+        crudo,
+        texto: el.textContent ?? '',
+        valorAtributo: el.getAttribute(tercias.atributo) ?? '',
+        fuente: 'data-campo-alterno',
+      })
+      continue
+    }
     const partes = partiendoEnDosPuntos(crudo)
     salida.push({
       pagina,
       documento: partes?.[0] ?? '',
       ruta: partes?.[1] ?? '',
-      // Es el texto que el script pinta DESPUÉS — casi siempre sobre el
-      // mismo nodo («Cerrar menú», «¡Copiado!», «Enviando»), pero en el
-      // visor 3D sobre un elemento que el script crea ADENTRO del nodo
-      // marcado (el <model-viewer> no existe hasta que el visor carga).
-      // Cuenta para la biyección igual que un data-campo de todos modos:
-      // el panel tiene que saber que la vista previa no lo va a mostrar
-      // sin simular la interacción.
       atributo: null,
       crudo,
+      texto: el.textContent ?? '',
+      valorAtributo: null,
+      fuente: 'data-campo-alterno',
     })
   }
 

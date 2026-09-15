@@ -304,12 +304,23 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
             {/* La barra 3D de Marcos (Blender): un solo GLB para los 15
                 sabores — marca.ts le cambia la textura del pliego al
                 elegir. La imagen es el fallback y lo único que hay sin
-                JS o con reduced-motion. El data-campo-alterno apunta a la
-                descripción que el script le pone al <model-viewer> que
-                inserta ACÁ ADENTRO cuando el visor carga: ese elemento no
-                existe todavía en este HTML, así que el campo cuelga del
-                contenedor para que el panel tenga un nodo que encontrar. */}
-            <div class="ficha-envoltura" data-visor3d data-glb="/sitio/marca/barra.glb" data-campo-alterno="sitio:anaquel.visorAlt">
+                JS o con reduced-motion.
+                El data-campo-alterno lleva la forma de ATRIBUTO
+                («alt:documento:ruta», igual que data-campo-attr) porque
+                este alterno no es de los otros tres (que reemplazan el
+                textContent del nodo marcado): el script crea un
+                <model-viewer> ACÁ ADENTRO cuando el visor carga y le pone
+                el alt ahí. Si el panel de la fase 6 tratara este nodo
+                como los otros tres —pintándole el textContent— le
+                borraría el <img> de fallback de abajo, que es lo único
+                que queda visible sin JS o con reduced-motion. Con la
+                forma de atributo, «la referencia nombra un atributo ⇒
+                nunca tocar el textContent» sale de leer el dato, no de
+                acordarse de un caso especial. El campo cuelga del
+                contenedor, no del <model-viewer>, porque ese elemento no
+                existe todavía en este HTML — nace cuando el visor
+                carga. */}
+            <div class="ficha-envoltura" data-visor3d data-glb="/sitio/marca/barra.glb" data-campo-alterno="alt:sitio:anaquel.visorAlt">
               <img
                 src={`/sitio/marca/barra-${inicial.slug}.webp`}
                 alt={`${marca.anaquel.envolturaAltPrefijo} ${inicial.nombre}`}
@@ -567,7 +578,13 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
             >
               <div class="negocio-encabezado">
                 <h3 data-campo={`sitio:negocios.tabs.${i}.titulo`}>{t.titulo}</h3>
-                <span class="mono">{t.precio == null ? <span data-campo={`sitio:negocios.tabs.${i}.precioNota`}>{t.precioNota}</span> : <><span data-campo={`sitio:negocios.tabs.${i}.precioNota`}>{t.precioNota}</span> {precioMXN(t.precio)}</>}</span>
+                {/* El precio solo se marca en la pestaña 0 (polvo): es la
+                    ÚNICA que usa `precioONada` — un valor de la clienta,
+                    hoy en `null`. Las de gotas y barras (i 1 y 2) muestran
+                    el `derivado` (el mínimo de sus propios productos): no
+                    son un campo que la clienta edite acá, y marcarlas
+                    haría que (b) las rechazara por no ser editables. */}
+                <span class="mono">{t.precio == null ? <span data-campo={`sitio:negocios.tabs.${i}.precioNota`}>{t.precioNota}</span> : <><span data-campo={`sitio:negocios.tabs.${i}.precioNota`}>{t.precioNota}</span> {i === 0 ? <span data-campo="sitio:negocios.tabs.0.precio">{precioMXN(t.precio)}</span> : precioMXN(t.precio)}</>}</span>
               </div>
               <p class="negocio-cuerpo" data-campo={`sitio:negocios.tabs.${i}.cuerpo`}>{t.cuerpo}</p>
               <ul class="negocio-datos">
@@ -624,7 +641,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
             data-asunto-personal={marca.contacto.formulario.asuntoPersonal}
             data-asunto-negocio={marca.contacto.formulario.asuntoNegocio}
             data-correo={marca.contacto.correo}
-            data-campo-attr="data-asunto-personal:sitio:contacto.formulario.asuntoPersonal"
+            data-campo-attr="data-asunto-personal:sitio:contacto.formulario.asuntoPersonal data-asunto-negocio:sitio:contacto.formulario.asuntoNegocio"
           >
             <h3 class="formulario-titulo" data-campo="sitio:contacto.formulario.titulo">{marca.contacto.formulario.titulo}</h3>
             {/* Honeypot y marca de tiempo: capas anti-bots que la función
