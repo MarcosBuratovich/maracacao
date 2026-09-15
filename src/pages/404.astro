@@ -15,15 +15,15 @@ const sello = selloRaw.replace('<svg', '<svg aria-hidden="true" focusable="false
 <Base titulo={marca.noEncontrada.titulo} fuentes="marca">
   <main class="perdida" data-tono="crema">
     <span class="perdida-sello" set:html={sello} />
-    <p class="perdida-wordmark">{marca.marca.wordmark}</p>
+    <p class="perdida-wordmark" data-campo="sitio:marca.wordmark">{marca.marca.wordmark}</p>
 
     <span class="perdida-codigo mano" aria-hidden="true">404</span>
 
-    <h1 class="perdida-titulo">{marca.noEncontrada.encabezado}</h1>
-    <p class="perdida-sub">{marca.noEncontrada.sub}</p>
+    <h1 class="perdida-titulo" data-campo="sitio:noEncontrada.encabezado">{marca.noEncontrada.encabezado}</h1>
+    <p class="perdida-sub" data-campo="sitio:noEncontrada.sub">{marca.noEncontrada.sub}</p>
 
     <div class="perdida-accion">
-      <BotonMarca href={marca.noEncontrada.rutaInicio}>{marca.noEncontrada.cta}</BotonMarca>
+      <BotonMarca href={marca.noEncontrada.rutaInicio}><span data-campo="sitio:noEncontrada.cta">{marca.noEncontrada.cta}</span></BotonMarca>
     </div>
   </main>
 </Base>

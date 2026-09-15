@@ -60,31 +60,21 @@ const PENDIENTES = new Set<string>([
   // panel tenga la ficha del formulario: ahí los dos se editan juntos y
   // ninguno de los dos necesita nodo propio. Ver spec §1.7.
   'sitio:contacto.formulario.asuntoNegocio',
+  // El <title> de esta página sale del prop `titulo` de Base.astro: lo
+  // marca la Tarea 12, que es dueña del <head> compartido de las tres
+  // páginas. Ver Tarea 11.
   'sitio:fichasTecnicas.titulo',
+  // Mismo caso que el título: `descripcion` solo alimenta la meta
+  // description, el og:description y el twitter:description del <head>
+  // de Base.astro (prop `descripcion`) — no hay ningún nodo en el cuerpo
+  // de fichas-tecnicas.astro donde colgarle el data-campo, así que le
+  // toca a la Tarea 12 igual que el título.
   'sitio:fichasTecnicas.descripcion',
-  'sitio:fichasTecnicas.kicker',
-  'sitio:fichasTecnicas.encabezado',
-  'sitio:fichasTecnicas.sub',
-  'sitio:fichasTecnicas.tipoDocumento',
-  'sitio:fichasTecnicas.indiceAria',
-  'sitio:fichasTecnicas.descargar',
-  'sitio:fichasTecnicas.descargarNota',
-  'sitio:fichasTecnicas.volver',
-  'sitio:fichasTecnicas.contactoNota',
+  // El <title> de esta página también sale del prop `titulo` de
+  // Base.astro: mismo caso que fichasTecnicas.titulo, lo marca la
+  // Tarea 12.
   'sitio:noEncontrada.titulo',
-  'sitio:noEncontrada.encabezado',
-  'sitio:noEncontrada.sub',
-  'sitio:noEncontrada.cta',
   'sabores:gotas[].precio',
-  'fichas:fichas[].producto',
-  'fichas:fichas[].denominacion',
-  'fichas:fichas[].meta[].0',
-  'fichas:fichas[].meta[].1',
-  'fichas:fichas[].secciones[].titulo',
-  'fichas:fichas[].secciones[].bloques[].texto',
-  'fichas:fichas[].secciones[].bloques[].items[]',
-  'fichas:fichas[].secciones[].bloques[].encabezados[]',
-  'fichas:fichas[].secciones[].bloques[].filas[][]',
 ])
 
 const DOCUMENTOS = {

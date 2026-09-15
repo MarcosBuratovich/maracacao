@@ -25,77 +25,81 @@ const copy = marca.fichasTecnicas
 const ancla = (archivo: string) => archivo.replace('ficha-tecnica-', '')
 ---
 <Base titulo={copy.titulo} fuentes="marca" descripcion={copy.descripcion} ruta={copy.ruta}>
-  <a href="#contenido" class="salto">{marca.skipLink}</a>
+  <a href="#contenido" class="salto" data-campo="sitio:skipLink">{marca.skipLink}</a>
 
   <header class="cabecera" data-tono="crema">
     <div class="contenedor cabecera-fila">
       <a class="lockup" href={copy.rutaInicio}>
         <span class="lockup-sello" set:html={sello} />
         <span>
-          <span class="lockup-nombre">{marca.marca.wordmark}</span>
-          <span class="lockup-descriptor mono">{marca.marca.descriptor}</span>
+          <span class="lockup-nombre" data-campo="sitio:marca.wordmark">{marca.marca.wordmark}</span>
+          <span class="lockup-descriptor mono" data-campo="sitio:marca.descriptor">{marca.marca.descriptor}</span>
         </span>
       </a>
-      <a class="volver mono" href={copy.rutaInicio}>{copy.volver}</a>
+      <a class="volver mono" href={copy.rutaInicio} data-campo="sitio:fichasTecnicas.volver">{copy.volver}</a>
     </div>
   </header>
 
   <main id="contenido" class="zona" data-tono="crema">
     <div class="contenedor">
-      <EtiquetaSabor texto={copy.kicker} />
-      <h1 class="titular">{copy.encabezado}</h1>
-      <p class="intro">{copy.sub}</p>
+      <EtiquetaSabor texto={copy.kicker} campo="sitio:fichasTecnicas.kicker" />
+      <h1 class="titular" data-campo="sitio:fichasTecnicas.encabezado">{copy.encabezado}</h1>
+      <p class="intro" data-campo="sitio:fichasTecnicas.sub">{copy.sub}</p>
 
-      <nav class="indice" aria-label={copy.indiceAria}>
-        {fichasBase.map((f) => <a href={`#${ancla(f.archivo)}`}>{f.producto}</a>)}
+      <nav class="indice" aria-label={copy.indiceAria} data-campo-attr="aria-label:sitio:fichasTecnicas.indiceAria">
+        {fichasBase.map((f, i) => <a href={`#${ancla(f.archivo)}`} data-campo={`fichas:fichas.${i}.producto`}>{f.producto}</a>)}
       </nav>
 
-      {fichasBase.map((f) => (
+      {fichasBase.map((f, i) => (
         <article class="doc" id={ancla(f.archivo)} style={`--acento: ${f.acento}`}>
           <header class="doc-cabeza">
             <div class="doc-titulos">
-              <p class="doc-tipo mono">{copy.tipoDocumento}</p>
-              <h2>{f.producto}</h2>
-              <p class="doc-denominacion">{f.denominacion}</p>
+              <p class="doc-tipo mono" data-campo="sitio:fichasTecnicas.tipoDocumento">{copy.tipoDocumento}</p>
+              <h2 data-campo={`fichas:fichas.${i}.producto`}>{f.producto}</h2>
+              <p class="doc-denominacion" data-campo={`fichas:fichas.${i}.denominacion`}>{f.denominacion}</p>
             </div>
             <a class="doc-pdf" href={`${copy.rutaPdf}/${f.archivo}.pdf`} download>
-              <span class="mono">{copy.descargar}</span>
-              <span class="doc-pdf-nota mono">{copy.descargarNota}</span>
+              <span class="mono" data-campo="sitio:fichasTecnicas.descargar">{copy.descargar}</span>
+              <span class="doc-pdf-nota mono" data-campo="sitio:fichasTecnicas.descargarNota">{copy.descargarNota}</span>
             </a>
           </header>
 
           <dl class="doc-meta">
-            {f.meta.map(([clave, valor]) => (
+            {f.meta.map(([clave, valor], j) => (
               <div>
-                <dt class="mono">{clave}</dt>
-                <dd>{valor}</dd>
+                <dt class="mono" data-campo={`fichas:fichas.${i}.meta.${j}.0`}>{clave}</dt>
+                <dd data-campo={`fichas:fichas.${i}.meta.${j}.1`}>{valor}</dd>
               </div>
             ))}
           </dl>
 
           <div class="doc-secciones">
-            {f.secciones.map((seccion, i) => (
+            {f.secciones.map((seccion, k) => (
               <section>
-                <h3>
-                  <span class="n mono" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+                <h3 data-campo={`fichas:fichas.${i}.secciones.${k}.titulo`}>
+                  <span class="n mono" aria-hidden="true">{String(k + 1).padStart(2, '0')}</span>
                   {seccion.titulo}
                 </h3>
-                {seccion.bloques.map((b) =>
+                {seccion.bloques.map((b, m) =>
                   b.tipo === 'parrafo' ? (
-                    <p>{b.texto}</p>
+                    <p data-campo={`fichas:fichas.${i}.secciones.${k}.bloques.${m}.texto`}>{b.texto}</p>
                   ) : b.tipo === 'lista' ? (
-                    <ul>{b.items.map((item) => <li>{item}</li>)}</ul>
+                    <ul>{b.items.map((item, n) => <li data-campo={`fichas:fichas.${i}.secciones.${k}.bloques.${m}.items.${n}`}>{item}</li>)}</ul>
                   ) : (
                     <div class="tabla-marco">
                       <table>
                         <thead>
-                          <tr>{b.encabezados.map((e) => <th scope="col">{e}</th>)}</tr>
+                          <tr>{b.encabezados.map((e, n) => <th scope="col" data-campo={`fichas:fichas.${i}.secciones.${k}.bloques.${m}.encabezados.${n}`}>{e}</th>)}</tr>
                         </thead>
                         <tbody>
-                          {b.filas.map((fila) => (
+                          {b.filas.map((fila, n) => (
                             <tr>
-                              {fila.map((celda, j) =>
-                                j === 0 ? <th scope="row">{celda}</th> : <td class="mono">{celda}</td>,
+                              {fila.map((celda, o) =>
+                                o === 0 ? (
+                                  <th scope="row" data-campo={`fichas:fichas.${i}.secciones.${k}.bloques.${m}.filas.${n}.${o}`}>{celda}</th>
+                                ) : (
+                                  <td class="mono" data-campo={`fichas:fichas.${i}.secciones.${k}.bloques.${m}.filas.${n}.${o}`}>{celda}</td>
+                                ),
                               )}
                             </tr>
                           ))}
@@ -111,7 +115,7 @@ const ancla = (archivo: string) => archivo.replace('ficha-tecnica-', '')
       ))}
 
       <p class="pie-nota mono">
-        {copy.contactoNota} <a href={`mailto:${marca.contacto.correo}`}>{marca.contacto.correo}</a>
+        <span data-campo="sitio:fichasTecnicas.contactoNota">{copy.contactoNota}</span> <a href={`mailto:${marca.contacto.correo}`}>{marca.contacto.correo}</a>
         {' · '}{marca.contacto.redes}
       </p>
     </div>
