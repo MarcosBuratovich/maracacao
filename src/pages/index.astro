@@ -486,16 +486,16 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
     <section id="nosotros" class="seccion" data-tono="crema">
       <div class="contenedor nosotros">
         <div>
-          <EtiquetaSabor texto={marca.nosotros.kicker} />
-          <h2 class="titular">{marca.nosotros.titulo}</h2>
-          {marca.nosotros.parrafos.map((p) => <p class="nosotros-parrafo">{p}</p>)}
+          <EtiquetaSabor texto={marca.nosotros.kicker} campo="sitio:nosotros.kicker" />
+          <h2 class="titular" data-campo="sitio:nosotros.titulo">{marca.nosotros.titulo}</h2>
+          {marca.nosotros.parrafos.map((p, i) => <p class="nosotros-parrafo" data-campo={`sitio:nosotros.parrafos.${i}`}>{p}</p>)}
         </div>
         <div>
           <div class="nosotros-carta">
-            <b class="nota-titulo">{marca.nosotros.cacaoTitulo}</b> {marca.nosotros.cacao}
+            <b class="nota-titulo" data-campo="sitio:nosotros.cacaoTitulo">{marca.nosotros.cacaoTitulo}</b> <span data-campo="sitio:nosotros.cacao">{marca.nosotros.cacao}</span>
           </div>
           <div class="nosotros-pie">
-            <p class="mono suave">{marca.nosotros.datos.join(' · ')}</p>
+            <p class="mono suave"><span data-campo="sitio:nosotros.datos.0">{marca.nosotros.datos[0]}</span> · <span data-campo="sitio:nosotros.datos.1">{marca.nosotros.datos[1]}</span></p>
             <img
               src="/sitio/personaje-sentado-t.webp"
               alt={marca.nosotros.personajeAlt}
@@ -503,6 +503,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
               height="352"
               loading="lazy"
               data-parallax="-0.06"
+              data-campo-attr="alt:sitio:nosotros.personajeAlt"
             />
           </div>
         </div>
@@ -515,10 +516,11 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
           columnas distintas, y el script los busca dentro del grupo. */}
       <div class="contenedor negocios" data-tabs>
         <div>
-          <EtiquetaSabor texto={marca.negocios.kicker} />
-          <h2 class="titular">{marca.negocios.titulo}</h2>
-          <p class="suave negocios-intro">{marca.negocios.intro}</p>
-          <div class="pestanas" role="tablist" aria-label={marca.negocios.titulo}>
+          <EtiquetaSabor texto={marca.negocios.kicker} campo="sitio:negocios.kicker" />
+          <h2 class="titular" data-campo="sitio:negocios.titulo">{marca.negocios.titulo}</h2>
+          <p class="suave negocios-intro" data-campo="sitio:negocios.intro">{marca.negocios.intro}</p>
+          <div class="pestanas" role="tablist" aria-label={marca.negocios.titulo}
+               data-campo-attr="aria-label:sitio:negocios.titulo">
             {marca.negocios.tabs.map((t, i) => (
               <button
                 type="button"
@@ -527,14 +529,15 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
                 aria-selected={i === 0 ? 'true' : 'false'}
                 aria-controls={`panel-${t.id}`}
                 data-tab
+                data-campo={`sitio:negocios.tabs.${i}.etiqueta`}
               >{t.etiqueta}</button>
             ))}
           </div>
           <dl class="semaforo">
-            {marca.negocios.fichas.map((f) => (
+            {marca.negocios.fichas.map((f, i) => (
               <div class="semaforo-fila">
-                <dt>{f.dato}</dt>
-                <dd class="mono">{f.estado}</dd>
+                <dt data-campo={`sitio:negocios.fichas.${i}.dato`}>{f.dato}</dt>
+                <dd class="mono" data-campo={`sitio:negocios.fichas.${i}.estado`}>{f.estado}</dd>
               </div>
             ))}
           </dl>
@@ -542,7 +545,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
               botón de verdad — el enlace de texto pasaba desapercibido
               (retro de Marcos, 2026-09-02). */}
           <p class="negocios-fichas">
-            <BotonMarca href={marca.fichasTecnicas.ruta} variante="secundario">{marca.negocios.fichasCta}</BotonMarca>
+            <BotonMarca href={marca.fichasTecnicas.ruta} variante="secundario"><span data-campo="sitio:negocios.fichasCta">{marca.negocios.fichasCta}</span></BotonMarca>
           </p>
         </div>
         <div class="negocios-paneles">
@@ -557,21 +560,21 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
               style={`--sabor:${colorSabor[t.clave]}`}
             >
               <div class="negocio-encabezado">
-                <h3>{t.titulo}</h3>
-                <span class="mono">{t.precio == null ? t.precioNota : `${t.precioNota} ${precioMXN(t.precio)}`}</span>
+                <h3 data-campo={`sitio:negocios.tabs.${i}.titulo`}>{t.titulo}</h3>
+                <span class="mono">{t.precio == null ? <span data-campo={`sitio:negocios.tabs.${i}.precioNota`}>{t.precioNota}</span> : <><span data-campo={`sitio:negocios.tabs.${i}.precioNota`}>{t.precioNota}</span> {precioMXN(t.precio)}</>}</span>
               </div>
-              <p class="negocio-cuerpo">{t.cuerpo}</p>
+              <p class="negocio-cuerpo" data-campo={`sitio:negocios.tabs.${i}.cuerpo`}>{t.cuerpo}</p>
               <ul class="negocio-datos">
-                {t.datos.map((d) => (
-                  <li><span class="mano negocio-flecha" aria-hidden="true">→</span>{d}</li>
+                {t.datos.map((d, j) => (
+                  <li><span class="mano negocio-flecha" aria-hidden="true">→</span><span data-campo={`sitio:negocios.tabs.${i}.datos.${j}`}>{d}</span></li>
                 ))}
               </ul>
               <p class="negocio-ficha">
                 <a href={`${marca.fichasTecnicas.ruta}${t.ficha}`}>
-                  {marca.negocios.fichaEnlace}<span class="mano" aria-hidden="true"> →</span>
+                  <span data-campo="sitio:negocios.fichaEnlace">{marca.negocios.fichaEnlace}</span><span class="mano" aria-hidden="true"> →</span>
                 </a>
               </p>
-              <p class="mono negocio-correo">{marca.negocios.correoEtiqueta} {marca.negocios.correo}</p>
+              <p class="mono negocio-correo"><span data-campo="sitio:negocios.correoEtiqueta">{marca.negocios.correoEtiqueta}</span> <span data-campo="sitio:negocios.correo">{marca.negocios.correo}</span></p>
             </div>
           ))}
         </div>
