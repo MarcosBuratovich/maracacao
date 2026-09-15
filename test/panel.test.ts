@@ -40,48 +40,25 @@ const PENDIENTES = new Set<string>([
   // renderiza ningún nodo. Cuando la clienta le ponga uno, el nodo aparece
   // con su data-campo y esta línea se borra. Antes no.
   'sitio:negocios.tabs.0.precio',
-  'sitio:preguntas.kicker',
-  'sitio:preguntas.titulo',
-  'sitio:preguntas.items[].p',
-  'sitio:preguntas.items[].r',
-  'sitio:contacto.kicker',
-  'sitio:contacto.titulo',
-  'sitio:contacto.puestoEtiqueta',
-  'sitio:contacto.puestoTitulo.0',
-  'sitio:contacto.puestoTitulo.1',
-  'sitio:contacto.direccion.0',
-  'sitio:contacto.direccion.1',
+  // Los tres campos de la dirección que lee Google (localidad, estado,
+  // código postal) no tienen nodo en el cuerpo de la página: viven solo en
+  // el JSON-LD del <head> (PostalAddress). Los marca la Tarea 12, que se
+  // ocupa del <head>.
   'sitio:contacto.direccionPostal.localidad',
   'sitio:contacto.direccionPostal.estado',
   'sitio:contacto.direccionPostal.codigoPostal',
-  'sitio:contacto.correoEtiqueta',
-  'sitio:contacto.correo',
-  'sitio:contacto.correoNota',
-  'sitio:contacto.copiar',
+  // El script lo pinta sobre el botón de copiar en runtime (Parte A,
+  // textos-ui): no está en el HTML que construye Astro. Se resuelve en la
+  // Tarea 13.
   'sitio:contacto.copiado',
-  'sitio:contacto.redesEtiqueta',
-  'sitio:contacto.redes',
-  'sitio:contacto.redesNota',
-  'sitio:contacto.catalogoEtiqueta',
-  'sitio:contacto.catalogoNombre',
-  'sitio:contacto.catalogoNota',
-  'sitio:contacto.personajeAlt',
-  'sitio:contacto.formulario.titulo',
-  'sitio:contacto.formulario.nombre',
-  'sitio:contacto.formulario.correo',
-  'sitio:contacto.formulario.tipo',
-  'sitio:contacto.formulario.tipoOpciones.0.texto',
-  'sitio:contacto.formulario.tipoOpciones.1.texto',
-  'sitio:contacto.formulario.mensaje',
-  'sitio:contacto.formulario.mensajeEjemplo',
-  'sitio:contacto.formulario.enviar',
+  // El script lo pinta sobre el botón de enviar mientras el formulario
+  // manda el mensaje (Parte A, textos-ui): no está en el HTML que
+  // construye Astro. Se resuelve en la Tarea 13.
   'sitio:contacto.formulario.enviando',
-  'sitio:contacto.formulario.nota',
-  'sitio:contacto.formulario.exitoTitulo',
-  'sitio:contacto.formulario.exitoSub',
-  'sitio:contacto.formulario.otraVez',
-  'sitio:contacto.formulario.aviso',
-  'sitio:contacto.formulario.asuntoPersonal',
+  // El <form> lleva los dos asuntos en data-asunto-*; `data-campo-attr` es
+  // un solo atributo por elemento. Se resuelve en la fase 6, cuando el
+  // panel tenga la ficha del formulario: ahí los dos se editan juntos y
+  // ninguno de los dos necesita nodo propio. Ver spec §1.7.
   'sitio:contacto.formulario.asuntoNegocio',
   'sitio:fichasTecnicas.titulo',
   'sitio:fichasTecnicas.descripcion',

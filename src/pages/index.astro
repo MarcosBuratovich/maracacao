@@ -584,16 +584,16 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
     {/* ——— 09 · Preguntas frecuentes ——— */}
     <section id="preguntas" class="seccion" data-tono="crema">
       <div class="contenedor preguntas">
-        <EtiquetaSabor texto={marca.preguntas.kicker} />
-        <h2 class="titular">{marca.preguntas.titulo}</h2>
+        <EtiquetaSabor texto={marca.preguntas.kicker} campo="sitio:preguntas.kicker" />
+        <h2 class="titular" data-campo="sitio:preguntas.titulo">{marca.preguntas.titulo}</h2>
         <div class="preguntas-lista">
-          {marca.preguntas.items.map((item) => (
+          {marca.preguntas.items.map((item, i) => (
             <details class="pregunta">
               <summary>
-                <h3>{item.p}</h3>
+                <h3 data-campo={`sitio:preguntas.items.${i}.p`}>{item.p}</h3>
                 <span class="pregunta-mas mano" aria-hidden="true">+</span>
               </summary>
-              <p class="suave">{item.r}</p>
+              <p class="suave" data-campo={`sitio:preguntas.items.${i}.r`}>{item.r}</p>
             </details>
           ))}
         </div>
@@ -603,8 +603,8 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
     {/* ——— 10 · Contacto ——— */}
     <section id="contacto" class="seccion" data-tono="calida">
       <div class="contenedor">
-        <EtiquetaSabor texto={marca.contacto.kicker} />
-        <h2 class="titular">{marca.contacto.titulo}</h2>
+        <EtiquetaSabor texto={marca.contacto.kicker} campo="sitio:contacto.kicker" />
+        <h2 class="titular" data-campo="sitio:contacto.titulo">{marca.contacto.titulo}</h2>
         {/* El formulario entero primero, la información abajo en texto —
             sin tarjetas (retro de Marcos). Sin servidor detrás: el envío
             arma un mailto con los datos y lo abre en el correo del
@@ -618,8 +618,9 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
             data-asunto-personal={marca.contacto.formulario.asuntoPersonal}
             data-asunto-negocio={marca.contacto.formulario.asuntoNegocio}
             data-correo={marca.contacto.correo}
+            data-campo-attr="data-asunto-personal:sitio:contacto.formulario.asuntoPersonal"
           >
-            <h3 class="formulario-titulo">{marca.contacto.formulario.titulo}</h3>
+            <h3 class="formulario-titulo" data-campo="sitio:contacto.formulario.titulo">{marca.contacto.formulario.titulo}</h3>
             {/* Honeypot y marca de tiempo: capas anti-bots que la función
                 /api/contacto verifica. Invisibles para humanos. */}
             <div class="campo-trampa" aria-hidden="true">
@@ -631,25 +632,32 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
             <input type="hidden" name="inicio" value="" />
             <div class="formulario-campos">
               <label>
-                <span>{marca.contacto.formulario.nombre}</span>
+                {/* El <span> ya existía y no lleva ninguna otra marca propia
+                    (ni class, ni data-*): colgarle data-campo directo lo deja
+                    indistinguible de uno inventado y el normalizador lo
+                    desenvuelve al comparar. Se envuelve el texto en un span
+                    nuevo adentro, como pide el comentario de
+                    test/lib/html-normalizado.ts. */}
+                <span><span data-campo="sitio:contacto.formulario.nombre">{marca.contacto.formulario.nombre}</span></span>
                 <input type="text" name="nombre" autocomplete="name" required />
               </label>
               <label>
-                <span>{marca.contacto.formulario.correo}</span>
+                <span><span data-campo="sitio:contacto.formulario.correo">{marca.contacto.formulario.correo}</span></span>
                 <input type="email" name="correo" autocomplete="email" required />
               </label>
               <fieldset>
-                <legend>{marca.contacto.formulario.tipo}</legend>
+                <legend data-campo="sitio:contacto.formulario.tipo">{marca.contacto.formulario.tipo}</legend>
                 {marca.contacto.formulario.tipoOpciones.map((op, i) => (
                   <label class="formulario-radio">
                     <input type="radio" name="tipo" value={op.valor} checked={i === 0} />
-                    <span>{op.texto}</span>
+                    <span><span data-campo={`sitio:contacto.formulario.tipoOpciones.${i}.texto`}>{op.texto}</span></span>
                   </label>
                 ))}
               </fieldset>
               <label class="campo-mensaje">
-                <span>{marca.contacto.formulario.mensaje}</span>
-                <textarea name="mensaje" rows="5" placeholder={marca.contacto.formulario.mensajeEjemplo} required></textarea>
+                <span><span data-campo="sitio:contacto.formulario.mensaje">{marca.contacto.formulario.mensaje}</span></span>
+                <textarea name="mensaje" rows="5" placeholder={marca.contacto.formulario.mensajeEjemplo} required
+                          data-campo-attr="placeholder:sitio:contacto.formulario.mensajeEjemplo"></textarea>
               </label>
             </div>
             {claveTurnstile && (
@@ -657,10 +665,10 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
             )}
             <div class="formulario-pie">
               <button class="formulario-enviar" type="submit" data-iman>
-                <span data-formulario-boton>{marca.contacto.formulario.enviar}</span>
+                <span data-formulario-boton data-campo="sitio:contacto.formulario.enviar">{marca.contacto.formulario.enviar}</span>
                 <span class="puntos" aria-hidden="true"><i></i><i></i><i></i></span>
               </button>
-              <p class="formulario-nota suave">{marca.contacto.formulario.nota}</p>
+              <p class="formulario-nota suave" data-campo="sitio:contacto.formulario.nota">{marca.contacto.formulario.nota}</p>
             </div>
 
             {/* El éxito llega como sello de goma: el ticket cosido se
@@ -669,17 +677,17 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
             <div class="formulario-exito" data-formulario-exito hidden tabindex="-1" role="status">
               <div class="exito-ticket">
                 <TicketPanel>
-                  <p class="exito-titulo mano">{marca.contacto.formulario.exitoTitulo}</p>
-                  <p class="exito-sub">{marca.contacto.formulario.exitoSub}</p>
+                  <p class="exito-titulo mano" data-campo="sitio:contacto.formulario.exitoTitulo">{marca.contacto.formulario.exitoTitulo}</p>
+                  <p class="exito-sub" data-campo="sitio:contacto.formulario.exitoSub">{marca.contacto.formulario.exitoSub}</p>
                 </TicketPanel>
                 <span class="exito-chispa a" aria-hidden="true"><i></i><i></i><i></i></span>
                 <span class="exito-chispa b" aria-hidden="true"><i></i><i></i><i></i></span>
               </div>
               <button class="exito-otra" type="button" data-formulario-otra>
-                {marca.contacto.formulario.otraVez}
+                <span data-campo="sitio:contacto.formulario.otraVez">{marca.contacto.formulario.otraVez}</span>
               </button>
             </div>
-            <p class="formulario-nota suave formulario-aviso" data-formulario-aviso hidden role="status">
+            <p class="formulario-nota suave formulario-aviso" data-formulario-aviso hidden role="status" data-campo="sitio:contacto.formulario.aviso">
               {marca.contacto.formulario.aviso}
             </p>
           </form>
@@ -691,38 +699,40 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
             height="323"
             loading="lazy"
             data-parallax="-0.05"
+            data-campo-attr="alt:sitio:contacto.personajeAlt"
           />
         </div>
 
         <div class="contacto-info">
           <div class="info-bloque">
-            <p class="mono info-etiqueta">{marca.contacto.correoEtiqueta}</p>
+            <p class="mono info-etiqueta" data-campo="sitio:contacto.correoEtiqueta">{marca.contacto.correoEtiqueta}</p>
             <p class="info-dato">
-              <a href={`mailto:${marca.contacto.correo}`}>{marca.contacto.correo}</a>
-              <button class="copiar" type="button" data-copiar={marca.contacto.correo} hidden>
-                <span data-copiar-texto>{marca.contacto.copiar}</span>
+              <a href={`mailto:${marca.contacto.correo}`} data-campo="sitio:contacto.correo">{marca.contacto.correo}</a>
+              <button class="copiar" type="button" data-copiar={marca.contacto.correo} hidden
+                      data-campo-attr="data-copiar:sitio:contacto.correo">
+                <span data-copiar-texto data-campo="sitio:contacto.copiar">{marca.contacto.copiar}</span>
               </button>
             </p>
-            <p class="info-nota suave">{marca.contacto.correoNota}</p>
+            <p class="info-nota suave" data-campo="sitio:contacto.correoNota">{marca.contacto.correoNota}</p>
           </div>
           <div class="info-bloque">
-            <p class="mono info-etiqueta">{marca.contacto.puestoEtiqueta}</p>
-            <p class="info-dato">{marca.contacto.puestoTitulo.join(' ')}</p>
-            <p class="info-nota suave">{marca.contacto.direccion[0]} · {marca.contacto.direccion[1]}</p>
+            <p class="mono info-etiqueta" data-campo="sitio:contacto.puestoEtiqueta">{marca.contacto.puestoEtiqueta}</p>
+            <p class="info-dato"><span data-campo="sitio:contacto.puestoTitulo.0">{marca.contacto.puestoTitulo[0]}</span> <span data-campo="sitio:contacto.puestoTitulo.1">{marca.contacto.puestoTitulo[1]}</span></p>
+            <p class="info-nota suave"><span data-campo="sitio:contacto.direccion.0">{marca.contacto.direccion[0]}</span> · <span data-campo="sitio:contacto.direccion.1">{marca.contacto.direccion[1]}</span></p>
           </div>
           <div class="info-bloque">
-            <p class="mono info-etiqueta">{marca.contacto.catalogoEtiqueta}</p>
+            <p class="mono info-etiqueta" data-campo="sitio:contacto.catalogoEtiqueta">{marca.contacto.catalogoEtiqueta}</p>
             <p class="info-dato">
               <a href={marca.contacto.catalogoUrl} target="_blank" rel="noopener">
-                {marca.contacto.catalogoNombre}<span class="sr-only"> (se abre en pestaña nueva)</span>
+                <span data-campo="sitio:contacto.catalogoNombre">{marca.contacto.catalogoNombre}</span><span class="sr-only"> (se abre en pestaña nueva)</span>
               </a>
             </p>
-            <p class="info-nota suave">{marca.contacto.catalogoNota}</p>
+            <p class="info-nota suave" data-campo="sitio:contacto.catalogoNota">{marca.contacto.catalogoNota}</p>
           </div>
           <div class="info-bloque">
-            <p class="mono info-etiqueta">{marca.contacto.redesEtiqueta}</p>
-            <p class="info-dato">{marca.contacto.redes}</p>
-            <p class="info-nota suave">{marca.contacto.redesNota}</p>
+            <p class="mono info-etiqueta" data-campo="sitio:contacto.redesEtiqueta">{marca.contacto.redesEtiqueta}</p>
+            <p class="info-dato" data-campo="sitio:contacto.redes">{marca.contacto.redes}</p>
+            <p class="info-nota suave" data-campo="sitio:contacto.redesNota">{marca.contacto.redesNota}</p>
           </div>
         </div>
       </div>
