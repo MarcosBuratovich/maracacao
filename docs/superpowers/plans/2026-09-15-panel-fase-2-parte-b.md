@@ -28,6 +28,10 @@ Valen para toda tarea de este plan.
   python3 -c "import io;print(io.open('<archivo>',encoding='utf-8').read().count(chr(0xa0)))"
   git show <BASE>:<archivo> | python3 -c "import sys;print(sys.stdin.read().count(chr(0xa0)))"
   ```
+- **La lista generada manda sobre las tablas de cada tarea.** Las tablas de
+  campos de las tareas 3 a 13 se escribieron contra un inventario que resultó
+  incompleto. Cada tarea marca TODAS las rutas de su sección que aparezcan en
+  `PENDIENTES`, aunque su tabla no las nombre, y reporta cuáles agregó.
 - **Los números de línea de `.astro` se mueven** en cuanto una tarea agrega atributos. **Ubicá el código por su texto exacto, no por número de línea.** Los números de este plan son del árbol en `main` al 2026-09-15 y están para orientar, no para saltar.
 - **Línea base:** hoy `pnpm test` da **901 tests verdes (35 archivos)** y `pnpm typecheck` **0 errores, 0 warnings, 4 hints**. Ninguna tarea puede bajar el verde.
 - **`pnpm build` es la compuerta:** construye el sitio, corre la suite y `astro check`. Ninguna tarea escribe un test que invoque `pnpm build` (`test/meta.test.ts` lo prohíbe: es una bomba de recursión).
@@ -84,7 +88,7 @@ hay nada que resaltar. El test de biyección solo exige nodos para lo que ella
 edita.
 
 **D7 · La lista de pendientes es el andamio.** La Tarea 1 escribe
-`test/panel.test.ts` con una constante `PENDIENTES` que arranca con TODAS las
+`test/panel.test.ts` con una constante `PENDIENTES` que arranca con las 198
 rutas editables. Cada tarea borra de esa lista las rutas que marcó. El test
 falla de dos maneras: si una ruta que no está en `PENDIENTES` no tiene nodo
 (regresión), y si una ruta de `PENDIENTES` ya no existe en el esquema (lista
@@ -441,7 +445,9 @@ Pegá la salida adentro del `new Set<string>([...])` de `PENDIENTES`, y
 borrá `scratchpad/pendientes.ts` (no se commitea: `scratchpad/` es
 scratch, no fuente).
 
-**Esperado: ~170 rutas** — 154 de `sitio`, 7 de `sabores`, 9 de `fichas`.
+**Esperado: 198 rutas** — 182 de `sitio`, 7 de `sabores`, 9 de `fichas`.
+[MEDIDO el 2026-09-15 contra el esquema: `recorre(esquemaSitio)` da 209 hojas,
+de las que 182 son editables por la clienta.]
 Si te da un número muy distinto, pará y decilo: alguien cambió el esquema.
 
 - [ ] **Paso 4: Correr y ver que el test mide algo**
@@ -485,7 +491,7 @@ la vista previa no cambia, y ella cree que no funcionó— y un data-campo
 que apunta a una ruta que ya no existe. Este test es lo único que las
 ataja antes de producción.
 
-La lista de pendientes arranca con las ~170 rutas editables y cada tarea
+La lista de pendientes arranca con las 198 rutas editables y cada tarea
 de esta fase la achica. No es un TODO: el test falla si una ruta que dice
 que falta ya está hecha, así que la lista no puede mentir.
 
