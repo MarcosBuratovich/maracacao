@@ -450,6 +450,7 @@
       "productosTitulo": "Productos",
       "contactoTitulo": "Contacto",
       "legalesTitulo": "Legales",
+      "mapaAria": "Mapa del sitio",
       "productos": [
         {
           "ancla": "#sabores",

@@ -741,9 +741,9 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
 
   <footer class="pie" data-tono="rojo">
     <div class="pie-marquesina">
-      <Marquesina aria={marca.footer.lema} dur="24s">
-        <span class="mono pie-lema">{marca.footer.lema} ·</span>
-        <span class="mono pie-lema">{marca.footer.lema} ·</span>
+      <Marquesina aria={marca.footer.lema} campoAria="sitio:footer.lema" dur="24s">
+        <span class="mono pie-lema" data-campo="sitio:footer.lema">{marca.footer.lema} ·</span>
+        <span class="mono pie-lema" data-campo="sitio:footer.lema">{marca.footer.lema} ·</span>
       </Marquesina>
     </div>
     <div class="contenedor pie-cuerpo">
@@ -752,58 +752,58 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
           el rojo del pie. */}
       <div class="pie-marca">
         <span class="pie-sello" set:html={sello} />
-        <p class="pie-wordmark">{marca.marca.wordmark}</p>
-        <p class="mono pie-linea">{marca.footer.linea}</p>
+        <p class="pie-wordmark" data-campo="sitio:marca.wordmark">{marca.marca.wordmark}</p>
+        <p class="mono pie-linea" data-campo="sitio:footer.linea">{marca.footer.linea}</p>
       </div>
-      <nav class="pie-columnas" aria-label="Mapa del sitio">
+      <nav class="pie-columnas" aria-label={marca.footer.mapaAria} data-campo-attr="aria-label:sitio:footer.mapaAria">
         <div>
-          <p class="pie-titulo mano">{marca.footer.seccionesTitulo}</p>
+          <p class="pie-titulo mano" data-campo="sitio:footer.seccionesTitulo">{marca.footer.seccionesTitulo}</p>
           <ul>
-            {marca.nav.items.map((item) => (
-              <li><a href={item.ancla}>{item.texto}</a></li>
+            {marca.nav.items.map((item, i) => (
+              <li><a href={item.ancla} data-campo={`sitio:nav.items.${i}.texto`}>{item.texto}</a></li>
             ))}
           </ul>
         </div>
         <div>
-          <p class="pie-titulo mano">{marca.footer.productosTitulo}</p>
+          <p class="pie-titulo mano" data-campo="sitio:footer.productosTitulo">{marca.footer.productosTitulo}</p>
           <ul>
-            {marca.footer.productos.map((p) => (
-              <li><a href={p.ancla}>{p.texto}</a></li>
+            {marca.footer.productos.map((p, i) => (
+              <li><a href={p.ancla} data-campo={`sitio:footer.productos.${i}.texto`}>{p.texto}</a></li>
             ))}
             <li>
               <a href={marca.contacto.catalogoUrl} target="_blank" rel="noopener">
-                {marca.nav.catalogo}<span class="sr-only"> (se abre en pestaña nueva)</span>
+                <span data-campo="sitio:nav.catalogo">{marca.nav.catalogo}</span><span class="sr-only"> (se abre en pestaña nueva)</span>
               </a>
             </li>
           </ul>
         </div>
         <div>
-          <p class="pie-titulo mano">{marca.footer.contactoTitulo}</p>
+          <p class="pie-titulo mano" data-campo="sitio:footer.contactoTitulo">{marca.footer.contactoTitulo}</p>
           <ul>
             <li>
               {/* <wbr> tras la arroba: en columna angosta parte ahí y no a
                   mitad de «gmail.com» (overflow-wrap: anywhere). */}
-              <a href={`mailto:${marca.contacto.correo}`}>{correoUsuario}@<wbr />{correoDominio}</a>
+              <a href={`mailto:${marca.contacto.correo}`} data-campo="sitio:contacto.correo">{correoUsuario}@<wbr />{correoDominio}</a>
             </li>
-            <li><a href="#contacto">{marca.contacto.puestoTitulo.join(' ')}</a></li>
-            <li><span class="pie-suelto">{marca.contacto.direccion[1]}</span></li>
-            <li><span class="pie-suelto">{marca.contacto.redes}</span></li>
+            <li><a href="#contacto"><span data-campo="sitio:contacto.puestoTitulo.0">{marca.contacto.puestoTitulo[0]}</span> <span data-campo="sitio:contacto.puestoTitulo.1">{marca.contacto.puestoTitulo[1]}</span></a></li>
+            <li><span class="pie-suelto" data-campo="sitio:contacto.direccion.1">{marca.contacto.direccion[1]}</span></li>
+            <li><span class="pie-suelto" data-campo="sitio:contacto.redes">{marca.contacto.redes}</span></li>
           </ul>
         </div>
         <div>
-          <p class="pie-titulo mano">{marca.footer.legalesTitulo}</p>
+          <p class="pie-titulo mano" data-campo="sitio:footer.legalesTitulo">{marca.footer.legalesTitulo}</p>
           <ul>
             {/* Sin href a propósito: las páginas legales no existen
                 todavía — la estructura queda lista para enchufarlas. */}
-            {marca.footer.legales.map((l) => (
-              <li><span class="pie-suelto">{l} <em>({marca.footer.legalesNota.toLowerCase()})</em></span></li>
+            {marca.footer.legales.map((l, i) => (
+              <li><span class="pie-suelto"><span data-campo={`sitio:footer.legales.${i}`}>{l}</span> <em data-campo="sitio:footer.legalesNota">({marca.footer.legalesNota.toLowerCase()})</em></span></li>
             ))}
           </ul>
         </div>
       </nav>
     </div>
     <div class="contenedor pie-remate">
-      <p class="mono">{marca.footer.derechos}</p>
+      <p class="mono" data-campo="sitio:footer.derechos">{marca.footer.derechos}</p>
     </div>
   </footer>
 

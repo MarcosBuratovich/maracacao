@@ -207,6 +207,16 @@ export const camposDePaginas = {
         ayuda: 'El encabezado de la cuarta columna del pie.',
         maxCaracteres: 20,
       }),
+      // El `aria-label` del bloque de columnas del pie. Lo leen las
+      // personas ciegas y los buscadores; en la pantalla no se ve. Estaba
+      // escrito a mano en index.astro hasta la fase 2 Parte B.
+      mapaAria: texto({
+        ...enPie,
+        etiqueta: 'Nombre del mapa del sitio',
+        ayuda: 'No se ve en la página: es el nombre que escuchan las personas que navegan con lector de pantalla cuando llegan a las columnas del pie.',
+        maxCaracteres: 40,
+        falla: ['ninguno'],
+      }),
       productos: lista({
         ...enPie,
         etiqueta: 'Enlaces de productos',
