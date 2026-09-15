@@ -257,7 +257,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
         style={`--fondo:${colorSabor[inicial.clave]};--texto:${tintaSabor[inicial.clave]}`}
       >
         <div class="contenedor anaquel-encabezado">
-          <EtiquetaSabor texto={marca.anaquel.kicker} />
+          <EtiquetaSabor texto={marca.anaquel.kicker} campo="sitio:anaquel.kicker" />
           {/* El enlace al catálogo /barras se retiró (2026-08-17: Marcos
               lo descontinuó). La página y su código se borraron el
               2026-09-08: el anaquel de esta sección es el único
@@ -265,19 +265,21 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
           <span class="mono" aria-hidden="true"><span data-anaquel-contador>{inicial.orden}</span>/15</span>
         </div>
         <div class="contenedor">
-          <h2 class="titular">{marca.anaquel.titulo}</h2>
+          <h2 class="titular" data-campo="sitio:anaquel.titulo">{marca.anaquel.titulo}</h2>
         </div>
-        <div class="anaquel-riel" role="radiogroup" aria-label={marca.anaquel.grupoAria} data-anaquel>
+        <div class="anaquel-riel" role="radiogroup" aria-label={marca.anaquel.grupoAria} data-anaquel
+             data-campo-attr="aria-label:sitio:anaquel.grupoAria">
           {/* Mismo srcset y el MISMO `sizes` que la marquesina del hero
               (aunque acá se ven más chicas): así cada dispositivo elige
               la misma variante y el riel sale de caché, sin bajar nada. */}
-          {sabores.map((s) => (
+          {sabores.map((s, i) => (
             <button
               type="button"
               role="radio"
               aria-checked={s.slug === inicial.slug ? 'true' : 'false'}
               aria-label={s.nombre}
               data-anaquel-radio={s.slug}
+              data-campo-attr={`aria-label:sabores:sabores.${i}.nombre`}
               data-cursor="Ver"
             >
               <img
@@ -305,6 +307,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
               <img
                 src={`/sitio/marca/barra-${inicial.slug}.webp`}
                 alt={`${marca.anaquel.envolturaAltPrefijo} ${inicial.nombre}`}
+                data-campo-attr="alt:sitio:anaquel.envolturaAltPrefijo"
                 width="754"
                 height="1617"
                 loading="lazy"
@@ -315,26 +318,26 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
                 texto indexable, no un swap de JS. Sin `hidden` en el
                 HTML (regla no-JS: sin script se apilan las quince);
                 marca.ts esconde las inactivas al tomar control. */}
-            {datosAnaquel.map((d) => (
+            {datosAnaquel.map((d, i) => (
               <div class="ficha-datos" data-ficha-de={d.slug}>
                 <p class="mono ficha-orden">
-                  {marca.anaquel.fichaEtiqueta} {d.orden} {marca.anaquel.contadorDe}
+                  <span data-campo="sitio:anaquel.fichaEtiqueta">{marca.anaquel.fichaEtiqueta}</span> {d.orden} {marca.anaquel.contadorDe}
                 </p>
                 <div class="ficha-nombre-fila">
-                  <h3 class="ficha-nombre">{d.nombre}</h3>
-                  <p class="ficha-precio">{d.precio}</p>
+                  <h3 class="ficha-nombre" data-campo={`sabores:sabores.${i}.nombre`}>{d.nombre}</h3>
+                  <p class="ficha-precio" data-campo={`sabores:sabores.${i}.precio`}>{d.precio}</p>
                 </div>
                 <div class="chips">
-                  <Insignia tono="rojo">{d.cacao}</Insignia>
-                  <Insignia tono="cacao">{marca.anaquel.pesoInsignia}</Insignia>
-                  <Insignia tono="amarillo">{marca.anaquel.manoInsignia}</Insignia>
+                  <Insignia tono="rojo" campo={`sabores:sabores.${i}.cacao`}>{d.cacao}</Insignia>
+                  <Insignia tono="cacao" campo="sitio:anaquel.pesoInsignia">{marca.anaquel.pesoInsignia}</Insignia>
+                  <Insignia tono="amarillo" campo="sitio:anaquel.manoInsignia">{marca.anaquel.manoInsignia}</Insignia>
                 </div>
                 <p class="ficha-ingredientes mono">
-                  {marca.anaquel.ingredientesEtiqueta}: {d.ingredientes}.
+                  <span data-campo="sitio:anaquel.ingredientesEtiqueta">{marca.anaquel.ingredientesEtiqueta}</span>: <span data-campo={`sabores:sabores.${i}.ingredientes`}>{d.ingredientes}</span>.
                 </p>
                 <div class="ficha-ctas">
-                  <BotonMarca href={d.url} externo>{marca.anaquel.cta}</BotonMarca>
-                  <p class="mano ficha-remate suave">{marca.anaquel.remate}</p>
+                  <BotonMarca href={d.url} externo><span data-campo="sitio:anaquel.cta">{marca.anaquel.cta}</span></BotonMarca>
+                  <p class="mano ficha-remate suave" data-campo="sitio:anaquel.remate">{marca.anaquel.remate}</p>
                 </div>
               </div>
             ))}
@@ -343,12 +346,13 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
                 class="flota"
                 src={inicialTieneIlustracion ? `/sitio/marca/ilustracion-${inicial.slug}.webp` : undefined}
                 alt={`${marca.anaquel.ilustracionAltPrefijo} ${inicial.nombre}`}
+                data-campo-attr="alt:sitio:anaquel.ilustracionAltPrefijo"
                 width="400"
                 height="450"
                 loading="lazy"
                 data-anaquel-ilustracion
               />
-              <figcaption class="mano suave">{marca.anaquel.ilustracionCaption}</figcaption>
+              <figcaption class="mano suave" data-campo="sitio:anaquel.ilustracionCaption">{marca.anaquel.ilustracionCaption}</figcaption>
             </figure>
           </div>
 
