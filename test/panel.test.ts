@@ -37,10 +37,10 @@ const PENDIENTES = new Set<string>([
   // renderiza ningún nodo. Cuando la clienta le ponga uno, el nodo aparece
   // con su data-campo y esta línea se borra. Antes no.
   'sitio:negocios.tabs.0.precio',
-  // Los tres campos de la dirección que lee Google (localidad, estado,
-  // código postal) no tienen nodo en el cuerpo de la página: viven solo en
-  // el JSON-LD del <head> (PostalAddress). Los marca la Tarea 12, que se
-  // ocupa del <head>.
+  // Los tres viven solo adentro del JSON-LD del <head>, que es un bloque
+  // de JSON y no un nodo de texto. El panel los edita desde la ficha de
+  // «Dirección para Google», con vista previa textual y sin resaltado en
+  // la página — spec §1.7, los campos que son atributo no se miden.
   'sitio:contacto.direccionPostal.localidad',
   'sitio:contacto.direccionPostal.estado',
   'sitio:contacto.direccionPostal.codigoPostal',
