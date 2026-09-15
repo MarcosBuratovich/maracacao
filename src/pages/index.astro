@@ -119,7 +119,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
         aria-controls="menu-principal"
         data-menu-boton
       >
-        <span class="sr-only" data-menu-texto data-campo="sitio:nav.abrir">{marca.nav.abrir}</span>
+        <span class="sr-only" data-menu-texto data-campo="sitio:nav.abrir" data-campo-alterno="sitio:nav.cerrar">{marca.nav.abrir}</span>
         <span class="hamburguesa-linea" aria-hidden="true"></span>
         <span class="hamburguesa-linea" aria-hidden="true"></span>
         <span class="hamburguesa-linea" aria-hidden="true"></span>
@@ -305,7 +305,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
                 sabores — marca.ts le cambia la textura del pliego al
                 elegir. La imagen es el fallback y lo único que hay sin
                 JS o con reduced-motion. */}
-            <div class="ficha-envoltura" data-visor3d data-glb="/sitio/marca/barra.glb">
+            <div class="ficha-envoltura" data-visor3d data-glb="/sitio/marca/barra.glb" data-campo-alterno="sitio:anaquel.visorAlt">
               <img
                 src={`/sitio/marca/barra-${inicial.slug}.webp`}
                 alt={`${marca.anaquel.envolturaAltPrefijo} ${inicial.nombre}`}
@@ -667,7 +667,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
             )}
             <div class="formulario-pie">
               <button class="formulario-enviar" type="submit" data-iman>
-                <span data-formulario-boton data-campo="sitio:contacto.formulario.enviar">{marca.contacto.formulario.enviar}</span>
+                <span data-formulario-boton data-campo="sitio:contacto.formulario.enviar" data-campo-alterno="sitio:contacto.formulario.enviando">{marca.contacto.formulario.enviar}</span>
                 <span class="puntos" aria-hidden="true"><i></i><i></i><i></i></span>
               </button>
               <p class="formulario-nota suave" data-campo="sitio:contacto.formulario.nota">{marca.contacto.formulario.nota}</p>
@@ -712,7 +712,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
               <a href={`mailto:${marca.contacto.correo}`} data-campo="sitio:contacto.correo">{marca.contacto.correo}</a>
               <button class="copiar" type="button" data-copiar={marca.contacto.correo} hidden
                       data-campo-attr="data-copiar:sitio:contacto.correo">
-                <span data-copiar-texto data-campo="sitio:contacto.copiar">{marca.contacto.copiar}</span>
+                <span data-copiar-texto data-campo="sitio:contacto.copiar" data-campo-alterno="sitio:contacto.copiado">{marca.contacto.copiar}</span>
               </button>
             </p>
             <p class="info-nota suave" data-campo="sitio:contacto.correoNota">{marca.contacto.correoNota}</p>

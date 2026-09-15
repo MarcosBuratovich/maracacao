@@ -1,7 +1,7 @@
 /*
  * Lee las páginas CONSTRUIDAS y devuelve qué campos dice el HTML que
- * muestra: cada `data-campo` y cada `data-campo-attr` que encuentra,
- * partido en documento + ruta.
+ * muestra: cada `data-campo`, cada `data-campo-attr` y cada
+ * `data-campo-alterno` que encuentra, partido en documento + ruta.
  *
  * Vive en test/lib/ y no en src/ porque hoy lo usa solo la suite. Cuando
  * la fase 4 traiga el medidor, ese va a necesitar exactamente esto sobre
@@ -112,6 +112,22 @@ export function referenciasDe(pagina: Pagina): Referencia[] {
       documento: segundo?.[0] ?? '',
       ruta: segundo?.[1] ?? '',
       atributo: primero?.[0] ?? '',
+      crudo,
+    })
+  }
+
+  for (const el of document.querySelectorAll('[data-campo-alterno]')) {
+    const crudo = el.getAttribute('data-campo-alterno') ?? ''
+    const partes = partiendoEnDosPuntos(crudo)
+    salida.push({
+      pagina,
+      documento: partes?.[0] ?? '',
+      ruta: partes?.[1] ?? '',
+      // Es el texto que el script pinta DESPUÉS, sobre el mismo nodo:
+      // cuenta para la biyección igual que un data-campo, pero el panel
+      // tiene que saber que la vista previa no lo va a mostrar sin
+      // simular la interacción.
+      atributo: null,
       crudo,
     })
   }

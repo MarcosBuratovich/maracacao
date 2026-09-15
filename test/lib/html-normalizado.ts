@@ -17,7 +17,7 @@ import { parseHTML } from 'linkedom'
 export function normaliza(html: string): string {
   const { document } = parseHTML(html)
 
-  // Un solo recorrido hace dos cosas: (a) borra los dos atributos que la
+  // Un solo recorrido hace dos cosas: (a) borra los tres atributos que la
   // fase 2 tiene permitido agregar, en cualquier elemento; (b) mientras
   // los borra, anota qué <span> hay que desenvolver después —porque no
   // era un elemento real, era puro percha para el data-campo.
@@ -51,10 +51,11 @@ export function normaliza(html: string): string {
   // que ya estaba. Si algún día hace falta marcar uno, que lleve también
   // una `class`: con eso vuelve a quedar del lado protegido.
   const inventados: Element[] = []
-  for (const el of document.querySelectorAll('[data-campo], [data-campo-attr]')) {
+  for (const el of document.querySelectorAll('[data-campo], [data-campo-attr], [data-campo-alterno]')) {
     const teniaCampo = el.hasAttribute('data-campo')
     el.removeAttribute('data-campo')
     el.removeAttribute('data-campo-attr')
+    el.removeAttribute('data-campo-alterno')
     if (
       teniaCampo &&
       el.tagName === 'SPAN' &&

@@ -32,7 +32,6 @@ import { todasLasReferencias, coincideConPatron, hayPaginasConstruidas } from '.
  * tiene nodo es una lista podrida que le miente al que la lee.
  */
 const PENDIENTES = new Set<string>([
-  'sitio:nav.cerrar',
   // El polvo todavía no tiene precio (`null`), así que la plantilla no
   // renderiza ningún nodo. Cuando la clienta le ponga uno, el nodo aparece
   // con su data-campo y esta línea se borra. Antes no.
@@ -44,14 +43,6 @@ const PENDIENTES = new Set<string>([
   'sitio:contacto.direccionPostal.localidad',
   'sitio:contacto.direccionPostal.estado',
   'sitio:contacto.direccionPostal.codigoPostal',
-  // El script lo pinta sobre el botón de copiar en runtime (Parte A,
-  // textos-ui): no está en el HTML que construye Astro. Se resuelve en la
-  // Tarea 13.
-  'sitio:contacto.copiado',
-  // El script lo pinta sobre el botón de enviar mientras el formulario
-  // manda el mensaje (Parte A, textos-ui): no está en el HTML que
-  // construye Astro. Se resuelve en la Tarea 13.
-  'sitio:contacto.formulario.enviando',
   // El <form> lleva los dos asuntos en data-asunto-*; `data-campo-attr` es
   // un solo atributo por elemento. Se resuelve en la fase 6, cuando el
   // panel tenga la ficha del formulario: ahí los dos se editan juntos y

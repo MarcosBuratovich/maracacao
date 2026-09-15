@@ -24,6 +24,7 @@ export const TEXTOS_UI = {
   enviando: 'contacto.formulario.enviando',
   envolturaAltPrefijo: 'anaquel.envolturaAltPrefijo',
   ilustracionAltPrefijo: 'anaquel.ilustracionAltPrefijo',
+  visorAlt: 'anaquel.visorAlt',
 } as const
 
 export type ClaveTextoUi = keyof typeof TEXTOS_UI
