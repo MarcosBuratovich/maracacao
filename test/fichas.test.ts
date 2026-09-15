@@ -67,7 +67,9 @@ describe('la página /fichas-tecnicas (2026-09-02): legibles en el sitio', () =>
     expect(html).not.toContain('data-candado')
     expect(html).not.toContain('name="robots"')
     expect(html).toContain(`<link rel="canonical" href="https://www.maracacao.mx${marca.fichasTecnicas.ruta}"`)
-    expect(html).toContain(`<title>${marca.fichasTecnicas.titulo}</title>`)
+    // Tarea 12: el <title> lleva data-campo (de qué campo sale), así que
+    // el match es por contenido, no por el tag exacto.
+    expect(html).toMatch(new RegExp(`<title[^>]*>${esc(marca.fichasTecnicas.titulo)}</title>`))
   })
 
   it('cada PDF publicado existe en public/fichas (pnpm fichas escribe ahí)', () => {

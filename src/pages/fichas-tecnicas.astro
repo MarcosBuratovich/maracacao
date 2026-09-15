@@ -24,7 +24,14 @@ const copy = marca.fichasTecnicas
 // El ancla legible de cada ficha, sin el prefijo del nombre de archivo.
 const ancla = (archivo: string) => archivo.replace('ficha-tecnica-', '')
 ---
-<Base titulo={copy.titulo} fuentes="marca" descripcion={copy.descripcion} ruta={copy.ruta}>
+<Base
+  titulo={copy.titulo}
+  campoTitulo="sitio:fichasTecnicas.titulo"
+  fuentes="marca"
+  descripcion={copy.descripcion}
+  campoDescripcion="sitio:fichasTecnicas.descripcion"
+  ruta={copy.ruta}
+>
   <a href="#contenido" class="salto" data-campo="sitio:skipLink">{marca.skipLink}</a>
 
   <header class="cabecera" data-tono="crema">

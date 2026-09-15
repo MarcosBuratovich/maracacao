@@ -12,7 +12,7 @@ import '@/styles/marca.css'
 
 const sello = selloRaw.replace('<svg', '<svg aria-hidden="true" focusable="false"')
 ---
-<Base titulo={marca.noEncontrada.titulo} fuentes="marca">
+<Base titulo={marca.noEncontrada.titulo} campoTitulo="sitio:noEncontrada.titulo" fuentes="marca">
   <main class="perdida" data-tono="crema">
     <span class="perdida-sello" set:html={sello} />
     <p class="perdida-wordmark" data-campo="sitio:marca.wordmark">{marca.marca.wordmark}</p>

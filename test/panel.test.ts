@@ -32,9 +32,6 @@ import { todasLasReferencias, coincideConPatron, hayPaginasConstruidas } from '.
  * tiene nodo es una lista podrida que le miente al que la lee.
  */
 const PENDIENTES = new Set<string>([
-  'sitio:titulo',
-  'sitio:descripcion',
-  'sitio:marca.nombre',
   'sitio:nav.cerrar',
   // El polvo todavía no tiene precio (`null`), así que la plantilla no
   // renderiza ningún nodo. Cuando la clienta le ponga uno, el nodo aparece
@@ -60,20 +57,6 @@ const PENDIENTES = new Set<string>([
   // panel tenga la ficha del formulario: ahí los dos se editan juntos y
   // ninguno de los dos necesita nodo propio. Ver spec §1.7.
   'sitio:contacto.formulario.asuntoNegocio',
-  // El <title> de esta página sale del prop `titulo` de Base.astro: lo
-  // marca la Tarea 12, que es dueña del <head> compartido de las tres
-  // páginas. Ver Tarea 11.
-  'sitio:fichasTecnicas.titulo',
-  // Mismo caso que el título: `descripcion` solo alimenta la meta
-  // description, el og:description y el twitter:description del <head>
-  // de Base.astro (prop `descripcion`) — no hay ningún nodo en el cuerpo
-  // de fichas-tecnicas.astro donde colgarle el data-campo, así que le
-  // toca a la Tarea 12 igual que el título.
-  'sitio:fichasTecnicas.descripcion',
-  // El <title> de esta página también sale del prop `titulo` de
-  // Base.astro: mismo caso que fichasTecnicas.titulo, lo marca la
-  // Tarea 12.
-  'sitio:noEncontrada.titulo',
   'sabores:gotas[].precio',
 ])
 

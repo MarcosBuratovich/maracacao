@@ -1,6 +1,7 @@
 ---
 import { origenCanonico } from '@/seo/esquema'
 import { jsonParaHtml } from '@/lib/json-en-html'
+import { marca } from '@/copy/sitio-marca'
 
 interface Props {
   titulo: string
@@ -13,6 +14,10 @@ interface Props {
    * para el lanzamiento, la indexación se abre sola.
    */
   descripcion?: string
+  /** Ruta del campo del que sale `titulo`, «documento:ruta». */
+  campoTitulo?: string
+  /** Ruta del campo del que sale `descripcion`. */
+  campoDescripcion?: string
   ruta?: string
   ogImagen?: string
   /** Datos estructurados JSON-LD (objeto o lista de src/seo/esquema.ts). */
@@ -48,6 +53,8 @@ const {
   fuentes = 'identidad',
   candado = false,
   descripcion,
+  campoTitulo,
+  campoDescripcion,
   ruta,
   ogImagen = '/social/tarjeta.png',
   esquema,
@@ -89,11 +96,11 @@ const familias: { href: string; media?: string }[] =
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <title>{titulo}</title>
+    <title data-campo={campoTitulo}>{titulo}</title>
     {candado && <meta name="robots" content="noindex, nofollow" />}
-    {descripcion && <meta name="description" content={descripcion} />}
+    {descripcion && <meta name="description" content={descripcion} data-campo-attr={campoDescripcion && `content:${campoDescripcion}`} />}
     {canonico && <link rel="canonical" href={canonico} />}
-    <meta property="og:site_name" content="Maracacao" />
+    <meta property="og:site_name" content={marca.marca.nombre} data-campo-attr="content:sitio:marca.nombre" />
     <meta property="og:locale" content="es_MX" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content={titulo} />

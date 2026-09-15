@@ -89,8 +89,10 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
 ---
 <Base
   titulo={marca.titulo}
+  campoTitulo="sitio:titulo"
   fuentes="marca"
   descripcion={marca.descripcion}
+  campoDescripcion="sitio:descripcion"
   ruta="/"
   esquema={esquema}
   cormorantMedia="(min-width: 761px)"
