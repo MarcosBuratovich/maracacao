@@ -425,8 +425,8 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
     {/* ——— 05 · Cómo catar ——— */}
     <section id="catar" class="seccion" data-tono="crema">
       <div class="contenedor">
-        <EtiquetaSabor texto={marca.catar.kicker} />
-        <h2 class="titular">{marca.catar.titulo}</h2>
+        <EtiquetaSabor texto={marca.catar.kicker} campo="sitio:catar.kicker" />
+        <h2 class="titular" data-campo="sitio:catar.titulo">{marca.catar.titulo}</h2>
         <ol class="catar-pasos">
           {marca.catar.pasos.map((paso, i) => (
             <li class="paso" data-revelar style={`--orden:${i % 3}`}>
@@ -435,18 +435,18 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
                 style={`background:${colorSabor[paso.clave]};color:${tintaSabor[paso.clave]}`}
                 aria-hidden="true"
               >{i + 1}</span>
-              <p><b>{paso.nombre}.</b> {paso.texto}</p>
+              <p><b data-campo={`sitio:catar.pasos.${i}.nombre`}>{paso.nombre}.</b> <span data-campo={`sitio:catar.pasos.${i}.texto`}>{paso.texto}</span></p>
             </li>
           ))}
         </ol>
         <div class="catar-cita">
           <TicketPanel>
-            <p class="cita-texto">“{marca.catar.cita}”</p>
+            <p class="cita-texto">“<span data-campo="sitio:catar.cita">{marca.catar.cita}</span>”</p>
           </TicketPanel>
         </div>
         <div class="catar-notas">
-          <p><b class="nota-titulo">{marca.catar.porqueTitulo}</b> {marca.catar.porque}</p>
-          <p><b class="nota-titulo">{marca.catar.aporteTitulo}.</b> {marca.catar.aporte}</p>
+          <p><b class="nota-titulo" data-campo="sitio:catar.porqueTitulo">{marca.catar.porqueTitulo}</b> <span data-campo="sitio:catar.porque">{marca.catar.porque}</span></p>
+          <p><b class="nota-titulo" data-campo="sitio:catar.aporteTitulo">{marca.catar.aporteTitulo}.</b> <span data-campo="sitio:catar.aporte">{marca.catar.aporte}</span></p>
         </div>
       </div>
     </section>
@@ -454,27 +454,28 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
     {/* ——— 06 · Recetas ——— */}
     <section id="recetas" class="seccion" data-tono="calida">
       <div class="contenedor recetas-encabezado">
-        <EtiquetaSabor texto={marca.recetas.kicker} />
-        <span class="mano suave" aria-hidden="true">{marca.recetas.deslizaNota}</span>
+        <EtiquetaSabor texto={marca.recetas.kicker} campo="sitio:recetas.kicker" />
+        <span class="mano suave" aria-hidden="true" data-campo="sitio:recetas.deslizaNota">{marca.recetas.deslizaNota}</span>
       </div>
-      <div class="contenedor"><h2 class="titular">{marca.recetas.titulo}</h2></div>
-      <div class="recetas-riel" role="region" aria-label={marca.recetas.listaAria} tabindex="0">
-        {marca.recetas.lista.map((r) => (
+      <div class="contenedor"><h2 class="titular" data-campo="sitio:recetas.titulo">{marca.recetas.titulo}</h2></div>
+      <div class="recetas-riel" role="region" aria-label={marca.recetas.listaAria} tabindex="0"
+           data-campo-attr="aria-label:sitio:recetas.listaAria">
+        {marca.recetas.lista.map((r, i) => (
           <article
             class:list={['receta', tintaClara(r.clave) ? 'receta-clara' : 'receta-oscura']}
             style={`--sabor:${colorSabor[r.clave]};--tinta:${tintaSabor[r.clave]}`}
           >
-            <p class="mono receta-kicker">{r.kicker}</p>
-            <h3 class="receta-titulo">{r.titulo}</h3>
-            <p class="receta-resumen">{r.resumen}</p>
-            {r.chipPolvo && <p class="mono receta-chip">{r.chipPolvo}</p>}
-            <div class="receta-tip mano"><b>{marca.recetas.etiquetaTip}:</b> {r.tip}</div>
+            <p class="mono receta-kicker" data-campo={`sitio:recetas.lista.${i}.kicker`}>{r.kicker}</p>
+            <h3 class="receta-titulo" data-campo={`sitio:recetas.lista.${i}.titulo`}>{r.titulo}</h3>
+            <p class="receta-resumen" data-campo={`sitio:recetas.lista.${i}.resumen`}>{r.resumen}</p>
+            {r.chipPolvo && <p class="mono receta-chip" data-campo={`sitio:recetas.lista.${i}.chipPolvo`}>{r.chipPolvo}</p>}
+            <div class="receta-tip mano"><b data-campo="sitio:recetas.etiquetaTip">{marca.recetas.etiquetaTip}:</b> <span data-campo={`sitio:recetas.lista.${i}.tip`}>{r.tip}</span></div>
             <details class="receta-completa">
-              <summary>{marca.recetas.verCompleta}</summary>
+              <summary data-campo="sitio:recetas.verCompleta">{marca.recetas.verCompleta}</summary>
               <ul>
-                {r.ingredientes.map((ing) => <li>{ing}</li>)}
+                {r.ingredientes.map((ing, j) => <li data-campo={`sitio:recetas.lista.${i}.ingredientes.${j}`}>{ing}</li>)}
               </ul>
-              <p>{r.pasos}</p>
+              <p data-campo={`sitio:recetas.lista.${i}.pasos`}>{r.pasos}</p>
             </details>
           </article>
         ))}
