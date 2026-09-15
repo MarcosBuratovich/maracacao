@@ -123,10 +123,13 @@ export function referenciasDe(pagina: Pagina): Referencia[] {
       pagina,
       documento: partes?.[0] ?? '',
       ruta: partes?.[1] ?? '',
-      // Es el texto que el script pinta DESPUÉS, sobre el mismo nodo:
-      // cuenta para la biyección igual que un data-campo, pero el panel
-      // tiene que saber que la vista previa no lo va a mostrar sin
-      // simular la interacción.
+      // Es el texto que el script pinta DESPUÉS — casi siempre sobre el
+      // mismo nodo («Cerrar menú», «¡Copiado!», «Enviando»), pero en el
+      // visor 3D sobre un elemento que el script crea ADENTRO del nodo
+      // marcado (el <model-viewer> no existe hasta que el visor carga).
+      // Cuenta para la biyección igual que un data-campo de todos modos:
+      // el panel tiene que saber que la vista previa no lo va a mostrar
+      // sin simular la interacción.
       atributo: null,
       crudo,
     })

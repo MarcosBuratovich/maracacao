@@ -304,7 +304,11 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
             {/* La barra 3D de Marcos (Blender): un solo GLB para los 15
                 sabores — marca.ts le cambia la textura del pliego al
                 elegir. La imagen es el fallback y lo único que hay sin
-                JS o con reduced-motion. */}
+                JS o con reduced-motion. El data-campo-alterno apunta a la
+                descripción que el script le pone al <model-viewer> que
+                inserta ACÁ ADENTRO cuando el visor carga: ese elemento no
+                existe todavía en este HTML, así que el campo cuelga del
+                contenedor para que el panel tenga un nodo que encontrar. */}
             <div class="ficha-envoltura" data-visor3d data-glb="/sitio/marca/barra.glb" data-campo-alterno="sitio:anaquel.visorAlt">
               <img
                 src={`/sitio/marca/barra-${inicial.slug}.webp`}
