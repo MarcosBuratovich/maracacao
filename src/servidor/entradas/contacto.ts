@@ -1,5 +1,17 @@
-/* Función serverless de Vercel: el formulario de contacto envía correo
- * de verdad (el mailto queda como fallback sin JS o sin configurar).
+/* Fuente de la función serverless de contacto.
+ *
+ * Vive acá, en `src/servidor/entradas/`, y NO directo en `api/`, porque
+ * necesita importar `../origen`: [MEDIDO 2026-09-16, en producción] una
+ * función de Vercel que importa algo de afuera de `api/` CONSTRUYE y
+ * después muere al invocarla (FUNCTION_INVOCATION_FAILED). El tracer no
+ * se lleva el archivo al paquete. `scripts/bundle-api.ts` (esbuild) la
+ * empaqueta en `api/contacto.js`, autocontenida, que es lo que Vercel
+ * despliega de verdad — ver `docs/panel-operacion.md`. Tocás este
+ * archivo, corrés `pnpm bundle:api`, y commiteás los dos: el test de
+ * `test/bundle-api.test.ts` no deja que se separen.
+ *
+ * El formulario de contacto envía correo de verdad (el mailto queda como
+ * fallback sin JS o sin configurar).
  *
  * Envío por Resend (https://resend.com). Variables de entorno en Vercel:
  *   RESEND_API_KEY        — obligatoria para enviar
@@ -13,29 +25,12 @@
  *      con contenido, es un bot → 200 silencioso (no le enseñamos nada).
  *   2. Trampa de tiempo: el form marca cuándo se abrió; enviar en menos
  *      de 4 segundos no es humano.
- *   3. Origen: solo aceptamos POST desde nuestros propios dominios.
+ *   3. Origen: solo aceptamos POST desde nuestros propios dominios
+ *      (`origenPermitido`, compartida con el resto de las funciones).
  *   4. Turnstile (si está configurado): verificación server-side del
  *      token de Cloudflare.
  */
-
-/* NO se importa `src/servidor/origen.ts` desde acá, y NO es por gusto:
- * [MEDIDO 2026-09-16, en producción] con ese import el build de Vercel pasa
- * y la función igual muere al invocarla — FUNCTION_INVOCATION_FAILED, 500 en
- * las dos ramas del origen. El tracer no se lleva el archivo de afuera de
- * api/ al paquete de la función. Es la respuesta al experimento del spec §4:
- * el panel de la fase 5 necesita el paso de esbuild (`scripts/bundle-api.ts`)
- * que arma un `api/panel.js` autocontenido; no alcanza con `includeFiles`.
- *
- * Mientras tanto esta función se queda autocontenida, y `test/origen-servidor.test.ts`
- * exige que esta lista y la de `src/servidor/origen.ts` digan lo mismo, para
- * que no se separen mientras viven duplicadas.
- */
-const ORIGENES_PERMITIDOS = [
-  'https://maracacao.mx',
-  'https://www.maracacao.mx',
-  'http://localhost:4321',
-  'http://localhost:4322',
-]
+import { origenPermitido } from '../origen'
 
 interface Pedido {
   method?: string
@@ -63,9 +58,7 @@ export default async function handler(req: Pedido, res: Respuesta) {
   }
 
   const origen = String(req.headers.origin ?? '')
-  const origenValido =
-    ORIGENES_PERMITIDOS.includes(origen) || /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origen)
-  if (!origenValido) return res.status(403).json({ error: 'Origen no permitido' })
+  if (!origenPermitido(origen)) return res.status(403).json({ error: 'Origen no permitido' })
 
   const b = (req.body ?? {}) as Record<string, unknown>
   const nombre = esTexto(b.nombre) ? b.nombre.trim().slice(0, 120) : ''
