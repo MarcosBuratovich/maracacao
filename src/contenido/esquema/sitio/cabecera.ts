@@ -65,6 +65,7 @@ export const camposDeCabecera = {
         etiqueta: 'Nombre',
         ayuda: 'El nombre de la marca que lee Google en la ficha de datos de la página. No se ve escrito en el sitio.',
         maxCaracteres: 20,
+        enAtributo: 'content',
         falla: ['ninguno'],
       }),
       wordmark: texto({

@@ -89,8 +89,10 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
 ---
 <Base
   titulo={marca.titulo}
+  campoTitulo="sitio:titulo"
   fuentes="marca"
   descripcion={marca.descripcion}
+  campoDescripcion="sitio:descripcion"
   ruta="/"
   esquema={esquema}
   cormorantMedia="(min-width: 761px)"
@@ -99,15 +101,15 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
       (módulo diferido) y el menú se pintaba un instante como fila
       estática empujando todo hacia abajo (CLS 0.035 en desktop). */}
   <script is:inline>document.documentElement.classList.add('js')</script>
-  <a href="#contenido" class="salto">{marca.skipLink}</a>
+  <a href="#contenido" class="salto" data-campo="sitio:skipLink">{marca.skipLink}</a>
 
   <header class="cabecera" data-tono="crema">
     <div class="contenedor cabecera-fila">
       <a class="lockup" href="#contenido">
         <span class="lockup-sello" set:html={sello} />
         <span>
-          <span class="lockup-nombre">{marca.marca.wordmark}</span>
-          <span class="lockup-descriptor mono">{marca.marca.descriptor}</span>
+          <span class="lockup-nombre" data-campo="sitio:marca.wordmark">{marca.marca.wordmark}</span>
+          <span class="lockup-descriptor mono" data-campo="sitio:marca.descriptor">{marca.marca.descriptor}</span>
         </span>
       </a>
       <button
@@ -117,7 +119,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
         aria-controls="menu-principal"
         data-menu-boton
       >
-        <span class="sr-only" data-menu-texto>{marca.nav.abrir}</span>
+        <span class="sr-only" data-menu-texto data-campo="sitio:nav.abrir" data-campo-alterno="sitio:nav.cerrar">{marca.nav.abrir}</span>
         <span class="hamburguesa-linea" aria-hidden="true"></span>
         <span class="hamburguesa-linea" aria-hidden="true"></span>
         <span class="hamburguesa-linea" aria-hidden="true"></span>
@@ -126,26 +128,27 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
   </header>
 
   {/* Sin JS es una fila de enlaces bajo la cabecera; con JS, el overlay. */}
-  <nav id="menu-principal" class="menu" aria-label={marca.nav.etiqueta} data-menu>
+  <nav id="menu-principal" class="menu" aria-label={marca.nav.etiqueta} data-menu
+       data-campo-attr="aria-label:sitio:nav.etiqueta">
     <div class="menu-interior">
       <ol class="menu-lista">
         {marca.nav.items.map((item, i) => (
           <li style={`--orden:${i}`}>
             <a href={item.ancla} data-menu-enlace>
               <span class="menu-numero mono" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
-              {item.texto}
+              <span data-campo={`sitio:nav.items.${i}.texto`}>{item.texto}</span>
             </a>
           </li>
         ))}
         <li class="menu-catalogo" style={`--orden:${marca.nav.items.length}`}>
           <a href={marca.contacto.catalogoUrl} target="_blank" rel="noopener" data-menu-enlace>
             <span class="menu-numero mano" aria-hidden="true">↗</span>
-            {marca.nav.catalogo}<span class="sr-only"> (se abre en pestaña nueva)</span>
+            <span data-campo="sitio:nav.catalogo">{marca.nav.catalogo}</span><span class="sr-only"> (se abre en pestaña nueva)</span>
           </a>
         </li>
       </ol>
       <div class="menu-pie">
-        {marca.nav.pie.map((linea) => <span class="mono">{linea}</span>)}
+        {marca.nav.pie.map((linea, i) => <span class="mono" data-campo={`sitio:nav.pie.${i}`}>{linea}</span>)}
       </div>
       <img class="menu-personaje flota" src="/sitio/personaje-sentado-t.webp" alt="" width="300" height="352" loading="lazy" />
     </div>
@@ -157,16 +160,16 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
       <div class="contenedor portada-fila">
         <div class="portada-texto">
           <h1 class="portada-titular">
-            {marca.hero.titular[0]}<br />
-            {marca.hero.titular[1].replace(/,$/, '')}<span class="acento">,</span><br />
-            <span class="acento">{marca.hero.titular[2]}</span>
+            <span data-campo="sitio:hero.titular.0">{marca.hero.titular[0]}</span><br />
+            <span data-campo="sitio:hero.titular.1">{marca.hero.titular[1].replace(/,$/, '')}</span><span class="acento">,</span><br />
+            <span class="acento" data-campo="sitio:hero.titular.2">{marca.hero.titular[2]}</span>
           </h1>
-          <p class="portada-sub">{marca.hero.sub}</p>
+          <p class="portada-sub" data-campo="sitio:hero.sub">{marca.hero.sub}</p>
           <div class="portada-ctas">
             {/* A la categoría de barras por más vendidas (pedido de
                 Marcos), no a la portada general del catálogo. */}
-            <BotonMarca href={urlCatalogoBarras} externo>{marca.hero.ctaCatalogo}</BotonMarca>
-            <a class="enlace-sabores" href="#sabores">{marca.hero.ctaSabores}</a>
+            <BotonMarca href={urlCatalogoBarras} externo><span data-campo="sitio:hero.ctaCatalogo">{marca.hero.ctaCatalogo}</span></BotonMarca>
+            <a class="enlace-sabores" href="#sabores" data-campo="sitio:hero.ctaSabores">{marca.hero.ctaSabores}</a>
           </div>
         </div>
         {/* El lockup del sistema anterior, que a Marcos le gustaba: el
@@ -177,7 +180,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
             titular de al lado y en la cabecera — repetirlo era ruido. */}
         <div class="portada-logo">
           <span class="portada-sello" set:html={sello} />
-          <p class="portada-wordmark">{marca.marca.wordmark}</p>
+          <p class="portada-wordmark" data-campo="sitio:marca.wordmark">{marca.marca.wordmark}</p>
         </div>
       </div>
       <div class="portada-tira" data-parallax="0.045">
@@ -186,7 +189,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
         {/* Las primeras cuatro barras entran en el primer pantallazo móvil
             y una de ellas es el LCP: prioridad alta; el resto, baja para
             no pelearle ancho de banda a las fuentes. */}
-        <Marquesina aria={marca.hero.marquesinaAria} dur="140s" rotacion={-3}>
+        <Marquesina aria={marca.hero.marquesinaAria} campoAria="sitio:hero.marquesinaAria" dur="140s" rotacion={-3}>
           {enMarquesina.map((s, i) => (
             <img
               class="tira-barra"
@@ -209,39 +212,39 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
     <section class="seccion" data-tono="calida">
       <div class="contenedor postura">
         <div>
-          <EtiquetaSabor texto={marca.postura.kicker} />
-          <h2 class="titular">{marca.postura.titulo}</h2>
-          <p class="postura-intro">{marca.postura.intro}</p>
+          <EtiquetaSabor texto={marca.postura.kicker} campo="sitio:postura.kicker" />
+          <h2 class="titular" data-campo="sitio:postura.titulo">{marca.postura.titulo}</h2>
+          <p class="postura-intro" data-campo="sitio:postura.intro">{marca.postura.intro}</p>
           <div class="chips">
-            {marca.postura.chips.map((chip) => <Insignia tono="cacao">{chip}</Insignia>)}
+            {marca.postura.chips.map((chip, i) => <Insignia tono="cacao" campo={`sitio:postura.chips.${i}`}>{chip}</Insignia>)}
           </div>
         </div>
         <div data-tabs>
-          <div class="conmutador" role="tablist" aria-label={marca.postura.titulo}>
-            <button type="button" role="tab" id="tab-si" aria-selected="true" aria-controls="panel-si" data-tab>
+          <div class="conmutador" role="tablist" aria-label={marca.postura.titulo} data-campo-attr="aria-label:sitio:postura.titulo">
+            <button type="button" role="tab" id="tab-si" aria-selected="true" aria-controls="panel-si" data-tab data-campo="sitio:postura.tabSi">
               {marca.postura.tabSi}
             </button>
-            <button type="button" role="tab" id="tab-no" aria-selected="false" aria-controls="panel-no" data-tab>
+            <button type="button" role="tab" id="tab-no" aria-selected="false" aria-controls="panel-no" data-tab data-campo="sitio:postura.tabNo">
               {marca.postura.tabNo}
             </button>
           </div>
           <div class="panel panel-si" id="panel-si" role="tabpanel" aria-labelledby="tab-si" tabindex="0" data-panel>
             <ul class="panel-lista">
-              {marca.postura.lleva.map((item) => (
-                <li><span class="mano panel-marca" aria-hidden="true">✓</span>{item}</li>
+              {marca.postura.lleva.map((item, i) => (
+                <li><span class="mano panel-marca" aria-hidden="true">✓</span><span data-campo={`sitio:postura.lleva.${i}`}>{item}</span></li>
               ))}
             </ul>
-            <p class="panel-nota mono">{marca.postura.llevaNota}</p>
+            <p class="panel-nota mono" data-campo="sitio:postura.llevaNota">{marca.postura.llevaNota}</p>
           </div>
           {/* Sin `hidden` en el HTML: sin JS los dos paneles se apilan
               visibles; el script esconde el inactivo al tomar control. */}
           <div class="panel panel-no" id="panel-no" role="tabpanel" aria-labelledby="tab-no" tabindex="0" data-panel>
             <ul class="panel-lista">
-              {marca.postura.noLleva.map((item) => (
-                <li><span class="mano panel-marca" aria-hidden="true">✕</span><s>{item}</s></li>
+              {marca.postura.noLleva.map((item, i) => (
+                <li><span class="mano panel-marca" aria-hidden="true">✕</span><s data-campo={`sitio:postura.noLleva.${i}`}>{item}</s></li>
               ))}
             </ul>
-            <p class="panel-cierre">{marca.postura.noLlevaCierre}</p>
+            <p class="panel-cierre" data-campo="sitio:postura.noLlevaCierre">{marca.postura.noLlevaCierre}</p>
           </div>
         </div>
       </div>
@@ -256,7 +259,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
         style={`--fondo:${colorSabor[inicial.clave]};--texto:${tintaSabor[inicial.clave]}`}
       >
         <div class="contenedor anaquel-encabezado">
-          <EtiquetaSabor texto={marca.anaquel.kicker} />
+          <EtiquetaSabor texto={marca.anaquel.kicker} campo="sitio:anaquel.kicker" />
           {/* El enlace al catálogo /barras se retiró (2026-08-17: Marcos
               lo descontinuó). La página y su código se borraron el
               2026-09-08: el anaquel de esta sección es el único
@@ -264,19 +267,21 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
           <span class="mono" aria-hidden="true"><span data-anaquel-contador>{inicial.orden}</span>/15</span>
         </div>
         <div class="contenedor">
-          <h2 class="titular">{marca.anaquel.titulo}</h2>
+          <h2 class="titular" data-campo="sitio:anaquel.titulo">{marca.anaquel.titulo}</h2>
         </div>
-        <div class="anaquel-riel" role="radiogroup" aria-label={marca.anaquel.grupoAria} data-anaquel>
+        <div class="anaquel-riel" role="radiogroup" aria-label={marca.anaquel.grupoAria} data-anaquel
+             data-campo-attr="aria-label:sitio:anaquel.grupoAria">
           {/* Mismo srcset y el MISMO `sizes` que la marquesina del hero
               (aunque acá se ven más chicas): así cada dispositivo elige
               la misma variante y el riel sale de caché, sin bajar nada. */}
-          {sabores.map((s) => (
+          {sabores.map((s, i) => (
             <button
               type="button"
               role="radio"
               aria-checked={s.slug === inicial.slug ? 'true' : 'false'}
               aria-label={s.nombre}
               data-anaquel-radio={s.slug}
+              data-campo-attr={`aria-label:sabores:sabores.${i}.nombre`}
               data-cursor="Ver"
             >
               <img
@@ -299,11 +304,27 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
             {/* La barra 3D de Marcos (Blender): un solo GLB para los 15
                 sabores — marca.ts le cambia la textura del pliego al
                 elegir. La imagen es el fallback y lo único que hay sin
-                JS o con reduced-motion. */}
-            <div class="ficha-envoltura" data-visor3d data-glb="/sitio/marca/barra.glb">
+                JS o con reduced-motion.
+                El data-campo-alterno lleva la forma de ATRIBUTO
+                («alt:documento:ruta», igual que data-campo-attr) porque
+                este alterno no es de los otros tres (que reemplazan el
+                textContent del nodo marcado): el script crea un
+                <model-viewer> ACÁ ADENTRO cuando el visor carga y le pone
+                el alt ahí. Si el panel de la fase 6 tratara este nodo
+                como los otros tres —pintándole el textContent— le
+                borraría el <img> de fallback de abajo, que es lo único
+                que queda visible sin JS o con reduced-motion. Con la
+                forma de atributo, «la referencia nombra un atributo ⇒
+                nunca tocar el textContent» sale de leer el dato, no de
+                acordarse de un caso especial. El campo cuelga del
+                contenedor, no del <model-viewer>, porque ese elemento no
+                existe todavía en este HTML — nace cuando el visor
+                carga. */}
+            <div class="ficha-envoltura" data-visor3d data-glb="/sitio/marca/barra.glb" data-campo-alterno="alt:sitio:anaquel.visorAlt">
               <img
                 src={`/sitio/marca/barra-${inicial.slug}.webp`}
                 alt={`${marca.anaquel.envolturaAltPrefijo} ${inicial.nombre}`}
+                data-campo-attr="alt:sitio:anaquel.envolturaAltPrefijo"
                 width="754"
                 height="1617"
                 loading="lazy"
@@ -314,26 +335,26 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
                 texto indexable, no un swap de JS. Sin `hidden` en el
                 HTML (regla no-JS: sin script se apilan las quince);
                 marca.ts esconde las inactivas al tomar control. */}
-            {datosAnaquel.map((d) => (
+            {datosAnaquel.map((d, i) => (
               <div class="ficha-datos" data-ficha-de={d.slug}>
                 <p class="mono ficha-orden">
-                  {marca.anaquel.fichaEtiqueta} {d.orden} {marca.anaquel.contadorDe}
+                  <span data-campo="sitio:anaquel.fichaEtiqueta">{marca.anaquel.fichaEtiqueta}</span> {d.orden} {marca.anaquel.contadorDe}
                 </p>
                 <div class="ficha-nombre-fila">
-                  <h3 class="ficha-nombre">{d.nombre}</h3>
-                  <p class="ficha-precio">{d.precio}</p>
+                  <h3 class="ficha-nombre" data-campo={`sabores:sabores.${i}.nombre`}>{d.nombre}</h3>
+                  <p class="ficha-precio" data-campo={`sabores:sabores.${i}.precio`}>{d.precio}</p>
                 </div>
                 <div class="chips">
-                  <Insignia tono="rojo">{d.cacao}</Insignia>
-                  <Insignia tono="cacao">{marca.anaquel.pesoInsignia}</Insignia>
-                  <Insignia tono="amarillo">{marca.anaquel.manoInsignia}</Insignia>
+                  <Insignia tono="rojo" campo={`sabores:sabores.${i}.cacao`}>{d.cacao}</Insignia>
+                  <Insignia tono="cacao" campo="sitio:anaquel.pesoInsignia">{marca.anaquel.pesoInsignia}</Insignia>
+                  <Insignia tono="amarillo" campo="sitio:anaquel.manoInsignia">{marca.anaquel.manoInsignia}</Insignia>
                 </div>
                 <p class="ficha-ingredientes mono">
-                  {marca.anaquel.ingredientesEtiqueta}: {d.ingredientes}.
+                  <span data-campo="sitio:anaquel.ingredientesEtiqueta">{marca.anaquel.ingredientesEtiqueta}</span>: <span data-campo={`sabores:sabores.${i}.ingredientes`}>{d.ingredientes}</span>.
                 </p>
                 <div class="ficha-ctas">
-                  <BotonMarca href={d.url} externo>{marca.anaquel.cta}</BotonMarca>
-                  <p class="mano ficha-remate suave">{marca.anaquel.remate}</p>
+                  <BotonMarca href={d.url} externo><span data-campo="sitio:anaquel.cta">{marca.anaquel.cta}</span></BotonMarca>
+                  <p class="mano ficha-remate suave" data-campo="sitio:anaquel.remate">{marca.anaquel.remate}</p>
                 </div>
               </div>
             ))}
@@ -342,47 +363,48 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
                 class="flota"
                 src={inicialTieneIlustracion ? `/sitio/marca/ilustracion-${inicial.slug}.webp` : undefined}
                 alt={`${marca.anaquel.ilustracionAltPrefijo} ${inicial.nombre}`}
+                data-campo-attr="alt:sitio:anaquel.ilustracionAltPrefijo"
                 width="400"
                 height="450"
                 loading="lazy"
                 data-anaquel-ilustracion
               />
-              <figcaption class="mano suave">{marca.anaquel.ilustracionCaption}</figcaption>
+              <figcaption class="mano suave" data-campo="sitio:anaquel.ilustracionCaption">{marca.anaquel.ilustracionCaption}</figcaption>
             </figure>
           </div>
 
           <div class="ficha-extras">
             <div class="extra-ticket">
               <TicketPanel>
-                <p class="extra-titulo">{marca.minis.titulo} · {precioMXN(marca.minis.precio)}</p>
-                <p class="extra-cuerpo">{marca.minis.cuerpo}</p>
-                <p class="mano">{marca.minis.nota}</p>
+                <p class="extra-titulo"><span data-campo="sitio:minis.titulo">{marca.minis.titulo}</span> · <span data-campo="sitio:minis.precio">{precioMXN(marca.minis.precio)}</span></p>
+                <p class="extra-cuerpo" data-campo="sitio:minis.cuerpo">{marca.minis.cuerpo}</p>
+                <p class="mano" data-campo="sitio:minis.nota">{marca.minis.nota}</p>
               </TicketPanel>
             </div>
             <div class="extra-carta">
               <div class="extra-encabezado">
-                <h4>{marca.gotas.titulo}</h4>
-                <span class="mono extra-precio">{marca.gotas.desdeEtiqueta} {precioMXN(marca.gotas.precioDesde)}</span>
+                <h4 data-campo="sitio:gotas.titulo">{marca.gotas.titulo}</h4>
+                <span class="mono extra-precio"><span data-campo="sitio:gotas.desdeEtiqueta">{marca.gotas.desdeEtiqueta}</span> {precioMXN(marca.gotas.precioDesde)}</span>
               </div>
-              <p class="extra-cuerpo suave">{marca.gotas.cuerpo}</p>
+              <p class="extra-cuerpo suave" data-campo="sitio:gotas.cuerpo">{marca.gotas.cuerpo}</p>
               <ul class="gotas-puntos" aria-label={`${marca.gotas.sabores} de gotas`}>
-                {gotas.map((g) => (
+                {gotas.map((g, i) => (
                   <li>
                     <span class="gota-punto" style={`background:${colorSabor[g.clave]}`} aria-hidden="true"></span>
-                    <span class="sr-only">{g.nombre}</span>
+                    <span class="sr-only" data-campo={`sabores:gotas.${i}.nombre`}>{g.nombre}</span>
                   </li>
                 ))}
-                <li class="mono gotas-cifra" aria-hidden="true">{marca.gotas.sabores}</li>
+                <li class="mono gotas-cifra" aria-hidden="true" data-campo="sitio:gotas.sabores">{marca.gotas.sabores}</li>
               </ul>
-              <p class="mono extra-nota suave">{marca.gotas.notaPrecio}: {precioMXN(marca.gotas.precioJengibre)}</p>
+              <p class="mono extra-nota suave"><span data-campo="sitio:gotas.notaPrecio">{marca.gotas.notaPrecio}</span>: {precioMXN(marca.gotas.precioJengibre)}</p>
             </div>
             <div class="extra-carta">
               <div class="extra-encabezado">
-                <h4>{marca.polvoCard.titulo}</h4>
-                <span class="mono extra-chip">{marca.polvoCard.chip}</span>
+                <h4 data-campo="sitio:polvoCard.titulo">{marca.polvoCard.titulo}</h4>
+                <span class="mono extra-chip" data-campo="sitio:polvoCard.chip">{marca.polvoCard.chip}</span>
               </div>
-              <p class="extra-cuerpo suave">{marca.polvoCard.cuerpo}</p>
-              <p class="mono extra-lista">{polvo.map((p) => p.nombre.toLowerCase()).join(' · ')}</p>
+              <p class="extra-cuerpo suave" data-campo="sitio:polvoCard.cuerpo">{marca.polvoCard.cuerpo}</p>
+              <p class="mono extra-lista">{polvo.flatMap((p, i) => i === 0 ? [<span data-campo={`sabores:polvo.${i}.nombre`}>{p.nombre.toLowerCase()}</span>] : [' · ', <span data-campo={`sabores:polvo.${i}.nombre`}>{p.nombre.toLowerCase()}</span>])}</p>
             </div>
           </div>
         </article>
@@ -394,14 +416,15 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
       <div class="contenedor polvo-fila">
         <div class="polvo-texto">
           <div class="polvo-encabezado">
-            <EtiquetaSabor texto={marca.polvo.kicker} />
-            <span class="sello-pronto mano" aria-hidden="true">{marca.polvo.chip}</span>
-            <span class="sr-only">{marca.polvo.chip}</span>
+            <EtiquetaSabor texto={marca.polvo.kicker} campo="sitio:polvo.kicker" />
+            <span class="sello-pronto mano" aria-hidden="true" data-campo="sitio:polvo.chip">{marca.polvo.chip}</span>
+            <span class="sr-only" data-campo="sitio:polvo.chip">{marca.polvo.chip}</span>
           </div>
-          <h2 class="titular">{marca.polvo.titulo}</h2>
-          <p class="suave">{marca.polvo.cuerpo}</p>
+          <h2 class="titular" data-campo="sitio:polvo.titulo">{marca.polvo.titulo}</h2>
+          <p class="suave" data-campo="sitio:polvo.cuerpo">{marca.polvo.cuerpo}</p>
         </div>
-        <div class="polvo-riel" role="region" aria-label={marca.polvo.titulo} tabindex="0" data-parallax="0.05">
+        <div class="polvo-riel" role="region" aria-label={marca.polvo.titulo} tabindex="0" data-parallax="0.05"
+             data-campo-attr="aria-label:sitio:polvo.titulo">
           {polvo.map((p) => (
             <img
               src={`/sitio/${p.archivo}.webp`}
@@ -409,6 +432,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
               width="832"
               height="1600"
               loading="lazy"
+              data-campo-attr="alt:sitio:polvo.altPrefijo"
             />
           ))}
         </div>
@@ -418,8 +442,8 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
     {/* ——— 05 · Cómo catar ——— */}
     <section id="catar" class="seccion" data-tono="crema">
       <div class="contenedor">
-        <EtiquetaSabor texto={marca.catar.kicker} />
-        <h2 class="titular">{marca.catar.titulo}</h2>
+        <EtiquetaSabor texto={marca.catar.kicker} campo="sitio:catar.kicker" />
+        <h2 class="titular" data-campo="sitio:catar.titulo">{marca.catar.titulo}</h2>
         <ol class="catar-pasos">
           {marca.catar.pasos.map((paso, i) => (
             <li class="paso" data-revelar style={`--orden:${i % 3}`}>
@@ -428,18 +452,18 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
                 style={`background:${colorSabor[paso.clave]};color:${tintaSabor[paso.clave]}`}
                 aria-hidden="true"
               >{i + 1}</span>
-              <p><b>{paso.nombre}.</b> {paso.texto}</p>
+              <p><b data-campo={`sitio:catar.pasos.${i}.nombre`}>{paso.nombre}.</b> <span data-campo={`sitio:catar.pasos.${i}.texto`}>{paso.texto}</span></p>
             </li>
           ))}
         </ol>
         <div class="catar-cita">
           <TicketPanel>
-            <p class="cita-texto">“{marca.catar.cita}”</p>
+            <p class="cita-texto">“<span data-campo="sitio:catar.cita">{marca.catar.cita}</span>”</p>
           </TicketPanel>
         </div>
         <div class="catar-notas">
-          <p><b class="nota-titulo">{marca.catar.porqueTitulo}</b> {marca.catar.porque}</p>
-          <p><b class="nota-titulo">{marca.catar.aporteTitulo}.</b> {marca.catar.aporte}</p>
+          <p><b class="nota-titulo" data-campo="sitio:catar.porqueTitulo">{marca.catar.porqueTitulo}</b> <span data-campo="sitio:catar.porque">{marca.catar.porque}</span></p>
+          <p><b class="nota-titulo" data-campo="sitio:catar.aporteTitulo">{marca.catar.aporteTitulo}.</b> <span data-campo="sitio:catar.aporte">{marca.catar.aporte}</span></p>
         </div>
       </div>
     </section>
@@ -447,27 +471,28 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
     {/* ——— 06 · Recetas ——— */}
     <section id="recetas" class="seccion" data-tono="calida">
       <div class="contenedor recetas-encabezado">
-        <EtiquetaSabor texto={marca.recetas.kicker} />
-        <span class="mano suave" aria-hidden="true">{marca.recetas.deslizaNota}</span>
+        <EtiquetaSabor texto={marca.recetas.kicker} campo="sitio:recetas.kicker" />
+        <span class="mano suave" aria-hidden="true" data-campo="sitio:recetas.deslizaNota">{marca.recetas.deslizaNota}</span>
       </div>
-      <div class="contenedor"><h2 class="titular">{marca.recetas.titulo}</h2></div>
-      <div class="recetas-riel" role="region" aria-label={marca.recetas.listaAria} tabindex="0">
-        {marca.recetas.lista.map((r) => (
+      <div class="contenedor"><h2 class="titular" data-campo="sitio:recetas.titulo">{marca.recetas.titulo}</h2></div>
+      <div class="recetas-riel" role="region" aria-label={marca.recetas.listaAria} tabindex="0"
+           data-campo-attr="aria-label:sitio:recetas.listaAria">
+        {marca.recetas.lista.map((r, i) => (
           <article
             class:list={['receta', tintaClara(r.clave) ? 'receta-clara' : 'receta-oscura']}
             style={`--sabor:${colorSabor[r.clave]};--tinta:${tintaSabor[r.clave]}`}
           >
-            <p class="mono receta-kicker">{r.kicker}</p>
-            <h3 class="receta-titulo">{r.titulo}</h3>
-            <p class="receta-resumen">{r.resumen}</p>
-            {r.chipPolvo && <p class="mono receta-chip">{r.chipPolvo}</p>}
-            <div class="receta-tip mano"><b>{marca.recetas.etiquetaTip}:</b> {r.tip}</div>
+            <p class="mono receta-kicker" data-campo={`sitio:recetas.lista.${i}.kicker`}>{r.kicker}</p>
+            <h3 class="receta-titulo" data-campo={`sitio:recetas.lista.${i}.titulo`}>{r.titulo}</h3>
+            <p class="receta-resumen" data-campo={`sitio:recetas.lista.${i}.resumen`}>{r.resumen}</p>
+            {r.chipPolvo && <p class="mono receta-chip" data-campo={`sitio:recetas.lista.${i}.chipPolvo`}>{r.chipPolvo}</p>}
+            <div class="receta-tip mano"><b data-campo="sitio:recetas.etiquetaTip">{marca.recetas.etiquetaTip}:</b> <span data-campo={`sitio:recetas.lista.${i}.tip`}>{r.tip}</span></div>
             <details class="receta-completa">
-              <summary>{marca.recetas.verCompleta}</summary>
+              <summary data-campo="sitio:recetas.verCompleta">{marca.recetas.verCompleta}</summary>
               <ul>
-                {r.ingredientes.map((ing) => <li>{ing}</li>)}
+                {r.ingredientes.map((ing, j) => <li data-campo={`sitio:recetas.lista.${i}.ingredientes.${j}`}>{ing}</li>)}
               </ul>
-              <p>{r.pasos}</p>
+              <p data-campo={`sitio:recetas.lista.${i}.pasos`}>{r.pasos}</p>
             </details>
           </article>
         ))}
@@ -478,16 +503,16 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
     <section id="nosotros" class="seccion" data-tono="crema">
       <div class="contenedor nosotros">
         <div>
-          <EtiquetaSabor texto={marca.nosotros.kicker} />
-          <h2 class="titular">{marca.nosotros.titulo}</h2>
-          {marca.nosotros.parrafos.map((p) => <p class="nosotros-parrafo">{p}</p>)}
+          <EtiquetaSabor texto={marca.nosotros.kicker} campo="sitio:nosotros.kicker" />
+          <h2 class="titular" data-campo="sitio:nosotros.titulo">{marca.nosotros.titulo}</h2>
+          {marca.nosotros.parrafos.map((p, i) => <p class="nosotros-parrafo" data-campo={`sitio:nosotros.parrafos.${i}`}>{p}</p>)}
         </div>
         <div>
           <div class="nosotros-carta">
-            <b class="nota-titulo">{marca.nosotros.cacaoTitulo}</b> {marca.nosotros.cacao}
+            <b class="nota-titulo" data-campo="sitio:nosotros.cacaoTitulo">{marca.nosotros.cacaoTitulo}</b> <span data-campo="sitio:nosotros.cacao">{marca.nosotros.cacao}</span>
           </div>
           <div class="nosotros-pie">
-            <p class="mono suave">{marca.nosotros.datos.join(' · ')}</p>
+            <p class="mono suave"><span data-campo="sitio:nosotros.datos.0">{marca.nosotros.datos[0]}</span> · <span data-campo="sitio:nosotros.datos.1">{marca.nosotros.datos[1]}</span></p>
             <img
               src="/sitio/personaje-sentado-t.webp"
               alt={marca.nosotros.personajeAlt}
@@ -495,6 +520,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
               height="352"
               loading="lazy"
               data-parallax="-0.06"
+              data-campo-attr="alt:sitio:nosotros.personajeAlt"
             />
           </div>
         </div>
@@ -507,10 +533,11 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
           columnas distintas, y el script los busca dentro del grupo. */}
       <div class="contenedor negocios" data-tabs>
         <div>
-          <EtiquetaSabor texto={marca.negocios.kicker} />
-          <h2 class="titular">{marca.negocios.titulo}</h2>
-          <p class="suave negocios-intro">{marca.negocios.intro}</p>
-          <div class="pestanas" role="tablist" aria-label={marca.negocios.titulo}>
+          <EtiquetaSabor texto={marca.negocios.kicker} campo="sitio:negocios.kicker" />
+          <h2 class="titular" data-campo="sitio:negocios.titulo">{marca.negocios.titulo}</h2>
+          <p class="suave negocios-intro" data-campo="sitio:negocios.intro">{marca.negocios.intro}</p>
+          <div class="pestanas" role="tablist" aria-label={marca.negocios.titulo}
+               data-campo-attr="aria-label:sitio:negocios.titulo">
             {marca.negocios.tabs.map((t, i) => (
               <button
                 type="button"
@@ -519,14 +546,15 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
                 aria-selected={i === 0 ? 'true' : 'false'}
                 aria-controls={`panel-${t.id}`}
                 data-tab
+                data-campo={`sitio:negocios.tabs.${i}.etiqueta`}
               >{t.etiqueta}</button>
             ))}
           </div>
           <dl class="semaforo">
-            {marca.negocios.fichas.map((f) => (
+            {marca.negocios.fichas.map((f, i) => (
               <div class="semaforo-fila">
-                <dt>{f.dato}</dt>
-                <dd class="mono">{f.estado}</dd>
+                <dt data-campo={`sitio:negocios.fichas.${i}.dato`}>{f.dato}</dt>
+                <dd class="mono" data-campo={`sitio:negocios.fichas.${i}.estado`}>{f.estado}</dd>
               </div>
             ))}
           </dl>
@@ -534,7 +562,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
               botón de verdad — el enlace de texto pasaba desapercibido
               (retro de Marcos, 2026-09-02). */}
           <p class="negocios-fichas">
-            <BotonMarca href={marca.fichasTecnicas.ruta} variante="secundario">{marca.negocios.fichasCta}</BotonMarca>
+            <BotonMarca href={marca.fichasTecnicas.ruta} variante="secundario"><span data-campo="sitio:negocios.fichasCta">{marca.negocios.fichasCta}</span></BotonMarca>
           </p>
         </div>
         <div class="negocios-paneles">
@@ -549,21 +577,27 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
               style={`--sabor:${colorSabor[t.clave]}`}
             >
               <div class="negocio-encabezado">
-                <h3>{t.titulo}</h3>
-                <span class="mono">{t.precio == null ? t.precioNota : `${t.precioNota} ${precioMXN(t.precio)}`}</span>
+                <h3 data-campo={`sitio:negocios.tabs.${i}.titulo`}>{t.titulo}</h3>
+                {/* El precio solo se marca en la pestaña 0 (polvo): es la
+                    ÚNICA que usa `precioONada` — un valor de la clienta,
+                    hoy en `null`. Las de gotas y barras (i 1 y 2) muestran
+                    el `derivado` (el mínimo de sus propios productos): no
+                    son un campo que la clienta edite acá, y marcarlas
+                    haría que (b) las rechazara por no ser editables. */}
+                <span class="mono">{t.precio == null ? <span data-campo={`sitio:negocios.tabs.${i}.precioNota`}>{t.precioNota}</span> : <><span data-campo={`sitio:negocios.tabs.${i}.precioNota`}>{t.precioNota}</span> {i === 0 ? <span data-campo="sitio:negocios.tabs.0.precio">{precioMXN(t.precio)}</span> : precioMXN(t.precio)}</>}</span>
               </div>
-              <p class="negocio-cuerpo">{t.cuerpo}</p>
+              <p class="negocio-cuerpo" data-campo={`sitio:negocios.tabs.${i}.cuerpo`}>{t.cuerpo}</p>
               <ul class="negocio-datos">
-                {t.datos.map((d) => (
-                  <li><span class="mano negocio-flecha" aria-hidden="true">→</span>{d}</li>
+                {t.datos.map((d, j) => (
+                  <li><span class="mano negocio-flecha" aria-hidden="true">→</span><span data-campo={`sitio:negocios.tabs.${i}.datos.${j}`}>{d}</span></li>
                 ))}
               </ul>
               <p class="negocio-ficha">
                 <a href={`${marca.fichasTecnicas.ruta}${t.ficha}`}>
-                  {marca.negocios.fichaEnlace}<span class="mano" aria-hidden="true"> →</span>
+                  <span data-campo="sitio:negocios.fichaEnlace">{marca.negocios.fichaEnlace}</span><span class="mano" aria-hidden="true"> →</span>
                 </a>
               </p>
-              <p class="mono negocio-correo">{marca.negocios.correoEtiqueta} {marca.negocios.correo}</p>
+              <p class="mono negocio-correo"><span data-campo="sitio:negocios.correoEtiqueta">{marca.negocios.correoEtiqueta}</span> <span data-campo="sitio:negocios.correo">{marca.negocios.correo}</span></p>
             </div>
           ))}
         </div>
@@ -573,16 +607,16 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
     {/* ——— 09 · Preguntas frecuentes ——— */}
     <section id="preguntas" class="seccion" data-tono="crema">
       <div class="contenedor preguntas">
-        <EtiquetaSabor texto={marca.preguntas.kicker} />
-        <h2 class="titular">{marca.preguntas.titulo}</h2>
+        <EtiquetaSabor texto={marca.preguntas.kicker} campo="sitio:preguntas.kicker" />
+        <h2 class="titular" data-campo="sitio:preguntas.titulo">{marca.preguntas.titulo}</h2>
         <div class="preguntas-lista">
-          {marca.preguntas.items.map((item) => (
+          {marca.preguntas.items.map((item, i) => (
             <details class="pregunta">
               <summary>
-                <h3>{item.p}</h3>
+                <h3 data-campo={`sitio:preguntas.items.${i}.p`}>{item.p}</h3>
                 <span class="pregunta-mas mano" aria-hidden="true">+</span>
               </summary>
-              <p class="suave">{item.r}</p>
+              <p class="suave" data-campo={`sitio:preguntas.items.${i}.r`}>{item.r}</p>
             </details>
           ))}
         </div>
@@ -592,8 +626,8 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
     {/* ——— 10 · Contacto ——— */}
     <section id="contacto" class="seccion" data-tono="calida">
       <div class="contenedor">
-        <EtiquetaSabor texto={marca.contacto.kicker} />
-        <h2 class="titular">{marca.contacto.titulo}</h2>
+        <EtiquetaSabor texto={marca.contacto.kicker} campo="sitio:contacto.kicker" />
+        <h2 class="titular" data-campo="sitio:contacto.titulo">{marca.contacto.titulo}</h2>
         {/* El formulario entero primero, la información abajo en texto —
             sin tarjetas (retro de Marcos). Sin servidor detrás: el envío
             arma un mailto con los datos y lo abre en el correo del
@@ -607,8 +641,9 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
             data-asunto-personal={marca.contacto.formulario.asuntoPersonal}
             data-asunto-negocio={marca.contacto.formulario.asuntoNegocio}
             data-correo={marca.contacto.correo}
+            data-campo-attr="data-asunto-personal:sitio:contacto.formulario.asuntoPersonal data-asunto-negocio:sitio:contacto.formulario.asuntoNegocio"
           >
-            <h3 class="formulario-titulo">{marca.contacto.formulario.titulo}</h3>
+            <h3 class="formulario-titulo" data-campo="sitio:contacto.formulario.titulo">{marca.contacto.formulario.titulo}</h3>
             {/* Honeypot y marca de tiempo: capas anti-bots que la función
                 /api/contacto verifica. Invisibles para humanos. */}
             <div class="campo-trampa" aria-hidden="true">
@@ -620,25 +655,31 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
             <input type="hidden" name="inicio" value="" />
             <div class="formulario-campos">
               <label>
-                <span>{marca.contacto.formulario.nombre}</span>
+                {/* El <span> ya existía y no lleva ninguna otra marca propia
+                    (ni class, ni data-*): colgarle data-campo directo lo deja
+                    indistinguible de un span inventado por esta fase. Se
+                    envuelve el texto en un span nuevo adentro para no tocar
+                    el que ya estaba. */}
+                <span><span data-campo="sitio:contacto.formulario.nombre">{marca.contacto.formulario.nombre}</span></span>
                 <input type="text" name="nombre" autocomplete="name" required />
               </label>
               <label>
-                <span>{marca.contacto.formulario.correo}</span>
+                <span><span data-campo="sitio:contacto.formulario.correo">{marca.contacto.formulario.correo}</span></span>
                 <input type="email" name="correo" autocomplete="email" required />
               </label>
               <fieldset>
-                <legend>{marca.contacto.formulario.tipo}</legend>
+                <legend data-campo="sitio:contacto.formulario.tipo">{marca.contacto.formulario.tipo}</legend>
                 {marca.contacto.formulario.tipoOpciones.map((op, i) => (
                   <label class="formulario-radio">
                     <input type="radio" name="tipo" value={op.valor} checked={i === 0} />
-                    <span>{op.texto}</span>
+                    <span><span data-campo={`sitio:contacto.formulario.tipoOpciones.${i}.texto`}>{op.texto}</span></span>
                   </label>
                 ))}
               </fieldset>
               <label class="campo-mensaje">
-                <span>{marca.contacto.formulario.mensaje}</span>
-                <textarea name="mensaje" rows="5" placeholder={marca.contacto.formulario.mensajeEjemplo} required></textarea>
+                <span><span data-campo="sitio:contacto.formulario.mensaje">{marca.contacto.formulario.mensaje}</span></span>
+                <textarea name="mensaje" rows="5" placeholder={marca.contacto.formulario.mensajeEjemplo} required
+                          data-campo-attr="placeholder:sitio:contacto.formulario.mensajeEjemplo"></textarea>
               </label>
             </div>
             {claveTurnstile && (
@@ -646,10 +687,10 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
             )}
             <div class="formulario-pie">
               <button class="formulario-enviar" type="submit" data-iman>
-                <span data-formulario-boton>{marca.contacto.formulario.enviar}</span>
+                <span data-formulario-boton data-campo="sitio:contacto.formulario.enviar" data-campo-alterno="sitio:contacto.formulario.enviando">{marca.contacto.formulario.enviar}</span>
                 <span class="puntos" aria-hidden="true"><i></i><i></i><i></i></span>
               </button>
-              <p class="formulario-nota suave">{marca.contacto.formulario.nota}</p>
+              <p class="formulario-nota suave" data-campo="sitio:contacto.formulario.nota">{marca.contacto.formulario.nota}</p>
             </div>
 
             {/* El éxito llega como sello de goma: el ticket cosido se
@@ -658,17 +699,17 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
             <div class="formulario-exito" data-formulario-exito hidden tabindex="-1" role="status">
               <div class="exito-ticket">
                 <TicketPanel>
-                  <p class="exito-titulo mano">{marca.contacto.formulario.exitoTitulo}</p>
-                  <p class="exito-sub">{marca.contacto.formulario.exitoSub}</p>
+                  <p class="exito-titulo mano" data-campo="sitio:contacto.formulario.exitoTitulo">{marca.contacto.formulario.exitoTitulo}</p>
+                  <p class="exito-sub" data-campo="sitio:contacto.formulario.exitoSub">{marca.contacto.formulario.exitoSub}</p>
                 </TicketPanel>
                 <span class="exito-chispa a" aria-hidden="true"><i></i><i></i><i></i></span>
                 <span class="exito-chispa b" aria-hidden="true"><i></i><i></i><i></i></span>
               </div>
               <button class="exito-otra" type="button" data-formulario-otra>
-                {marca.contacto.formulario.otraVez}
+                <span data-campo="sitio:contacto.formulario.otraVez">{marca.contacto.formulario.otraVez}</span>
               </button>
             </div>
-            <p class="formulario-nota suave formulario-aviso" data-formulario-aviso hidden role="status">
+            <p class="formulario-nota suave formulario-aviso" data-formulario-aviso hidden role="status" data-campo="sitio:contacto.formulario.aviso">
               {marca.contacto.formulario.aviso}
             </p>
           </form>
@@ -680,38 +721,40 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
             height="323"
             loading="lazy"
             data-parallax="-0.05"
+            data-campo-attr="alt:sitio:contacto.personajeAlt"
           />
         </div>
 
         <div class="contacto-info">
           <div class="info-bloque">
-            <p class="mono info-etiqueta">{marca.contacto.correoEtiqueta}</p>
+            <p class="mono info-etiqueta" data-campo="sitio:contacto.correoEtiqueta">{marca.contacto.correoEtiqueta}</p>
             <p class="info-dato">
-              <a href={`mailto:${marca.contacto.correo}`}>{marca.contacto.correo}</a>
-              <button class="copiar" type="button" data-copiar={marca.contacto.correo} hidden>
-                <span data-copiar-texto>{marca.contacto.copiar}</span>
+              <a href={`mailto:${marca.contacto.correo}`} data-campo="sitio:contacto.correo">{marca.contacto.correo}</a>
+              <button class="copiar" type="button" data-copiar={marca.contacto.correo} hidden
+                      data-campo-attr="data-copiar:sitio:contacto.correo">
+                <span data-copiar-texto data-campo="sitio:contacto.copiar" data-campo-alterno="sitio:contacto.copiado">{marca.contacto.copiar}</span>
               </button>
             </p>
-            <p class="info-nota suave">{marca.contacto.correoNota}</p>
+            <p class="info-nota suave" data-campo="sitio:contacto.correoNota">{marca.contacto.correoNota}</p>
           </div>
           <div class="info-bloque">
-            <p class="mono info-etiqueta">{marca.contacto.puestoEtiqueta}</p>
-            <p class="info-dato">{marca.contacto.puestoTitulo.join(' ')}</p>
-            <p class="info-nota suave">{marca.contacto.direccion[0]} · {marca.contacto.direccion[1]}</p>
+            <p class="mono info-etiqueta" data-campo="sitio:contacto.puestoEtiqueta">{marca.contacto.puestoEtiqueta}</p>
+            <p class="info-dato"><span data-campo="sitio:contacto.puestoTitulo.0">{marca.contacto.puestoTitulo[0]}</span> <span data-campo="sitio:contacto.puestoTitulo.1">{marca.contacto.puestoTitulo[1]}</span></p>
+            <p class="info-nota suave"><span data-campo="sitio:contacto.direccion.0">{marca.contacto.direccion[0]}</span> · <span data-campo="sitio:contacto.direccion.1">{marca.contacto.direccion[1]}</span></p>
           </div>
           <div class="info-bloque">
-            <p class="mono info-etiqueta">{marca.contacto.catalogoEtiqueta}</p>
+            <p class="mono info-etiqueta" data-campo="sitio:contacto.catalogoEtiqueta">{marca.contacto.catalogoEtiqueta}</p>
             <p class="info-dato">
               <a href={marca.contacto.catalogoUrl} target="_blank" rel="noopener">
-                {marca.contacto.catalogoNombre}<span class="sr-only"> (se abre en pestaña nueva)</span>
+                <span data-campo="sitio:contacto.catalogoNombre">{marca.contacto.catalogoNombre}</span><span class="sr-only"> (se abre en pestaña nueva)</span>
               </a>
             </p>
-            <p class="info-nota suave">{marca.contacto.catalogoNota}</p>
+            <p class="info-nota suave" data-campo="sitio:contacto.catalogoNota">{marca.contacto.catalogoNota}</p>
           </div>
           <div class="info-bloque">
-            <p class="mono info-etiqueta">{marca.contacto.redesEtiqueta}</p>
-            <p class="info-dato">{marca.contacto.redes}</p>
-            <p class="info-nota suave">{marca.contacto.redesNota}</p>
+            <p class="mono info-etiqueta" data-campo="sitio:contacto.redesEtiqueta">{marca.contacto.redesEtiqueta}</p>
+            <p class="info-dato" data-campo="sitio:contacto.redes">{marca.contacto.redes}</p>
+            <p class="info-nota suave" data-campo="sitio:contacto.redesNota">{marca.contacto.redesNota}</p>
           </div>
         </div>
       </div>
@@ -720,9 +763,9 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
 
   <footer class="pie" data-tono="rojo">
     <div class="pie-marquesina">
-      <Marquesina aria={marca.footer.lema} dur="24s">
-        <span class="mono pie-lema">{marca.footer.lema} ·</span>
-        <span class="mono pie-lema">{marca.footer.lema} ·</span>
+      <Marquesina aria={marca.footer.lema} campoAria="sitio:footer.lema" dur="24s">
+        <span class="mono pie-lema" data-campo="sitio:footer.lema">{marca.footer.lema} ·</span>
+        <span class="mono pie-lema" data-campo="sitio:footer.lema">{marca.footer.lema} ·</span>
       </Marquesina>
     </div>
     <div class="contenedor pie-cuerpo">
@@ -731,58 +774,58 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
           el rojo del pie. */}
       <div class="pie-marca">
         <span class="pie-sello" set:html={sello} />
-        <p class="pie-wordmark">{marca.marca.wordmark}</p>
-        <p class="mono pie-linea">{marca.footer.linea}</p>
+        <p class="pie-wordmark" data-campo="sitio:marca.wordmark">{marca.marca.wordmark}</p>
+        <p class="mono pie-linea" data-campo="sitio:footer.linea">{marca.footer.linea}</p>
       </div>
-      <nav class="pie-columnas" aria-label="Mapa del sitio">
+      <nav class="pie-columnas" aria-label={marca.footer.mapaAria} data-campo-attr="aria-label:sitio:footer.mapaAria">
         <div>
-          <p class="pie-titulo mano">{marca.footer.seccionesTitulo}</p>
+          <p class="pie-titulo mano" data-campo="sitio:footer.seccionesTitulo">{marca.footer.seccionesTitulo}</p>
           <ul>
-            {marca.nav.items.map((item) => (
-              <li><a href={item.ancla}>{item.texto}</a></li>
+            {marca.nav.items.map((item, i) => (
+              <li><a href={item.ancla} data-campo={`sitio:nav.items.${i}.texto`}>{item.texto}</a></li>
             ))}
           </ul>
         </div>
         <div>
-          <p class="pie-titulo mano">{marca.footer.productosTitulo}</p>
+          <p class="pie-titulo mano" data-campo="sitio:footer.productosTitulo">{marca.footer.productosTitulo}</p>
           <ul>
-            {marca.footer.productos.map((p) => (
-              <li><a href={p.ancla}>{p.texto}</a></li>
+            {marca.footer.productos.map((p, i) => (
+              <li><a href={p.ancla} data-campo={`sitio:footer.productos.${i}.texto`}>{p.texto}</a></li>
             ))}
             <li>
               <a href={marca.contacto.catalogoUrl} target="_blank" rel="noopener">
-                {marca.nav.catalogo}<span class="sr-only"> (se abre en pestaña nueva)</span>
+                <span data-campo="sitio:nav.catalogo">{marca.nav.catalogo}</span><span class="sr-only"> (se abre en pestaña nueva)</span>
               </a>
             </li>
           </ul>
         </div>
         <div>
-          <p class="pie-titulo mano">{marca.footer.contactoTitulo}</p>
+          <p class="pie-titulo mano" data-campo="sitio:footer.contactoTitulo">{marca.footer.contactoTitulo}</p>
           <ul>
             <li>
               {/* <wbr> tras la arroba: en columna angosta parte ahí y no a
                   mitad de «gmail.com» (overflow-wrap: anywhere). */}
-              <a href={`mailto:${marca.contacto.correo}`}>{correoUsuario}@<wbr />{correoDominio}</a>
+              <a href={`mailto:${marca.contacto.correo}`} data-campo="sitio:contacto.correo">{correoUsuario}@<wbr />{correoDominio}</a>
             </li>
-            <li><a href="#contacto">{marca.contacto.puestoTitulo.join(' ')}</a></li>
-            <li><span class="pie-suelto">{marca.contacto.direccion[1]}</span></li>
-            <li><span class="pie-suelto">{marca.contacto.redes}</span></li>
+            <li><a href="#contacto"><span data-campo="sitio:contacto.puestoTitulo.0">{marca.contacto.puestoTitulo[0]}</span> <span data-campo="sitio:contacto.puestoTitulo.1">{marca.contacto.puestoTitulo[1]}</span></a></li>
+            <li><span class="pie-suelto" data-campo="sitio:contacto.direccion.1">{marca.contacto.direccion[1]}</span></li>
+            <li><span class="pie-suelto" data-campo="sitio:contacto.redes">{marca.contacto.redes}</span></li>
           </ul>
         </div>
         <div>
-          <p class="pie-titulo mano">{marca.footer.legalesTitulo}</p>
+          <p class="pie-titulo mano" data-campo="sitio:footer.legalesTitulo">{marca.footer.legalesTitulo}</p>
           <ul>
             {/* Sin href a propósito: las páginas legales no existen
                 todavía — la estructura queda lista para enchufarlas. */}
-            {marca.footer.legales.map((l) => (
-              <li><span class="pie-suelto">{l} <em>({marca.footer.legalesNota.toLowerCase()})</em></span></li>
+            {marca.footer.legales.map((l, i) => (
+              <li><span class="pie-suelto"><span data-campo={`sitio:footer.legales.${i}`}>{l}</span> <em data-campo="sitio:footer.legalesNota">({marca.footer.legalesNota.toLowerCase()})</em></span></li>
             ))}
           </ul>
         </div>
       </nav>
     </div>
     <div class="contenedor pie-remate">
-      <p class="mono">{marca.footer.derechos}</p>
+      <p class="mono" data-campo="sitio:footer.derechos">{marca.footer.derechos}</p>
     </div>
   </footer>
 

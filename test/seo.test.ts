@@ -56,7 +56,9 @@ describe('el switch de lanzamiento: la home abierta, lo privado noindex', () => 
 describe('el head de la home', () => {
   it('description, canonical www sin barra extra, OG completo y tarjeta social', async () => {
     const html = await container.renderToString(Home)
-    expect(html).toContain(`<title>${marca.titulo}</title>`)
+    // Tarea 12: el <title> lleva data-campo (de qué campo sale), así que
+    // el match es por contenido, no por el tag exacto.
+    expect(html).toMatch(new RegExp(`<title[^>]*>${esc(marca.titulo)}</title>`))
     expect(html).toContain(`<meta name="description" content="${marca.descripcion}"`)
     expect(html).toContain(`<link rel="canonical" href="${ORIGEN}/"`)
     expect(html).toContain(`property="og:url" content="${ORIGEN}/"`)
@@ -96,7 +98,8 @@ describe('el head de la home', () => {
 
   it('la 404 tiene su título, vuelve al inicio y no lleva candado', async () => {
     const html = await container.renderToString(NoEncontrada)
-    expect(html).toContain(`<title>${marca.noEncontrada.titulo}</title>`)
+    // Mismo motivo que arriba: el <title> lleva data-campo.
+    expect(html).toMatch(new RegExp(`<title[^>]*>${esc(marca.noEncontrada.titulo)}</title>`))
     expect(html).toContain('href="/"')
     expect(html).not.toContain('data-candado')
   })

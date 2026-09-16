@@ -222,6 +222,20 @@ export const camposDeProducto = {
         ayuda: 'El texto bajo el dibujo de la envoltura.',
         maxCaracteres: 50,
       }),
+      // Lo que escucha quien navega con lector de pantalla cuando llega al
+      // visor de la barra en 3D. Estaba escrito a mano adentro de
+      // `marca.ts` hasta la fase 2 Parte B: la clienta no podía cambiarlo
+      // y nadie se enteraba de que existía. Vive adentro de un `alt`, sin
+      // nada geométrico que medir, así que va con sección accesibilidad y
+      // `falla: ['ninguno']`, igual que `ilustracionAltPrefijo`.
+      visorAlt: texto({
+        ...enAccesibilidad,
+        etiqueta: 'Descripción de la barra que gira',
+        ayuda: 'No se ve en la página: es lo que escuchan las personas que navegan con lector de pantalla cuando llegan a la barra que se puede girar.',
+        maxCaracteres: 80,
+        enAtributo: 'alt',
+        falla: ['ninguno'],
+      }),
       // Se le agrega el nombre del sabor: vive adentro de un `alt`, sin
       // nada geométrico que medir.
       ilustracionAltPrefijo: texto({

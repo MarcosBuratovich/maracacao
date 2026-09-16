@@ -149,7 +149,9 @@ describe('la página / (rediseño de marca, 2026-08-13; en la raíz desde 2026-0
     const sinComa = marca.hero.titular[1].slice(0, -1)
 
     const html = await container.renderToString(Borrador)
-    expect(html).toMatch(new RegExp(`${esc(sinComa)}<span class="acento"[^>]*>,</span>`))
+    // El renglón vive en su propio <span data-campo> (fase 2B, tarea 3):
+    // el texto sin coma ya no queda pegado directo al span del acento.
+    expect(html).toMatch(new RegExp(`<span[^>]*>${esc(sinComa)}</span><span class="acento"[^>]*>,</span>`))
   })
 })
 

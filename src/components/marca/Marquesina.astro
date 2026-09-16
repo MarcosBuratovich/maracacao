@@ -10,14 +10,17 @@ interface Props {
   dur?: string
   /** Rotación del conjunto en grados (el hero usa -3). */
   rotacion?: number
+  /** Ruta del campo del `aria`, «documento:ruta». */
+  campoAria?: string
 }
-const { aria, dur = '34s', rotacion = 0 } = Astro.props
+const { aria, dur = '34s', rotacion = 0, campoAria } = Astro.props
 ---
 <div
   class="marquesina"
   role={aria ? 'img' : undefined}
   aria-label={aria}
   style={rotacion ? `transform:rotate(${rotacion}deg)` : undefined}
+  data-campo-attr={campoAria && `aria-label:${campoAria}`}
 >
   <div class="marquesina-pista" style={`--marquesina-dur:${dur}`}>
     <div class="tramo"><slot /></div>

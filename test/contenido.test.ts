@@ -2353,13 +2353,14 @@ describe('los candados del sistema de contenido', () => {
 })
 
 describe('los textos que el script pinta en runtime', () => {
-  it('arma el objeto con los seis textos, sacados del contenido', () => {
+  it('arma el objeto con los siete textos, sacados del contenido', () => {
     const t = textosUi(fixture.marca as never)
     expect(Object.keys(t).sort()).toEqual([
-      'copiado', 'enviando', 'envolturaAltPrefijo', 'ilustracionAltPrefijo', 'navAbrir', 'navCerrar',
+      'copiado', 'enviando', 'envolturaAltPrefijo', 'ilustracionAltPrefijo', 'navAbrir', 'navCerrar', 'visorAlt',
     ])
     expect(t.copiado).toBe(fixture.marca.contacto.copiado)
     expect(t.navCerrar).toBe(fixture.marca.nav.cerrar)
+    expect(t.visorAlt).toBe(fixture.marca.anaquel.visorAlt)
   })
 
   it('truena si una ruta declarada no da un texto', () => {

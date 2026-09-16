@@ -207,6 +207,18 @@ export const camposDePaginas = {
         ayuda: 'El encabezado de la cuarta columna del pie.',
         maxCaracteres: 20,
       }),
+      // Vive adentro de un `aria-label`, no en un nodo de texto: sin nada
+      // geométrico que medir, así que va con sección accesibilidad y
+      // `falla: ['ninguno']`. Estaba escrito a mano en index.astro hasta la
+      // fase 2 Parte B.
+      mapaAria: texto({
+        ...enAccesibilidad,
+        etiqueta: 'Nombre del mapa del sitio',
+        ayuda: 'No se ve en la página: es el nombre que escuchan las personas que navegan con lector de pantalla cuando llegan a las columnas del pie.',
+        maxCaracteres: 40,
+        enAtributo: 'aria-label',
+        falla: ['ninguno'],
+      }),
       productos: lista({
         ...enPie,
         etiqueta: 'Enlaces de productos',

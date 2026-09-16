@@ -140,6 +140,7 @@ const RESPALDO_TEXTOS_UI: Record<ClaveTextoUi, string> = {
   enviando: 'Enviando',
   envolturaAltPrefijo: 'Envoltura de',
   ilustracionAltPrefijo: 'Ilustración de la envoltura de',
+  visorAlt: 'La barra en tres dimensiones; arrastra para girarla',
 }
 
 const textosCrudos = document.getElementById('textos-ui')?.textContent
@@ -354,7 +355,7 @@ if (datos && anaquel) {
         if (!entrada.isIntersecting) return
         observador3d.disconnect()
         try {
-          const aplica = await montarBarra3D(visor, 'La barra en tres dimensiones; arrastra para girarla')
+          const aplica = await montarBarra3D(visor, textos.visorAlt)
           aplica(slugActual)
           visorElige = aplica
         } catch {

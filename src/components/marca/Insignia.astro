@@ -1,10 +1,14 @@
 ---
 // Insignia pequeña (Badge del canvas). El tono amarillo lleva texto en
 // rojo hondo (7.55 AAA) — el rojo de acento sobre amarillo falla AA.
-interface Props { tono?: 'rojo' | 'amarillo' | 'cacao' }
-const { tono = 'rojo' } = Astro.props
+interface Props {
+  tono?: 'rojo' | 'amarillo' | 'cacao'
+  /** Ruta del campo, «documento:ruta», para que el panel sepa qué texto es este. */
+  campo?: string
+}
+const { tono = 'rojo', campo } = Astro.props
 ---
-<span class:list={['insignia', tono]}><slot /></span>
+<span class:list={['insignia', tono]} data-campo={campo}><slot /></span>
 
 <style>
   .insignia {

@@ -191,3 +191,60 @@ concretos — por eso quedan QUEDA con nota, no listados assert por assert.
   `scripts/captura-html.ts`, la carpeta de fixtures y la línea `@source not` de
   `global.css`— o sacarlo del camino de Vercel. No puede seguir ahí el día que
   la clienta entre al panel.
+
+## Actualización 2026-09-15 — Fase 2, Parte B, Tarea 14 (cierre)
+
+- **BORRADO, como estaba prometido arriba.** El commit «feat: la biyección
+  campo ↔ HTML está completa, y el verificador se retira» borra
+  `test/html-normalizado.test.ts`, `test/lib/html-normalizado.ts`,
+  `scripts/captura-html.ts`, `test/fixtures/html-antes-fase-2/`, el script
+  `captura:html` de `package.json` y la línea `@source not` (con su
+  comentario) de `global.css`. Las catorce tareas de la Parte B pasaron por
+  él en verde sin recapturar ni una vez; su reemplazo es el medidor
+  diferencial de la fase 4 — hasta que exista, lo que protege la visual son
+  los topes de caracteres del esquema, puestos desde la fase 1.
+
+## Actualización 2026-09-15 — revisión final de `panel-fase-2-parte-b` (fix)
+
+- **`test/panel.test.ts` entra a esta tabla.** No congela un VALOR de
+  contenido —eso lo dejó BORRADO la fila de arriba, a propósito—, congela
+  la FORMA de la biyección campo ↔ HTML (spec §3.1), y es lo que reemplazó
+  de verdad al verificador retirado arriba para SU clase de regresión: «el
+  nodo marcado dejó de mostrar lo que el campo dice». Contra las tres
+  páginas construidas (`dist/index.html`, `dist/404.html`,
+  `dist/fichas-tecnicas/index.html`) mide tres cosas: **(a)** que todo
+  campo editable tenga al menos un nodo en ALGUNA de las tres —no por
+  página: un campo se da por marcado si aparece en cualquiera de las
+  páginas donde vive, porque desde ahí lo puede editar la clienta—;
+  **(b)** que todo `data-campo`/`data-campo-attr`/`data-campo-alterno` del
+  HTML apunte a un campo que existe en el esquema y resuelve a texto o
+  número; y **(c)** —agregada en esta revisión (hallazgo I-1)— que el
+  nodo muestre el valor CRUDO del campo, salvo que la plantilla lo
+  transforme a propósito (lista `TRANSFORMADOS` del propio archivo, D5).
+  (c) es la que de verdad reemplaza al verificador para esta clase de
+  regresión: donde el verificador comparaba contra una CAPTURA byte a
+  byte y se ponía rojo con cualquier copy nuevo, (c) compara contra el
+  CONTENIDO de hoy, así que una edición legítima de la clienta no lo toca.
+- **(b) puede ponerse rojo con una edición legítima, y hay que saber
+  leerlo.** Si la clienta vacía un campo OPCIONAL (deja en `null` un
+  precio, por ejemplo) y el nodo de ESE campo está marcado SIN
+  condición —no adentro de un `if`/ternario que lo salte cuando el valor
+  falta—, la plantilla lo sigue renderizando, pero ahora con un valor que
+  ya no resuelve a texto ni a número, y (b) lo rechaza con «no resuelve a
+  un texto ni a un número». No es un bug de (b): es que ese nodo tenía que
+  nacer CONDICIONADO al valor desde el principio. `sitio:negocios.tabs.0.precio`
+  en `src/pages/index.astro` es el patrón a copiar —`i === 0 ? <span
+  data-campo="…">{precioMXN(t.precio)}</span> : precioMXN(t.precio)}`,
+  adentro de la rama que ya exige `t.precio != null`— y mientras el valor
+  falte, la ruta vive en `SIN_NODO`, no en el HTML.
+- **`SIN_NODO` bajó de seis a CINCO excepciones en esta revisión**
+  (hallazgo I-3): `sabores:gotas[].precio`; las tres del JSON-LD
+  (`sitio:contacto.direccionPostal.{localidad,estado,codigoPostal}`); y
+  `sitio:negocios.tabs.0.precio`. Cada una vive en el propio
+  `test/panel.test.ts`, con su razón en el comentario de al lado — no se
+  repite acá para no tener dos listas que se puedan desincronizar.
+  `sitio:contacto.formulario.asuntoNegocio` salió de la lista: `data-campo-attr`
+  ahora acepta más de una referencia separada por espacio en el mismo
+  atributo, así que el `<form>` de contacto marca `asuntoPersonal` Y
+  `asuntoNegocio` a la vez sin competir por el único atributo HTML que
+  tenía antes.
