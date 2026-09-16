@@ -7,6 +7,7 @@
 import { describe, it, expect } from 'vitest'
 import { cliente } from '../src/servidor/github'
 import { publica } from '../src/servidor/publicar'
+import { frase, type Cambio } from '../src/contenido/diff'
 import { fetchFalso } from './lib/github-falso'
 
 describe('publicar', () => {
@@ -98,6 +99,32 @@ describe('publicar', () => {
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.codigo).toBe(502)
     expect(pedidos.some((p) => p.metodo === 'PATCH')).toBe(false)
+  })
+
+  // E5: «el asunto ES el resumen que la clienta vio antes de publicar, y
+  // sale de diff.ts». Con `cambios` reales (no el genérico de los tests de
+  // arriba, que nunca lo pasan), el asunto del commit tiene que ser
+  // exactamente lo que frase() arma para ese mismo `Cambio[]` — la misma
+  // frase que la fase 6 va a mostrarle a la clienta antes de que apriete
+  // publicar.
+  it('el asunto del commit es el que arma frase() con los cambios reales (E5)', async () => {
+    const { f, pedidos } = fetchFalso([
+      { cuerpo: { object: { sha: 'main' } } }, { cuerpo: { sha: 'c', tree: { sha: 'a' } } },
+      { cuerpo: { sha: 'b' } }, { cuerpo: { sha: 'a2' } }, { cuerpo: { sha: 'c2' } }, { cuerpo: {} },
+    ])
+    const cambios: Cambio[] = [
+      { campo: 'anaquel.titulo', etiqueta: 'Título del anaquel', antes: 'Antes', despues: 'Elegí tu barra', tipo: 'cambio' },
+    ]
+    const esperado = frase(cambios)
+    const r = await publica(cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f }), {
+      archivos: [{ ruta: 'src/contenido/datos/sitio.json', contenido: '{}' }],
+      autor: 'clienta@ejemplo.mx',
+      cambios,
+    })
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.resumen).toBe(esperado)
+    const commit = pedidos[4].cuerpo as { message: string }
+    expect(commit.message.startsWith(esperado)).toBe(true)
   })
 
   // Ruling 6 (controller, más allá del brief): si el asunto que arma

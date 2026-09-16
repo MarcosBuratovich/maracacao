@@ -93,8 +93,28 @@ function bytesDelCuerpo(archivos: readonly Archivo[]): number {
   return archivos.reduce((total, a) => total + Buffer.from(a.contenido, 'utf8').toString('base64').length, 0)
 }
 
-/** Separa el status HTTP (si lo hay) del mensaje de GitHub adentro de un `Error` de `github.ts`. */
-function analizaError(e: unknown): { status?: number; mensaje: string } {
+/**
+ * El `PATCH` de `mueveRef` que falla DESPUÉS de que el commit ya existe en
+ * GitHub: lo que queda es un commit huérfano, sin ningún ref que apunte a
+ * él. Se envuelve el error original con ese sha adentro —en vez de perderlo
+ * al burbujear— para que el log de Marcos (E7: «todo, incluido el sha»)
+ * pueda nombrar exactamente qué objeto quedó colgado.
+ */
+class FalloAlMoverRef extends Error {
+  constructor(
+    readonly original: unknown,
+    readonly shaDelCommit: string,
+  ) {
+    super(original instanceof Error ? original.message : String(original))
+  }
+}
+
+/** Separa el status HTTP (si lo hay), el mensaje de GitHub y —si lo hay— el sha del commit huérfano. */
+function analizaError(e: unknown): { status?: number; mensaje: string; sha?: string } {
+  if (e instanceof FalloAlMoverRef) {
+    const { status, mensaje } = analizaError(e.original)
+    return { status, mensaje, sha: e.shaDelCommit }
+  }
   if (e instanceof Error) {
     const m = /^GitHub respondió (\d+): ([\s\S]*)$/.exec(e.message)
     if (m) return { status: Number(m[1]), mensaje: m[2] }
@@ -134,7 +154,14 @@ async function intento(gh: ReturnType<typeof cliente>, archivos: readonly Archiv
   const arbol = await gh.creaArbol(padre.tree, entradas)
 
   const shaDelCommit = await gh.creaCommit({ mensaje, arbol, padre: padre.sha, autor: AUTOR_PANEL })
-  await gh.mueveRef(REF, shaDelCommit, false)
+  try {
+    await gh.mueveRef(REF, shaDelCommit, false)
+  } catch (e) {
+    // El commit ya quedó escrito en GitHub cuando esto revienta: se
+    // envuelve el error con su sha para que el log (más abajo, en
+    // `publica()`) pueda nombrar el objeto huérfano.
+    throw new FalloAlMoverRef(e, shaDelCommit)
+  }
 
   return shaDelCommit
 }
@@ -181,30 +208,34 @@ export async function publica(gh: ReturnType<typeof cliente>, p: Publicacion): P
     } catch (segundoError) {
       if (!esConflictoDeRef(segundoError)) return traduceError(segundoError, p)
 
-      // Log para Marcos (E7): acá sí van el status, el mensaje de GitHub y
-      // qué se estaba publicando. Lo que sigue, en cambio, no lleva nada
-      // de eso — la clienta no sabe qué es un ref ni un fast-forward.
+      // Log para Marcos (E7): acá sí van el status, el mensaje de GitHub,
+      // el sha del commit que quedó huérfano y qué se estaba publicando.
+      // Lo que sigue, en cambio, no lleva nada de eso — la clienta no sabe
+      // qué es un ref, un fast-forward, ni qué commit quedó colgado.
+      const { status, mensaje: mensajeDeGitHub, sha } = analizaError(segundoError)
       console.error(
-        `publicar: el PATCH del ref chocó dos veces seguidas (autor: ${p.autor}, archivos: ${rutas.join(', ')}) — ${analizaError(segundoError).mensaje}`,
+        `publicar: el PATCH del ref chocó dos veces seguidas (autor: ${p.autor}, archivos: ${rutas.join(', ')}` +
+          `${sha ? `, commit huérfano: ${sha}` : ''}) — status ${status ?? '(sin status)'}: ${mensajeDeGitHub}`,
       )
       return {
         ok: false,
         codigo: 409,
-        problema: 'Marcos cambió algo del sitio mientras editabas: volvé a intentar la publicación.',
+        problema: 'Marcos cambió algo del sitio mientras editabas: vuelve a intentar la publicación.',
       }
     }
   }
 }
 
-/** La otra cara de un error de GitHub (E7): al log, todo; a la clienta, nada técnico. */
+/** La otra cara de un error de GitHub (E7): al log, todo —status, mensaje y sha si lo hay—; a la clienta, nada técnico. */
 function traduceError(e: unknown, p: Publicacion): Resultado {
-  const { status, mensaje } = analizaError(e)
+  const { status, mensaje, sha } = analizaError(e)
   console.error(
-    `publicar: GitHub respondió con un error al publicar (autor: ${p.autor}, archivos: ${p.archivos.map((a) => a.ruta).join(', ')}) — status ${status ?? '(sin status)'}: ${mensaje}`,
+    `publicar: GitHub respondió con un error al publicar (autor: ${p.autor}, archivos: ${p.archivos.map((a) => a.ruta).join(', ')}` +
+      `${sha ? `, commit huérfano: ${sha}` : ''}) — status ${status ?? '(sin status)'}: ${mensaje}`,
   )
   return {
     ok: false,
     codigo: 502,
-    problema: 'No pudimos publicar: hubo un problema para conectarnos con el sitio. Probá de nuevo en unos minutos.',
+    problema: 'No pudimos publicar: hubo un problema para conectarnos con el sitio. Prueba de nuevo en unos minutos.',
   }
 }
