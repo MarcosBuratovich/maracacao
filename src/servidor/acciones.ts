@@ -372,8 +372,8 @@ const PROBLEMA_INESPERADO = 'Algo salió mal de nuestro lado. Intenta de nuevo e
 
 /**
  * El punto de entrada único del panel. Atrapa cualquier excepción que se
- * escape de las tres acciones —un `throw` de `conteosDe()` por un dato mal
- * formado, por ejemplo— y la convierte en un 500 sin jerga para la
+ * escape de las tres acciones —un JSON del repo que no parsea, un error
+ * raro del cliente de GitHub— y la convierte en un 500 sin jerga para la
  * clienta; el detalle completo va a `console.error`, para Marcos (E7).
  */
 export async function maneja(accion: string, pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
