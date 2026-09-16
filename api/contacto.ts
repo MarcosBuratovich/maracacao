@@ -18,6 +18,8 @@
  *      token de Cloudflare.
  */
 
+import { origenPermitido } from '../src/servidor/origen'
+
 interface Pedido {
   method?: string
   headers: Record<string, string | string[] | undefined>
@@ -28,13 +30,6 @@ interface Respuesta {
   json(cuerpo: unknown): void
   setHeader(nombre: string, valor: string): void
 }
-
-const ORIGENES_PERMITIDOS = [
-  'https://maracacao.mx',
-  'https://www.maracacao.mx',
-  'http://localhost:4321',
-  'http://localhost:4322',
-]
 
 const esTexto = (v: unknown): v is string => typeof v === 'string'
 
@@ -51,9 +46,7 @@ export default async function handler(req: Pedido, res: Respuesta) {
   }
 
   const origen = String(req.headers.origin ?? '')
-  const origenValido =
-    ORIGENES_PERMITIDOS.includes(origen) || /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origen)
-  if (!origenValido) return res.status(403).json({ error: 'Origen no permitido' })
+  if (!origenPermitido(origen)) return res.status(403).json({ error: 'Origen no permitido' })
 
   const b = (req.body ?? {}) as Record<string, unknown>
   const nombre = esTexto(b.nombre) ? b.nombre.trim().slice(0, 120) : ''
