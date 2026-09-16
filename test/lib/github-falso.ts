@@ -7,11 +7,26 @@
  * Vive en test/lib/ y no en src/ por la misma regla que campos-en-html.ts:
  * hoy lo usa solo la suite.
  */
+/**
+ * [M-11] Antes, un pedido de más repetía la ÚLTIMA respuesta programada
+ * para siempre — así que un test que scriptea de menos (por ejemplo,
+ * porque el código bajo prueba empezó a llamar a `fetch` una vez más de lo
+ * que el test esperaba) podía pasar por casualidad, con la última
+ * respuesta sirviendo para un pedido que nadie planeó. Ahora tira: un test
+ * que pide más respuestas de las que programó falla ruidoso, en vez de
+ * pasar en silencio por la razón equivocada.
+ */
 export function fetchFalso(respuestas: Array<{ status?: number; cuerpo: unknown }>) {
   const pedidos: Array<{ url: string; metodo: string; cuerpo: unknown; cabeceras: Record<string, string> }> = []
   let i = 0
   const f = async (url: string | URL, init?: RequestInit) => {
-    const r = respuestas[Math.min(i++, respuestas.length - 1)]
+    if (i >= respuestas.length) {
+      throw new Error(
+        `fetchFalso(): se pidió una respuesta más de las ${respuestas.length} programadas ` +
+          `(pedido #${i + 1}, ${init?.method ?? 'GET'} ${String(url)}) — el test scripteó de menos.`,
+      )
+    }
+    const r = respuestas[i++]
     pedidos.push({
       url: String(url),
       metodo: init?.method ?? 'GET',
