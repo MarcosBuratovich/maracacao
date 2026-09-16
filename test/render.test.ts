@@ -6,7 +6,16 @@ import { Resvg } from '@resvg/resvg-js'
 const SALIDA = 'test/tmp/ejemplo.png'
 afterAll(() => rmSync('test/tmp', { recursive: true, force: true }))
 
-describe('render-svg', () => {
+/*
+ * Cada test de acá arranca un `node` aparte que carga @resvg, que es un
+ * binario nativo. En esta máquina son ~1.8 s los trece juntos; en el
+ * contenedor de build de Vercel —cuatro núcleos compartidos y disco frío— el
+ * PRIMERO solo pagó 5.2 s de arranque y se pasó del tope de 5 s de vitest,
+ * tumbando el deploy del 2026-09-16 con los otros 907 tests en verde. El tope
+ * de acá es de arranque, no de trabajo: si alguno tarda 30 s hay algo roto de
+ * verdad.
+ */
+describe('render-svg', { timeout: 30_000 }, () => {
   it('rasteriza un SVG a PNG', () => {
     execFileSync('node', ['scripts/render-svg.mjs', 'test/fixtures/ejemplo.svg', SALIDA, '--ancho', '200'])
     expect(existsSync(SALIDA)).toBe(true)
