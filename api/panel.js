@@ -7,8 +7,17 @@ var __export = (target, all) => {
 
 // src/servidor/sesion.ts
 import { scryptSync, randomBytes, timingSafeEqual, createHmac } from "node:crypto";
+var SCRYPT_N = 16384;
+var SCRYPT_R = 8;
+var SCRYPT_P = 5;
+var LARGO_SAL = 16;
+var LARGO_HASH = 64;
 var MAXMEM = 64 * 1024 * 1024;
 var LARGO_MIN_SECRETO = 32;
+function hashDeClave(clave, sal = randomBytes(LARGO_SAL)) {
+  const hash2 = scryptSync(clave, sal, LARGO_HASH, { N: SCRYPT_N, r: SCRYPT_R, p: SCRYPT_P, maxmem: MAXMEM });
+  return `scrypt$${SCRYPT_N}$${SCRYPT_R}$${SCRYPT_P}$${sal.toString("base64")}$${hash2.toString("base64")}`;
+}
 function claveCorrecta(clave, guardado) {
   try {
     const partes = guardado.split("$");
@@ -17759,6 +17768,7 @@ function correoEnLista(correo2, lista2) {
   if (!lista2) return false;
   return lista2.split(",").map((c) => c.trim().toLowerCase()).includes(correo2.trim().toLowerCase());
 }
+var HASH_SENUELO = hashDeClave("se\xF1uelo \u2014 nunca es la contrase\xF1a de nadie, existe solo para parejar el reloj");
 function entrar(pedido, contexto) {
   const cuerpo = pedido.cuerpo ?? {};
   const correo2 = typeof cuerpo.correo === "string" ? cuerpo.correo.trim() : "";
@@ -17772,7 +17782,9 @@ function entrar(pedido, contexto) {
     return error51(503, PROBLEMA_INESPERADO);
   }
   const correoOk = correoEnLista(correo2, env.PANEL_CORREOS);
-  const claveOk = correoOk && claveCorrecta(clave, env.PANEL_CLAVE_HASH ?? "");
+  const hashContraElQueComparar = correoOk ? env.PANEL_CLAVE_HASH ?? "" : HASH_SENUELO;
+  const claveEsLaDelHash = claveCorrecta(clave, hashContraElQueComparar);
+  const claveOk = correoOk && claveEsLaDelHash;
   if (!claveOk) return error51(401, PROBLEMA_ENTRAR);
   const dias = cuerpo.recuerdame === true ? DIAS_SESION_LARGA : DIAS_SESION_CORTA;
   const dispositivo = typeof cuerpo.dispositivo === "string" ? cuerpo.dispositivo : "sin identificar";
@@ -17798,6 +17810,7 @@ async function publicarAccion(pedido, contexto) {
   }
   const sesion = verificaSesion(pedido.cookie, env.PANEL_SECRETO, contexto.ahora());
   if (!sesion) return error51(401, PROBLEMA_SESION);
+  if (!correoEnLista(sesion.correo, env.PANEL_CORREOS)) return error51(401, PROBLEMA_SESION);
   const cuerpo = pedido.cuerpo ?? {};
   const documentos = comoDocumentos(cuerpo.documentos);
   const ids = Object.keys(documentos);
@@ -17863,10 +17876,14 @@ var VARIABLES_REQUERIDAS = [
   "GITHUB_DUENIO",
   "GITHUB_REPO"
 ];
+var PROBLEMA_SALUD_OMITIDA = "Las variables est\xE1n, pero no revisamos la conexi\xF3n con GitHub: hubo demasiados pedidos seguidos. Intenta de nuevo en unos minutos.";
 async function salud(_pedido, contexto) {
   const faltan = VARIABLES_REQUERIDAS.filter((v) => !contexto.env[v]);
   if (faltan.length > 0) {
     return { status: 503, cuerpo: { ok: false, faltan, github: null } };
+  }
+  if (!intentoPermitido(contexto.ip, contexto.ahora())) {
+    return { status: 200, cuerpo: { ok: true, faltan: [], github: null, problema: PROBLEMA_SALUD_OMITIDA } };
   }
   const gh = cliente({
     token: contexto.env.PANEL_GITHUB_TOKEN,

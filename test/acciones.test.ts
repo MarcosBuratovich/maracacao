@@ -101,6 +101,47 @@ describe('entrar', () => {
     expect(r.status).toBe(429)
     expect(JSON.stringify(r.cuerpo)).not.toMatch(/correo|contraseña|clave|usuario|existe/i)
   })
+
+  // I-3: `correoOk && claveCorrecta(...)` cortaba camino apenas `correoOk`
+  // daba falso, así que un correo no listado nunca corría el scrypt caro
+  // de `claveCorrecta` — medido en la revisión: ~107 ms con un correo
+  // listado contra ~0.03 ms con uno no listado, una diferencia visible
+  // desde afuera con un solo pedido cronometrado. El arreglo hace que
+  // `claveCorrecta` corra SIEMPRE, contra un hash señuelo cuando el
+  // correo no está en la lista.
+  //
+  // Elegimos medir tiempo (y no espiar la llamada) porque un experimento
+  // con `vi.spyOn` sobre `claveCorrecta` importado en `acciones.ts` NO
+  // intercepta la llamada bajo este bundler de tests (Vite/Vitest liga el
+  // import en el momento de transformar, no por una propiedad del módulo
+  // que se pueda parchear) — se comprobó antes de escribir este test. El
+  // tiempo es la señal disponible, así que se afirma un PISO absoluto muy
+  // por debajo de lo que tarda un scrypt real (~100 ms, ver el comentario
+  // de MAXMEM en sesion.ts) pero muy por encima del ~0.03 ms del camino
+  // viejo (sin scrypt): más estable en CI que comparar una RAZÓN exacta
+  // entre dos mediciones, que la carga de la máquina puede mover.
+  it('I-3: claveCorrecta corre —y tarda lo mismo— con un correo listado que con uno que no lo está', async () => {
+    const PISO_MS = 15
+
+    const t0 = performance.now()
+    await maneja(
+      'entrar',
+      { cuerpo: { clave: 'una clave mala cualquiera', correo: 'clienta@ejemplo.mx' }, cookie: '' },
+      { ...contextoBase(fetchQueNoSeUsa()), ip: `i3-listado-${Math.random()}` },
+    )
+    const duracionListado = performance.now() - t0
+
+    const t1 = performance.now()
+    await maneja(
+      'entrar',
+      { cuerpo: { clave: 'una clave mala cualquiera', correo: 'nunca-estuvo-en-la-lista@ajeno.mx' }, cookie: '' },
+      { ...contextoBase(fetchQueNoSeUsa()), ip: `i3-no-listado-${Math.random()}` },
+    )
+    const duracionNoListado = performance.now() - t1
+
+    expect(duracionListado).toBeGreaterThan(PISO_MS)
+    expect(duracionNoListado).toBeGreaterThan(PISO_MS)
+  })
 })
 
 describe('publicar', () => {
@@ -109,6 +150,26 @@ describe('publicar', () => {
     const r = await maneja('publicar', { cuerpo: { documentos: {} }, cookie: '' }, contextoBase(contando(usos)))
     expect(r.status).toBe(401)
     expect(usos.n).toBe(0)
+  })
+
+  // I-4: la cookie dura hasta un año (E3), pero `PANEL_CORREOS` solo se
+  // leía en `entrar`. Antes de este fix, sacarle el acceso a alguien no
+  // revocaba nada hasta que su cookie venciera sola —o hasta rotar
+  // PANEL_SECRETO, que de paso desloguea a todo el mundo—: esta cookie es
+  // válida de verdad (firmada con el SECRETO real), para un correo que
+  // contextoBase() ya no trae en PANEL_CORREOS (solo clienta@ejemplo.mx y
+  // marcos@ejemplo.mx), como si a esa dirección le hubieran quitado el
+  // acceso después de que ella ya había entrado.
+  it('I-4: una cookie válida deja de servir para publicar en cuanto su correo sale de PANEL_CORREOS', async () => {
+    const usos = { n: 0 }
+    const cookieDeAccesoRevocado = cookieValida('ex-colaboradora@ejemplo.mx')
+    const r = await maneja(
+      'publicar',
+      { cuerpo: { documentos: {} }, cookie: cookieDeAccesoRevocado },
+      contextoBase(contando(usos)),
+    )
+    expect(r.status).toBe(401)
+    expect(usos.n).toBe(0) // ni siquiera llega a tocar GitHub
   })
 
   it('con contenido inválido, 422 con el campo y sin tocar GitHub', async () => {
@@ -225,6 +286,47 @@ describe('salud', () => {
     expect(texto).toContain('PANEL_GITHUB_TOKEN')
     expect(texto).not.toContain('token')
     expect(texto).not.toContain(SECRETO)
+  })
+
+  // I-6: `salud` sin sesión y sin freno era un amplificador — cualquiera
+  // podía hacerle disparar un pedido AUTENTICADO de verdad a GitHub en
+  // cada `curl`, gastando la misma cuota horaria del PAT que necesita
+  // `publicar`. Estos dos tests prueban las DOS mitades del arreglo.
+  it('I-6: con el freno de esa IP ya gastado, no toca GitHub y avisa que la conexión no se revisó', async () => {
+    const usos = { n: 0 }
+    const ctx = { ...contextoBase(contando(usos)), ip: `i6-salud-freno-${Math.random()}` }
+
+    for (let i = 0; i < 5; i++) await maneja('salud', { cuerpo: {}, cookie: '' }, ctx)
+    expect(usos.n).toBe(5) // los cinco primeros sí tocaron GitHub
+
+    const r = await maneja('salud', { cuerpo: {}, cookie: '' }, ctx)
+
+    expect(usos.n).toBe(5) // el sexto no gastó un pedido más del PAT
+    expect(r.status).toBe(200)
+    const cuerpo = r.cuerpo as { ok: boolean; faltan: string[]; github: boolean | null; problema?: string }
+    expect(cuerpo.ok).toBe(true)
+    expect(cuerpo.faltan).toEqual([])
+    expect(cuerpo.github).toBeNull()
+    expect(cuerpo.problema).toMatch(/no revisamos la conexión/i)
+  })
+
+  it('I-6: la mitad de variables sigue abierta y anónima aunque el freno de esa IP ya esté gastado', async () => {
+    const ip = `i6-salud-vars-${Math.random()}`
+    // Gasta el freno con intentos de "entrar" fallidos, desde la MISMA IP
+    // — el freno es compartido por IP, no por acción.
+    for (let i = 0; i < 5; i++) {
+      await maneja('entrar', { cuerpo: { clave: 'mala', correo: 'clienta@ejemplo.mx' }, cookie: '' }, { ...contextoBase(fetchQueNoSeUsa()), ip })
+    }
+
+    const ctx = { ...contextoBase(fetchQueNoSeUsa()), ip }
+    delete (ctx.env as Record<string, string | undefined>).GITHUB_REPO
+    // fetchQueNoSeUsa() tiraría si esto llegara a intentar tocar GitHub:
+    // con una variable faltante, `salud` tiene que contestar ANTES de
+    // mirar el freno.
+    const r = await maneja('salud', { cuerpo: {}, cookie: '' }, ctx)
+
+    expect(r.status).toBe(503)
+    expect((r.cuerpo as { faltan: string[] }).faltan).toContain('GITHUB_REPO')
   })
 })
 

@@ -19,7 +19,7 @@
  * a agregar— contesta 404, nunca 500: así el panel puede preguntar por una
  * acción que todavía no existe sin que se le caiga la página.
  */
-import { claveCorrecta, firmaSesion, verificaSesion, cookieDeSesion, intentoPermitido, LARGO_MIN_SECRETO } from './sesion'
+import { claveCorrecta, hashDeClave, firmaSesion, verificaSesion, cookieDeSesion, intentoPermitido, LARGO_MIN_SECRETO } from './sesion'
 import { cliente } from './github'
 import { publica, type Archivo } from './publicar'
 import type { Cambio } from '../contenido/diff'
@@ -140,6 +140,24 @@ function correoEnLista(correo: string, lista: string | undefined): boolean {
 }
 
 /**
+ * [I-3] Un hash señuelo, derivado UNA sola vez cuando el módulo carga, con
+ * una contraseña que no es la de nadie y que nunca se usa para entrar a
+ * ningún lado. `entrar()` lo usa cuando el correo del pedido NO está en
+ * `PANEL_CORREOS`, para que `claveCorrecta()` —que corre scrypt de
+ * verdad— se llame igual de despacio esté o no el correo en la lista.
+ *
+ * Por qué hace falta: `correoOk && claveCorrecta(...)` corta camino apenas
+ * `correoOk` da falso, así que un correo que no está en la lista nunca
+ * llega a correr scrypt. Medido en esta rama: ~107 ms con un correo
+ * listado y contraseña mala (scrypt corrió) contra ~0.03 ms con un correo
+ * no listado (scrypt NI SE LLAMÓ) — una diferencia de ~3800 veces que
+ * cualquiera puede medir de afuera con un solo pedido, y que le contesta
+ * la pregunta «¿esta dirección tiene acceso?» con el reloj, sin que la
+ * respuesta HTTP diga una palabra.
+ */
+const HASH_SENUELO = hashDeClave('señuelo — nunca es la contraseña de nadie, existe solo para parejar el reloj')
+
+/**
  * La forma del cuerpo que espera `entrar`. `correo`/`clave` son el
  * contrato real (E2); `recuerdame`/`dispositivo` NO están fijados por
  * ningún spec todavía —la Fase 5 Parte B, la pantalla de verdad, no
@@ -171,10 +189,13 @@ interface CuerpoEntrar {
  *    clienta haciéndole creer que el problema es SU contraseña— y el log
  *    nombra la variable para Marcos.
  * 3. Recién con las dos anteriores pasadas, un Y de dos condiciones —el
- *    correo está en la lista, y la contraseña es correcta— que corta
- *    apenas falla una (si el correo no está, `claveCorrecta` ni se
- *    llama). Cualquiera de las dos que falle da el MISMO 401 con el
- *    MISMO texto: quien pregunta no se entera cuál de las dos fue.
+ *    correo está en la lista, y la contraseña es correcta— pero las DOS
+ *    mitades siempre corren scrypt (I-3): si el correo no está en la
+ *    lista, `claveCorrecta` igual se llama, contra `HASH_SENUELO` en vez
+ *    de contra el hash real, para que el tiempo de respuesta no delate
+ *    si esa dirección tiene acceso. Cualquiera de las dos que falle da
+ *    el MISMO 401 con el MISMO texto: quien pregunta no se entera cuál
+ *    de las dos fue.
  */
 function entrar(pedido: Pedido, contexto: Contexto): Respuesta {
   const cuerpo = (pedido.cuerpo ?? {}) as CuerpoEntrar
@@ -191,8 +212,15 @@ function entrar(pedido: Pedido, contexto: Contexto): Respuesta {
     return error(503, PROBLEMA_INESPERADO)
   }
 
+  // [I-3] `claveCorrecta` SIEMPRE se llama —como sentencia propia, no
+  // adentro de un `&&` que la salte— contra el hash real si el correo
+  // está en la lista, contra el señuelo si no. Recién DESPUÉS se combina
+  // con `correoOk`: así el tiempo que tarda `entrar` no depende de si esa
+  // dirección tiene acceso, solo de que scrypt corrió una vez.
   const correoOk = correoEnLista(correo, env.PANEL_CORREOS)
-  const claveOk = correoOk && claveCorrecta(clave, env.PANEL_CLAVE_HASH ?? '')
+  const hashContraElQueComparar = correoOk ? (env.PANEL_CLAVE_HASH ?? '') : HASH_SENUELO
+  const claveEsLaDelHash = claveCorrecta(clave, hashContraElQueComparar)
+  const claveOk = correoOk && claveEsLaDelHash
 
   if (!claveOk) return error(401, PROBLEMA_ENTRAR)
 
@@ -264,6 +292,15 @@ function comoDocumentos(v: unknown): Record<string, unknown> {
  * demasiado corto, 503 —nunca el 401 de sesión inválida, que le haría
  * creer a la clienta que tiene que volver a entrar cuando el problema es
  * nuestro— y el log nombra la variable.
+ *
+ * [I-4] La cookie firmada solo prueba que ALGUNA VEZ el correo estuvo en
+ * `PANEL_CORREOS` —dura hasta un año (E3)—, no que sigue estando HOY:
+ * `PANEL_CORREOS` se vuelve a leer acá, después de que `verificaSesion`
+ * confirma la firma, y si esa dirección ya no está en la lista de hoy, el
+ * mismo 401 de sesión inválida. Sin este chequeo, sacarle el acceso a
+ * alguien —la hermana, alguien que dejó de trabajar con la marca— no
+ * revocaba nada hasta que su cookie venciera sola, o hasta rotar
+ * `PANEL_SECRETO`, que de paso desloguea a todo el mundo.
  */
 async function publicarAccion(pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
   const env = contexto.env
@@ -274,6 +311,11 @@ async function publicarAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
 
   const sesion = verificaSesion(pedido.cookie, env.PANEL_SECRETO, contexto.ahora())
   if (!sesion) return error(401, PROBLEMA_SESION)
+
+  // [I-4] Re-lee PANEL_CORREOS en cada publicación: una cookie firmada
+  // hace un año, con un correo que YA NO está en la lista de hoy, no
+  // puede seguir publicando solo porque la firma es válida.
+  if (!correoEnLista(sesion.correo, env.PANEL_CORREOS)) return error(401, PROBLEMA_SESION)
 
   const cuerpo = (pedido.cuerpo ?? {}) as { documentos?: unknown }
   const documentos = comoDocumentos(cuerpo.documentos)
@@ -373,6 +415,14 @@ const VARIABLES_REQUERIDAS = [
   'GITHUB_REPO',
 ] as const
 
+// [I-6] Lo que dice la clienta (bueno, acá nadie la llama por sesión, así
+// que en rigor es lo que le contesta el panel a quien sea) cuando el
+// freno de intentos frenó el pedido a GitHub de `salud`. Las variables SÍ
+// están —por eso `ok: true`—; lo único que falta es la parte que le
+// cuesta cuota al PAT.
+const PROBLEMA_SALUD_OMITIDA =
+  'Las variables están, pero no revisamos la conexión con GitHub: hubo demasiados pedidos seguidos. Intenta de nuevo en unos minutos.'
+
 /**
  * `salud`: ¿están las variables?, ¿responde GitHub? (E8).
  *
@@ -382,6 +432,19 @@ const VARIABLES_REQUERIDAS = [
  * tener una. Lo único que expone son NOMBRES de variables ausentes y un
  * booleano de si GitHub contestó: nada que un atacante no aprenda ya con
  * un `curl` a la página pública (que el panel existe, en qué dominio).
+ *
+ * [I-6] Esa misma falta de sesión es lo que convierte a `salud` en un
+ * amplificador: sin freno, cualquiera sin login puede hacer que el panel
+ * dispare un pedido AUTENTICADO de verdad a GitHub (con el PAT) en cada
+ * `curl`, y GitHub cobra esos pedidos contra la misma cuota horaria que
+ * necesita `publicar` para funcionar — alguien sin ninguna credencial
+ * puede agotarla y romper la publicación de Marcos. La mitad de las
+ * variables queda TAL CUAL —abierta, anónima, sin freno— porque es
+ * justo la que hay que poder preguntar sin sesión el día que algo falta;
+ * pero el pedido de verdad a GitHub corre detrás del MISMO freno por IP
+ * que usa `entrar` (E4): si ya se gastaron los cinco pedidos de la
+ * ventana, se contesta con las variables (que están bien) y se avisa que
+ * la conexión no se revisó, en vez de gastar un pedido más del PAT.
  */
 async function salud(_pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
   const faltan = VARIABLES_REQUERIDAS.filter((v) => !contexto.env[v])
@@ -390,7 +453,13 @@ async function salud(_pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
     return { status: 503, cuerpo: { ok: false, faltan, github: null } }
   }
 
-  // Las seis están: falta ver si GitHub de verdad contesta con ellas.
+  // Las seis están: falta ver si GitHub de verdad contesta con ellas — y
+  // ESE paso es el que va detrás del freno, no el chequeo de variables de
+  // arriba.
+  if (!intentoPermitido(contexto.ip, contexto.ahora())) {
+    return { status: 200, cuerpo: { ok: true, faltan: [], github: null, problema: PROBLEMA_SALUD_OMITIDA } }
+  }
+
   const gh = cliente({
     token: contexto.env.PANEL_GITHUB_TOKEN!,
     duenio: contexto.env.GITHUB_DUENIO!,
