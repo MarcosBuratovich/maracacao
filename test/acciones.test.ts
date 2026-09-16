@@ -59,6 +59,41 @@ describe('entrar', () => {
     const r = await maneja('entrar', { cuerpo: { clave: CLAVE, correo: 'ajeno@ejemplo.mx' }, cookie: '' }, contextoBase(fetchQueNoSeUsa()))
     expect(r.status).toBe(401)
   })
+
+  // RULING T6-a: las tres combinaciones que fallan por credenciales —
+  // contraseña mala con correo bueno, correo ajeno con contraseña buena,
+  // correo ajeno con contraseña mala— tienen que dar la MISMA respuesta,
+  // no solo el mismo status. IP propia para no compartir el contador de
+  // intentos con los otros tests de este describe.
+  it('las tres formas de fallar por credenciales dan la misma respuesta, byte a byte', async () => {
+    const ctx = { ...contextoBase(fetchQueNoSeUsa()), ip: '10.10.10.10' }
+
+    const contrasenaMala = await maneja('entrar', { cuerpo: { clave: 'mala', correo: 'clienta@ejemplo.mx' }, cookie: '' }, ctx)
+    const correoAjenoConLaBuena = await maneja('entrar', { cuerpo: { clave: CLAVE, correo: 'ajeno@ejemplo.mx' }, cookie: '' }, ctx)
+    const correoAjenoConLaMala = await maneja('entrar', { cuerpo: { clave: 'mala', correo: 'ajeno@ejemplo.mx' }, cookie: '' }, ctx)
+
+    for (const r of [contrasenaMala, correoAjenoConLaBuena, correoAjenoConLaMala]) expect(r.status).toBe(401)
+
+    const [a, b, c] = [contrasenaMala, correoAjenoConLaBuena, correoAjenoConLaMala].map((r) => JSON.stringify(r.cuerpo))
+    expect(a).toBe(b)
+    expect(b).toBe(c)
+  })
+
+  // RULING T6-a: el freno de intentos es una respuesta DISTINTA del 401
+  // de credenciales — 429, y gana incluso cuando el sexto intento manda
+  // la contraseña correcta (si no, el 401 de las credenciales enmascara
+  // que el freno actuó).
+  it('el sexto intento seguido desde la misma IP es 429, aunque la contraseña sea la correcta', async () => {
+    const ctx = { ...contextoBase(fetchQueNoSeUsa()), ip: '9.9.9.9' }
+
+    for (let i = 0; i < 5; i++) {
+      await maneja('entrar', { cuerpo: { clave: 'mala', correo: 'clienta@ejemplo.mx' }, cookie: '' }, ctx)
+    }
+    const r = await maneja('entrar', { cuerpo: { clave: CLAVE, correo: 'clienta@ejemplo.mx' }, cookie: '' }, ctx)
+
+    expect(r.status).toBe(429)
+    expect(JSON.stringify(r.cuerpo)).not.toMatch(/correo|contraseña|clave|usuario|existe/i)
+  })
 })
 
 describe('publicar', () => {

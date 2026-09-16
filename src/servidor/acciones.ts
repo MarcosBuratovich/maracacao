@@ -85,11 +85,26 @@ const error = (status: number, problema: string, campo?: string): Respuesta => (
  * ---------------------------------------------------------------------
  */
 
-// Un solo texto para las tres formas de fallar (freno de intentos, correo
+// Un solo texto para las DOS formas de fallar por CREDENCIALES (correo
 // fuera de la lista, contraseña incorrecta): a quien intenta entrar sin
-// permiso no se le dice CUÁL de las tres fue. Nunca menciona «correo»,
+// permiso no se le dice CUÁL de las dos fue — así el login no sirve para
+// averiguar qué direcciones tienen acceso. Nunca menciona «correo»,
 // «usuario» ni «existe» — un test lo vigila letra por letra.
+//
+// [RULING T6-a, coordinador] el freno de intentos (E4) NO es una tercera
+// forma de fallar por credenciales: es una cosa distinta, con su propia
+// respuesta (429, más abajo). Antes las tres —freno, correo, clave— caían
+// acá adentro con el mismo texto; separarlas es justo lo que le permite a
+// la clienta ver «demasiados intentos» en vez de una sexta «contraseña
+// incorrecta» inexplicable.
 const PROBLEMA_ENTRAR = 'No se pudo entrar: revisa tus datos y vuelve a intentar.'
+
+// El freno de intentos SÍ se anuncia (a diferencia de las credenciales):
+// no delata si la dirección tiene acceso —el freno es por IP, no por
+// correo— y un atacante que mide el tiempo entre intentos ya se daría
+// cuenta de que existe, así que ocultarlo no protege nada y confunde a la
+// clienta de verdad.
+const PROBLEMA_DEMASIADOS_INTENTOS = 'Demasiados intentos. Espera 15 minutos y vuelve a probar.'
 
 /** Treinta días por defecto; un año si el cuerpo marca el aparato como propio (E3). */
 const DIAS_SESION_LARGA = 365
@@ -103,6 +118,14 @@ function correoEnLista(correo: string, lista: string | undefined): boolean {
     .includes(correo.trim().toLowerCase())
 }
 
+/**
+ * La forma del cuerpo que espera `entrar`. `correo`/`clave` son el
+ * contrato real (E2); `recuerdame`/`dispositivo` NO están fijados por
+ * ningún spec todavía —la Fase 5 Parte B, la pantalla de verdad, no
+ * existe— así que son una invención de ESTA tarea, no un contrato ya
+ * acordado con el front. Cuando se escriba la pantalla, confirmar o
+ * cambiar esta forma ahí, no acá.
+ */
 interface CuerpoEntrar {
   correo?: unknown
   clave?: unknown
@@ -113,23 +136,31 @@ interface CuerpoEntrar {
 }
 
 /**
- * `entrar`: contraseña → cookie (E2, E3).
+ * `entrar`: contraseña → cookie (E2, E3, E4).
  *
- * El orden es el que pide el spec, y es un Y de tres condiciones que se
- * evalúan de izquierda a derecha —cada una corta la siguiente si falla,
- * así el `scrypt` caro de `claveCorrecta` ni se corre cuando ya se sabe
- * que no va a entrar—: primero el freno de intentos por IP (E4, que
- * cuenta el intento ya esté permitido o no), después que el correo esté
- * en la lista, y recién al final la contraseña. Cualquiera de las tres
- * que falle termina en el MISMO 401.
+ * Dos capas separadas, con dos respuestas distintas (RULING T6-a):
+ *
+ * 1. El freno de intentos por IP (E4) corre PRIMERO y aparte. Si ya se
+ *    gastaron los cinco intentos de la ventana, 429 — y ni siquiera se
+ *    mira si el correo está en la lista o si la contraseña de ESTE
+ *    pedido era la correcta: así un atacante frenado no le hace correr
+ *    el `scrypt` caro de `claveCorrecta` al servidor en cada intento.
+ * 2. Recién con el freno pasado, un Y de dos condiciones —el correo está
+ *    en la lista, y la contraseña es correcta— que corta apenas falla
+ *    una (si el correo no está, `claveCorrecta` ni se llama). Cualquiera
+ *    de las dos que falle da el MISMO 401 con el MISMO texto: quien
+ *    pregunta no se entera cuál de las dos fue.
  */
 function entrar(pedido: Pedido, contexto: Contexto): Respuesta {
   const cuerpo = (pedido.cuerpo ?? {}) as CuerpoEntrar
   const correo = typeof cuerpo.correo === 'string' ? cuerpo.correo.trim() : ''
   const clave = typeof cuerpo.clave === 'string' ? cuerpo.clave : ''
 
-  const permitido = intentoPermitido(contexto.ip, contexto.ahora())
-  const correoOk = permitido && correoEnLista(correo, contexto.env.PANEL_CORREOS)
+  if (!intentoPermitido(contexto.ip, contexto.ahora())) {
+    return error(429, PROBLEMA_DEMASIADOS_INTENTOS)
+  }
+
+  const correoOk = correoEnLista(correo, contexto.env.PANEL_CORREOS)
   const claveOk = correoOk && claveCorrecta(clave, contexto.env.PANEL_CLAVE_HASH ?? '')
 
   if (!claveOk) return error(401, PROBLEMA_ENTRAR)

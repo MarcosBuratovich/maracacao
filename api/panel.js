@@ -19416,6 +19416,7 @@ var error51 = (status, problema, campo) => ({
   cuerpo: campo === void 0 ? { ok: false, problema } : { ok: false, problema, campo }
 });
 var PROBLEMA_ENTRAR = "No se pudo entrar: revisa tus datos y vuelve a intentar.";
+var PROBLEMA_DEMASIADOS_INTENTOS = "Demasiados intentos. Espera 15 minutos y vuelve a probar.";
 var DIAS_SESION_LARGA = 365;
 var DIAS_SESION_CORTA = 30;
 function correoEnLista(correo2, lista2) {
@@ -19426,8 +19427,10 @@ function entrar(pedido, contexto) {
   const cuerpo = pedido.cuerpo ?? {};
   const correo2 = typeof cuerpo.correo === "string" ? cuerpo.correo.trim() : "";
   const clave = typeof cuerpo.clave === "string" ? cuerpo.clave : "";
-  const permitido = intentoPermitido(contexto.ip, contexto.ahora());
-  const correoOk = permitido && correoEnLista(correo2, contexto.env.PANEL_CORREOS);
+  if (!intentoPermitido(contexto.ip, contexto.ahora())) {
+    return error51(429, PROBLEMA_DEMASIADOS_INTENTOS);
+  }
+  const correoOk = correoEnLista(correo2, contexto.env.PANEL_CORREOS);
   const claveOk = correoOk && claveCorrecta(clave, contexto.env.PANEL_CLAVE_HASH ?? "");
   if (!claveOk) return error51(401, PROBLEMA_ENTRAR);
   const dias = cuerpo.recuerdame === true ? DIAS_SESION_LARGA : DIAS_SESION_CORTA;
