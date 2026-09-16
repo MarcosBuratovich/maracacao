@@ -5,22 +5,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { cliente } from '../src/servidor/github'
-
-function fetchFalso(respuestas: Array<{ status?: number; cuerpo: unknown }>) {
-  const pedidos: Array<{ url: string; metodo: string; cuerpo: unknown; cabeceras: Record<string, string> }> = []
-  let i = 0
-  const f = async (url: string | URL, init?: RequestInit) => {
-    const r = respuestas[Math.min(i++, respuestas.length - 1)]
-    pedidos.push({
-      url: String(url),
-      metodo: init?.method ?? 'GET',
-      cuerpo: init?.body ? JSON.parse(String(init.body)) : undefined,
-      cabeceras: (init?.headers ?? {}) as Record<string, string>,
-    })
-    return new Response(JSON.stringify(r.cuerpo), { status: r.status ?? 200 })
-  }
-  return { f: f as unknown as typeof globalThis.fetch, pedidos }
-}
+import { fetchFalso } from './lib/github-falso'
 
 const creds = (f: typeof globalThis.fetch) => ({
   token: 'token-de-prueba', duenio: 'MarcosBuratovich', repo: 'maracacao', fetch: f,
