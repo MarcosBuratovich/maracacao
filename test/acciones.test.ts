@@ -4,6 +4,7 @@
  * la capa que de verdad decide si algo entra al sitio.
  */
 import { describe, it, expect } from 'vitest'
+import { createHmac } from 'node:crypto'
 import { maneja } from '../src/servidor/acciones'
 import { hashDeClave, firmaSesion } from '../src/servidor/sesion'
 import { serializa } from '../src/contenido/carga'
@@ -11,7 +12,10 @@ import { esquemaSitio } from '../src/contenido/esquema/sitio'
 import { fetchFalso } from './lib/github-falso'
 import { marca } from '@/copy/sitio-marca'
 
-const SECRETO = 'secreto-de-prueba'
+// [C-1] 40 caracteres: por encima de LARGO_MIN_SECRETO (32), para que estos
+// tests ejerciten el camino normal. El propio candado de C-1 se prueba
+// aparte, con secretos deliberadamente cortos o ausentes.
+const SECRETO = 'secreto-de-prueba-no-es-el-de-produccion'
 const CLAVE = 'una contraseña larga de prueba'
 
 /** Un `fetch` que tira si alguien lo llama: para los caminos que no tienen que tocar GitHub. */
@@ -221,6 +225,68 @@ describe('salud', () => {
     expect(texto).toContain('PANEL_GITHUB_TOKEN')
     expect(texto).not.toContain('token')
     expect(texto).not.toContain(SECRETO)
+  })
+})
+
+// C-1: hoy, en producción, el token de GitHub está cargado y
+// PANEL_SECRETO no — la reviewer lo demostró forjando su propia cookie
+// firmada con la clave vacía que `contexto.env.PANEL_SECRETO ?? ''`
+// producía. Estos tests fijan que la ausencia (o un secreto demasiado
+// corto) falla CERRADO: 503 franco, nunca el 401 de credenciales (que
+// culparía a la contraseña de la clienta) ni el 500 genérico del
+// catch-all de `maneja()` (que no le avisa a Marcos cuál variable falta).
+describe('C-1: PANEL_SECRETO ausente o corto falla cerrado, nunca abierto', () => {
+  it('entrar: 503 si PANEL_SECRETO falta', async () => {
+    const ctx = contextoBase(fetchQueNoSeUsa())
+    delete (ctx.env as Record<string, string | undefined>).PANEL_SECRETO
+    const r = await maneja(
+      'entrar',
+      { cuerpo: { clave: CLAVE, correo: 'clienta@ejemplo.mx' }, cookie: '' },
+      { ...ctx, ip: `c1-entrar-ausente-${Math.random()}` },
+    )
+    expect(r.status).toBe(503)
+    expect(r.cookie).toBeUndefined()
+  })
+
+  it('entrar: 503 si PANEL_SECRETO mide menos de 32 caracteres', async () => {
+    const ctx = contextoBase(fetchQueNoSeUsa())
+    ;(ctx.env as Record<string, string>).PANEL_SECRETO = 'corto'
+    const r = await maneja(
+      'entrar',
+      { cuerpo: { clave: CLAVE, correo: 'clienta@ejemplo.mx' }, cookie: '' },
+      { ...ctx, ip: `c1-entrar-corto-${Math.random()}` },
+    )
+    expect(r.status).toBe(503)
+    expect(r.cookie).toBeUndefined()
+  })
+
+  it('publicar: 503 si PANEL_SECRETO falta — el ataque de verdad: una cookie forjada a mano con la clave vacía ya no pasa', async () => {
+    // Forjada exactamente como lo haría alguien que sabe que
+    // `PANEL_SECRETO` falta: firmar con la clave vacía, la MISMA que
+    // `verificaSesion` usaría si el código todavía hiciera `?? ''`. Antes
+    // de este fix, esta cookie pasaba `verificaSesion` sin problema.
+    const cuerpoCookie = Buffer.from(
+      JSON.stringify({ correo: 'atacante@ajeno.mx', vence: Date.now() + 365 * 86_400_000, dispositivo: 'x' }),
+    ).toString('base64url')
+    const firmaConClaveVacia = createHmac('sha256', '').update(cuerpoCookie).digest('base64url')
+    const cookieForjada = `${cuerpoCookie}.${firmaConClaveVacia}`
+
+    const usos = { n: 0 }
+    const ctx = contextoBase(contando(usos))
+    delete (ctx.env as Record<string, string | undefined>).PANEL_SECRETO
+
+    const r = await maneja('publicar', { cuerpo: { documentos: {} }, cookie: cookieForjada }, ctx)
+
+    expect(r.status).toBe(503)
+    expect(usos.n).toBe(0) // ni siquiera llega a tocar GitHub
+  })
+
+  it('salud: sigue funcionando cuando PANEL_SECRETO falta — es el día en que más hace falta que conteste', async () => {
+    const ctx = contextoBase(fetchQueNoSeUsa())
+    delete (ctx.env as Record<string, string | undefined>).PANEL_SECRETO
+    const r = await maneja('salud', { cuerpo: {}, cookie: '' }, { ...ctx, ip: `c1-salud-${Math.random()}` })
+    expect(r.status).toBe(503)
+    expect((r.cuerpo as { faltan: string[] }).faltan).toContain('PANEL_SECRETO')
   })
 })
 

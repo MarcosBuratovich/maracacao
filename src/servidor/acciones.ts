@@ -19,7 +19,7 @@
  * a agregar— contesta 404, nunca 500: así el panel puede preguntar por una
  * acción que todavía no existe sin que se le caiga la página.
  */
-import { claveCorrecta, firmaSesion, verificaSesion, cookieDeSesion, intentoPermitido } from './sesion'
+import { claveCorrecta, firmaSesion, verificaSesion, cookieDeSesion, intentoPermitido, LARGO_MIN_SECRETO } from './sesion'
 import { cliente } from './github'
 import { publica, type Archivo } from './publicar'
 import type { Cambio } from '../contenido/diff'
@@ -74,6 +74,31 @@ const error = (status: number, problema: string, campo?: string): Respuesta => (
   status,
   cuerpo: campo === undefined ? { ok: false, problema } : { ok: false, problema, campo },
 })
+
+// La misma frase para CUALQUIER falla de configuración que `entrar` o
+// `publicar` detecten antes de hacer nada (C-1: `PANEL_SECRETO` ausente o
+// corto) — nunca jerga, nunca el nombre de la variable (E7). Vive acá
+// arriba, no solo en el router de más abajo, porque estas dos acciones
+// también la usan y `maneja()` no es el único lugar que puede necesitar
+// avisar «esto no es culpa tuya, es nuestra».
+const PROBLEMA_INESPERADO = 'Algo salió mal de nuestro lado. Intenta de nuevo en unos minutos.'
+
+/**
+ * [C-1] ¿Hay un `PANEL_SECRETO` con el que de verdad se puede firmar o
+ * verificar una cookie? La ausencia total (`undefined`) y un valor
+ * cargado pero demasiado corto se tratan IGUAL —ninguno de los dos sirve—
+ * así que `entrar` y `publicar` frenan ACÁ, antes de intentar nada, en vez
+ * de dejar que `firmaSesion`/`verificaSesion` lo resuelvan más adentro:
+ * esas dos ya tienen su propio candado (tira una, devuelve `null` la
+ * otra), pero ese candado existe para el día en que ESTE chequeo se
+ * rompa, no para reemplazarlo. Devolver acá un 503 franco, con el nombre
+ * de la variable en el log, es lo que le dice a Marcos QUÉ falta en vez
+ * de dejar que la clienta vea un 401 de «contraseña incorrecta» que no
+ * tiene nada que ver con su contraseña.
+ */
+function secretoUtilizable(env: Entorno): env is Entorno & { PANEL_SECRETO: string } {
+  return typeof env.PANEL_SECRETO === 'string' && env.PANEL_SECRETO.length >= LARGO_MIN_SECRETO
+}
 
 /*
  * ---------------------------------------------------------------------
@@ -134,18 +159,22 @@ interface CuerpoEntrar {
 /**
  * `entrar`: contraseña → cookie (E2, E3, E4).
  *
- * Dos capas separadas, con dos respuestas distintas (RULING T6-a):
+ * Capas separadas, cada una con su propia respuesta (RULING T6-a, y C-1
+ * más abajo):
  *
  * 1. El freno de intentos por IP (E4) corre PRIMERO y aparte. Si ya se
  *    gastaron los cinco intentos de la ventana, 429 — y ni siquiera se
  *    mira si el correo está en la lista o si la contraseña de ESTE
- *    pedido era la correcta: así un atacante frenado no le hace correr
- *    el `scrypt` caro de `claveCorrecta` al servidor en cada intento.
- * 2. Recién con el freno pasado, un Y de dos condiciones —el correo está
- *    en la lista, y la contraseña es correcta— que corta apenas falla
- *    una (si el correo no está, `claveCorrecta` ni se llama). Cualquiera
- *    de las dos que falle da el MISMO 401 con el MISMO texto: quien
- *    pregunta no se entera cuál de las dos fue.
+ *    pedido era la correcta.
+ * 2. [C-1] `PANEL_SECRETO` tiene que servir para firmar de verdad. Si
+ *    falta o es demasiado corto, 503 —nunca un 401 que confunda a la
+ *    clienta haciéndole creer que el problema es SU contraseña— y el log
+ *    nombra la variable para Marcos.
+ * 3. Recién con las dos anteriores pasadas, un Y de dos condiciones —el
+ *    correo está en la lista, y la contraseña es correcta— que corta
+ *    apenas falla una (si el correo no está, `claveCorrecta` ni se
+ *    llama). Cualquiera de las dos que falle da el MISMO 401 con el
+ *    MISMO texto: quien pregunta no se entera cuál de las dos fue.
  */
 function entrar(pedido: Pedido, contexto: Contexto): Respuesta {
   const cuerpo = (pedido.cuerpo ?? {}) as CuerpoEntrar
@@ -156,8 +185,14 @@ function entrar(pedido: Pedido, contexto: Contexto): Respuesta {
     return error(429, PROBLEMA_DEMASIADOS_INTENTOS)
   }
 
-  const correoOk = correoEnLista(correo, contexto.env.PANEL_CORREOS)
-  const claveOk = correoOk && claveCorrecta(clave, contexto.env.PANEL_CLAVE_HASH ?? '')
+  const env = contexto.env
+  if (!secretoUtilizable(env)) {
+    console.error('entrar: PANEL_SECRETO falta o mide menos de 32 caracteres — no se puede firmar ninguna sesión.')
+    return error(503, PROBLEMA_INESPERADO)
+  }
+
+  const correoOk = correoEnLista(correo, env.PANEL_CORREOS)
+  const claveOk = correoOk && claveCorrecta(clave, env.PANEL_CLAVE_HASH ?? '')
 
   if (!claveOk) return error(401, PROBLEMA_ENTRAR)
 
@@ -165,7 +200,7 @@ function entrar(pedido: Pedido, contexto: Contexto): Respuesta {
   const dispositivo = typeof cuerpo.dispositivo === 'string' ? cuerpo.dispositivo : 'sin identificar'
   const vence = contexto.ahora() + dias * 86_400_000
 
-  const token = firmaSesion({ correo, vence, dispositivo }, contexto.env.PANEL_SECRETO ?? '')
+  const token = firmaSesion({ correo, vence, dispositivo }, env.PANEL_SECRETO)
   return ok({ ok: true }, cookieDeSesion(token, dias))
 }
 
@@ -224,9 +259,20 @@ function comoDocumentos(v: unknown): Record<string, unknown> {
  * escribir solo para calcularlos. Si algún día un aviso tiene que
  * bloquear o mostrarse en la respuesta, ESE es el momento de traer los
  * conteos de vuelta, con el caso real delante.
+ *
+ * [C-1] Antes de mirar la cookie siquiera: si `PANEL_SECRETO` falta o es
+ * demasiado corto, 503 —nunca el 401 de sesión inválida, que le haría
+ * creer a la clienta que tiene que volver a entrar cuando el problema es
+ * nuestro— y el log nombra la variable.
  */
 async function publicarAccion(pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
-  const sesion = verificaSesion(pedido.cookie, contexto.env.PANEL_SECRETO ?? '', contexto.ahora())
+  const env = contexto.env
+  if (!secretoUtilizable(env)) {
+    console.error('publicar: PANEL_SECRETO falta o mide menos de 32 caracteres — no se puede verificar ninguna sesión.')
+    return error(503, PROBLEMA_INESPERADO)
+  }
+
+  const sesion = verificaSesion(pedido.cookie, env.PANEL_SECRETO, contexto.ahora())
   if (!sesion) return error(401, PROBLEMA_SESION)
 
   const cuerpo = (pedido.cuerpo ?? {}) as { documentos?: unknown }
@@ -368,7 +414,8 @@ async function salud(_pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
  */
 
 const PROBLEMA_ACCION_INEXISTENTE = 'Esta acción todavía no existe.'
-const PROBLEMA_INESPERADO = 'Algo salió mal de nuestro lado. Intenta de nuevo en unos minutos.'
+// PROBLEMA_INESPERADO vive arriba de todo (antes de «entrar»): `entrar` y
+// `publicarAccion` también la usan para su 503 de C-1.
 
 /**
  * El punto de entrada único del panel. Atrapa cualquier excepción que se

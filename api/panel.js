@@ -8,6 +8,7 @@ var __export = (target, all) => {
 // src/servidor/sesion.ts
 import { scryptSync, randomBytes, timingSafeEqual, createHmac } from "node:crypto";
 var MAXMEM = 64 * 1024 * 1024;
+var LARGO_MIN_SECRETO = 32;
 function claveCorrecta(clave, guardado) {
   try {
     const partes = guardado.split("$");
@@ -28,11 +29,17 @@ function claveCorrecta(clave, guardado) {
   }
 }
 function firmaSesion(sesion, secreto) {
+  if (secreto.length < LARGO_MIN_SECRETO) {
+    throw new Error(
+      `firmaSesion(): PANEL_SECRETO mide menos de ${LARGO_MIN_SECRETO} caracteres \u2014 una clave as\xED de corta es, para HMAC, lo mismo que no tener firma.`
+    );
+  }
   const cuerpo = Buffer.from(JSON.stringify(sesion)).toString("base64url");
   const firma = createHmac("sha256", secreto).update(cuerpo).digest("base64url");
   return `${cuerpo}.${firma}`;
 }
 function verificaSesion(cookie, secreto, ahora = Date.now()) {
+  if (secreto.length < LARGO_MIN_SECRETO) return null;
   try {
     const punto = cookie.indexOf(".");
     if (punto <= 0 || punto === cookie.length - 1) return null;
@@ -17739,6 +17746,10 @@ var error51 = (status, problema, campo) => ({
   status,
   cuerpo: campo === void 0 ? { ok: false, problema } : { ok: false, problema, campo }
 });
+var PROBLEMA_INESPERADO = "Algo sali\xF3 mal de nuestro lado. Intenta de nuevo en unos minutos.";
+function secretoUtilizable(env) {
+  return typeof env.PANEL_SECRETO === "string" && env.PANEL_SECRETO.length >= LARGO_MIN_SECRETO;
+}
 var PROBLEMA_ENTRAR = "No se pudo entrar: revisa tus datos y vuelve a intentar.";
 var PROBLEMA_DEMASIADOS_INTENTOS = "Demasiados intentos. Espera 15 minutos y vuelve a probar.";
 var DIAS_SESION_LARGA = 365;
@@ -17754,13 +17765,18 @@ function entrar(pedido, contexto) {
   if (!intentoPermitido(contexto.ip, contexto.ahora())) {
     return error51(429, PROBLEMA_DEMASIADOS_INTENTOS);
   }
-  const correoOk = correoEnLista(correo2, contexto.env.PANEL_CORREOS);
-  const claveOk = correoOk && claveCorrecta(clave, contexto.env.PANEL_CLAVE_HASH ?? "");
+  const env = contexto.env;
+  if (!secretoUtilizable(env)) {
+    console.error("entrar: PANEL_SECRETO falta o mide menos de 32 caracteres \u2014 no se puede firmar ninguna sesi\xF3n.");
+    return error51(503, PROBLEMA_INESPERADO);
+  }
+  const correoOk = correoEnLista(correo2, env.PANEL_CORREOS);
+  const claveOk = correoOk && claveCorrecta(clave, env.PANEL_CLAVE_HASH ?? "");
   if (!claveOk) return error51(401, PROBLEMA_ENTRAR);
   const dias = cuerpo.recuerdame === true ? DIAS_SESION_LARGA : DIAS_SESION_CORTA;
   const dispositivo = typeof cuerpo.dispositivo === "string" ? cuerpo.dispositivo : "sin identificar";
   const vence = contexto.ahora() + dias * 864e5;
-  const token = firmaSesion({ correo: correo2, vence, dispositivo }, contexto.env.PANEL_SECRETO ?? "");
+  const token = firmaSesion({ correo: correo2, vence, dispositivo }, env.PANEL_SECRETO);
   return ok({ ok: true }, cookieDeSesion(token, dias));
 }
 var PROBLEMA_SESION = "Tu sesi\xF3n no es v\xE1lida: vuelve a entrar.";
@@ -17774,7 +17790,12 @@ function comoDocumentos(v) {
   return {};
 }
 async function publicarAccion(pedido, contexto) {
-  const sesion = verificaSesion(pedido.cookie, contexto.env.PANEL_SECRETO ?? "", contexto.ahora());
+  const env = contexto.env;
+  if (!secretoUtilizable(env)) {
+    console.error("publicar: PANEL_SECRETO falta o mide menos de 32 caracteres \u2014 no se puede verificar ninguna sesi\xF3n.");
+    return error51(503, PROBLEMA_INESPERADO);
+  }
+  const sesion = verificaSesion(pedido.cookie, env.PANEL_SECRETO, contexto.ahora());
   if (!sesion) return error51(401, PROBLEMA_SESION);
   const cuerpo = pedido.cuerpo ?? {};
   const documentos = comoDocumentos(cuerpo.documentos);
@@ -17861,7 +17882,6 @@ async function salud(_pedido, contexto) {
   }
 }
 var PROBLEMA_ACCION_INEXISTENTE = "Esta acci\xF3n todav\xEDa no existe.";
-var PROBLEMA_INESPERADO = "Algo sali\xF3 mal de nuestro lado. Intenta de nuevo en unos minutos.";
 async function maneja(accion, pedido, contexto) {
   try {
     switch (accion) {

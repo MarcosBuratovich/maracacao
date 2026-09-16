@@ -68,6 +68,26 @@ const LARGO_HASH = 64
 const MAXMEM = 64 * 1024 * 1024
 
 /**
+ * [C-1, revisión final] El largo mínimo que `PANEL_SECRETO` tiene que medir
+ * para que firmar o verificar una cookie tenga sentido. `createHmac` no
+ * exige ningún largo de clave — ni siquiera rechaza la cadena vacía— así
+ * que, para HMAC, una clave corta o ausente NO es «la clave real, nomás
+ * que débil»: es indistinguible de no tener firma en absoluto. Antes de
+ * este chequeo, `acciones.ts` llamaba a `firmaSesion`/`verificaSesion` con
+ * `contexto.env.PANEL_SECRETO ?? ''` cuando la variable faltaba en
+ * producción, y `createHmac('sha256', '')` firma y verifica igual de
+ * contento con la clave vacía — que cualquiera puede reproducir sin saber
+ * ningún secreto. Setenta y dos horas después de un deploy sin la
+ * variable, es la puerta de entrada la que queda firmando con una clave
+ * que el mundo entero conoce. 32 no blinda contra un secreto elegido a
+ * mano y débil —eso lo tiene que generar algo aleatorio, no este
+ * candado— pero SÍ descarta con certeza los dos casos que de verdad
+ * importan: la variable ausente (`undefined`, largo 0) y una clave
+ * puesta a mano corta «para probar» y olvidada así en producción.
+ */
+export const LARGO_MIN_SECRETO = 32
+
+/**
  * Hashea una contraseña con scrypt y una sal nueva (o la que se pase, para
  * tests). Formato guardado: `scrypt$N$r$p$<sal b64>$<hash b64>` — los
  * parámetros viajan adentro del string para que subirlos el día de mañana
@@ -111,8 +131,22 @@ export function claveCorrecta(clave: string, guardado: string): boolean {
   }
 }
 
-/** Firma una sesión: `<JSON en base64url>.<HMAC-SHA256 en base64url>`. */
+/**
+ * Firma una sesión: `<JSON en base64url>.<HMAC-SHA256 en base64url>`.
+ *
+ * [C-1] Tira si `secreto` mide menos de `LARGO_MIN_SECRETO`: una firma hecha
+ * con una clave corta o vacía no protege nada, así que emitirla sería peor
+ * que no emitir cookie ninguna — quien llama (`acciones.ts`) tiene que
+ * frenar ANTES de esto, y esta excepción es el candado que lo asegura
+ * incluso si algún día ese frenado se rompe.
+ */
 export function firmaSesion(sesion: Sesion, secreto: string): string {
+  if (secreto.length < LARGO_MIN_SECRETO) {
+    throw new Error(
+      `firmaSesion(): PANEL_SECRETO mide menos de ${LARGO_MIN_SECRETO} caracteres — una clave así de corta ` +
+        'es, para HMAC, lo mismo que no tener firma.',
+    )
+  }
   const cuerpo = Buffer.from(JSON.stringify(sesion)).toString('base64url')
   const firma = createHmac('sha256', secreto).update(cuerpo).digest('base64url')
   return `${cuerpo}.${firma}`
@@ -127,6 +161,17 @@ export function firmaSesion(sesion: Sesion, secreto: string): string {
  * dato en el que no se puede confiar todavía.
  */
 export function verificaSesion(cookie: string, secreto: string, ahora: number = Date.now()): Sesion | null {
+  // [C-1] Misma razón que en `firmaSesion`, del lado de verificar: un
+  // secreto corto o ausente (`''`) NO es «la clave real, nomás que
+  // débil» — para `createHmac` es indistinguible de no tener firma. Sin
+  // este chequeo, `PANEL_SECRETO` ausente en producción hacía que
+  // `contexto.env.PANEL_SECRETO ?? ''` verificara con la cadena vacía, que
+  // cualquiera puede reproducir sin saber ningún secreto: la puerta
+  // firmaba y aceptaba cookies fabricadas por quien sea. Acá se devuelve
+  // `null` (no se tira) porque `verificaSesion` siempre devuelve `null`
+  // ante cualquier cookie que no puede confiar, y un secreto inservible es
+  // exactamente eso.
+  if (secreto.length < LARGO_MIN_SECRETO) return null
   try {
     const punto = cookie.indexOf('.')
     if (punto <= 0 || punto === cookie.length - 1) return null

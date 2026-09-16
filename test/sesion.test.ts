@@ -5,8 +5,10 @@
  * Ningún secreto real aparece acá: cada test genera el suyo.
  */
 import { describe, it, expect } from 'vitest'
+import { createHmac } from 'node:crypto'
 import {
   hashDeClave, claveCorrecta, firmaSesion, verificaSesion, cookieDeSesion, intentoPermitido,
+  LARGO_MIN_SECRETO,
 } from '../src/servidor/sesion'
 
 const SECRETO = 'secreto-de-prueba-no-es-el-de-produccion'
@@ -39,7 +41,8 @@ describe('la cookie de sesión', () => {
   })
 
   it('rechaza una firma hecha con otro secreto', () => {
-    expect(verificaSesion(firmaSesion(sesion, 'otro'), SECRETO)).toBeNull()
+    const OTRO_SECRETO = 'otro-secreto-de-prueba-de-32-caracteres-o-mas'
+    expect(verificaSesion(firmaSesion(sesion, OTRO_SECRETO), SECRETO)).toBeNull()
   })
 
   it('rechaza un cuerpo manipulado aunque la firma venga del original', () => {
@@ -91,6 +94,51 @@ describe('la cookie de sesión', () => {
     expect(c).toContain('SameSite=Lax')
     expect(c).toContain('Path=/')
     expect(c).toMatch(/Max-Age=\d+/)
+  })
+})
+
+describe('C-1: un PANEL_SECRETO corto o ausente no puede tratarse como el secreto real', () => {
+  const sesion = { correo: 'clienta@ejemplo.mx', vence: Date.now() + 86_400_000, dispositivo: 'celu' }
+
+  it('firmaSesion() tira con la cadena vacía y con cualquier secreto corto', () => {
+    // La cadena vacía es justo lo que `contexto.env.PANEL_SECRETO ?? ''`
+    // producía cuando la variable faltaba en producción: `createHmac`
+    // firma con ella sin quejarse, así que el candado tiene que estar acá,
+    // no adentro de `createHmac`.
+    expect(() => firmaSesion(sesion, '')).toThrow(new RegExp(String(LARGO_MIN_SECRETO)))
+    expect(() => firmaSesion(sesion, 'x'.repeat(LARGO_MIN_SECRETO - 1))).toThrow()
+  })
+
+  it('firmaSesion() no tira con un secreto de 32 caracteres o más', () => {
+    expect(() => firmaSesion(sesion, 'x'.repeat(LARGO_MIN_SECRETO))).not.toThrow()
+  })
+
+  it('verificaSesion() devuelve null con un secreto corto, aunque la firma sea la que ESE secreto produciría', () => {
+    for (const secretoCorto of ['', 'x'.repeat(LARGO_MIN_SECRETO - 1)]) {
+      // Firmada A MANO —firmaSesion() ya no lo permite, es justo lo que
+      // arregla este candado— con exactamente el mismo HMAC que produciría
+      // un servidor mal configurado que llegara a firmar con esta clave.
+      const cuerpo = Buffer.from(JSON.stringify(sesion)).toString('base64url')
+      const firma = createHmac('sha256', secretoCorto).update(cuerpo).digest('base64url')
+      expect(verificaSesion(`${cuerpo}.${firma}`, secretoCorto)).toBeNull()
+    }
+  })
+
+  it('el ataque que motiva el candado: una cookie forjada con la clave vacía —que cualquiera puede reproducir sin saber ningún secreto— no pasa cuando PANEL_SECRETO falta', () => {
+    // Esto es literalmente lo que un atacante haría si `PANEL_SECRETO`
+    // faltara y `acciones.ts` siguiera firmando con `?? ''`: fabricar su
+    // propia cookie, firmada con la MISMA clave vacía que usaría el
+    // servidor, sin conocer ningún secreto real.
+    const sesionDelAtacante = { correo: 'atacante@ajeno.mx', vence: Date.now() + 365 * 86_400_000, dispositivo: 'lo que sea' }
+    const cuerpo = Buffer.from(JSON.stringify(sesionDelAtacante)).toString('base64url')
+    const firmaForjada = createHmac('sha256', '').update(cuerpo).digest('base64url')
+    const cookieForjada = `${cuerpo}.${firmaForjada}`
+
+    // Antes de C-1, un servidor con PANEL_SECRETO ausente verificaba esto
+    // contra '' y la aceptaba: la puerta se abría sin que el atacante
+    // supiera nada. Ahora, con el secreto vacío pasado explícitamente
+    // (el estado exacto de «la variable falta»), rechaza.
+    expect(verificaSesion(cookieForjada, '')).toBeNull()
   })
 })
 
