@@ -232,11 +232,15 @@ describe('el lanzamiento (2026-08-20): la landing es la home', () => {
 
 describe('el formulario con envío real (2026-08-17)', () => {
   it('la función de Vercel existe, con sus capas anti-bots', () => {
-    const fn = readFileSync('api/contacto.ts', 'utf8')
+    // Desde la Tarea 1 de la fase 5 parte A la fuente vive en
+    // src/servidor/entradas/ (ver docs/panel-operacion.md) y esbuild la
+    // empaquetea en api/contacto.js; ese artefacto lo vigila
+    // test/bundle-api.test.ts, no este guard.
+    const fn = readFileSync('src/servidor/entradas/contacto.ts', 'utf8')
     expect(fn).toContain('RESEND_API_KEY')
     expect(fn).toContain('apellido') // capa 1: honeypot
     expect(fn).toContain('4000') // capa 2: trampa de tiempo
-    expect(fn).toContain('ORIGENES_PERMITIDOS') // capa 3: origen
+    expect(fn).toContain('origenPermitido') // capa 3: origen
     expect(fn).toContain('TURNSTILE_SECRET') // capa 4: opcional
     // La clave nunca viaja en el código: solo por variable de entorno.
     expect(fn).not.toMatch(/re_[A-Za-z0-9]{20,}/)

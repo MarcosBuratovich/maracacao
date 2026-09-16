@@ -5,5 +5,11 @@
     "paths": {
       "@/*": ["src/*"]
     }
-  }
+  },
+  // "exclude" no hereda: si acá se declara, pisa el de astro/tsconfigs/strict
+  // (que solo saca `dist`), así que hay que repetirlo. `api/**/*.js` son los
+  // artefactos que arma `scripts/bundle-api.ts` (GENERADOS, no se editan a
+  // mano): sin esto, `astro check` los suma a la cuenta de archivos vistos
+  // porque `allowJs` está prendido.
+  "exclude": ["dist", "api/**/*.js"]
 }
