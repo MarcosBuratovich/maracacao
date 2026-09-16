@@ -39,3 +39,37 @@ se pone rojo porque el archivo dejó de matchear lo que la fuente produce. El
 banner de la primera línea del artefacto (`GENERADO por scripts/bundle-api.ts
 — no editar a mano`) está para recordarlo en el peor momento, con el archivo
 ya abierto.
+
+## Cómo se cambia la contraseña del panel
+
+No hay «recuperar contraseña» ni tabla de usuarios: la contraseña vive
+hasheada en la variable de entorno `PANEL_CLAVE_HASH` de Vercel (entorno
+Production, nada más), y `src/servidor/sesion.ts` es el único lugar que la
+lee y la compara. En claro no está guardada en ningún lado más que en el
+llavero del teléfono de la clienta — ni Marcos la sabe, y no hay forma de
+recuperarla si se pierde: se elige una nueva y se repite este paso.
+
+Para generar el hash que va a esa variable:
+
+```bash
+pnpm exec tsx -e "import {hashDeClave} from './src/servidor/sesion.ts'; console.log(hashDeClave(process.argv[1]))" 'la contraseña que eligió la clienta'
+```
+
+Esto imprime una sola línea con la forma
+`scrypt$16384$8$1$<sal en base64>$<hash en base64>`. Esa línea completa —
+tal cual, con los signos `$` incluidos— es el valor que va a
+`PANEL_CLAVE_HASH` en Vercel, nunca la contraseña en claro que se le pasó
+al comando.
+
+Dos advertencias:
+
+- **La contraseña en claro no se guarda en ningún lado.** Ni en este
+  comando (no queda en el historial de shell más que como argumento
+  efímero), ni en un archivo, ni en un chat. Se genera el hash, se pega en
+  Vercel, y se descarta.
+- **Cambiar la contraseña no cierra las sesiones que ya estén abiertas.**
+  La cookie de sesión es un HMAC firmado con `PANEL_SECRETO`, una variable
+  distinta — mientras `PANEL_SECRETO` no cambie, una cookie firmada antes
+  sigue siendo válida hasta que venza sola. Si hace falta cerrar TODAS las
+  sesiones activas (por ejemplo, si se sospecha que una cookie se filtró),
+  lo que hay que rotar es `PANEL_SECRETO`, no `PANEL_CLAVE_HASH`.
