@@ -17,7 +17,7 @@
 Valen para toda tarea de este plan.
 
 - **Ningún secreto entra al repo. Nunca.** Ni en código, ni en tests, ni en fixtures, ni en un comentario. Las variables viven en el panel de Vercel (solo entorno Production). Los tests usan valores de prueba generados en el propio test.
-- **`src/servidor/**` es puro e inyectable:** cada módulo recibe lo que necesita por parámetro (`fetch`, las variables de entorno, el reloj). Nada de `process.env` ni `globalThis.fetch` adentro de la lógica — solo el borde (`api/panel.ts`) los lee y los pasa. Es lo que hace que la suite los pruebe sin red.
+- **`src/servidor/entradas/**` es el BORDE y `src/servidor/**` es puro e inyectable:** el borde —un archivo por función, y nada más que eso— es el único que lee `process.env` y toma `fetch` del global: arma el contexto y lo pasa hacia adentro. Todo el resto (`sesion`, `github`, `publicar`, `acciones`, `rutas-permitidas`) recibe lo que necesita por parámetro, incluido el reloj. Es lo que hace que la suite los pruebe sin red y sin secretos.
 - **`src/contenido/**` sigue con su regla dura:** no importa `node:*`, no importa Astro, y usa solo rutas relativas sin extensión. El guard es lista blanca desde la fase 1. `src/servidor/**` SÍ puede importar `node:crypto` y `src/contenido/**`.
 - **Lo que le habla a la clienta va en español mexicano, sin jerga y sin nombrar tecnologías.** «No pude publicar: revisá tu conexión», nunca «HTTP 502 del upstream». Los comentarios del código y los mensajes para Marcos van en español rioplatense y explican POR QUÉ.
 - **Vocabulario prohibido de MARCA:** «mono», «chango», «changuito», «chispa(s)», «carrito», «pistachos», «cacahuete», «maní», «packaging», «snack», «smoothie».
