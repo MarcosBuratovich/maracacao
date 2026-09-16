@@ -19,18 +19,53 @@ export interface Sesion {
   dispositivo: string
 }
 
-// Parámetros de scrypt. N=16384 (2^14), r=8, p=1: el mínimo que OWASP
-// recomienda para 2023 (64 MiB de memoria, ~100ms en hardware moderno) —
-// bastante para que fuerza bruta offline contra el hash filtrado sea cara,
-// sin hacer que cada intento de login en una función serverless se sienta
-// lento. Quedan grabados EN el hash guardado (no son una constante que se
-// pueda perder) para que si algún día suben, los hashes viejos se sigan
-// leyendo con sus propios parámetros.
+// Parámetros de scrypt: N=16384 (2^14), r=8, p=5. Es la fila N=2^14 de la
+// tabla de la OWASP Password Storage Cheat Sheet (cheatsheetseries.owasp.org
+// /cheatsheets/Password_Storage_Cheat_Sheet.html), verificada contra el
+// documento en vivo el 2026-09-16 — no de memoria: esa fila es exactamente
+// «N=2^14, r=8, p=5».
+//
+// Medido en esta máquina (Node 22, `scryptSync`, no es una cifra citada de
+// otro lado):
+//   - Memoria: con estos tres parámetros, el mínimo `maxmem` con el que
+//     `scryptSync` no tira es ~16.01 MiB — y es CASI IGUAL con p=1 que con
+//     p=5 (16.004 MiB vs. 16.008 MiB): en la implementación de Node, la
+//     memoria depende de N y r (fórmula ~128·N·r), no de p. Contra lo que
+//     decía el comentario anterior (64 MiB): esa cifra es la de la fila
+//     N=2^16, p=2 de la misma tabla, no la de esta fila.
+//   - Tiempo: un `hashDeClave` con p=1 tardó ~24 ms de promedio (5
+//     corridas); con p=5, ~112 ms — unas 4.6 veces más lento. p es el
+//     parámetro de paralelismo: no cambia cuánta memoria hace falta a la
+//     vez, pero sí cuántas pasadas hace el algoritmo, así que el costo de
+//     fuerza bruta offline contra un hash filtrado sube en la misma
+//     proporción. Una vez por login, 112 ms no se siente; para quien
+//     prueba millones de contraseñas offline, sí.
+//
+// Quedan grabados EN el hash guardado (no son una constante que se pueda
+// perder) para que si algún día suben, los hashes viejos se sigan leyendo
+// con sus propios parámetros — `claveCorrecta` deriva con los que lee del
+// string, no con estas constantes.
 const SCRYPT_N = 16384
 const SCRYPT_R = 8
-const SCRYPT_P = 1
+const SCRYPT_P = 5
 const LARGO_SAL = 16
 const LARGO_HASH = 64
+
+// `maxmem` explícito en las dos llamadas a `scryptSync` de este archivo,
+// bastante por encima de los ~16 MiB que estos parámetros piden hoy. Sin
+// esto, Node usa su default (32 MiB) sin que el código lo diga en ningún
+// lado — y el día que alguien suba `N` sin acordarse de este comentario,
+// `scryptSync` empieza a pedir más memoria de la que el default cubre.
+// En `hashDeClave` eso tira una excepción bien visible (no hay try/catch
+// acá). En `claveCorrecta`, en cambio, SÍ hay un try/catch que existe para
+// convertir un hash con formato raro en «contraseña incorrecta» — y ese
+// mismo try/catch atraparía también un error de configuración,
+// devolviendo el mismo `false`. Con el default sin nombrar, ese día
+// alguien ve un lockout inexplicable y no un error de config. Fijarlo acá,
+// generoso, no lo evita del todo (una suba grande de `N` igual pediría
+// tocar esta constante) pero saca el número de la oscuridad del default y
+// dan margen a que un ajuste chico no rompa nada.
+const MAXMEM = 64 * 1024 * 1024
 
 /**
  * Hashea una contraseña con scrypt y una sal nueva (o la que se pase, para
@@ -39,7 +74,7 @@ const LARGO_HASH = 64
  * no invalide lo que ya está guardado en `PANEL_CLAVE_HASH`.
  */
 export function hashDeClave(clave: string, sal: Buffer = randomBytes(LARGO_SAL)): string {
-  const hash = scryptSync(clave, sal, LARGO_HASH, { N: SCRYPT_N, r: SCRYPT_R, p: SCRYPT_P })
+  const hash = scryptSync(clave, sal, LARGO_HASH, { N: SCRYPT_N, r: SCRYPT_R, p: SCRYPT_P, maxmem: MAXMEM })
   return `scrypt$${SCRYPT_N}$${SCRYPT_R}$${SCRYPT_P}$${sal.toString('base64')}$${hash.toString('base64')}`
 }
 
@@ -68,7 +103,7 @@ export function claveCorrecta(clave: string, guardado: string): boolean {
     const hashGuardado = Buffer.from(hashB64, 'base64')
     if (sal.length === 0 || hashGuardado.length === 0) return false
 
-    const candidato = scryptSync(clave, sal, hashGuardado.length, { N, r, p })
+    const candidato = scryptSync(clave, sal, hashGuardado.length, { N, r, p, maxmem: MAXMEM })
     if (candidato.length !== hashGuardado.length) return false
     return timingSafeEqual(candidato, hashGuardado)
   } catch {
