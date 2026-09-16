@@ -717,6 +717,16 @@ el experimento más barato del proyecto: en la fase 5, PRIMERO
 `api/contacto.ts` importando `../src/servidor/origen`. Un cambio de una
 línea que responde la pregunta antes de que dependa nada.
 
+[RESUELTO 2026-09-16 — corrido en producción] `api/contacto.ts` importando
+`../src/servidor/origen` **construye y no arranca**: el deploy queda verde y la
+función devuelve FUNCTION_INVOCATION_FAILED (500) en cada invocación, en las dos
+ramas del chequeo de origen. El tracer no se lleva el archivo de afuera de
+`api/` al paquete. **Gana el plan B**: la fase 5 se escribe con
+`scripts/bundle-api.ts` (esbuild) armando funciones autocontenidas;
+`includeFiles` no alcanza. La función de contacto volvió a quedar autocontenida
+(commit 1e7b51d), con un test que exige que su lista de orígenes y la de
+`src/servidor/origen.ts` digan lo mismo mientras vivan duplicadas.
+
 ─── 4.1 · Acceso: contraseña primero, enlace mágico de recuperación ───
 
 Esto se invierte respecto del diseño anterior, por dos razones que se
