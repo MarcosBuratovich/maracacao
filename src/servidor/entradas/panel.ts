@@ -26,6 +26,7 @@
  */
 import { maneja, type Pedido, type Contexto, type Entorno } from '../acciones'
 import { origenPermitido } from '../origen'
+import { ipDelPedido } from '../ip'
 
 interface PedidoHTTP {
   method?: string
@@ -59,16 +60,6 @@ function cookieDePanel(header: string | string[] | undefined): string {
 }
 
 /**
- * La IP de quien pide, de la cabecera que pone el proxy de Vercel
- * (`x-forwarded-for`): la primera de la lista es la del cliente real, las
- * que siguen son de los saltos intermedios.
- */
-function ipDelPedido(req: PedidoHTTP): string {
-  const primera = valorUnico(req.headers['x-forwarded-for']).split(',')[0]?.trim()
-  return primera || 'desconocida'
-}
-
-/**
  * Dueño y repo salen de las variables que Vercel YA inyecta en todo
  * deploy (`VERCEL_GIT_REPO_OWNER`/`VERCEL_GIT_REPO_SLUG`): no hace falta
  * que Marcos cargue una variable nueva para algo que la plataforma ya
@@ -94,6 +85,11 @@ export default async function handler(req: PedidoHTTP, res: RespuestaHTTP) {
   // ya frena la mayoría de los pedidos cruzados, esto frena el resto.
   // `salud` es GET y no cambia nada, así que no lo necesita.
   if (req.method === 'POST' && !origenPermitido(String(req.headers.origin ?? ''))) {
+    // [M-4] Antes esto no dejaba rastro: un 403 mudo no le dice a Marcos
+    // si fue él mismo olvidándose de agregar un dominio nuevo, o alguien
+    // probando el borde desde afuera. Con el origen rechazado en el log,
+    // al menos puede distinguir las dos cosas.
+    console.warn(`panel: origen rechazado — ${req.headers.origin ?? '(sin Origin)'}`)
     return res.status(403).json({ ok: false, problema: 'No se pudo procesar tu pedido.' })
   }
 
@@ -102,7 +98,7 @@ export default async function handler(req: PedidoHTTP, res: RespuestaHTTP) {
     env: entorno(),
     fetch: globalThis.fetch,
     ahora: () => Date.now(),
-    ip: ipDelPedido(req),
+    ip: ipDelPedido(req.headers),
   }
 
   const r = await maneja(accion, pedido, contexto)

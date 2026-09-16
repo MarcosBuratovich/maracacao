@@ -17930,8 +17930,19 @@ function origenPermitido(origen) {
   return ORIGENES_PERMITIDOS.includes(origen) || PREVIEW_DE_VERCEL.test(origen);
 }
 
-// src/servidor/entradas/panel.ts
+// src/servidor/ip.ts
 var valorUnico = (v) => Array.isArray(v) ? v[0] ?? "" : v ?? "";
+function ipDelPedido(headers) {
+  const deVercel = valorUnico(headers["x-vercel-forwarded-for"]).split(",")[0]?.trim();
+  if (deVercel) return deVercel;
+  const real = valorUnico(headers["x-real-ip"]).trim();
+  if (real) return real;
+  const primera = valorUnico(headers["x-forwarded-for"]).split(",")[0]?.trim();
+  return primera || "desconocida";
+}
+
+// src/servidor/entradas/panel.ts
+var valorUnico2 = (v) => Array.isArray(v) ? v[0] ?? "" : v ?? "";
 function cookieDePanel(header) {
   const cadena = Array.isArray(header) ? header.join("; ") : header ?? "";
   for (const parte of cadena.split(";")) {
@@ -17947,10 +17958,6 @@ function cookieDePanel(header) {
   }
   return "";
 }
-function ipDelPedido(req) {
-  const primera = valorUnico(req.headers["x-forwarded-for"]).split(",")[0]?.trim();
-  return primera || "desconocida";
-}
 function entorno() {
   return {
     PANEL_CLAVE_HASH: process.env.PANEL_CLAVE_HASH,
@@ -17962,8 +17969,9 @@ function entorno() {
   };
 }
 async function handler(req, res) {
-  const accion = valorUnico(req.query?.accion);
+  const accion = valorUnico2(req.query?.accion);
   if (req.method === "POST" && !origenPermitido(String(req.headers.origin ?? ""))) {
+    console.warn(`panel: origen rechazado \u2014 ${req.headers.origin ?? "(sin Origin)"}`);
     return res.status(403).json({ ok: false, problema: "No se pudo procesar tu pedido." });
   }
   const pedido = { cuerpo: req.body, cookie: cookieDePanel(req.headers.cookie) };
@@ -17971,7 +17979,7 @@ async function handler(req, res) {
     env: entorno(),
     fetch: globalThis.fetch,
     ahora: () => Date.now(),
-    ip: ipDelPedido(req)
+    ip: ipDelPedido(req.headers)
   };
   const r = await maneja(accion, pedido, contexto);
   if (r.cookie) res.setHeader("Set-Cookie", r.cookie);
