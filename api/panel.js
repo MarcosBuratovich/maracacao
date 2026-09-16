@@ -89,6 +89,7 @@ function intentoPermitido(ip, ahora = Date.now()) {
 
 // src/servidor/github.ts
 var VERSION_API = "2022-11-28";
+var codificaRuta = (ruta2) => ruta2.split("/").map(encodeURIComponent).join("/");
 function cliente(c) {
   const base = `https://api.github.com/repos/${c.duenio}/${c.repo}`;
   async function pedir(ruta2, init) {
@@ -113,7 +114,7 @@ function cliente(c) {
   return {
     /** El sha que apunta un ref (`heads/main`, por ejemplo). */
     async ref(nombre) {
-      const cuerpo = await pedir(`/git/ref/${nombre}`);
+      const cuerpo = await pedir(`/git/ref/${codificaRuta(nombre)}`);
       return { sha: cuerpo.object.sha };
     },
     /** Los datos de un commit: su árbol, su mensaje, cuándo lo hizo su autor. */
@@ -136,7 +137,7 @@ function cliente(c) {
      * foto vieja; esto es lo que GitHub tiene ahora mismo.
      */
     async archivoEnRef(ruta2, ref) {
-      const cuerpo = await pedir(`/contents/${ruta2}?ref=${encodeURIComponent(ref)}`);
+      const cuerpo = await pedir(`/contents/${codificaRuta(ruta2)}?ref=${encodeURIComponent(ref)}`);
       return Buffer.from(cuerpo.content, "base64").toString("utf8");
     },
     /** Crea un blob con este contenido (codificado a base64) y devuelve su sha. */

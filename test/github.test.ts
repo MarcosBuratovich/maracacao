@@ -31,6 +31,32 @@ describe('el cliente de GitHub', () => {
     expect(pedidos[0].url).toContain('ref=abc123')
   })
 
+  // M-7: hoy toda ruta que llega acá es una constante o ya pasó por la
+  // lista blanca, así que esto no cambia nada en producción — existe para
+  // la Parte B, donde las rutas de imagen van a llegar armadas con lo que
+  // la clienta haya escrito. Un segmento con un espacio o un `#` sin
+  // codificar rompería la URL (o, peor, la haría apuntar a otro recurso)
+  // antes de que la lista blanca llegara a rechazarlo.
+  it('M-7: codifica cada segmento de la ruta, sin tocar las barras que los separan', async () => {
+    const { f, pedidos } = fetchFalso([
+      { cuerpo: { content: Buffer.from('{}').toString('base64'), encoding: 'base64' } },
+    ])
+    await cliente(creds(f)).archivoEnRef('public/sitio/marca/barra con espacio #1.webp', 'abc123')
+    // Cada segmento va codificado (el espacio y el «#» no viajan crudos),
+    // pero las barras que separan `public`/`sitio`/`marca`/… siguen
+    // siendo barras: la ruta sigue teniendo la misma forma de niveles.
+    expect(pedidos[0].url).toContain(
+      '/contents/public/sitio/marca/' + encodeURIComponent('barra con espacio #1.webp'),
+    )
+    expect(pedidos[0].url).not.toContain('barra con espacio #1.webp')
+  })
+
+  it('M-7: ref() también codifica su nombre por segmento', async () => {
+    const { f, pedidos } = fetchFalso([{ cuerpo: { object: { sha: 'x' } } }])
+    await cliente(creds(f)).ref('heads/una rama#rara')
+    expect(pedidos[0].url).toContain('/git/ref/heads/' + encodeURIComponent('una rama#rara'))
+  })
+
   it('crea un blob con el contenido en base64', async () => {
     const { f, pedidos } = fetchFalso([{ cuerpo: { sha: 'blob1' } }])
     const sha = await cliente(creds(f)).creaBlob('hola')

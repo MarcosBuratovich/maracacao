@@ -39,6 +39,25 @@ export interface DatosCommit {
 
 const VERSION_API = '2022-11-28'
 
+/**
+ * [M-7] Encodea CADA segmento de una ruta con `/` adentro, sin tocar las
+ * barras que separan los segmentos: a diferencia de `encodeURIComponent` a
+ * secas —que codificaría la barra también, rompiendo la ruta en pedazos
+ * que la URL ya no entiende como una sola ruta con niveles—, esto deja
+ * intacta la estructura de segmentos y solo escapa lo que hay ADENTRO de
+ * cada uno.
+ *
+ * Hoy todo lo que llega acá es una constante o una ruta ya validada por
+ * `rutas-permitidas.ts` (`heads/main`, `src/contenido/datos/<id>.json`),
+ * así que esto no cambia ni un byte de lo que se manda en producción. La
+ * razón para escribirlo ahora, sin esperar a que haga falta, es la Parte B:
+ * las rutas de imagen van a llegar armadas con lo que la clienta haya
+ * escrito, y un segmento con `?`, `#` o un espacio sin codificar rompe la
+ * URL —o peor, apunta a otro recurso— antes de que la lista blanca llegue
+ * a rechazarlo.
+ */
+const codificaRuta = (ruta: string): string => ruta.split('/').map(encodeURIComponent).join('/')
+
 export function cliente(c: Credenciales) {
   const base = `https://api.github.com/repos/${c.duenio}/${c.repo}`
 
@@ -75,7 +94,7 @@ export function cliente(c: Credenciales) {
   return {
     /** El sha que apunta un ref (`heads/main`, por ejemplo). */
     async ref(nombre: string): Promise<{ sha: string }> {
-      const cuerpo = await pedir(`/git/ref/${nombre}`) as { object: { sha: string } }
+      const cuerpo = await pedir(`/git/ref/${codificaRuta(nombre)}`) as { object: { sha: string } }
       return { sha: cuerpo.object.sha }
     },
 
@@ -106,7 +125,7 @@ export function cliente(c: Credenciales) {
      * foto vieja; esto es lo que GitHub tiene ahora mismo.
      */
     async archivoEnRef(ruta: string, ref: string): Promise<string> {
-      const cuerpo = await pedir(`/contents/${ruta}?ref=${encodeURIComponent(ref)}`) as { content: string; encoding: string }
+      const cuerpo = await pedir(`/contents/${codificaRuta(ruta)}?ref=${encodeURIComponent(ref)}`) as { content: string; encoding: string }
       return Buffer.from(cuerpo.content, 'base64').toString('utf8')
     },
 
