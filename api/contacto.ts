@@ -18,7 +18,24 @@
  *      token de Cloudflare.
  */
 
-import { origenPermitido } from '../src/servidor/origen'
+/* NO se importa `src/servidor/origen.ts` desde acá, y NO es por gusto:
+ * [MEDIDO 2026-09-16, en producción] con ese import el build de Vercel pasa
+ * y la función igual muere al invocarla — FUNCTION_INVOCATION_FAILED, 500 en
+ * las dos ramas del origen. El tracer no se lleva el archivo de afuera de
+ * api/ al paquete de la función. Es la respuesta al experimento del spec §4:
+ * el panel de la fase 5 necesita el paso de esbuild (`scripts/bundle-api.ts`)
+ * que arma un `api/panel.js` autocontenido; no alcanza con `includeFiles`.
+ *
+ * Mientras tanto esta función se queda autocontenida, y `test/origen-servidor.test.ts`
+ * exige que esta lista y la de `src/servidor/origen.ts` digan lo mismo, para
+ * que no se separen mientras viven duplicadas.
+ */
+const ORIGENES_PERMITIDOS = [
+  'https://maracacao.mx',
+  'https://www.maracacao.mx',
+  'http://localhost:4321',
+  'http://localhost:4322',
+]
 
 interface Pedido {
   method?: string
@@ -46,7 +63,9 @@ export default async function handler(req: Pedido, res: Respuesta) {
   }
 
   const origen = String(req.headers.origin ?? '')
-  if (!origenPermitido(origen)) return res.status(403).json({ error: 'Origen no permitido' })
+  const origenValido =
+    ORIGENES_PERMITIDOS.includes(origen) || /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origen)
+  if (!origenValido) return res.status(403).json({ error: 'Origen no permitido' })
 
   const b = (req.body ?? {}) as Record<string, unknown>
   const nombre = esTexto(b.nombre) ? b.nombre.trim().slice(0, 120) : ''
