@@ -24,13 +24,9 @@ import { cliente } from './github'
 import { publica, type Archivo } from './publicar'
 import type { Cambio } from '../contenido/diff'
 import { resume } from '../contenido/diff'
-import { validar, type Problema } from '../contenido/validacion'
+import { validarContra, type Problema } from '../contenido/validacion'
 import { serializa } from '../contenido/carga'
-import { conteosDe } from '../contenido/conteos'
 import { DOCUMENTOS, type IdDocumento } from '../contenido/esquema'
-import datosSitio from '../contenido/datos/sitio.json'
-import datosSabores from '../contenido/datos/sabores.json'
-import datosFichas from '../contenido/datos/fichas.json'
 
 /** Lo que le llega al router, ya despojado de HTTP: el borde lo arma. */
 export interface Pedido {
@@ -181,13 +177,8 @@ function entrar(pedido: Pedido, contexto: Contexto): Respuesta {
 
 const PROBLEMA_SESION = 'Tu sesión no es válida: vuelve a entrar.'
 const PROBLEMA_SIN_DOCUMENTOS = 'No mandaste ningún documento para publicar.'
-
-/** El dato tal cual está publicado HOY, uno por documento. Ver el porqué en el docstring de `publicarAccion`. */
-const ACTUAL: Readonly<Record<IdDocumento, unknown>> = {
-  sitio: datosSitio,
-  sabores: datosSabores,
-  fichas: datosFichas,
-}
+const PROBLEMA_NO_SE_PUDO_LEER = 'No pudimos revisar el contenido actual del sitio: prueba de nuevo en unos minutos.'
+const SIN_CAMBIOS = 'No había nada que publicar: no cambiaste ningún dato del sitio.'
 
 const RUTA_DEL_DOCUMENTO = (id: IdDocumento): string => `src/contenido/datos/${id}.json`
 
@@ -202,21 +193,37 @@ function comoDocumentos(v: unknown): Record<string, unknown> {
 /**
  * `publicar`: documento → commit (E5, E6, E7).
  *
- * Por qué el dato ACTUAL sale de los JSON crudos bajo `src/contenido/datos/`
- * y no de las fachadas (`@/copy/sitio-marca`, `@/copy/sabores`,
- * `@/fichas/base`): las fachadas corren `cargar()` al importarse, que TIRA
- * si el contenido no pasa el esquema —`sitio-marca.ts` además necesita
- * `injerta()` con los cinco valores derivados, que sin `sabores`/`gotas`
- * ni siquiera se puede calcular—. Si `entrar` o `salud` importaran ese
- * camino sin querer (comparten el mismo bundle), un contenido roto
- * tumbaría TODO el panel, incluida la acción que existe para avisar que
- * algo está roto. El JSON crudo, en cambio, solo puede fallar por no ser
- * JSON válido —algo que `astro build` ya garantiza en cada deploy—. Y no
- * hace falta más: `resume()` salta los campos derivados (`seEdita()` los
- * filtra por `control: 'derivado'`), así que el valor de esos cinco
- * campos en el `antes` nunca se compara; y `conteosDe()` lee listas
- * (`sabores`, `gotas`, `polvo`, `recetas`…) que están en el JSON crudo tal
- * cual, sin que la inyección de derivados las toque.
+ * [RULING T6-d, coordinador] «lo actual» NO puede salir de un `import`
+ * estático de los JSON bajo `src/contenido/datos/`: esbuild los congela
+ * en `api/panel.js` en el momento de empaquetar (`pnpm bundle:api`), así
+ * que son la foto de ESE momento, no lo que GitHub tiene ahora. Con esa
+ * foto, publicar A→B y enseguida republicar A comparaba A contra la FOTO
+ * —que también era A—, veía «sin cambios» y contestaba `ok: true` sin
+ * escribir nada: la clienta creía haber deshecho el cambio y el sitio
+ * seguía en B. Por eso este router lee el contenido VIVO de cada
+ * documento que está por escribir con `gh.archivoEnRef()` (la API de
+ * Contents), a un solo sha base (`gh.ref('heads/main')`, leído una vez
+ * para que todo el lote se compare contra el MISMO instante).
+ *
+ * «No hay nada que publicar» lo deciden los BYTES —`serializa()` contra
+ * lo que `archivoEnRef` trajo—, nunca el resumen: `frase(cambios)` puede
+ * dar vacío por otra razón (por ejemplo, el único cambio real cae en un
+ * campo que `resume()` no reporta, como uno marcado `quien: 'marcos'`) y
+ * ahí igual hay que escribir —con un asunto genérico en vez de ninguno—,
+ * no saltarse la escritura.
+ *
+ * Si GitHub no contesta mientras se lee lo vivo, es un error fuerte —502,
+ * nunca un `ok: true`— y jamás se cae de vuelta a ninguna copia
+ * empaquetada: una base vieja es EXACTAMENTE lo que produjo este bug.
+ *
+ * La validación de esquema (`validarContra`, no `validar`) corre ANTES de
+ * tocar GitHub y no necesita conteos: los avisos de conteo
+ * (`gravedad: 'avisa'`) nunca bloquean una publicación —son la misma
+ * comodidad que el navegador ya le mostró antes de que ella apretara
+ * publicar—, así que no hace falta leer un documento que no se va a
+ * escribir solo para calcularlos. Si algún día un aviso tiene que
+ * bloquear o mostrarse en la respuesta, ESE es el momento de traer los
+ * conteos de vuelta, con el caso real delante.
  */
 async function publicarAccion(pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
   const sesion = verificaSesion(pedido.cookie, contexto.env.PANEL_SECRETO ?? '', contexto.ahora())
@@ -238,37 +245,17 @@ async function publicarAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
 
   const idsConocidos = ids as IdDocumento[]
 
-  // Los conteos cruzan textos («15 sabores») contra listas reales, y esas
-  // listas pueden vivir en un documento DISTINTO del que se está validando
-  // (`anaquel.kicker`, del sitio, cuenta la lista de `sabores.json`). Si
-  // ese otro documento viene en el mismo lote, se usa la versión que la
-  // clienta está por publicar —no la vieja—; si no vino, se usa la
-  // publicada hoy.
-  const conteos = conteosDe({
-    sitio: idsConocidos.includes('sitio') ? documentos.sitio : ACTUAL.sitio,
-    sabores: idsConocidos.includes('sabores') ? documentos.sabores : ACTUAL.sabores,
-  })
-
-  const archivos: Archivo[] = []
-  const cambios: Cambio[] = []
-
+  // Fase 1, sin tocar GitHub: el esquema COMPLETO de cada documento, no
+  // solo los campos que cambiaron. Un solo documento inválido rechaza el
+  // lote entero antes de gastar un solo pedido.
   for (const id of idsConocidos) {
-    const esquema = DOCUMENTOS[id]
-    const crudo = documentos[id]
-
-    // El esquema COMPLETO, no solo los campos que cambiaron: la
-    // revalidación del servidor es la única capa que un pedido armado a
-    // mano no puede saltear.
-    const problemas: Problema[] = validar(esquema, crudo, conteos)
-    const bloqueante = problemas.find((p) => p.gravedad === 'impide')
-    if (bloqueante) {
-      return error(422, bloqueante.titulo, `${id}.${bloqueante.campo}`)
+    const problemas: Problema[] = validarContra(DOCUMENTOS[id], documentos[id])
+    if (problemas.length > 0) {
+      return error(422, problemas[0].titulo, `${id}.${problemas[0].campo}`)
     }
-
-    archivos.push({ ruta: RUTA_DEL_DOCUMENTO(id), contenido: serializa(esquema, crudo) })
-    cambios.push(...resume(ACTUAL[id], crudo, esquema))
   }
 
+  // Fase 2: recién acá se toca GitHub. Un solo sha base para todo el lote.
   const gh = cliente({
     token: contexto.env.PANEL_GITHUB_TOKEN ?? '',
     duenio: contexto.env.GITHUB_DUENIO ?? '',
@@ -276,7 +263,46 @@ async function publicarAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
     fetch: contexto.fetch,
   })
 
-  const resultado = await publica(gh, { archivos, autor: sesion.correo, cambios })
+  const archivos: Archivo[] = []
+  const cambios: Cambio[] = []
+
+  try {
+    const base = await gh.ref('heads/main')
+
+    for (const id of idsConocidos) {
+      const ruta = RUTA_DEL_DOCUMENTO(id)
+      const vivoTexto = await gh.archivoEnRef(ruta, base.sha)
+      const crudo = documentos[id]
+      const esquema = DOCUMENTOS[id]
+      const bytesNuevos = serializa(esquema, crudo)
+
+      if (bytesNuevos === vivoTexto) continue // este documento no cambió: nada que escribir por acá.
+
+      archivos.push({ ruta, contenido: bytesNuevos })
+      cambios.push(...resume(JSON.parse(vivoTexto), crudo, esquema))
+    }
+  } catch (e) {
+    // El detalle (status, mensaje de GitHub) es para Marcos; a la clienta
+    // nunca se le dice «no pudimos leer» y se publica igual con lo viejo.
+    console.error('publicar: no se pudo leer el contenido actual de un documento antes de compararlo —', e)
+    return error(502, PROBLEMA_NO_SE_PUDO_LEER)
+  }
+
+  if (archivos.length === 0) {
+    return ok({ ok: true, sha: null, resumen: SIN_CAMBIOS })
+  }
+
+  const resultado = await publica(gh, {
+    archivos,
+    autor: sesion.correo,
+    // Si `cambios` quedó vacío pese a que los bytes SÍ cambiaron (`frase()`
+    // no encuentra nada que contar), se omite el campo entero en vez de
+    // mandar un array vacío: `publica()` lee `cambios: []` como «no hay
+    // nada que contar» y se salta la escritura (ver su docstring) — que es
+    // exactamente el atajo que este fix borra. Omitido, usa su asunto
+    // genérico y escribe igual.
+    ...(cambios.length > 0 ? { cambios } : {}),
+  })
   if (!resultado.ok) return error(resultado.codigo, resultado.problema)
 
   return ok({ ok: true, sha: resultado.sha, resumen: resultado.resumen })

@@ -90,9 +90,23 @@ export function cliente(c: Credenciales) {
       return { sha: cuerpo.sha, tree: cuerpo.tree.sha, message: cuerpo.message, author: cuerpo.author }
     },
 
-    /** El contenido de un blob, decodificado de base64 a texto. */
+    /** El contenido de un blob, decodificado de base64 a texto. Necesita el SHA del blob, no la ruta. */
     async contenido(sha: string): Promise<string> {
       const cuerpo = await pedir(`/git/blobs/${sha}`) as { content: string; encoding: string }
+      return Buffer.from(cuerpo.content, 'base64').toString('utf8')
+    },
+
+    /**
+     * El contenido de un ARCHIVO por su ruta, en un ref dado (rama, tag o
+     * sha) — la API de Contents, no la de blobs: esta resuelve ruta+ref
+     * directo, sin que quien llama tenga que ir a buscar el sha del blob
+     * primero. La usa el router (`acciones.ts`) para leer el contenido VIVO
+     * de un documento antes de compararlo contra lo que la clienta mandó:
+     * lo que esbuild metió en el bundle en el momento de empaquetar es una
+     * foto vieja; esto es lo que GitHub tiene ahora mismo.
+     */
+    async archivoEnRef(ruta: string, ref: string): Promise<string> {
+      const cuerpo = await pedir(`/contents/${ruta}?ref=${encodeURIComponent(ref)}`) as { content: string; encoding: string }
       return Buffer.from(cuerpo.content, 'base64').toString('utf8')
     },
 

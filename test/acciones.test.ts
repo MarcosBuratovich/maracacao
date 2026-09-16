@@ -6,6 +6,9 @@
 import { describe, it, expect } from 'vitest'
 import { maneja } from '../src/servidor/acciones'
 import { hashDeClave, firmaSesion } from '../src/servidor/sesion'
+import { serializa } from '../src/contenido/carga'
+import { esquemaSitio } from '../src/contenido/esquema/sitio'
+import { fetchFalso } from './lib/github-falso'
 import { marca } from '@/copy/sitio-marca'
 
 const SECRETO = 'secreto-de-prueba'
@@ -125,6 +128,87 @@ describe('publicar', () => {
   it('un documento que no existe se rechaza antes de mirar su contenido', async () => {
     const r = await maneja('publicar', { cuerpo: { documentos: { inventado: {} } }, cookie: cookieValida() }, contextoBase(fetchQueNoSeUsa()))
     expect(r.status).toBe(422)
+  })
+
+  // RULING T6-d — de la revisión: con sesión válida, un lote sin ningún
+  // documento adentro no puede llegar a tocar GitHub (ids.length === 0 se
+  // decide antes de armar el cliente de GitHub).
+  it('con sesión válida y sin documentos, 400 y sin tocar GitHub', async () => {
+    const r = await maneja('publicar', { cuerpo: { documentos: {} }, cookie: cookieValida() }, contextoBase(fetchQueNoSeUsa()))
+    expect(r.status).toBe(400)
+  })
+
+  // RULING T6-d — el bug de fondo: «lo actual» tiene que salir de GitHub,
+  // no de la foto que quedó congelada en el bundle. Estos cuatro tests lo
+  // fijan con un GitHub de mentira (`fetchFalso`, la misma ayudante de
+  // `test/github.test.ts` y `test/publicar.test.ts`).
+  describe('contra el contenido vivo, no contra el que quedó en el paquete (RULING T6-d)', () => {
+    it('deshacer: si lo vivo ya cambió, publica lo que mandó aunque sea igual a la vieja foto del bundle', async () => {
+      // "enviado" es lo que la clienta manda: A, la misma foto que un
+      // `import` estático habría congelado en el paquete. "vivo" es lo
+      // que GitHub tiene AHORA: B, distinto — como si alguien hubiera
+      // publicado un cambio después del último `pnpm bundle:api`.
+      const enviado = JSON.parse(JSON.stringify(marca))
+      const vivo = JSON.parse(JSON.stringify(marca))
+      vivo.anaquel.titulo = 'Un título que ya cambió en vivo'
+      const textoEnviado = serializa(esquemaSitio, enviado)
+      const textoVivo = serializa(esquemaSitio, vivo)
+      expect(textoEnviado).not.toBe(textoVivo) // guardia: si esto fallara, el test no prueba nada
+
+      const { f, pedidos } = fetchFalso([
+        { cuerpo: { object: { sha: 'main-1' } } }, // gh.ref (router, base del lote)
+        { cuerpo: { content: Buffer.from(textoVivo).toString('base64'), encoding: 'base64' } }, // gh.archivoEnRef (router, lo vivo)
+        { cuerpo: { object: { sha: 'main-1' } } }, // gh.ref (dentro de publica())
+        { cuerpo: { sha: 'commit-viejo', tree: { sha: 'arbol-viejo' } } }, // gh.commit
+        { cuerpo: { sha: 'blob-nuevo' } }, // creaBlob
+        { cuerpo: { sha: 'arbol-nuevo' } }, // creaArbol
+        { cuerpo: { sha: 'commit-nuevo' } }, // creaCommit
+        { cuerpo: {} }, // mueveRef
+      ])
+
+      const r = await maneja('publicar', { cuerpo: { documentos: { sitio: enviado } }, cookie: cookieValida() }, contextoBase(f))
+
+      expect(r.status).toBe(200)
+      expect((r.cuerpo as { ok: boolean; sha: string | null }).ok).toBe(true)
+      expect((r.cuerpo as { sha: string | null }).sha).toBe('commit-nuevo')
+      // El commit lleva el archivo con los bytes que la clienta mandó.
+      const blob = pedidos.find((p) => p.metodo === 'POST' && (p.cuerpo as { encoding?: string })?.encoding === 'base64')
+      expect(blob?.cuerpo).toEqual({ content: Buffer.from(textoEnviado).toString('base64'), encoding: 'base64' })
+    })
+
+    it('bytes idénticos a lo vivo: no publica nada, cero pedidos de escritura, y avisa que no cambió nada', async () => {
+      const enviado = JSON.parse(JSON.stringify(marca))
+      const textoEnviado = serializa(esquemaSitio, enviado)
+
+      const { f, pedidos } = fetchFalso([
+        { cuerpo: { object: { sha: 'main-1' } } }, // gh.ref
+        { cuerpo: { content: Buffer.from(textoEnviado).toString('base64'), encoding: 'base64' } }, // gh.archivoEnRef: igual a lo enviado
+      ])
+
+      const r = await maneja('publicar', { cuerpo: { documentos: { sitio: enviado } }, cookie: cookieValida() }, contextoBase(f))
+
+      expect(r.status).toBe(200)
+      const cuerpo = r.cuerpo as { ok: boolean; sha: string | null; resumen: string }
+      expect(cuerpo.ok).toBe(true)
+      expect(cuerpo.sha).toBeNull()
+      expect(cuerpo.resumen).toMatch(/no había nada que publicar/i)
+      expect(pedidos.filter((p) => p.metodo === 'POST' || p.metodo === 'PATCH')).toHaveLength(0)
+    })
+
+    it('si GitHub no contesta al leer lo vivo, no publica nada y nunca dice que salió bien', async () => {
+      const enviado = JSON.parse(JSON.stringify(marca))
+
+      const { f, pedidos } = fetchFalso([{ status: 500, cuerpo: { message: 'ups, caído' } }]) // gh.ref falla
+
+      const r = await maneja('publicar', { cuerpo: { documentos: { sitio: enviado } }, cookie: cookieValida() }, contextoBase(f))
+
+      expect(r.status).toBe(502)
+      const cuerpo = r.cuerpo as { ok: boolean; problema: string }
+      expect(cuerpo.ok).toBe(false)
+      expect(cuerpo.problema).toMatch(/prueba de nuevo|intenta/i)
+      expect(cuerpo.problema).not.toMatch(/500|ups|fetch|github/i)
+      expect(pedidos.filter((p) => p.metodo === 'POST' || p.metodo === 'PATCH')).toHaveLength(0)
+    })
   })
 })
 

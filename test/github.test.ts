@@ -20,6 +20,17 @@ describe('el cliente de GitHub', () => {
     expect(pedidos[0].url).toContain('/repos/MarcosBuratovich/maracacao/git/ref/heads/main')
   })
 
+  it('lee el archivo de un ref por su ruta, con la API de Contents', async () => {
+    const contenido = '{"hola":"mundo"}'
+    const { f, pedidos } = fetchFalso([
+      { cuerpo: { content: Buffer.from(contenido).toString('base64'), encoding: 'base64' } },
+    ])
+    const texto = await cliente(creds(f)).archivoEnRef('src/contenido/datos/sitio.json', 'abc123')
+    expect(texto).toBe(contenido)
+    expect(pedidos[0].url).toContain('/repos/MarcosBuratovich/maracacao/contents/src/contenido/datos/sitio.json')
+    expect(pedidos[0].url).toContain('ref=abc123')
+  })
+
   it('crea un blob con el contenido en base64', async () => {
     const { f, pedidos } = fetchFalso([{ cuerpo: { sha: 'blob1' } }])
     const sha = await cliente(creds(f)).creaBlob('hola')
