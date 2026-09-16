@@ -64,7 +64,7 @@ const LARGO_HASH = 64
 // alguien ve un lockout inexplicable y no un error de config. Fijarlo acá,
 // generoso, no lo evita del todo (una suba grande de `N` igual pediría
 // tocar esta constante) pero saca el número de la oscuridad del default y
-// dan margen a que un ajuste chico no rompa nada.
+// da margen a que un ajuste chico no rompa nada.
 const MAXMEM = 64 * 1024 * 1024
 
 /**
