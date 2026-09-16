@@ -54,11 +54,11 @@ export const TOPE_CUERPO = 3.5 * 1024 * 1024
  */
 export function revisaLote(rutas: string[], bytesDelCuerpo: number): { ok: true } | { ok: false; problema: string } {
   if (rutas.length > TOPE_ARCHIVOS) {
-    return { ok: false, problema: `Son demasiadas fotos para una sola publicación: mandá hasta ${TOPE_ARCHIVOS} por vez.` }
+    return { ok: false, problema: `Son demasiadas fotos para una sola publicación: manda hasta ${TOPE_ARCHIVOS} por vez.` }
   }
 
   if (bytesDelCuerpo > TOPE_CUERPO) {
-    return { ok: false, problema: 'Es demasiado contenido para una sola publicación: mandá menos fotos, o de menor tamaño.' }
+    return { ok: false, problema: 'Es demasiado contenido para una sola publicación: manda menos fotos, o de menor tamaño.' }
   }
 
   for (const ruta of rutas) {

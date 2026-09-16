@@ -25,8 +25,6 @@ export interface Publicacion {
   archivos: Archivo[]
   /** El correo de quien publica: va al trailer `Panel-Autor:` (E5). */
   autor: string
-  /** Reservado para un chequeo temprano de concurrencia (tareas futuras); esta tarea no lo usa. */
-  ramaSha?: string
   /**
    * Los `Cambio[]` que la clienta ya vio antes de apretar publicar (E5): el
    * asunto del commit sale de `frase(cambios)`. Si se omite —por ejemplo,

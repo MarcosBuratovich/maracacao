@@ -2,6 +2,9 @@
   "buildCommand": "pnpm build",
   "cleanUrls": true,
   "trailingSlash": false,
+  "functions": {
+    "api/panel.js": { "maxDuration": 60 }
+  },
   "headers": [
     {
       "source": "/(presentacion|manual)/:camino*",
