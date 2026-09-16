@@ -302,9 +302,23 @@ export const escapaInvisibles = (json: string): string =>
  *
  * Tira si el esquema y el dato no coinciden — y por eso además sirve como
  * prueba de que el esquema describe exactamente el contenido de hoy.
+ *
+ * [I-2] Termina con `\n`. Todo archivo bajo `src/contenido/datos/` termina
+ * con un salto de línea final —lo pone Prettier/el editor, la convención
+ * de POSIX de «un archivo de texto termina en \n»— así que ANTES de este
+ * fix, `serializa()` nunca podía dar bytes idénticos a un archivo real:
+ * comparado contra `sitio.json`, `sabores.json` o `fichas.json`, siempre
+ * difería en el último byte. La comparación de `publicarAccion()`
+ * (`bytesNuevos === vivoTexto`, en `acciones.ts`) que decide «no había
+ * nada que publicar» nunca daba verdadero en la primera publicación de un
+ * documento —aunque la clienta no hubiera tocado nada— y esa primera
+ * publicación le sacaba el `\n` final al archivo. La suite no lo veía
+ * porque sus propios fixtures de «lo vivo» se arman con `serializa()`, así
+ * que los dos lados de la comparación tenían el mismo bug y coincidían por
+ * la razón equivocada.
  */
 export function serializa<E extends z.ZodType>(esquema: E, valor: unknown): string {
-  return escapaInvisibles(JSON.stringify(ordenaSegun(esquema, valor, ''), null, 2))
+  return `${escapaInvisibles(JSON.stringify(ordenaSegun(esquema, valor, ''), null, 2))}\n`
 }
 
 /**

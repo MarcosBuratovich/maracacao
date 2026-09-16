@@ -15118,7 +15118,8 @@ var escapaInvisibles = (json2) => json2.replace(
   (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`
 );
 function serializa(esquema, valor) {
-  return escapaInvisibles(JSON.stringify(ordenaSegun(esquema, valor, ""), null, 2));
+  return `${escapaInvisibles(JSON.stringify(ordenaSegun(esquema, valor, ""), null, 2))}
+`;
 }
 var exigeObjeto = (donde, valor) => {
   if (valor !== null && typeof valor === "object" && !Array.isArray(valor)) return;

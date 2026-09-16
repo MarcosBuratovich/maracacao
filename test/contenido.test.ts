@@ -1604,14 +1604,16 @@ describe('la capa de contenido', () => {
     // se llena de ruido que esconde los cambios de verdad.
     const bytes = readFileSync('src/contenido/datos/sabores.json', 'utf8')
     const cargado = cargar('src/contenido/datos/sabores.json', esquemaSabores, JSON.parse(bytes))
-    expect(serializa(esquemaSabores, cargado) + '\n').toBe(bytes)
+    // [I-2] serializa() ya termina en '\n' — antes había que pegárselo acá
+    // a mano porque nunca podía coincidir con un archivo real.
+    expect(serializa(esquemaSabores, cargado)).toBe(bytes)
   })
 
   describe('el documento de fichas', () => {
     it('vuelve a salir idéntico', () => {
       const bytes = readFileSync('src/contenido/datos/fichas.json', 'utf8')
       const cargado = cargar('src/contenido/datos/fichas.json', esquemaFichas, JSON.parse(bytes))
-      expect(serializa(esquemaFichas, cargado) + '\n').toBe(bytes)
+      expect(serializa(esquemaFichas, cargado)).toBe(bytes)
     })
 
     it('toda fila trae una celda por encabezado', () => {
@@ -2145,6 +2147,25 @@ describe('los candados del sistema de contenido', () => {
     expect(Object.keys(DOCUMENTOS).sort()).toEqual(['fichas', 'sabores', 'sitio'])
   })
 
+  // [I-2, revisión final] El candado permanente: lee cada documento REAL
+  // del repo tal cual está en disco —`JSON.parse` directo, sin pasar por
+  // `cargar()`/`congela()`, que podría disimular una diferencia real
+  // detrás de una transformación de Zod— y confirma que volver a
+  // serializar ese JSON crudo da BYTE A BYTE el mismo archivo, `\n` final
+  // incluido. Antes de este fix, esto no podía dar verdad NUNCA: todo
+  // archivo bajo `src/contenido/datos/` termina en `\n` y `serializa()`
+  // no lo agregaba, así que el último byte siempre difería. Es también la
+  // prueba de que cada esquema describe exactamente el contenido de hoy:
+  // el día que deje de ser así, este test —no un publish real de la
+  // clienta— es el que se entera primero.
+  it('0 · serializa() es la inversa exacta de cada archivo real bajo src/contenido/datos/', () => {
+    for (const id of Object.keys(DOCUMENTOS) as IdDocumento[]) {
+      const ruta = `src/contenido/datos/${id}.json`
+      const texto = readFileSync(ruta, 'utf8')
+      expect(serializa(DOCUMENTOS[id], JSON.parse(texto)), id).toBe(texto)
+    }
+  })
+
   it('2 · toda ruta del esquema existe en el dato, y toda clave del dato está en el esquema', () => {
     // El candado anti-desincronización. `serializa()` ya lo verifica al
     // escribir, pero eso pasa UNA vez, cuando alguien corre el script.
@@ -2164,7 +2185,8 @@ describe('los candados del sistema de contenido', () => {
       const ruta = `src/contenido/datos/${id}.json`
       const bytes = readFileSync(ruta, 'utf8')
       const cargado = cargar(ruta, DOCUMENTOS[id], CRUDO[id])
-      expect(serializa(DOCUMENTOS[id], cargado) + '\n', id).toBe(bytes)
+      // [I-2] serializa() ya termina en '\n'.
+      expect(serializa(DOCUMENTOS[id], cargado), id).toBe(bytes)
     }
   })
 
