@@ -268,7 +268,10 @@ limpieza() {
     printf '#####################################################################\n'
     printf 'footer.derechos en vivo (o a punto de estarlo) tiene el texto de prueba\n'
     printf 'de esta corrida, no el original. Para dejarlo como estaba, corré:\n\n'
-    printf "  %s --restaurar '%s'\n\n" "$0" "$DERECHOS_ORIGINAL"
+    # `%q` y no comillas a mano: el día que footer.derechos tenga un
+    # apóstrofo —«Hecho a mano en México, como se hacía»— el comando que le
+    # decimos que pegue se rompería justo cuando más lo necesita.
+    printf '  %s --restaurar %s\n\n' "$(printf '%q' "$0")" "$(printf '%q' "$DERECHOS_ORIGINAL")"
     printf 'Eso entra con tu contraseña y publica el valor de arriba por el mismo\n'
     printf 'canal que usa la clienta — nunca hace falta `git revert` a mano.\n'
     printf '#####################################################################\n'
