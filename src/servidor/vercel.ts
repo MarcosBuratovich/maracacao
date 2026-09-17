@@ -82,6 +82,23 @@ export function clienteVercel(c: CredencialesVercel) {
         )
       }
 
+      // [RULING T5-2] Un 200 con un cuerpo que no se puede leer también es un
+      // error, y hay que tratarlo como tal. Sin esta línea, el `.catch()` de
+      // arriba lo dejaba en `undefined`, el `?? []` de abajo lo volvía «no hay
+      // despliegues» y el módulo contestaba `'desconocido'` — que significa
+      // «la plataforma todavía no vio este commit», una afirmación FALSA
+      // cuando lo que pasó es que contestó basura. Y en silencio: sin
+      // excepción no hay nada en el log de Marcos, contra lo que promete el
+      // docstring de este archivo. Pasa de verdad: una página de
+      // mantenimiento servida con 200, una respuesta truncada por timeout.
+      //
+      // `json()` sobre un cuerpo válido nunca devuelve `undefined` —un `null`
+      // literal parsea a `null`— así que `undefined` acá significa
+      // exactamente una cosa: no se pudo leer.
+      if (cuerpo === undefined) {
+        throw new Error(`La plataforma respondió ${respuesta.status} con un cuerpo que no se pudo leer.`)
+      }
+
       const despliegues = (cuerpo as { deployments?: Array<{ state?: string; url?: string | null }> } | undefined)?.deployments ?? []
       const primero = despliegues[0]
       if (!primero) return { estado: 'desconocido', url: null }

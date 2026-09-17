@@ -55,4 +55,21 @@ describe('el estado del despliegue de un commit', () => {
     const { f } = fetchFalso([{ status: 403, cuerpo: { error: { message: 'Not authorized' } } }])
     await expect(deV(f).despliegueDe('a'.repeat(40))).rejects.toThrow(/403/)
   })
+
+  it('T5-2: un 200 con un cuerpo ilegible también tira — «desconocido» sería mentir', async () => {
+    // Una página de mantenimiento servida con 200, o una respuesta truncada
+    // por timeout. Sin este camino, el módulo contestaba `'desconocido'` —que
+    // significa «todavía no vio este commit»— y no dejaba nada en el log: el
+    // único caso en que este archivo fallaba callado.
+    const f = (async () =>
+      new Response('<html>mantenimiento</html>', { status: 200 })) as unknown as typeof globalThis.fetch
+    await expect(deV(f).despliegueDe('a'.repeat(40))).rejects.toThrow(/no se pudo leer/)
+  })
+
+  it('T5-2: y «desconocido» queda SOLO para el cuerpo bien formado sin despliegues', async () => {
+    // El candado del test de arriba: que la excepción nueva no se haya comido
+    // el caso legítimo, que es el normal en los primeros segundos tras publicar.
+    const { f } = fetchFalso([{ cuerpo: { deployments: [] } }])
+    expect((await deV(f).despliegueDe('a'.repeat(40))).estado).toBe('desconocido')
+  })
 })
