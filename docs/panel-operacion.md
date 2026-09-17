@@ -4,6 +4,13 @@ Notas de operación del panel para la clienta (fase 5). Se arma a medida que
 cada tarea deja algo que vale la pena anotar para el Marcos de más adelante,
 no de una sola vez.
 
+Si algo del panel deja de andar, `scripts/humo-panel.sh` es el ensayo de
+este documento en forma de script: pega contra `www.maracacao.mx` de
+verdad —salud, un login que falla a propósito, el freno de intentos, un
+login que funciona, una publicación real y su vuelta atrás— y en el camino
+confirma o descarta la mitad de las preguntas que este runbook contesta por
+escrito. Correrlo primero, antes de tocar nada a mano, ahorra tiempo.
+
 ## Cómo se escribe una función
 
 La fuente de cada función serverless va en `src/servidor/entradas/<nombre>.ts`,
@@ -40,6 +47,36 @@ banner de la primera línea del artefacto (`GENERADO por scripts/bundle-api.ts
 — no editar a mano`) está para recordarlo en el peor momento, con el archivo
 ya abierto.
 
+## Las seis variables: qué es cada una y dónde vive
+
+Todas viven en el mismo lugar: vercel.com → proyecto `maracacao` →
+**Settings** → **Environment Variables**, marcadas para el entorno
+**Production** nada más (nunca Preview ni Development — los previews de
+cada rama y `pnpm dev` local no necesitan, y no deberían tener, ningún
+secreto real). `salud` (`GET /api/panel?accion=salud`) es la forma de
+confirmar desde afuera que las seis están cargadas, sin necesitar sesión:
+
+```bash
+curl -s https://www.maracacao.mx/api/panel?accion=salud
+```
+
+| Variable | Qué es | Si falta |
+|---|---|---|
+| `PANEL_CLAVE_HASH` | El hash de la contraseña de la clienta (formato `scrypt$…`, ver la sección de abajo). Sin esto, nadie entra. | `entrar` compara contra el hash señuelo igual, así que siempre da 401 — parece «contraseña incorrecta» aunque el problema sea otro. `salud` es la forma de distinguir los dos casos. |
+| `PANEL_SECRETO` | La clave con la que se firma y se verifica la cookie de sesión (HMAC-SHA256). Tiene que medir 32 caracteres o más — con menos, `entrar` y `publicar` responden 503 a propósito, antes de intentar nada (ver C-1 en `src/servidor/acciones.ts`). | Nadie puede entrar ni publicar: 503, nunca un 401 que confunda. |
+| `PANEL_CORREOS` | La lista de correos con acceso, separados por comas. Se vuelve a leer en CADA `entrar` y en CADA `publicar` (I-4) — nunca queda una cookie vieja publicando en nombre de alguien que ya no está en la lista. | Nadie entra: ningún correo matchea una lista vacía. |
+| `PANEL_GITHUB_TOKEN` | El fine-grained PAT de GitHub, acotado al repo `maracacao`, con un solo permiso (`Contents: Read and write`, sin `Workflows`). Es lo que le permite al panel escribir commits. | `publicar` no puede leer ni escribir nada: 502. `salud` contesta `"github":false`. |
+| `GITHUB_DUENIO` | El dueño del repo (`MarcosBuratovich`). Tiene default: si falta, se completa solo con `VERCEL_GIT_REPO_OWNER` (que Vercel ya inyecta en todo deploy conectado a Git) o, si ni eso está, con el literal `MarcosBuratovich` (`src/servidor/entradas/panel.ts`, función `entorno()`). | En la práctica, nunca falta — por eso no hace falta cargarla a mano en Vercel. |
+| `GITHUB_REPO` | El nombre del repo (`maracacao`). Mismo default en cascada que `GITHUB_DUENIO`. | Igual que arriba: nunca falta en la práctica. |
+
+Las últimas dos están en la lista de `salud` porque el código las pide (E8:
+seis variables, siempre las mismas seis), pero en un deploy conectado a
+GitHub —que es como está este proyecto— nunca vas a ver a `GITHUB_DUENIO` ni
+a `GITHUB_REPO` en el `"faltan"` de una respuesta real: el default las
+completa antes de que `salud` las mire. Si alguna vez hace falta apuntar el
+panel a OTRO repo (un fork, una migración), ahí sí hay que cargarlas a mano
+— mientras tanto, no.
+
 ## Cómo se cambia la contraseña del panel
 
 No hay «recuperar contraseña» ni tabla de usuarios: la contraseña vive
@@ -56,7 +93,7 @@ pnpm exec tsx -e "import {hashDeClave} from './src/servidor/sesion.ts'; console.
 ```
 
 Esto imprime una sola línea con la forma
-`scrypt$16384$8$1$<sal en base64>$<hash en base64>`. Esa línea completa —
+`scrypt$16384$8$5$<sal en base64>$<hash en base64>`. Esa línea completa —
 tal cual, con los signos `$` incluidos— es el valor que va a
 `PANEL_CLAVE_HASH` en Vercel, nunca la contraseña en claro que se le pasó
 al comando.
@@ -73,3 +110,210 @@ Dos advertencias:
   sigue siendo válida hasta que venza sola. Si hace falta cerrar TODAS las
   sesiones activas (por ejemplo, si se sospecha que una cookie se filtró),
   lo que hay que rotar es `PANEL_SECRETO`, no `PANEL_CLAVE_HASH`.
+
+Los clics para dejar el hash nuevo funcionando, en Vercel:
+
+1. vercel.com → el proyecto `maracacao` → **Settings** → **Environment
+   Variables**.
+2. Buscá `PANEL_CLAVE_HASH` en la lista, tocá los tres puntos de esa fila →
+   **Edit**.
+3. Pegá la línea completa que imprimió el comando de arriba (con los `$`) en
+   el valor. Abajo, donde pregunta en qué entornos vale, tiene que quedar
+   marcado **solo Production** — ni Preview ni Development: los tests y las
+   ramas de trabajo no necesitan la contraseña real, y si algún día un
+   Preview la tuviera cargada, cualquiera con el link de ese Preview podría
+   probarla.
+4. **Save.**
+5. Un cambio de variable de entorno NO redespliega solo: las funciones ya
+   desplegadas siguen corriendo con el valor viejo hasta el próximo deploy.
+   Andá a **Deployments**, abrí el de arriba de todo (el de Production) →
+   los tres puntos → **Redeploy** → confirmá sin tocar la opción de caché.
+6. Esperá el redeploy (un par de minutos) y probá con
+   `curl -s https://www.maracacao.mx/api/panel?accion=salud` — tiene que
+   seguir diciendo `"ok":true`. Recién ahí la contraseña vieja dejó de
+   servir y la nueva ya sirve.
+
+## Cómo rotar el PAT de GitHub en cinco minutos
+
+Esto es lo que hay que hacer el día que el token de GitHub (el que vive en
+`PANEL_GITHUB_TOKEN`) se filtra, o simplemente por las dudas cada tanto. El
+token es un **fine-grained personal access token**, acotado al repo
+`maracacao` y con un solo permiso: `Contents: Read and write` — sin
+`Workflows`, así que aunque alguien lo tuviera en la mano no podría tocar
+`.github/workflows/**` ni con el token a la vista (y aunque el token tuviera
+de más, la lista blanca de `src/servidor/rutas-permitidas.ts` tampoco deja
+que el panel intente escribir ahí — es cinturón y tirantes, no uno solo).
+
+**Revocar el que puede estar filtrado:**
+
+1. github.com → tu foto de perfil (arriba a la derecha) → **Settings**.
+2. En el menú de la izquierda, hasta abajo del todo → **Developer
+   settings**.
+3. **Personal access tokens** → **Fine-grained tokens**.
+4. Buscá el que usa el panel (el nombre que le hayas puesto al crearlo, algo
+   como «panel-maracacao») → entrá → **Delete token** → confirmá. Desde ese
+   instante ese token ya no sirve para nada, aunque alguien lo tenga
+   guardado.
+
+**Generar uno nuevo, con los mismos permisos:**
+
+5. En la misma pantalla de **Fine-grained tokens** → **Generate new token**.
+6. **Token name**: algo que se reconozca de un vistazo, por ejemplo
+   `panel-maracacao-2027`. **Expiration**: la más larga disponible (o «No
+   expiration» si la organización lo permite) — un token que vence solo un
+   día cualquiera y tira el panel abajo sin aviso es peor que uno que dura
+   de más.
+7. **Resource owner**: tu usuario (`MarcosBuratovich`).
+8. **Repository access** → **Only select repositories** → elegí `maracacao`
+   nada más. Nunca «All repositories»: un token que puede tocar CUALQUIER
+   repo tuyo es un premio demasiado grande para quien lo consiga.
+9. **Permissions** → **Repository permissions** → buscá **Contents** → poné
+   **Read and write**. Dejá TODO lo demás en «No access», en particular
+   **Actions** (que es donde vive el permiso de tocar workflows) — no hace
+   falta ni un solo permiso más para que el panel funcione.
+10. **Generate token**. GitHub lo muestra UNA sola vez: copialo ahí mismo,
+    no cierres la pestaña sin copiarlo.
+
+**Cargarlo en Vercel y redesplegar:**
+
+11. vercel.com → proyecto `maracacao` → **Settings** → **Environment
+    Variables** → `PANEL_GITHUB_TOKEN` → **Edit** → pegá el token nuevo →
+    confirmá que sigue marcado solo **Production** → **Save**.
+12. **Deployments** → el de arriba (Production) → los tres puntos →
+    **Redeploy**. Igual que con la contraseña: sin este paso, las funciones
+    ya desplegadas siguen usando el token viejo (que ya no existe) hasta
+    que algo las redespliegue.
+13. Confirmá con
+    `curl -s https://www.maracacao.mx/api/panel?accion=salud` — tiene que
+    volver a decir `"github":true`. Si dice `false`, o el token no se pegó
+    bien, o el redeploy todavía no terminó — esperá un minuto y probá de
+    nuevo antes de sospechar algo peor.
+
+Cinco pasos que importan, cinco minutos reales si ya sabés dónde hacer clic:
+revocar (paso 4), generar (pasos 5 a 10), pegar (paso 11), redeploy (paso
+12), confirmar (paso 13).
+
+## Cómo cerrar TODAS las sesiones abiertas
+
+No hay un botón de «cerrar sesión de todo el mundo» ni una lista de quién
+está adentro — no hay tabla de sesiones, la cookie ES la sesión (E3). La
+única forma de invalidar TODAS las cookies ya emitidas, de una sola vez, es
+cambiar `PANEL_SECRETO`: la firma de cada cookie vieja deja de matchear la
+firma que el servidor calcula con el secreto nuevo, así que `verificaSesion`
+las rechaza a todas por igual, sin excepción — incluida la tuya, si habías
+entrado antes del cambio.
+
+Usalo cuando sospeches que una cookie se filtró (una pantalla compartida,
+un aparato perdido) o cuando alguien que tenía acceso deja de tenerlo y no
+alcanza con sacarlo de `PANEL_CORREOS` (sacarlo de la lista le bloquea
+`publicar` en el próximo pedido — I-4 — pero no invalida una cookie que
+todavía no venció; si además hay que estar seguro de que esa cookie puntual
+ya no sirve para nada, hace falta este paso).
+
+1. Generá un secreto nuevo, al azar, de más de 32 caracteres (el mínimo que
+   exige `LARGO_MIN_SECRETO` en `src/servidor/sesion.ts` — con menos, un
+   HMAC no protege nada):
+   ```bash
+   openssl rand -base64 48
+   ```
+2. vercel.com → proyecto `maracacao` → **Settings** → **Environment
+   Variables** → `PANEL_SECRETO` → **Edit** → pegá el valor nuevo → solo
+   **Production** → **Save**.
+3. **Deployments** → Production → **Redeploy** (mismo motivo que siempre:
+   sin esto, las funciones ya desplegadas siguen firmando y verificando con
+   el secreto viejo).
+4. Confirmá con `salud` como en los pasos anteriores, y después probá
+   entrar de nuevo con la contraseña — tiene que pedir login otra vez, para
+   vos también. Si te dejó pasar sin pedir nada, el redeploy todavía no
+   terminó.
+
+## Si `main` queda roto
+
+No hay apuro. El sitio en producción sigue sirviendo el ÚLTIMO deploy
+bueno — Vercel no tira abajo lo que ya está andando solo porque el commit
+de arriba de `main` no compila o falla un check. `www.maracacao.mx` sigue
+respondiendo exactamente igual que antes, con el contenido de antes,
+mientras vos arreglás con calma.
+
+Lo que rompió `main` casi siempre es un commit que vino DESDE el panel — un
+documento que igual pasó la validación del navegador pero después falló
+algo en `astro build` (un caso que la revalidación del servidor no cubre,
+porque valida el esquema del contenido, no que el sitio entero compile) — o
+un commit tuyo, normal, desde la computadora. La solución es la misma para
+los dos casos: un commit nuevo, normal, desde tu computadora, que arregla lo
+que sea que rompió, y lo empujás a `main` como cualquier otro día. Nunca
+hace falta tocar el panel para esto — el panel no sabe nada de si el sitio
+compila, y no tiene por qué saberlo.
+
+Si el deploy roto ya se disparó y está corriendo, podés cancelarlo a mano
+desde **Deployments** en Vercel (los tres puntos → **Cancel**) mientras
+armás el arreglo, pero ni siquiera eso es urgente: el peor caso es que
+Vercel termine de intentarlo, falle, y el sitio en vivo siga siendo el
+mismo de antes.
+
+## Qué NO puede hacer el panel, aunque quisiera
+
+Todo esto está frenado por diseño, en capas — no es que «no se nos ocurrió»
+pedirle al panel que lo haga, es que cada candado existe a propósito:
+
+- **No puede tocar workflows.** El PAT no tiene el permiso de GitHub
+  (`Actions`) que hace falta para escribir en `.github/workflows/**` — así
+  que aunque el código del panel intentara, GitHub lo rechazaría antes de
+  que el commit exista. Y antes de siquiera llegar a GitHub, la lista
+  blanca de `src/servidor/rutas-permitidas.ts` ya rechazó esa ruta: dos
+  frenos independientes, no uno.
+- **No puede tocar código, ni configuración, ni nada fuera de tres patrones
+  exactos.** La lista blanca solo deja pasar `src/contenido/datos/*.json`
+  (los tres documentos de contenido) y las imágenes bajo
+  `public/sitio/marca/`, `public/sitio/envoltura/` y
+  `public/sitio/etiqueta-*.webp`. `package.json`, `vercel.json`, cualquier
+  archivo de `src/servidor/**`, cualquier `.ts` o `.astro`: todo eso está
+  afuera. La comparación es letra por letra contra el patrón exacto —no
+  hay «se parece», no hay mayúsculas que se cuelen, no hay `../` que
+  escape del directorio.
+- **No puede publicar más de 40 archivos ni más de 3.5 MB por pedido**
+  (`TOPE_ARCHIVOS`, `TOPE_CUERPO` en `rutas-permitidas.ts`) — un límite
+  para que un error (o alguien probando los bordes) no mande un lote
+  gigante de una sola vez.
+- **No puede forzar un push.** Cada commit se arma con `force: false`
+  contra el `main` que el panel acaba de leer — si `main` se movió en el
+  medio, el commit falla en vez de pisar lo que sea que haya cambiado.
+- **No puede hacerse pasar por vos.** Cada commit lleva el autor `Panel
+  Maracacao <panel@maracacao.mx>`, nunca tu nombre — para que el historial
+  de Git siempre diga «esto lo publicó el panel», no «esto lo publicó
+  Marcos», ni siquiera cuando el correo en el trailer `Panel-Autor:` sea el
+  tuyo.
+- **No puede saltarse la validación.** El mismo `validar()` que corre en el
+  navegador vuelve a correr entero en el servidor, sobre el documento
+  completo, antes de tocar GitHub — un documento roto no se publica aunque
+  el navegador de quien lo mandó estuviera mintiendo.
+
+## Lo que todavía NO está cubierto
+
+Dos cosas quedaron anotadas, a propósito, para más adelante — no son bugs
+de esta parte, son límites conocidos de lo que se construyó hasta acá:
+
+- **Dos personas editando el mismo documento a la vez pueden pisarse sin
+  que nadie se entere.** El panel escribe el documento ENTERO en cada
+  publicación, así que si vos y tu hermana editan `sitio.json` al mismo
+  tiempo, quien publica segundo sobreescribe TODO lo que publicó quien lo
+  hizo primero, sin conflicto y sin aviso — el segundo commit entra como un
+  fast-forward limpio, porque para Git no hay ningún dato de que el
+  contenido cambió en el medio (a diferencia de un archivo de código, donde
+  un merge marcaría el choque). Hoy hay una sola persona con acceso, así
+  que el riesgo es bajo, pero está anotado (ledger de esta fase, ítem I-5):
+  la Fase 5 Parte B es la que tiene que traer el número de versión que el
+  navegador leyó, para que el servidor pueda decir «esto cambió mientras
+  editabas» en vez de pisarlo en silencio.
+- **El freno de los cinco intentos vive en la memoria de una sola función
+  en ejecución (E4), no en una base de datos compartida.** Las funciones
+  serverless de Vercel son efímeras y pueden correr varias a la vez: alguien
+  que dispare intentos contra varias instancias en simultáneo, o que
+  simplemente tenga paciencia y espere a que Vercel recicle una instancia,
+  se salta el freno sin mucho esfuerzo. No es la defensa principal —esa es
+  tener una contraseña larga (E2)— sino el freno al intento casual y al
+  script tonto. Por la misma razón, `scripts/humo-panel.sh` (paso 3) puede
+  ver el freno saltar antes o después de lo que uno cuenta a mano: no es
+  una falla del script, es este mismo límite. Si algún día hace falta un
+  freno de verdad, contra un atacante de verdad, hace falta un almacén
+  compartido entre instancias (Redis, o algo así) — hoy no existe.
