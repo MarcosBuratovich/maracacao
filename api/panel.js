@@ -15371,6 +15371,7 @@ function frase(cambios) {
 var AUTOR_PANEL = { name: "Panel Maracacao", email: "panel@maracacao.mx" };
 var REF = "heads/main";
 var ASUNTO_GENERICO = "Actualiza contenido del panel";
+var PROBLEMA_NO_SE_PUDO_PUBLICAR = "No pudimos publicar: hubo un problema para conectarnos con el sitio. Prueba de nuevo en unos minutos.";
 var CONCURRENCIA_BLOBS = 4;
 async function mapaConcurrencia(items, limite, tarea) {
   const resultados = new Array(items.length);
@@ -15479,7 +15480,7 @@ function traduceError(e, p) {
   return {
     ok: false,
     codigo: 502,
-    problema: "No pudimos publicar: hubo un problema para conectarnos con el sitio. Prueba de nuevo en unos minutos."
+    problema: PROBLEMA_NO_SE_PUDO_PUBLICAR
   };
 }
 
@@ -18448,7 +18449,7 @@ var RESUMEN_DESHECHO = "Listo, lo dej\xE9 como estaba antes.";
 var PROBLEMA_TARDE = "Ya pas\xF3 mucho tiempo para deshacer esto desde aqu\xED. B\xFAscalo en el historial de cambios.";
 var PROBLEMA_NO_VALIDA = "Ese contenido ya no cumple con las reglas de hoy. Puedo abr\xEDrtelo como borrador para que lo ajustes.";
 var PROBLEMA_NO_ES_TUYO = "Ese cambio no se public\xF3 desde aqu\xED, as\xED que no lo puedo deshacer.";
-var PROBLEMA_NO_SE_PUDO_DESHACER = "No pudimos publicar: hubo un problema para conectarnos con el sitio. Prueba de nuevo en unos minutos.";
+var PROBLEMA_NADA_QUE_DESHACER = "Esa publicaci\xF3n no cambi\xF3 ning\xFAn dato del sitio, as\xED que no hay nada que deshacer.";
 async function deshacerAccion(pedido, contexto) {
   const env = contexto.env;
   if (!secretoUtilizable(env)) {
@@ -18497,13 +18498,17 @@ async function deshacerAccion(pedido, contexto) {
     case "no-valida":
       console.error(`deshacer: el contenido viejo de ${cuerpo.sha} no pasa las reglas de hoy \u2014 ${r.detalle}`);
       return error51(422, PROBLEMA_NO_VALIDA);
-    // `nada-que-revertir` y `falló` caen las dos acá: son la misma frase
-    // genérica de «no se pudo» que ya usa el resto del router para un error
-    // fuerte del lado de GitHub — ninguna de las dos tiene una frase propia
-    // que a ella le sirva más que esta.
+    // Permanente, no una falla de red — ver el comentario de
+    // `PROBLEMA_NADA_QUE_DESHACER` más arriba.
+    case "nada-que-revertir":
+      console.error(`deshacer: ${cuerpo.sha} no ten\xEDa nada que revertir \u2014 ${r.detalle}`);
+      return error51(409, PROBLEMA_NADA_QUE_DESHACER);
+    // Solo `falló` llega hasta acá: un error de verdad del lado de GitHub
+    // (`revierte()`/`publica()`), la misma frase que usa `traduceError()`
+    // en `publicar.ts` — compartida para que las dos no se desincronicen.
     default:
       console.error(`deshacer: no se pudo deshacer ${cuerpo.sha} \u2014 ${r.motivo}: ${r.detalle}`);
-      return error51(502, PROBLEMA_NO_SE_PUDO_DESHACER);
+      return error51(502, PROBLEMA_NO_SE_PUDO_PUBLICAR);
   }
 }
 var PROBLEMA_ACCION_INEXISTENTE = "Esta acci\xF3n todav\xEDa no existe.";

@@ -55,6 +55,31 @@ const FRASE_TARDA =
  */
 export const JERGA_PROHIBIDA = ['Vercel', 'deploy', 'commit', 'build', 'GitHub', 'CDN', 'sha'] as const
 
+/**
+ * ¿Esta frase le habla a la clienta con jerga? Devuelve la palabra de
+ * `JERGA_PROHIBIDA` que encontró, o `null` si la frase está limpia.
+ *
+ * [Tarea 9, Ronda 1] Por LÍMITES DE PALABRA y no por substring crudo (que es
+ * como comparaban a mano los tres lugares que usaban esta lista antes de
+ * esta función), porque `'sha'` —la única entrada de tres letras— vive
+ * adentro de «deshacer» y de «deshabilitar», que son exactamente el
+ * vocabulario de un panel de publicación (el botón de la Tarea 9 SE LLAMA
+ * «Deshacer»). Un guardián que rechaza la palabra del botón principal no se
+ * corrige: se afloja, y a la tercera vez que alguien lo pelea, deja de
+ * proteger — que es peor que no tenerlo, porque nadie se entera de que dejó
+ * de proteger.
+ *
+ * Se normalizan los acentos antes de comparar (NFD, sin las marcas
+ * diacríticas) para que «commit» no se cuele escrito como «cómmit».
+ */
+export function jergaEn(frase: string): string | null {
+  const normalizada = frase.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  for (const jerga of JERGA_PROHIBIDA) {
+    if (new RegExp(`\\b${jerga}\\b`, 'i').test(normalizada)) return jerga
+  }
+  return null
+}
+
 export interface Veredicto {
   estado: 'enCurso' | 'listo' | 'falló'
   frase: string

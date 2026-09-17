@@ -76,6 +76,18 @@ const REF = 'heads/main'
 /** Se usa cuando `publica()` no recibió `cambios`: no hay diff para nombrar, pero sí algo que publicar. */
 const ASUNTO_GENERICO = 'Actualiza contenido del panel'
 
+/**
+ * [Tarea 9, Ronda 1] La frase para cualquier error fuerte del lado de
+ * GitHub —acá, en `traduceError()`, abajo—. Exportada porque `revierte()`
+ * (revertir.ts) puede devolver este MISMO texto adentro de `detalle` cuando
+ * `publica()` es quien falló, y `deshacerAccion` (acciones.ts) la reusa tal
+ * cual para su propio error genérico: tenerla escrita en dos archivos era
+ * la clase de duplicado que se desincroniza sola en cuanto alguien edite
+ * uno de los dos sin acordarse del otro.
+ */
+export const PROBLEMA_NO_SE_PUDO_PUBLICAR =
+  'No pudimos publicar: hubo un problema para conectarnos con el sitio. Prueba de nuevo en unos minutos.'
+
 /** Cuántos blobs se crean en simultáneo. Ni uno por uno (lento) ni todos juntos (le pega a la API de golpe). */
 const CONCURRENCIA_BLOBS = 4
 
@@ -281,6 +293,6 @@ function traduceError(e: unknown, p: Publicacion): Resultado {
   return {
     ok: false,
     codigo: 502,
-    problema: 'No pudimos publicar: hubo un problema para conectarnos con el sitio. Prueba de nuevo en unos minutos.',
+    problema: PROBLEMA_NO_SE_PUDO_PUBLICAR,
   }
 }

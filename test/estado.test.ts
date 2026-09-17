@@ -8,7 +8,7 @@
  * Por eso las once combinaciones se prueban acá, en milisegundos.
  */
 import { describe, it, expect } from 'vitest'
-import { decide, JERGA_PROHIBIDA } from '../src/servidor/estado'
+import { decide, jergaEn } from '../src/servidor/estado'
 
 const SHA = 'a'.repeat(40)
 const base = { despliegue: 'enCurso' as const, url: null, shaServido: null, shaPublicado: SHA, desdeHaceMs: 5_000 }
@@ -69,9 +69,31 @@ describe('el veredicto', () => {
       decide({ ...base, desdeHaceMs: 300_001 }).frase,
     ]
     for (const f of frases) {
-      for (const jerga of JERGA_PROHIBIDA) {
-        expect(f.toLowerCase(), f).not.toContain(jerga.toLowerCase())
-      }
+      expect(jergaEn(f), f).toBeNull()
     }
+  })
+})
+
+describe('jergaEn', () => {
+  // [Tarea 9, Ronda 1] `'sha'` —la entrada de tres letras de
+  // `JERGA_PROHIBIDA`— es también un fragmento de «deshacer» y de
+  // «deshabilitar», dos palabras de vocabulario de panel completamente
+  // normales. Un chequeo por substring crudo las rechazaría igual que
+  // rechaza «el sha del commit» de verdad.
+  it('deja pasar el vocabulario del panel que por casualidad contiene «sha»', () => {
+    expect(jergaEn('Deshacer esta publicación')).toBeNull()
+    expect(jergaEn('Puedo deshabilitar esa opción si hace falta')).toBeNull()
+  })
+
+  it('atrapa «sha» cuando aparece como palabra suelta', () => {
+    expect(jergaEn('el sha del commit')).not.toBeNull()
+  })
+
+  it('no se le escapa por la mayúscula', () => {
+    expect(jergaEn('hubo un problema con el Deploy')).not.toBeNull()
+  })
+
+  it('está limpia si ninguna palabra de la lista aparece', () => {
+    expect(jergaEn('Listo, lo dejé como estaba antes.')).toBeNull()
   })
 })

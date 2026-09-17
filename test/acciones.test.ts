@@ -17,7 +17,7 @@ import { esquemaSabores } from '../src/contenido/esquema/sabores'
 import { TOPE_CUERPO } from '../src/servidor/rutas-permitidas'
 import { fetchFalso, respuestasDeUnaPublicacionCompleta, respuestasDeUnaPublicacionDirecta } from './lib/github-falso'
 import { marca } from '@/copy/sitio-marca'
-import { JERGA_PROHIBIDA } from '../src/servidor/estado'
+import { jergaEn } from '../src/servidor/estado'
 
 // El JSON tal cual vive en el repo, SIN pasar por la fachada: es
 // exactamente lo que `scripts/humo-panel.sh` publica de verdad (lee el
@@ -1273,9 +1273,7 @@ describe('accion=estado', () => {
     // vacía.
     expect(salidas.filter((s) => s !== '')).toHaveLength(4)
     for (const frase of salidas) {
-      for (const jerga of JERGA_PROHIBIDA) {
-        expect(frase.toLowerCase(), frase).not.toContain(jerga.toLowerCase())
-      }
+      expect(jergaEn(frase), frase).toBeNull()
     }
   })
 
@@ -1392,10 +1390,8 @@ describe('accion=estado', () => {
     )
     const paraElla = cartas.find((c) => c.a.includes('clienta@ejemplo.mx'))
     expect(paraElla).toBeDefined()
-    const texto = `${paraElla!.asunto} ${paraElla!.texto}`.toLowerCase()
-    for (const jerga of JERGA_PROHIBIDA) {
-      expect(texto, texto).not.toContain(jerga.toLowerCase())
-    }
+    const texto = `${paraElla!.asunto} ${paraElla!.texto}`
+    expect(jergaEn(texto), texto).toBeNull()
   })
 
   // Ronda 2, F-2: los `await contexto.correo(...)` de la reversión están
@@ -1574,10 +1570,18 @@ describe('accion=deshacer', () => {
     },
   })
 
-  it('deshace la última publicación y devuelve el resumen', async () => {
-    const sha = 'a'.repeat(40)
+  /**
+   * Las catorce respuestas del camino FELIZ completo: `revisaLaCabeza()`
+   * (3, con el despliegue de `sha` en `READY` — nada que autorrevertir),
+   * la lectura propia de `deshacerAccion` para la ventana (1), y
+   * `revierte()` de punta a punta sobre `sabores.json` (3 + 1 +
+   * `respuestasDeUnaPublicacionDirecta()`). La usan tanto el camino feliz
+   * de siempre como el test del borde exacto de la ventana — extraída para
+   * no repetir las catorce líneas dos veces.
+   */
+  const respuestasDeUnDeshacerExitoso = (sha: string) => {
     const c = commitDelPanel(sha)
-    const { f } = fetchFalso([
+    return [
       { cuerpo: { object: { sha } } }, // gh.ref (revisaLaCabeza)
       c, // gh.commit (revisaLaCabeza)
       { cuerpo: { deployments: [{ state: 'READY', url: 'maracacao-x.vercel.app' }] } }, // vercel.despliegueDe (revisaLaCabeza): el despliegue de ESTE commit salió bien, nada que autorrevertir
@@ -1587,7 +1591,12 @@ describe('accion=deshacer', () => {
       { cuerpo: { files: [{ filename: 'src/contenido/datos/sabores.json' }] } }, // gh.comparaRefs(padre, sha)
       { cuerpo: { content: Buffer.from(textoSaboresVivo).toString('base64'), encoding: 'base64' } }, // gh.archivoEnRef(sabores, padre): el contenido VIEJO
       ...respuestasDeUnaPublicacionDirecta(),
-    ])
+    ]
+  }
+
+  it('deshace la última publicación y devuelve el resumen', async () => {
+    const sha = 'a'.repeat(40)
+    const { f } = fetchFalso(respuestasDeUnDeshacerExitoso(sha))
     const r = await maneja(
       'deshacer',
       { cuerpo: { sha }, cookie: cookieValida() },
@@ -1738,7 +1747,12 @@ describe('accion=deshacer', () => {
     expect((r.cuerpo as { problema: string }).problema).toBe('Ese cambio no se publicó desde aquí, así que no lo puedo deshacer.')
   })
 
-  it('un commit que no tocó contenido no tiene nada que revertir: no es un éxito', async () => {
+  it('un commit que no tocó contenido no tiene nada que revertir: no es un éxito, y no es «prueba de nuevo»', async () => {
+    // [Ronda 1] `nada-que-revertir` es un hecho PERMANENTE de ese commit, no
+    // una falla de red: reintentar da el mismo resultado siempre. Por eso es
+    // 409 con su propia frase, no el 502 genérico de «no pudimos conectarnos»
+    // (ese es para `falló`, que sí es un error de GitHub — ver el test de
+    // abajo).
     const sha = '2'.repeat(40)
     const c = commitDelPanel(sha)
     const { f } = fetchFalso([
@@ -1755,10 +1769,99 @@ describe('accion=deshacer', () => {
       { cuerpo: { sha }, cookie: cookieValida() },
       contextoDePrueba({ fetch: f, ahora: () => PUBLICADO_EN + 60_000 }),
     )
+    expect(r.status).toBe(409)
+    expect((r.cuerpo as { problema: string }).problema).toBe(
+      'Esa publicación no cambió ningún dato del sitio, así que no hay nada que deshacer.',
+    )
+  })
+
+  it('el motivo `falló` de verdad (no `nada-que-revertir`) da 502 con la MISMA frase que usa publicar.ts', async () => {
+    // A diferencia de `nada-que-revertir` (arriba, permanente), este SÍ es
+    // el motivo genérico de error del que vale la pena reintentar. Se llega
+    // con un commit sin padre —el camino más corto hasta `falló` adentro de
+    // `revierte()` (revertir.ts), sin necesitar que `publica()` falle de
+    // verdad— y lo que importa acá no es CÓMO se llega, sino que el router
+    // conteste con la frase compartida (`PROBLEMA_NO_SE_PUDO_PUBLICAR`) y no
+    // con una copia suelta que se puede desincronizar.
+    const sha = '3'.repeat(40)
+    const c = {
+      cuerpo: {
+        sha,
+        tree: { sha: 't' },
+        message: 'cambia sabores\n\nPanel: sí',
+        author: { date: '2026-09-17T12:00:00Z' },
+        parents: [], // sin padre: revierte() no tiene a qué volver — motivo `falló`
+      },
+    }
+    const { f } = fetchFalso([
+      { cuerpo: { object: { sha } } },
+      c,
+      { cuerpo: { deployments: [{ state: 'READY', url: 'x' }] } },
+      c,
+      { cuerpo: { object: { sha } } },
+      c,
+    ])
+    const r = await maneja(
+      'deshacer',
+      { cuerpo: { sha }, cookie: cookieValida() },
+      contextoDePrueba({ fetch: f, ahora: () => PUBLICADO_EN + 60_000 }),
+    )
     expect(r.status).toBe(502)
     expect((r.cuerpo as { problema: string }).problema).toBe(
       'No pudimos publicar: hubo un problema para conectarnos con el sitio. Prueba de nuevo en unos minutos.',
     )
+  })
+
+  it('una fecha que no se puede leer NO cae del lado permisivo', async () => {
+    // [Ronda 1, Important] `NaN > VENTANA_DESHACER_MS` da `false`: sin la
+    // guardia explícita de `Number.isFinite`, un commit con fecha ilegible
+    // se trataría como «recién publicado» y se podría deshacer siempre. Es
+    // el bug de JavaScript que más veces se reintrodujo en la historia del
+    // lenguaje, y acá dejaría la ventana de media hora abierta para siempre.
+    for (const fecha of ['no-es-una-fecha', '']) {
+      const sha = '4'.repeat(40)
+      const c = {
+        cuerpo: {
+          sha,
+          tree: { sha: 't' },
+          message: 'cambia sabores\n\nPanel: sí',
+          author: { date: fecha },
+          parents: [{ sha: 'padre' }],
+        },
+      }
+      const { f } = fetchFalso([...respuestasDeNingunaReversionPendiente(), c])
+      const r = await maneja(
+        'deshacer',
+        { cuerpo: { sha }, cookie: cookieValida() },
+        contextoDePrueba({ fetch: f, ahora: () => PUBLICADO_EN + 60_000 }),
+      )
+      expect(r.status, `fecha «${fecha}»`).toBe(409)
+      expect((r.cuerpo as { problema: string }).problema, `fecha «${fecha}»`).toBe(
+        'Ya pasó mucho tiempo para deshacer esto desde aquí. Búscalo en el historial de cambios.',
+      )
+    }
+  })
+
+  it('a los 30:00.000 exactos todavía se puede deshacer — es una elección, no un accidente', async () => {
+    const sha = '5'.repeat(40)
+    const { f } = fetchFalso(respuestasDeUnDeshacerExitoso(sha))
+    const r = await maneja(
+      'deshacer',
+      { cuerpo: { sha }, cookie: cookieValida() },
+      contextoDePrueba({ fetch: f, ahora: () => PUBLICADO_EN + VENTANA_DESHACER_MS }), // exactamente 30 minutos
+    )
+    expect(r.status).toBe(200)
+  })
+
+  it('a los 30:00.001, un milisegundo de más ya cruzó la ventana', async () => {
+    const sha = '6'.repeat(40)
+    const { f } = fetchFalso([...respuestasDeNingunaReversionPendiente(), commitDelPanel(sha)])
+    const r = await maneja(
+      'deshacer',
+      { cuerpo: { sha }, cookie: cookieValida() },
+      contextoDePrueba({ fetch: f, ahora: () => PUBLICADO_EN + VENTANA_DESHACER_MS + 1 }),
+    )
+    expect(r.status).toBe(409)
   })
 
   it('VENTANA_DESHACER_MS son treinta minutos — la fase 6 apaga el botón con este mismo número', () => {
@@ -1817,7 +1920,7 @@ describe('accion=deshacer', () => {
       salidas.push((r.cuerpo as { problema: string }).problema)
     }
 
-    // 502: nada que revertir.
+    // 409: nada que revertir (permanente, no una falla de conexión).
     {
       const sha = '2'.repeat(40)
       const c = commitDelPanel(sha)
@@ -1829,6 +1932,34 @@ describe('accion=deshacer', () => {
         { cuerpo: { object: { sha } } },
         c,
         { cuerpo: { files: [] } },
+      ])
+      const r = await maneja(
+        'deshacer',
+        { cuerpo: { sha }, cookie: cookieValida() },
+        contextoDePrueba({ fetch: f, ahora: () => PUBLICADO_EN + 60_000 }),
+      )
+      salidas.push((r.cuerpo as { problema: string }).problema)
+    }
+
+    // 502: falló de verdad (comparte la frase con publicar.ts).
+    {
+      const sha = '3'.repeat(40)
+      const c = {
+        cuerpo: {
+          sha,
+          tree: { sha: 't' },
+          message: 'cambia sabores\n\nPanel: sí',
+          author: { date: '2026-09-17T12:00:00Z' },
+          parents: [],
+        },
+      }
+      const { f } = fetchFalso([
+        { cuerpo: { object: { sha } } },
+        c,
+        { cuerpo: { deployments: [{ state: 'READY', url: 'x' }] } },
+        c,
+        { cuerpo: { object: { sha } } },
+        c,
       ])
       const r = await maneja(
         'deshacer',
@@ -1858,24 +1989,17 @@ describe('accion=deshacer', () => {
       salidas.push((r.cuerpo as { resumen: string }).resumen)
     }
 
-    expect(salidas.filter((s) => s !== '')).toHaveLength(5)
+    expect(salidas.filter((s) => s !== '')).toHaveLength(6)
 
-    // [Hallazgo, Tarea 9] `JERGA_PROHIBIDA` incluye «sha» —el hash corto de
-    // un commit— pero el resto de la suite lo busca con `.toContain()`, un
-    // substring CRUDO. Esta acción se llama «deshacer», y «deshacer»
-    // CONTIENE «sha» como fragmento (de-s-h-a-cer) sin ser jerga de
-    // ninguna forma: es el verbo que le da nombre al botón. Con
-    // `.toContain()` a secas, DOS de las frases de esta tarea
-    // (`PROBLEMA_TARDE`, `PROBLEMA_NO_ES_TUYO`) fallarían por un falso
-    // positivo, no por jerga de verdad. Acá se busca cada palabra de
-    // `JERGA_PROHIBIDA` con LÍMITES de palabra (`\b`), que es lo que la
-    // lista siempre quiso decir — «sha» como palabra suelta, no como
-    // fragmento de cualquier palabra que la contenga.
+    // [Hallazgo, Tarea 9, Ronda 1 — arreglado de raíz] `JERGA_PROHIBIDA`
+    // incluye «sha» —el hash corto de un commit—, y «deshacer» (el verbo que
+    // le da nombre al botón) lo CONTIENE como fragmento sin ser jerga de
+    // ninguna forma. `jergaEn()` (estado.ts) es el arreglo compartido: busca
+    // cada palabra por LÍMITES, no por substring — se lo agregaron acá los
+    // otros dos consumidores que antes comparaban a mano (el B10 de `estado`
+    // y el F5 del correo, más arriba en este archivo).
     for (const frase of salidas) {
-      for (const jerga of JERGA_PROHIBIDA) {
-        const patron = new RegExp(`\\b${jerga.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i')
-        expect(frase, `«${frase}» no debería contener la palabra «${jerga}»`).not.toMatch(patron)
-      }
+      expect(jergaEn(frase), frase).toBeNull()
     }
   })
 })

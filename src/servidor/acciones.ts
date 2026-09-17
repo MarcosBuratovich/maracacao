@@ -24,7 +24,7 @@ import {
   type Sesion,
 } from './sesion'
 import { cliente } from './github'
-import { publica, type Archivo } from './publicar'
+import { publica, PROBLEMA_NO_SE_PUDO_PUBLICAR, type Archivo } from './publicar'
 import { revierte, TRAILER_REVIERTE, TRAILER_PANEL, tieneTrailer, valorDeTrailer, autorDelCommit } from './revertir'
 import type { Cambio } from '../contenido/diff'
 import { resume } from '../contenido/diff'
@@ -1213,8 +1213,18 @@ const PROBLEMA_TARDE = 'Ya pasó mucho tiempo para deshacer esto desde aquí. B�
 
 const PROBLEMA_NO_VALIDA = 'Ese contenido ya no cumple con las reglas de hoy. Puedo abrírtelo como borrador para que lo ajustes.'
 const PROBLEMA_NO_ES_TUYO = 'Ese cambio no se publicó desde aquí, así que no lo puedo deshacer.'
-const PROBLEMA_NO_SE_PUDO_DESHACER =
-  'No pudimos publicar: hubo un problema para conectarnos con el sitio. Prueba de nuevo en unos minutos.'
+
+// [Tarea 9, Ronda 1] `nada-que-revertir` es un hecho PERMANENTE de ese
+// commit —no tocó ningún documento de contenido— no una falla de conexión:
+// reintentar no lo va a arreglar nunca. Antes caía en la misma frase
+// genérica de «no pudimos conectarnos» que `falló`, y eso es engañoso — la
+// fase 7, cuando publique imágenes sueltas, va a hacer este camino
+// alcanzable de verdad (revertir.ts, comentario [D]): ella aprieta
+// «Deshacer», recibe «prueba de nuevo en unos minutos», reintenta tres
+// veces con el mismo resultado, y termina convencida de que el sitio está
+// caído. 409, no 502: no es un error nuestro, es que no hay nada que hacer
+// desde acá.
+const PROBLEMA_NADA_QUE_DESHACER = 'Esa publicación no cambió ningún dato del sitio, así que no hay nada que deshacer.'
 
 /**
  * `deshacer`: volver atrás la última publicación, durante media hora (spec
@@ -1274,6 +1284,15 @@ async function deshacerAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
     return error(502, PROBLEMA_NO_SE_PUDO_LEER)
   }
 
+  // [Tarea 9, Ronda 1] `!Number.isFinite(publicadoEn)` no es decorativo:
+  // `NaN > VENTANA_DESHACER_MS` da `false` en JavaScript, así que SIN esta
+  // guardia una fecha ilegible («GitHub contestó algo raro») caería del
+  // lado PERMISIVO —se podría deshacer cualquier commit, de cualquier
+  // fecha— en vez de rechazarse. Es el bug clásico de comparar con `NaN`, y
+  // acá abre la ventana de media hora para siempre si alguien lo reintroduce.
+  //
+  // El `>` (y no `>=`) es una elección explícita: a los 30:00.000 exactos
+  // TODAVÍA se puede deshacer. Ver los tests del borde en acciones.test.ts.
   if (!Number.isFinite(publicadoEn) || contexto.ahora() - publicadoEn > VENTANA_DESHACER_MS) {
     return error(409, PROBLEMA_TARDE)
   }
@@ -1298,13 +1317,17 @@ async function deshacerAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
     case 'no-valida':
       console.error(`deshacer: el contenido viejo de ${cuerpo.sha} no pasa las reglas de hoy — ${r.detalle}`)
       return error(422, PROBLEMA_NO_VALIDA)
-    // `nada-que-revertir` y `falló` caen las dos acá: son la misma frase
-    // genérica de «no se pudo» que ya usa el resto del router para un error
-    // fuerte del lado de GitHub — ninguna de las dos tiene una frase propia
-    // que a ella le sirva más que esta.
+    // Permanente, no una falla de red — ver el comentario de
+    // `PROBLEMA_NADA_QUE_DESHACER` más arriba.
+    case 'nada-que-revertir':
+      console.error(`deshacer: ${cuerpo.sha} no tenía nada que revertir — ${r.detalle}`)
+      return error(409, PROBLEMA_NADA_QUE_DESHACER)
+    // Solo `falló` llega hasta acá: un error de verdad del lado de GitHub
+    // (`revierte()`/`publica()`), la misma frase que usa `traduceError()`
+    // en `publicar.ts` — compartida para que las dos no se desincronicen.
     default:
       console.error(`deshacer: no se pudo deshacer ${cuerpo.sha} — ${r.motivo}: ${r.detalle}`)
-      return error(502, PROBLEMA_NO_SE_PUDO_DESHACER)
+      return error(502, PROBLEMA_NO_SE_PUDO_PUBLICAR)
   }
 }
 
