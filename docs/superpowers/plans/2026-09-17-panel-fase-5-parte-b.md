@@ -3103,6 +3103,176 @@ nada más. En `publicarAccion` tiene que correr **antes** del chequeo de `base`
 (Tarea 2): si la cabeza está rota y se revierte, la cabeza cambia, y comparar
 contra la vieja daría un 409 por un commit que acaba de dejar de existir.
 
+- [ ] **Step 9b: Los once arreglos que salieron de la revisión**
+
+La revisión de esta tarea la hizo un modelo capaz contra un GitHub de mentira
+**con estado** —grafo de commits, árboles reales, un `PATCH` que aplica
+fast-forward de verdad— y encontró once cosas. Casi todas son defectos del
+diseño de este brief, no de la transcripción. Van todas en una ronda, agrupadas
+por lo que de verdad arreglan.
+
+**A · La guardia que vivía en el lugar equivocado (Critical).**
+`revierte()` no se niega a revertir **una reversión**: esa guardia existe solo
+en el llamador. Medido: con la cabeza siendo una reversión de `MALO`,
+`revierte()` devuelve `ok` y **resucita el `sitio.json` malo**, en un commit
+nuevo que además lleva su propio trailer — así que nadie lo va a volver a
+revertir. Hoy no es alcanzable desde la UI, pero las Tareas 9 y 10 le van a
+pasar más shas a esta función.
+
+Mové el chequeo adentro de `revierte()`, justo después de la guardia de
+«¿es del panel?»:
+
+```ts
+  // Una reversión no se revierte: eso republica exactamente el contenido que
+  // se acaba de declarar roto, y encima en un commit que lleva su propio
+  // trailer, así que la red de seguridad no lo va a tocar nunca más. La
+  // guardia vive ACÁ y no solo en el llamador: una invariante que depende de
+  // que todos los llamadores se acuerden no es una invariante, y esta función
+  // va a tener llamadores nuevos en las dos tareas siguientes.
+  if (commit.message.includes(`${TRAILER_REVIERTE}: `)) {
+    return { ok: false, motivo: 'ya-revertido', detalle: `${p.sha} ya es una reversión` }
+  }
+```
+
+**B · Los avisos: quién le habla a quién (3 Important juntos).**
+Medido: en el camino **normal** —ella publica, su commit es la cabeza, el panel
+sondea por ese sha— salen **cuatro** correos, dos idénticos a ella. Con tres
+reintentos sobre una cabeza que no se puede arreglar, **seis**. Y peor: la red
+de seguridad le manda «Tu cambio no se pudo publicar» **a quien entró al
+panel**, no a quien publicó — si Marcos entra, recibe un correo diciéndole que
+su cambio falló, por un cambio de ella, con un texto técnico que le atribuye el
+commit a él.
+
+No se arregla deduplicando sino repartiendo el trabajo:
+
+- **`revisaLaCabeza()` le avisa SOLO a Marcos.** Es la red de seguridad: limpia
+  algo que quedó colgado de antes, y eso es asunto de él. Nadie está mirando.
+- **`estadoAccion` es el único que le habla a ella**, porque es el único momento
+  en que ella está esperando el resultado de SU publicación.
+- **El autor real sale del trailer `Panel-Autor:`** del commit, que
+  `revisaLaCabeza()` ya leyó dos líneas antes — nunca de quién hizo el pedido.
+
+`revieteYAvisa` se parte en dos: `revierteYAvisaAMarcos(sha, contexto)` (la que
+usa la red de seguridad, que saca el autor del trailer) y el camino de
+`estadoAccion`, que además le escribe a ella. Y `revisaLaCabeza()` devuelve el
+sha que atendió, para que `estadoAccion` no vuelva a revertir ni a avisar por el
+mismo:
+
+```ts
+async function revisaLaCabeza(contexto: Contexto): Promise<string | null>
+```
+
+**C · La red de seguridad corría demasiado temprano (Important).**
+Medido: el test «con sesión válida y sin documentos, 400 **sin tocar GitHub**»
+ahora SÍ toca GitHub, y sigue verde solo porque `revisaLaCabeza()` se traga el
+error del `fetch` que el test puso justamente para que nadie lo llamara. Un test
+que ya no puede ver lo que promete.
+
+`revisaLaCabeza()` pasa a correr **después** de las validaciones baratas y
+sincrónicas —lote vacío, documento desconocido, `base` ausente— y **antes** de
+la comparación de `base` (que tiene que ver la cabeza ya arreglada). No cuesta
+nada y devuelve al test su capacidad de fallar.
+
+**D · Un «revertido» que no revirtió nada (Important).**
+Un commit del panel que no tocó documentos de contenido devuelve
+`{ ok: true, sha: null }`, y a Marcos le llega «Reversión automática:
+**revertido**» mientras `main` sigue con el commit roto. Hoy no es alcanzable;
+cuando la fase 7 publique imágenes, sí. Agregá un motivo propio
+(`'nada-que-revertir'`) y que el correo lo diga con esas palabras.
+
+**E · El reintento de `publica()` se come un commit ajeno (Important).**
+Medido: si Marcos publica a mano entre que la reversión lee el ref y mueve el
+ref, el `PATCH` rebota, el reintento rearma el árbol **sobre el commit de él,
+con los bytes viejos**, y su cambio desaparece sin 409 y sin log. En
+`publicarAccion` eso lo cubre el chequeo de `base`; `revierte()` no tiene
+equivalente, y ahora corre sin que nadie lo pida.
+
+`Publicacion` gana `reintentar?: boolean` (default `true`, así nada cambia para
+quien ya la usa) y `revierte()` pasa `reintentar: false`. Si el ref se movió,
+devuelve `no-es-la-cabeza` y la próxima acción reevalúa desde cero — que es lo
+correcto para algo idempotente, y mucho más seguro que insistir a ciegas.
+
+**F · Y seis cosas chicas, todas de una línea:**
+
+1. **El literal del proyecto.** `revisaLaCabeza()` resuelve el nombre con
+   `'maracacao'` a mano mientras la acción vecina usa
+   `PANEL_VERCEL_PROYECTO ?? GITHUB_REPO` con guardia. No es cosmético: si
+   alguna vez divergen, la plataforma contesta «no hay despliegues», el código
+   sale por `estado !== 'falló'`, y **la reversión automática deja de existir
+   sin una sola línea de log**. Misma expresión que el vecino, más un
+   `console.error` si queda vacía.
+2. **Los dos `await contexto.correo(...)` de la reversión están fuera del
+   `try`.** Hoy `manda()` no tira (ruling T6-2), pero eso es una promesa de otro
+   módulo sosteniendo la de éste. El mismo `try` de una línea sale gratis.
+3. **`JSON.parse(viejo)` sin guardia**: un documento viejo ilegible hace que
+   `revierte()` TIRE en vez de devolver `{ ok: false, motivo: 'falló' }`, que es
+   lo que su propio tipo promete.
+4. **Los trailers se buscan como substring, no como línea.** Un commit escrito a
+   mano que cite «Panel: sí» en su cuerpo pasa por commit del panel. Anclalos
+   por línea.
+5. **La copia nueva para la clienta no tiene test contra `JERGA_PROHIBIDA`**, a
+   diferencia de las frases de `estado`. El texto de hoy está bien; nada protege
+   a la próxima edición.
+6. **Cada arreglo de arriba va con su test.** Los de A, B, D y E son los que más
+   importan: son comportamiento, no forma.
+
+- [ ] **Step 9c: Lo que la re-revisión encontró abierto**
+
+Los once arreglos del paso anterior quedaron verificados —con mutación de
+control incluida— pero aparecieron cinco cosas más, dos de ellas serias.
+
+**1 (Important) · El arreglo del Grupo C se aplicó a una sola de las dos
+acciones.** `publicarAccion` ahora corre `revisaLaCabeza()` después de sus
+validaciones baratas; `estadoAccion` no. Su comentario afirma que «no tiene
+ningún chequeo sincrónico previo» y es **falso**: tiene el 400 por `sha` mal
+formado, el 503 por token ausente y el 503 por proyecto sin nombre. Medido: un
+`sha` mal formado gasta **un pedido real a GitHub** antes de contestar 400.
+
+Y hay algo peor, que cierra un círculo: el test `T7-2` —el que exigí en la
+tarea anterior justamente para que la guardia del proyecto no quedara sin
+candado— **pasa hoy por la misma razón podrida que el ruling T7-5**:
+`fetchFalso([])` tira, `revisaLaCabeza()` se traga la excepción en su propio
+`try`, y el pedido nunca se registra. Mismo arreglo que en `publicarAccion`:
+mover `revisaLaCabeza(contexto)` debajo del bloque de validaciones sincrónicas
+de `estadoAccion`, y corregir ese comentario.
+
+**2 (Important) · El envío protegido atrapa el fracaso imposible y deja mudo el
+real.** `mandaProtegido()` envuelve el envío en un `try` —que atrapa que
+`manda()` tire, cosa que el ruling T6-2 volvió imposible— y **descarta el
+resultado**. `manda()` documenta explícitamente que el detalle lo loguea quien
+llama, «que sí lo sabe», y quien llama no lo loguea. O sea: `sin-configurar` y
+`rechazado` pasan sin dejar rastro. Cuando el despliegue falla con nadie
+mirando, ese correo es la única señal que tiene Marcos.
+
+```ts
+  const r = await contexto.correo(carta)
+  if (!r.ok) {
+    console.error(`aviso: no se pudo mandar «${carta.asunto}» a ${carta.a.join(', ')} — ${r.motivo}`)
+  }
+```
+
+**3 (Minor) · El otro camino de aviso sigue atribuyendo mal.** `revierteYAvisa()`
+usa `sesion.correo` como `Panel-Autor:` del commit de reversión y como el
+«publicado por X» del correo. Es el mismo error que B-3 arregló en la red de
+seguridad, en el camino de al lado, y el trailer ya está leído dos líneas antes.
+
+**4 (Minor) · `'Panel: sí'` está escrito dos veces.** `revertir.ts` tiene
+`TRAILER_PANEL` sin exportar y `acciones.ts` repite el literal — justo en la
+guardia que decide si el panel puede escribir en `main`. Exportala y usala en
+los dos lados.
+
+**5 (Minor) · El test de tres líneas del fallback de autor.** Y corregí la
+afirmación de que el caso es «hoy inalcanzable»: no lo es. Desde que los
+trailers se anclan por línea, un commit escrito a mano cuyo cuerpo contenga la
+línea `Panel: sí` —copiar el mensaje de un commit del panel, un cherry-pick—
+pasa la guardia sin traer `Panel-Autor:`. `autorDelCommit` es pura y exportada,
+así que el test cuesta tres líneas.
+
+**Lo que NO se arregla, y queda anotado:** con la cabeza irrecuperable, un
+recargue manual de la pestaña vuelve a disparar el par de correos. El diseño ya
+decidió repartir en vez de deduplicar, y `reintentarEn: null` evita que el panel
+insista solo. Se acepta.
+
 - [ ] **Step 10: Corré la suite entera, reempaquetá y commiteá**
 
 ```bash
@@ -3135,6 +3305,48 @@ las frases.
   `{ ok: true, sha, resumen }` o un error con frase.
 - `VENTANA_DESHACER_MS = 30 * 60_000` exportado de `acciones.ts` (la fase 6 lo
   necesita para saber cuándo esconder el botón).
+
+- [ ] **Step 0: Arreglá `fetchFalso` para que «cero pedidos» signifique algo**
+
+[RULING T7-5] Varios tests de este plan —incluidos los de esta tarea— afirman
+«no se gastó ni un pedido» con `expect(pedidos).toHaveLength(0)`. **Ese assert
+hoy no prueba nada**, y está medido: `fetchFalso([])` tira su error de «se pidió
+una respuesta de más» ANTES de hacer `pedidos.push(...)`, así que la lista queda
+en cero tanto si el código frenó antes de la red como si la intentó. Parece un
+candado y es decoración.
+
+Se arregla en la raíz, en `test/lib/github-falso.ts`: registrar el intento
+**antes** de decidir si hay respuesta programada.
+
+```ts
+  const f = async (url: string | URL, init?: RequestInit) => {
+    // El intento se registra ANTES de mirar si hay respuesta programada: si se
+    // registrara después, un pedido que cae en el error de «scripteó de menos»
+    // quedaría sin rastro, y todos los `expect(pedidos).toHaveLength(0)` de la
+    // suite darían cero tanto si el código frenó antes de la red como si la
+    // intentó. Parecerían candados y serían decoración.
+    pedidos.push({
+      url: String(url),
+      metodo: init?.method ?? 'GET',
+      cuerpo: init?.body ? JSON.parse(String(init.body)) : undefined,
+      cabeceras: (init?.headers ?? {}) as Record<string, string>,
+    })
+
+    if (i >= respuestas.length) {
+      throw new Error(
+        `fetchFalso(): se pidió una respuesta más de las ${respuestas.length} programadas ` +
+          `(pedido #${i + 1}, ${init?.method ?? 'GET'} ${String(url)}) — el test scripteó de menos.`,
+      )
+    }
+    const r = respuestas[i++]
+    return new Response(JSON.stringify(r.cuerpo), { status: r.status ?? 200 })
+  }
+```
+
+**Corré la suite entera después de este cambio, antes de seguir.** Es un ayudante
+compartido: si algún test existente contaba pedidos y ahora cuenta uno más, ese
+test estaba midiendo lo que no creía y hay que mirarlo de verdad, no acomodar el
+número. Si aparece alguno así, decilo en el reporte con su nombre.
 
 - [ ] **Step 1: Escribí los tests que fallan**
 
