@@ -837,9 +837,37 @@ y el JSON del `publicar` pasa a llevar `"base": "'"$BASE"'"` junto a
 === 4c) Publicar con una base vieja tiene que rebotar con 409 ===
 ```
 
-que repite el mismo `publicar` con `"base": "0000000000000000000000000000000000000000"`
-y exige 409. Es el freno de mano de esta tarea, probado contra producción: si
-algún día alguien lo saca, el ensayo lo encuentra.
+**[CORREGIDO 2026-09-17, ruling T2-1]** La primera versión de este paso usaba un
+sha inventado (`000…0`) esperando un 409, y eso **no puede funcionar**: ese
+objeto no existe en el repo, así que la comparación de GitHub devuelve 404, el
+`catch` de la Fase 2 lo convierte en 502 «no pudimos revisar el contenido
+actual», y el paso afirmaría un resultado que el código no produce. Un ensayo
+que afirma lo imposible es peor que no tenerlo: el día que falle de verdad,
+nadie le va a creer.
+
+El paso correcto usa un sha que SÍ existe y contra el que SÍ hubo un cambio de
+contenido en el medio — que es exactamente la situación que el 409 describe.
+Aprovecha que el paso anterior acaba de publicar:
+
+```bash
+# ANTES de publicar el cambio de prueba, guardá la cabeza:
+ANTES=$(curl -fsS "https://api.github.com/repos/$DUENIO/$REPO/git/ref/heads/main"   | python3 -c 'import json,sys;print(json.load(sys.stdin)["object"]["sha"])')
+
+# …se publica el cambio de prueba (paso anterior), que mueve la cabeza…
+
+# Y ahora se publica OTRA VEZ declarando la base vieja: en el medio cambió
+# `sitio.json`, que es justo el documento del lote, así que tiene que rebotar.
+# Es la pisada de verdad, no una simulada.
+```
+
+y exige **409** con la frase «Marcos cambió algo del sitio mientras editabas».
+Es el freno de mano de esta tarea, probado contra producción: si algún día
+alguien lo saca, el ensayo lo encuentra.
+
+Sumá además un paso hermano que prueba el otro lado de la regla —que un cambio
+ajeno que NO toca el lote **no** frena—: no se puede armar con un `curl` sin
+tocar el repo, así que va como comentario en el script explicando por qué ese
+caso lo cubren los tests y no el ensayo.
 
 - [ ] **Step 10: Corré la suite entera**
 
