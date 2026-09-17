@@ -60,6 +60,14 @@ export interface Contexto {
   ahora: () => number
   /** La IP de quien pide, para el freno de intentos de `entrar` (E4). */
   ip: string
+  /**
+   * Cuántos bytes pesó el CUERPO del pedido HTTP. `0` cuando el borde no lo
+   * pudo medir (sin `Content-Length`): ahí `publica()` se cae a la suma de
+   * los archivos, que es una cota inferior. Vive en el contexto y no en el
+   * `Pedido` porque no es un dato del pedido de la clienta —ella no lo
+   * manda—: es una medición del transporte, del mismo tipo que la IP.
+   */
+  bytesDelCuerpo: number
 }
 
 /** Lo que devuelve el router. El borde lo traduce a una respuesta HTTP real. */
@@ -503,6 +511,7 @@ async function publicarAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
   const resultado = await publica(gh, {
     archivos,
     autor: sesion.correo,
+    bytesDelCuerpo: contexto.bytesDelCuerpo,
     // Si `cambios` quedó vacío pese a que los bytes SÍ cambiaron (`frase()`
     // no encuentra nada que contar), se omite el campo entero en vez de
     // mandar un array vacío: `publica()` lee `cambios: []` como «no hay

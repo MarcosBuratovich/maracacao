@@ -42,6 +42,20 @@ interface RespuestaHTTP {
 
 const valorUnico = (v: string | string[] | undefined): string => (Array.isArray(v) ? (v[0] ?? '') : (v ?? ''))
 
+/**
+ * Cuánto pesó el cuerpo del pedido, según `Content-Length`. Devuelve `0`
+ * cuando la cabecera no vino o no es un número: el router lo entiende como
+ * «no se pudo medir» y se cae a la cuenta vieja. No se mide serializando
+ * `req.body` de nuevo —eso sería medir la reconstrucción, no el pedido— ni
+ * se confía en que el número sea honesto: es un tope de comodidad contra el
+ * límite de la plataforma, no un control de seguridad.
+ */
+function bytesDeCuerpo(headers: Record<string, string | string[] | undefined>): number {
+  const crudo = valorUnico(headers['content-length'])
+  const n = Number.parseInt(crudo, 10)
+  return Number.isFinite(n) && n > 0 ? n : 0
+}
+
 /** El valor de `panel_sesion` adentro del header `Cookie`, o `''` si no vino. */
 function cookieDePanel(header: string | string[] | undefined): string {
   const cadena = Array.isArray(header) ? header.join('; ') : (header ?? '')
@@ -99,6 +113,7 @@ export default async function handler(req: PedidoHTTP, res: RespuestaHTTP) {
     fetch: globalThis.fetch,
     ahora: () => Date.now(),
     ip: ipDelPedido(req.headers),
+    bytesDelCuerpo: bytesDeCuerpo(req.headers),
   }
 
   const r = await maneja(accion, pedido, contexto)

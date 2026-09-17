@@ -33,6 +33,15 @@ export interface Publicacion {
    * contar), no se crea un commit vacío: ver la última rama de `publica()`.
    */
   cambios?: Cambio[]
+  /**
+   * Cuánto pesó el CUERPO del pedido HTTP que trajo esta publicación. Es lo
+   * que `TOPE_CUERPO` quiere limitar de verdad —el tope de 4.5 MB de cuerpo
+   * de request que impone la plataforma—, y solo el borde lo sabe. Cuando no
+   * viene (el borde no pudo medirlo), se cae a la suma de los archivos en
+   * base64: es una cota INFERIOR del cuerpo real, así que sigue sirviendo
+   * para frenar un lote descomunal, nomás que con menos margen.
+   */
+  bytesDelCuerpo?: number
 }
 
 export type Resultado =
@@ -182,7 +191,7 @@ async function intento(gh: ReturnType<typeof cliente>, archivos: readonly Archiv
  */
 export async function publica(gh: ReturnType<typeof cliente>, p: Publicacion): Promise<Resultado> {
   const rutas = p.archivos.map((a) => a.ruta)
-  const chequeo = revisaLote(rutas, bytesDelCuerpo(p.archivos))
+  const chequeo = revisaLote(rutas, p.bytesDelCuerpo ?? bytesDelCuerpo(p.archivos))
   if (!chequeo.ok) return { ok: false, codigo: 422, problema: chequeo.problema }
 
   const asunto = p.cambios !== undefined ? frase(p.cambios) : ASUNTO_GENERICO

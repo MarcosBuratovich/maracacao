@@ -76,6 +76,10 @@ const contextoBase = (fetch: typeof globalThis.fetch) => ({
   fetch,
   ahora: () => Date.now(),
   ip: '1.2.3.4',
+  // M-9: `Contexto` ahora pide esta medida; estos tests no ejercitan el
+  // tope de cuerpo (eso lo cubre `publicar.test.ts`), así que alcanza con
+  // el mismo valor que usa el borde cuando no pudo medir nada.
+  bytesDelCuerpo: 0,
 })
 
 const cookieValida = (correo = 'clienta@ejemplo.mx') =>

@@ -31,6 +31,30 @@ describe('el cliente de GitHub', () => {
     expect(pedidos[0].url).toContain('ref=abc123')
   })
 
+  it('M-8: un archivo grande viene con encoding "none" y se resuelve pidiendo el blob', async () => {
+    // La API de Contents, para un archivo de entre 1 MB y 100 MB, contesta 200
+    // con el contenido VACÍO y `encoding: "none"`. Sin este camino, el llamador
+    // recibe '' —no un error— y cree que el archivo está vacío.
+    const { f, pedidos } = fetchFalso([
+      { cuerpo: { content: '', encoding: 'none', sha: 'blob123' } },
+      { cuerpo: { content: Buffer.from('contenido grande').toString('base64'), encoding: 'base64' } },
+    ])
+    const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+
+    expect(await gh.archivoEnRef('public/sitio/marca/barra-canela.webp', 'abc')).toBe('contenido grande')
+    expect(pedidos[1].url).toContain('/git/blobs/blob123')
+  })
+
+  it('M-8: un archivo chico sigue resolviéndose con UN solo pedido', async () => {
+    const { f, pedidos } = fetchFalso([
+      { cuerpo: { content: Buffer.from('{"a":1}').toString('base64'), encoding: 'base64', sha: 'blobchico' } },
+    ])
+    const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+
+    expect(await gh.archivoEnRef('src/contenido/datos/sitio.json', 'abc')).toBe('{"a":1}')
+    expect(pedidos).toHaveLength(1)
+  })
+
   // M-7: hoy toda ruta que llega acá es una constante o ya pasó por la
   // lista blanca, así que esto no cambia nada en producción — existe para
   // la Parte B, donde las rutas de imagen van a llegar armadas con lo que

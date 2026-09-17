@@ -132,12 +132,23 @@ function cliente(c) {
      * sha) — la API de Contents, no la de blobs: esta resuelve ruta+ref
      * directo, sin que quien llama tenga que ir a buscar el sha del blob
      * primero. La usa el router (`acciones.ts`) para leer el contenido VIVO
-     * de un documento antes de compararlo contra lo que la clienta mandó:
-     * lo que esbuild metió en el bundle en el momento de empaquetar es una
-     * foto vieja; esto es lo que GitHub tiene ahora mismo.
+     * de un documento antes de compararlo contra lo que la clienta mandó.
+     *
+     * [M-8] Arriba de 1 MB, la API de Contents contesta 200 con
+     * `content: ""` y `encoding: "none"` — o sea, te miente por omisión: no
+     * es un error, es un cuerpo vacío que parece un archivo vacío. Ahí se
+     * pide el blob por el sha que la MISMA respuesta trae, que sí viene en
+     * base64 hasta 100 MB. Con los JSON de hoy (el más grande son 24 KB)
+     * esta rama no corre nunca; con las fotos de producto de la fase 7 corre
+     * siempre, y el modo de falla sin esto es publicar creyendo que el
+     * archivo vivo estaba vacío.
      */
     async archivoEnRef(ruta2, ref) {
       const cuerpo = await pedir(`/contents/${codificaRuta(ruta2)}?ref=${encodeURIComponent(ref)}`);
+      if (cuerpo.encoding !== "base64") {
+        const blob = await pedir(`/git/blobs/${cuerpo.sha}`);
+        return Buffer.from(blob.content, "base64").toString("utf8");
+      }
       return Buffer.from(cuerpo.content, "base64").toString("utf8");
     },
     /** Crea un blob con este contenido (codificado a base64) y devuelve su sha. */
@@ -15385,7 +15396,7 @@ async function intento(gh, archivos, mensaje) {
 }
 async function publica(gh, p) {
   const rutas = p.archivos.map((a) => a.ruta);
-  const chequeo = revisaLote(rutas, bytesDelCuerpo(p.archivos));
+  const chequeo = revisaLote(rutas, p.bytesDelCuerpo ?? bytesDelCuerpo(p.archivos));
   if (!chequeo.ok) return { ok: false, codigo: 422, problema: chequeo.problema };
   const asunto = p.cambios !== void 0 ? frase(p.cambios) : ASUNTO_GENERICO;
   if (asunto === "") {
@@ -17942,6 +17953,7 @@ async function publicarAccion(pedido, contexto) {
   const resultado = await publica(gh, {
     archivos,
     autor: sesion.correo,
+    bytesDelCuerpo: contexto.bytesDelCuerpo,
     // Si `cambios` quedó vacío pese a que los bytes SÍ cambiaron (`frase()`
     // no encuentra nada que contar), se omite el campo entero en vez de
     // mandar un array vacío: `publica()` lee `cambios: []` como «no hay
@@ -18028,6 +18040,11 @@ function ipDelPedido(headers) {
 
 // src/servidor/entradas/panel.ts
 var valorUnico2 = (v) => Array.isArray(v) ? v[0] ?? "" : v ?? "";
+function bytesDeCuerpo(headers) {
+  const crudo = valorUnico2(headers["content-length"]);
+  const n = Number.parseInt(crudo, 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
 function cookieDePanel(header) {
   const cadena = Array.isArray(header) ? header.join("; ") : header ?? "";
   for (const parte of cadena.split(";")) {
@@ -18064,7 +18081,8 @@ async function handler(req, res) {
     env: entorno(),
     fetch: globalThis.fetch,
     ahora: () => Date.now(),
-    ip: ipDelPedido(req.headers)
+    ip: ipDelPedido(req.headers),
+    bytesDelCuerpo: bytesDeCuerpo(req.headers)
   };
   const r = await maneja(accion, pedido, contexto);
   if (r.cookie) res.setHeader("Set-Cookie", r.cookie);

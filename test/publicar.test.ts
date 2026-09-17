@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest'
 import { cliente } from '../src/servidor/github'
 import { publica } from '../src/servidor/publicar'
 import { frase, type Cambio } from '../src/contenido/diff'
+import { TOPE_CUERPO } from '../src/servidor/rutas-permitidas'
 import { fetchFalso } from './lib/github-falso'
 
 describe('publicar', () => {
@@ -144,5 +145,42 @@ describe('publicar', () => {
       expect(r.resumen).not.toBe('')
     }
     expect(pedidos).toHaveLength(0)
+  })
+
+  it('M-9: el tope de cuerpo se mide contra el PEDIDO, no contra los archivos', async () => {
+    // El tope existe para no pasarse del límite de cuerpo de request que
+    // impone la plataforma: es un límite sobre lo que ENTRA a la función. Un
+    // documento chico que llegó adentro de un pedido enorme (varias fotos en
+    // el mismo lote) tiene que rebotar, aunque el archivo pese nada.
+    const { f } = fetchFalso([])
+    const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+
+    const r = await publica(gh, {
+      archivos: [{ ruta: 'src/contenido/datos/sitio.json', contenido: '{}' }],
+      autor: 'quien@ejemplo.mx',
+      bytesDelCuerpo: TOPE_CUERPO + 1,
+    })
+
+    expect(r).toEqual({
+      ok: false,
+      codigo: 422,
+      problema: 'Es demasiado contenido para una sola publicación: manda menos fotos, o de menor tamaño.',
+    })
+  })
+
+  it('M-9: sin la medida del pedido se cae a la suma de los archivos, como antes', async () => {
+    // El borde puede no tener cómo medir el cuerpo (sin Content-Length). Ahí
+    // la cuenta vieja es mejor que ninguna: es una cota inferior de lo que
+    // pesó el pedido, así que sigue frenando el lote descomunal.
+    const { f } = fetchFalso([])
+    const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+
+    const enorme = 'x'.repeat(TOPE_CUERPO)
+    const r = await publica(gh, {
+      archivos: [{ ruta: 'src/contenido/datos/sitio.json', contenido: enorme }],
+      autor: 'quien@ejemplo.mx',
+    })
+
+    expect(r.ok).toBe(false)
   })
 })

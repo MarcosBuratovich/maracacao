@@ -120,12 +120,27 @@ export function cliente(c: Credenciales) {
      * sha) — la API de Contents, no la de blobs: esta resuelve ruta+ref
      * directo, sin que quien llama tenga que ir a buscar el sha del blob
      * primero. La usa el router (`acciones.ts`) para leer el contenido VIVO
-     * de un documento antes de compararlo contra lo que la clienta mandó:
-     * lo que esbuild metió en el bundle en el momento de empaquetar es una
-     * foto vieja; esto es lo que GitHub tiene ahora mismo.
+     * de un documento antes de compararlo contra lo que la clienta mandó.
+     *
+     * [M-8] Arriba de 1 MB, la API de Contents contesta 200 con
+     * `content: ""` y `encoding: "none"` — o sea, te miente por omisión: no
+     * es un error, es un cuerpo vacío que parece un archivo vacío. Ahí se
+     * pide el blob por el sha que la MISMA respuesta trae, que sí viene en
+     * base64 hasta 100 MB. Con los JSON de hoy (el más grande son 24 KB)
+     * esta rama no corre nunca; con las fotos de producto de la fase 7 corre
+     * siempre, y el modo de falla sin esto es publicar creyendo que el
+     * archivo vivo estaba vacío.
      */
     async archivoEnRef(ruta: string, ref: string): Promise<string> {
-      const cuerpo = await pedir(`/contents/${codificaRuta(ruta)}?ref=${encodeURIComponent(ref)}`) as { content: string; encoding: string }
+      const cuerpo = await pedir(`/contents/${codificaRuta(ruta)}?ref=${encodeURIComponent(ref)}`) as {
+        content: string
+        encoding: string
+        sha: string
+      }
+      if (cuerpo.encoding !== 'base64') {
+        const blob = await pedir(`/git/blobs/${cuerpo.sha}`) as { content: string; encoding: string }
+        return Buffer.from(blob.content, 'base64').toString('utf8')
+      }
       return Buffer.from(cuerpo.content, 'base64').toString('utf8')
     },
 
