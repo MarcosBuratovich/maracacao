@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest'
 import { createHmac } from 'node:crypto'
 import { readFileSync } from 'node:fs'
-import { maneja } from '../src/servidor/acciones'
+import { maneja, idDeDispositivo } from '../src/servidor/acciones'
 import { hashDeClave, firmaSesion } from '../src/servidor/sesion'
 import { cliente } from '../src/servidor/github'
 import { publica } from '../src/servidor/publicar'
@@ -813,6 +813,30 @@ describe('revocar una sesión sin rotar la llave', () => {
     const r = await maneja(
       'publicar',
       { cuerpo: { base: 'x', documentos: {} }, cookie: cookieEmitidaEn('2026-09-11T00:00:00Z') },
+      ctx,
+    )
+    expect(r.status).toBe(401)
+  })
+
+  it('C-2: un id de dispositivo con coma no puede anular su propia revocación', () => {
+    // Medido en la revisión de esta tarea: con el id crudo, poner ESE MISMO id
+    // en la lista de revocados no revocaba nada —la coma partía la lista— y
+    // `publicar` seguía pasando. El id se normaliza al entrar, así que la coma
+    // no llega nunca a la cookie.
+    expect(idDeDispositivo('iPhone 15, de Marcos')).toBe('iPhone-15-de-Marcos')
+    expect(idDeDispositivo('iPhone 15, de Marcos')).not.toContain(',')
+    expect(idDeDispositivo('')).toBe('sin-nombre')
+    expect(idDeDispositivo(undefined)).toBe('sin-nombre')
+    expect(idDeDispositivo(',,,')).toBe('sin-nombre')
+    expect(idDeDispositivo('x'.repeat(200))).toHaveLength(64)
+  })
+
+  it('C-2: y revocarlo funciona de punta a punta', async () => {
+    const ctx = contextoBase(fetchQueNoSeUsa())
+    ;(ctx.env as Record<string, string>).PANEL_DISPOSITIVOS_REVOCADOS = 'otro, iPhone-15-de-Marcos'
+    const r = await maneja(
+      'publicar',
+      { cuerpo: { base: 'x', documentos: {} }, cookie: cookieDeDispositivo('iPhone-15-de-Marcos') },
       ctx,
     )
     expect(r.status).toBe(401)

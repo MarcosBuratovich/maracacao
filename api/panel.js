@@ -17854,6 +17854,11 @@ function correoEnLista(correo2, lista2) {
   return lista2.split(",").map((c) => c.trim().toLowerCase()).includes(correo2.trim().toLowerCase());
 }
 var HASH_SENUELO = hashDeClave("se\xF1uelo \u2014 nunca es la contrase\xF1a de nadie, existe solo para parejar el reloj");
+var idDeDispositivo = (crudo) => {
+  const texto2 = typeof crudo === "string" ? crudo : "";
+  const limpio = texto2.replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 64);
+  return limpio === "" ? "sin-nombre" : limpio;
+};
 function entrar(pedido, contexto) {
   const cuerpo = pedido.cuerpo ?? {};
   const correo2 = typeof cuerpo.correo === "string" ? cuerpo.correo.trim() : "";
@@ -17872,7 +17877,7 @@ function entrar(pedido, contexto) {
   const claveOk = correoOk && claveEsLaDelHash;
   if (!claveOk) return error51(401, PROBLEMA_ENTRAR);
   const dias = cuerpo.recuerdame === true ? DIAS_SESION_LARGA : DIAS_SESION_CORTA;
-  const dispositivo = typeof cuerpo.dispositivo === "string" ? cuerpo.dispositivo : "sin identificar";
+  const dispositivo = idDeDispositivo(cuerpo.dispositivo);
   const vence = contexto.ahora() + dias * 864e5;
   const token = firmaSesion({ correo: correo2, vence, dispositivo, emitida: contexto.ahora() }, env.PANEL_SECRETO);
   return ok({ ok: true }, cookieDeSesion(token, dias));

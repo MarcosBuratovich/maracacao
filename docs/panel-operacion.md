@@ -133,9 +133,10 @@ Dos advertencias:
 - **Cambiar la contraseña no cierra las sesiones que ya estén abiertas.**
   La cookie de sesión es un HMAC firmado con `PANEL_SECRETO`, una variable
   distinta — mientras `PANEL_SECRETO` no cambie, una cookie firmada antes
-  sigue siendo válida hasta que venza sola. Si hace falta cerrar TODAS las
-  sesiones activas (por ejemplo, si se sospecha que una cookie se filtró),
-  lo que hay que rotar es `PANEL_SECRETO`, no `PANEL_CLAVE_HASH`.
+  sigue siendo válida hasta que venza sola. Si hace falta cortar sesiones
+  activas —un aparato perdido, alguien que se va, o todas de una sola vez—,
+  ver «Cómo cortar una sesión» más arriba: ninguno de esos tres botones pide
+  tocar `PANEL_CLAVE_HASH` ni `PANEL_SECRETO`.
 
 Los clics para dejar el hash nuevo funcionando, en Vercel:
 
@@ -219,22 +220,28 @@ Cinco pasos que importan, cinco minutos reales si ya sabés dónde hacer clic:
 revocar (paso 4), generar (pasos 5 a 10), pegar (paso 11), redeploy (paso
 12), confirmar (paso 13).
 
-## Cómo cerrar TODAS las sesiones abiertas
+## Cómo rotar `PANEL_SECRETO` (último recurso: el secreto se filtró)
 
-No hay un botón de «cerrar sesión de todo el mundo» ni una lista de quién
-está adentro — no hay tabla de sesiones, la cookie ES la sesión (E3). La
-única forma de invalidar TODAS las cookies ya emitidas, de una sola vez, es
-cambiar `PANEL_SECRETO`: la firma de cada cookie vieja deja de matchear la
-firma que el servidor calcula con el secreto nuevo, así que `verificaSesion`
-las rechaza a todas por igual, sin excepción — incluida la tuya, si habías
-entrado antes del cambio.
+Esta sección se llamaba «Cómo cerrar TODAS las sesiones abiertas», y decía
+que rotar `PANEL_SECRETO` era la ÚNICA forma de hacerlo. Eso dejó de ser
+cierto: «Cómo cortar una sesión» (más arriba, en la sección de variables)
+ya cubre un aparato puntual, todas las sesiones desde una fecha, o sacar a
+una persona — y ninguno de los tres te desloguea a vos de paso, ni mata los
+enlaces mágicos que estén en vuelo (algo que rotar el secreto sí hace,
+desde la Tarea 12).
 
-Usalo cuando sospeches que una cookie se filtró (una pantalla compartida,
-un aparato perdido) o cuando alguien que tenía acceso deja de tenerlo y no
-alcanza con sacarlo de `PANEL_CORREOS` (sacarlo de la lista le bloquea
-`publicar` en el próximo pedido — I-4 — pero no invalida una cookie que
-todavía no venció; si además hay que estar seguro de que esa cookie puntual
-ya no sirve para nada, hace falta este paso).
+**Para un celular perdido, alguien que se va, o «por las dudas, que todos
+vuelvan a entrar», no hace falta esto — usá los tres botones de arriba.**
+Son más baratos y hacen exactamente lo que necesitás, sin de paso sacarte a
+vos también.
+
+Rotar `PANEL_SECRETO` es para un caso distinto y más grave: **el secreto en
+sí se filtró** — apareció en un log, una captura de pantalla compartida, un
+repo que no debía tenerlo. Ahí no alcanza con cortar una sesión puntual ni
+con `PANEL_SESIONES_DESDE`: quien tiene el secreto puede FIRMAR cookies
+nuevas, con la fecha de `emitida` que quiera, así que la única forma de que
+dejen de servir es que el secreto con el que las firmó deje de ser el que
+el servidor usa.
 
 1. Generá un secreto nuevo, al azar, de más de 32 caracteres (el mínimo que
    exige `LARGO_MIN_SECRETO` en `src/servidor/sesion.ts` — con menos, un

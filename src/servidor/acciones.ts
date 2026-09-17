@@ -207,6 +207,34 @@ interface CuerpoEntrar {
 }
 
 /**
+ * [RULING T3-1] El id de dispositivo llega del navegador y hoy es texto
+ * libre: el panel manda lo que quiera. Eso choca de frente con
+ * `PANEL_DISPOSITIVOS_REVOCADOS`, que es una lista separada por comas — un
+ * id con una coma adentro («iPhone 15, de Marcos») se parte al leer la
+ * lista, ninguno de los dos pedazos coincide con el id entero que viaja en
+ * la cookie, y **la revocación falla en silencio justo cuando Marcos cree
+ * haberla hecho bien**. Está medido: con ese id, `publicar` sigue pasando.
+ *
+ * Se arregla en el ORIGEN y no en el lector: acá, donde el id entra al
+ * sistema por primera vez, se lo normaliza a un alfabeto que no puede
+ * romper ninguna lista. Arreglarlo del lado de `listaTiene` —escapando, o
+ * cambiando el separador— dejaría el id crudo dando vueltas por el resto
+ * del sistema para que el próximo lugar que lo use se vuelva a tropezar.
+ *
+ * Que dos aparatos con nombres parecidos colapsen al mismo id es un costo
+ * aceptable hoy: el id de hoy lo elige el navegador y no identifica nada
+ * por sí solo. La fase 6, cuando dibuje la pantalla de «¿desde qué aparato
+ * estás editando?», va a querer separar las dos cosas —un id opaco que
+ * genera el servidor para revocar, y una etiqueta legible para mostrar— y
+ * ese es el momento de hacerlo, con la pantalla delante.
+ */
+export const idDeDispositivo = (crudo: unknown): string => {
+  const texto = typeof crudo === 'string' ? crudo : ''
+  const limpio = texto.replace(/[^A-Za-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64)
+  return limpio === '' ? 'sin-nombre' : limpio
+}
+
+/**
  * `entrar`: contraseña → cookie (E2, E3, E4).
  *
  * Capas separadas, cada una con su propia respuesta (RULING T6-a, y C-1
@@ -257,7 +285,7 @@ function entrar(pedido: Pedido, contexto: Contexto): Respuesta {
   if (!claveOk) return error(401, PROBLEMA_ENTRAR)
 
   const dias = cuerpo.recuerdame === true ? DIAS_SESION_LARGA : DIAS_SESION_CORTA
-  const dispositivo = typeof cuerpo.dispositivo === 'string' ? cuerpo.dispositivo : 'sin identificar'
+  const dispositivo = idDeDispositivo(cuerpo.dispositivo)
   const vence = contexto.ahora() + dias * 86_400_000
 
   const token = firmaSesion({ correo, vence, dispositivo, emitida: contexto.ahora() }, env.PANEL_SECRETO)
