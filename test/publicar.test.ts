@@ -197,4 +197,30 @@ describe('publicar', () => {
       'Actualiza contenido del panel\n\nPanel: sí\nPanel-Autor: ella@ejemplo.mx\nPanel-Revierte: abc123',
     )
   })
+
+  // Ronda 2, Grupo E: `revertir.ts` pasa `reintentar: false` porque su
+  // reintento rearmaría el árbol sobre el commit que ganó la carrera CON LOS
+  // BYTES VIEJOS de la reversión — si ese commit es de Marcos, desaparece sin
+  // 409 y sin log. Este test fija el comportamiento de `publica()` en sí:
+  // con `reintentar: false`, un solo choque basta para rendirse.
+  it('E: con `reintentar: false`, un choque del PATCH no reintenta — 409 directo, sin un segundo intento', async () => {
+    const choque = { status: 422, cuerpo: { message: 'Update is not a fast forward' } }
+    const { f, pedidos } = fetchFalso([
+      { cuerpo: { object: { sha: 'm' } } }, { cuerpo: { sha: 'c', tree: { sha: 'a' } } },
+      { cuerpo: { sha: 'b' } }, { cuerpo: { sha: 'a2' } }, { cuerpo: { sha: 'c2' } }, choque,
+    ])
+    const r = await publica(cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f }), {
+      archivos: [{ ruta: 'src/contenido/datos/sitio.json', contenido: '{}' }],
+      autor: 'x@y.mx',
+      reintentar: false,
+    })
+    expect(r.ok).toBe(false)
+    if (!r.ok) {
+      expect(r.codigo).toBe(409)
+      expect(r.problema).toMatch(/Marcos/)
+    }
+    // Nada de un segundo `gh.ref`, ni un segundo PATCH: un solo choque, y se rinde.
+    expect(pedidos.filter((p) => p.metodo === 'PATCH')).toHaveLength(1)
+    expect(pedidos).toHaveLength(6)
+  })
 })

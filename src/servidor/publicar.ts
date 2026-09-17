@@ -50,6 +50,17 @@ export interface Publicacion {
    * propio: el próximo trailer no debería pedir tocar esta interfaz otra vez.
    */
   trailers?: Record<string, string>
+  /**
+   * Si el `PATCH` choca, ¿se reintenta? Default `true` (el de siempre): nada
+   * cambia para quien ya usaba `publica()`. `revertir.ts` (Tarea 8) pasa
+   * `false` — su reintento rearmaría el árbol sobre el commit que ganó la
+   * carrera CON LOS BYTES VIEJOS de la reversión, y si ese commit es de
+   * Marcos, su cambio desaparecería sin 409 y sin log. Para algo idempotente
+   * como una reversión, rendirse y dejar que la próxima invocación reevalúe
+   * desde cero es lo correcto — nunca insistir a ciegas sobre una carrera que
+   * ya se perdió.
+   */
+  reintentar?: boolean
 }
 
 export type Resultado =
@@ -217,6 +228,24 @@ export async function publica(gh: ReturnType<typeof cliente>, p: Publicacion): P
     return { ok: true, sha, resumen: asunto }
   } catch (primerError) {
     if (!esConflictoDeRef(primerError)) return traduceError(primerError, p)
+
+    if (p.reintentar === false) {
+      // Perder la carrera acá no es un error fuerte: es el mismo 409 de
+      // «alguien más publicó primero», pero SIN el segundo intento que
+      // pisaría ese commit con los bytes viejos de esta reversión. Quien
+      // llamó (`revierte()`) decide qué hacer con eso — típicamente, nada:
+      // la próxima invocación relee la cabeza desde cero.
+      const { status, mensaje: mensajeDeGitHub, sha } = analizaError(primerError)
+      console.error(
+        `publicar: el PATCH del ref chocó y no se reintenta —reintentar:false— (autor: ${p.autor}, archivos: ${rutas.join(', ')}` +
+          `${sha ? `, commit huérfano: ${sha}` : ''}) — status ${status ?? '(sin status)'}: ${mensajeDeGitHub}`,
+      )
+      return {
+        ok: false,
+        codigo: 409,
+        problema: 'Marcos cambió algo del sitio mientras editabas: vuelve a intentar la publicación.',
+      }
+    }
 
     try {
       const sha = await intento(gh, p.archivos, mensaje)

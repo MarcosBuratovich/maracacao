@@ -88,13 +88,99 @@ describe('revertir un commit del panel', () => {
     expect((commit.cuerpo as { message: string }).message).toContain(`${TRAILER_REVIERTE}: ${SHA}`)
   })
 
-  it('un commit del panel que no tocó contenido no tiene nada que revertir', async () => {
+  // Ronda 2, Grupo D: un commit que no tocó contenido no es un «revertido»
+  // silencioso — `main` sigue con el commit roto, y decir `ok: true` le
+  // mentía a Marcos («Reversión automática: revertido») sobre un sitio que
+  // seguía sirviendo lo malo.
+  it('D: un commit del panel que no tocó contenido no tiene nada que revertir — no es un éxito', async () => {
     const { f } = fetchFalso([
       { cuerpo: { object: { sha: SHA } } },
       { cuerpo: { sha: SHA, tree: { sha: 't' }, message: 'algo\n\nPanel: sí', author: { date: '2026-09-17T12:00:00Z' }, parents: [{ sha: 'padre' }] } },
       { cuerpo: { files: [] } },
     ])
     const r = await revierte(gh(f), { sha: SHA, autor: 'ella@ejemplo.mx' })
-    expect(r).toEqual({ ok: true, sha: null, revirtio: SHA })
+    expect(r).toEqual({ ok: false, motivo: 'nada-que-revertir', detalle: expect.any(String) })
+  })
+
+  // Ronda 2, Grupo A: la guardia de «no revertir una reversión» vive ADENTRO
+  // de `revierte()`, no solo en quien llama. Medido en la revisión: sin esto,
+  // revertir la cabeza de una reversión republica el contenido MALO en un
+  // commit nuevo que además lleva su propio `Panel-Revierte:` — y como ya
+  // «es una reversión», la red de seguridad nunca lo vuelve a tocar.
+  it('A: no revierte una reversión, aunque sea del panel y sea la cabeza', async () => {
+    const { f, pedidos } = fetchFalso([
+      { cuerpo: { object: { sha: SHA } } },
+      {
+        cuerpo: {
+          sha: SHA,
+          tree: { sha: 't' },
+          message: `Deshace un cambio\n\nPanel: sí\nPanel-Autor: x\n${TRAILER_REVIERTE}: otroShaCualquiera`,
+          author: { date: '2026-09-17T12:00:00Z' },
+          parents: [{ sha: 'padre' }],
+        },
+      },
+    ])
+    const r = await revierte(gh(f), { sha: SHA, autor: 'ella@ejemplo.mx' })
+    expect(r).toEqual({ ok: false, motivo: 'ya-revertido', detalle: expect.any(String) })
+    expect(pedidos.every((p) => p.metodo === 'GET')).toBe(true)
+  })
+
+  // Ronda 2, Grupo E: si el PATCH choca (alguien más publicó justo en el
+  // medio), `revierte()` no reintenta — el reintento de `publica()` rearma el
+  // árbol SOBRE el commit que ganó la carrera, pero con los bytes VIEJOS de
+  // esta reversión: si ese commit es de Marcos, desaparece sin 409 y sin log.
+  it('E: si el PATCH choca, no reintenta — se rinde para no comerse un commit ajeno', async () => {
+    const fichasReales = readFileSync('src/contenido/datos/fichas.json', 'utf8')
+    const choque = { status: 422, cuerpo: { message: 'Update is not a fast forward' } }
+    const { f, pedidos } = fetchFalso([
+      { cuerpo: { object: { sha: SHA } } }, // ref
+      { cuerpo: { sha: SHA, tree: { sha: 't' }, message: 'cambia algo\n\nPanel: sí', author: { date: '2026-09-17T12:00:00Z' }, parents: [{ sha: 'padre' }] } }, // commit
+      { cuerpo: { files: [{ filename: 'src/contenido/datos/fichas.json' }] } }, // comparaRefs
+      { cuerpo: { content: Buffer.from(fichasReales).toString('base64'), encoding: 'base64' } }, // archivoEnRef del padre
+      // adentro de publica(), UN solo intento — sin reintento:
+      { cuerpo: { object: { sha: 'main-x' } } }, // gh.ref
+      { cuerpo: { sha: 'c', tree: { sha: 'a' } } }, // gh.commit
+      { cuerpo: { sha: 'blob-1' } }, // creaBlob
+      { cuerpo: { sha: 'arbol-1' } }, // creaArbol
+      { cuerpo: { sha: 'commit-1' } }, // creaCommit
+      choque, // el PATCH choca — y se termina ACÁ, sin un segundo intento
+    ])
+    const r = await revierte(gh(f), { sha: SHA, autor: 'ella@ejemplo.mx' })
+    expect(r).toEqual({ ok: false, motivo: 'no-es-la-cabeza', detalle: expect.any(String) })
+    expect(pedidos.filter((p) => p.metodo === 'PATCH')).toHaveLength(1)
+  })
+
+  // Ronda 2, F-3: un contenido viejo que no es JSON válido no puede tirar —
+  // el tipo de `revierte()` promete `{ ok: false }`, no una excepción.
+  it('F3: un contenido viejo que no es JSON válido no revienta — devuelve falló', async () => {
+    const { f } = fetchFalso([
+      { cuerpo: { object: { sha: SHA } } },
+      { cuerpo: { sha: SHA, tree: { sha: 't' }, message: 'algo\n\nPanel: sí', author: { date: '2026-09-17T12:00:00Z' }, parents: [{ sha: 'padre' }] } },
+      { cuerpo: { files: [{ filename: 'src/contenido/datos/fichas.json' }] } },
+      { cuerpo: { content: Buffer.from('esto no es JSON {{{').toString('base64'), encoding: 'base64' } },
+    ])
+    const r = await revierte(gh(f), { sha: SHA, autor: 'ella@ejemplo.mx' })
+    expect(r).toEqual({ ok: false, motivo: 'falló', detalle: expect.any(String) })
+  })
+
+  // Ronda 2, F-4: los trailers se anclan por LÍNEA, no como substring en
+  // cualquier lado del mensaje. Un commit a mano que simplemente MENCIONE
+  // «Panel: sí» —en un párrafo, citando lo que decía otro commit— no puede
+  // colarse como si fuera del panel.
+  it('F4: mencionar «Panel: sí» en el cuerpo del mensaje no alcanza — no es una línea de trailer', async () => {
+    const { f } = fetchFalso([
+      { cuerpo: { object: { sha: SHA } } },
+      {
+        cuerpo: {
+          sha: SHA,
+          tree: { sha: 't' },
+          message: 'fix: revierto a mano lo que decía "Panel: sí" en el commit anterior',
+          author: { date: '2026-09-17T12:00:00Z' },
+          parents: [{ sha: 'p' }],
+        },
+      },
+    ])
+    const r = await revierte(gh(f), { sha: SHA, autor: 'ella@ejemplo.mx' })
+    expect(r).toEqual({ ok: false, motivo: 'no-es-del-panel', detalle: expect.any(String) })
   })
 })

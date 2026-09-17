@@ -35,14 +35,46 @@ export const TRAILER_REVIERTE = 'Panel-Revierte'
 /** La marca que el panel le pone a todo lo que publica (`publicar.ts`). */
 const TRAILER_PANEL = 'Panel: sí'
 
+/** El trailer que lleva el correo de quien publicó de verdad (`publicar.ts`). */
+const TRAILER_AUTOR = 'Panel-Autor'
+
 export type ResultadoReversion =
   | { ok: true; sha: string | null; revirtio: string }
-  | { ok: false; motivo: 'no-es-del-panel' | 'no-es-la-cabeza' | 'ya-revertido' | 'no-valida' | 'falló'; detalle: string }
+  | {
+      ok: false
+      motivo: 'no-es-del-panel' | 'no-es-la-cabeza' | 'ya-revertido' | 'nada-que-revertir' | 'no-valida' | 'falló'
+      detalle: string
+    }
 
 const RUTA_DEL_DOCUMENTO = (id: IdDocumento): string => `src/contenido/datos/${id}.json`
 const DOCUMENTO_DE_RUTA = new Map<string, IdDocumento>(
   (Object.keys(DOCUMENTOS) as IdDocumento[]).map((id) => [RUTA_DEL_DOCUMENTO(id), id]),
 )
+
+/**
+ * [F-4] ¿El mensaje de un commit lleva esta línea de trailer EXACTA? Anclado
+ * por línea completa —una de las líneas del mensaje, partido por `\n`, tiene
+ * que ser IGUAL a `lineaExacta`— y no un substring en cualquier lado. Sin
+ * esto, un commit escrito a mano cuyo cuerpo mencione «Panel: sí» en medio de
+ * una oración («revierto lo que decía Panel: sí, a mano») pasaría por un
+ * commit del panel.
+ */
+export function tieneTrailer(mensaje: string, lineaExacta: string): boolean {
+  return mensaje.split('\n').includes(lineaExacta)
+}
+
+/**
+ * [F-4] El valor de un trailer `Clave: valor`, buscado por línea (el prefijo
+ * `Clave: ` tiene que estar al principio de una línea entera), o `undefined`
+ * si no está. Se usa tanto para detectar «esto YA es una reversión de algo»
+ * (`TRAILER_REVIERTE`, sin saber de antemano qué sha sigue) como para leer
+ * `Panel-Autor:` sin tener que reconstruir la línea completa primero.
+ */
+export function valorDeTrailer(mensaje: string, clave: string): string | undefined {
+  const prefijo = `${clave}: `
+  const linea = mensaje.split('\n').find((l) => l.startsWith(prefijo))
+  return linea === undefined ? undefined : linea.slice(prefijo.length)
+}
 
 /**
  * Las fuentes de los cinco derivados de `sitio`, sacadas de un documento de
@@ -76,7 +108,7 @@ export async function revierte(
     // …salvo que la cabeza SEA la reversión de este mismo sha. Ahí no es un
     // error: es que alguien ya lo hizo, y la respuesta correcta es «listo»,
     // no «no se puede».
-    if (cabezaCommit.message.includes(`${TRAILER_REVIERTE}: ${p.sha}`)) {
+    if (valorDeTrailer(cabezaCommit.message, TRAILER_REVIERTE) === p.sha) {
       return { ok: false, motivo: 'ya-revertido', detalle: `${cabeza.sha} ya revierte ${p.sha}` }
     }
     return { ok: false, motivo: 'no-es-la-cabeza', detalle: `la cabeza es ${cabeza.sha}` }
@@ -86,8 +118,19 @@ export async function revierte(
 
   // El panel no deshace lo que no publicó. Un commit de Marcos, hecho a mano,
   // no se toca desde acá ni aunque el despliegue haya fallado por su culpa.
-  if (!commit.message.includes(TRAILER_PANEL)) {
+  if (!tieneTrailer(commit.message, TRAILER_PANEL)) {
     return { ok: false, motivo: 'no-es-del-panel', detalle: `${p.sha} no lleva «${TRAILER_PANEL}»` }
+  }
+
+  // [A] Una reversión no se revierte. Republicar el contenido de una
+  // reversión es resucitar EXACTAMENTE el contenido que se acaba de declarar
+  // roto — y encima en un commit nuevo que lleva su PROPIO trailer, así que
+  // la red de seguridad (`revisaLaCabeza()`, acciones.ts) nunca lo va a
+  // volver a tocar: quedaría malo para siempre. La guardia vive ACÁ, no solo
+  // en quien llama: una invariante que depende de que todo llamador se
+  // acuerde de chequearla antes no es una invariante.
+  if (valorDeTrailer(commit.message, TRAILER_REVIERTE) !== undefined) {
+    return { ok: false, motivo: 'ya-revertido', detalle: `${p.sha} ya es una reversión` }
   }
 
   const padre = commit.padres[0]
@@ -104,8 +147,14 @@ export async function revierte(
     return id ? [{ ruta, id }] : []
   })
 
+  // [D] Nada que revertir NO es lo mismo que «revertido»: `main` sigue con el
+  // commit roto (hoy no alcanzable —un commit del panel siempre toca al
+  // menos un documento de contenido—, pero deja de serlo en cuanto la fase 7
+  // publique imágenes sueltas, que no están en `DOCUMENTO_DE_RUTA`). Decirlo
+  // como éxito le mentía a Marcos: el correo decía «revertido» con el sitio
+  // todavía roto.
   if (documentos.length === 0) {
-    return { ok: true, sha: null, revirtio: p.sha }
+    return { ok: false, motivo: 'nada-que-revertir', detalle: `${p.sha} no tocó ningún documento de contenido` }
   }
 
   // El contenido VIEJO (en el padre) de cada documento tocado, leído de una
@@ -121,6 +170,18 @@ export async function revierte(
   for (const { ruta, id } of documentos) {
     const viejo = contenidos.get(id) as string
 
+    // [F-3] El contenido viejo puede no ser JSON válido (corrupción rara,
+    // migración a medio camino). Eso es un motivo de la MISMA familia que
+    // «no pasa las reglas de hoy» — un `falló` con detalle, nunca una
+    // excepción que tire a quien llamó, que es justo lo que el tipo de
+    // retorno de esta función promete no hacer.
+    let crudo: unknown
+    try {
+      crudo = JSON.parse(viejo)
+    } catch (e) {
+      return { ok: false, motivo: 'falló', detalle: `${ruta}: el contenido del padre no es JSON válido (${String(e)})` }
+    }
+
     // `sitio` tiene cinco campos derivados que `serializa()` nunca escribe
     // (carga.ts:390-395; ver derivados.ts) — así que el JSON que vive en el
     // repo, tal cual, NUNCA los trae. Validarlo crudo rechaza CUALQUIER
@@ -131,12 +192,18 @@ export async function revierte(
     // el router: las de `sabores` si también se está revirtiendo en este
     // lote (sus valores son los que van a quedar vivos después de este
     // commit), o si no, las de `sabores` vivo en el mismo padre.
-    let paraValidar: unknown = JSON.parse(viejo)
+    let paraValidar: unknown = crudo
     if (id === 'sitio') {
       const textoSabores = contenidos.has('sabores')
         ? (contenidos.get('sabores') as string)
         : await gh.archivoEnRef(RUTA_DEL_DOCUMENTO('sabores'), padre)
-      const fuentes = fuentesDeSabores(JSON.parse(textoSabores))
+      let saboresCrudo: unknown
+      try {
+        saboresCrudo = JSON.parse(textoSabores)
+      } catch {
+        saboresCrudo = undefined
+      }
+      const fuentes = fuentesDeSabores(saboresCrudo)
       // Mismo criterio que `publicarAccion`: si `injerta()` tira porque al
       // documento le falta un CONTENEDOR entero (`gotas`, no solo
       // `gotas.precioDesde`), eso es un documento con una forma rota de
@@ -144,7 +211,7 @@ export async function revierte(
       // el documento TAL CUAL para que sea `validarContra`, no un 500, quien
       // diga qué falta.
       try {
-        paraValidar = injerta(paraValidar, fuentes)
+        paraValidar = injerta(crudo, fuentes)
       } catch {
         // se deja `paraValidar` tal cual llegó, sin injertar.
       }
@@ -165,9 +232,30 @@ export async function revierte(
     archivos,
     autor: p.autor,
     trailers: { [TRAILER_REVIERTE]: p.sha },
+    // [E] Sin el reintento interno de `publica()`: ese reintento rearmaría
+    // el árbol SOBRE el commit que ganó la carrera, pero con los bytes
+    // VIEJOS de esta reversión — si ese commit es de Marcos, publicado justo
+    // en la ventana entre que se leyó el ref y se movió, su cambio
+    // desaparecería sin 409 y sin log. Perder la carrera acá se traduce
+    // abajo en `no-es-la-cabeza`: la próxima invocación relee todo desde
+    // cero, que es lo correcto para algo idempotente.
+    reintentar: false,
     ...(p.bytesDelCuerpo !== undefined ? { bytesDelCuerpo: p.bytesDelCuerpo } : {}),
   })
 
-  if (!resultado.ok) return { ok: false, motivo: 'falló', detalle: resultado.problema }
+  if (!resultado.ok) {
+    return {
+      ok: false,
+      // [E] El 409 de `publica()` con `reintentar:false` es exactamente la
+      // misma situación que la guardia de arriba detecta ANTES de escribir:
+      // la cabeza cambió. Contarlo con el mismo motivo es lo que le permite a
+      // quien llama tratar los dos casos igual.
+      motivo: resultado.codigo === 409 ? 'no-es-la-cabeza' : 'falló',
+      detalle: resultado.problema,
+    }
+  }
   return { ok: true, sha: resultado.sha, revirtio: p.sha }
 }
+
+/** El correo de quien publicó de verdad, leído del trailer `Panel-Autor:` — nunca de quien pidió la reversión. */
+export const autorDelCommit = (mensaje: string): string | undefined => valorDeTrailer(mensaje, TRAILER_AUTOR)

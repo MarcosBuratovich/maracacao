@@ -25,7 +25,7 @@ import {
 } from './sesion'
 import { cliente } from './github'
 import { publica, type Archivo } from './publicar'
-import { revierte, TRAILER_REVIERTE } from './revertir'
+import { revierte, TRAILER_REVIERTE, tieneTrailer, valorDeTrailer, autorDelCommit } from './revertir'
 import type { Cambio } from '../contenido/diff'
 import { resume } from '../contenido/diff'
 import { validarContra, type Problema } from '../contenido/validacion'
@@ -429,8 +429,64 @@ function listaTiene(lista: string | undefined, valor: string): boolean {
  * ---------------------------------------------------------------------
  */
 
+// El correo para ella, siempre el mismo texto: para que el correo y lo que
+// ve en pantalla no cuenten dos historias distintas. Nada técnico (B10) —
+// [F-5] `test/acciones.test.ts` lo pasa por `JERGA_PROHIBIDA`.
+const ASUNTO_PARA_ELLA = 'Tu cambio no se pudo publicar'
+const TEXTO_PARA_ELLA = 'No salió; lo dejé como estaba y ya le avisé a Marcos.\n\nPuedes volver a intentarlo cuando quieras.'
+
 /**
- * Deshace un commit cuyo despliegue falló y avisa a las dos personas.
+ * [F-2] Manda una carta protegida por su propio `try`. `manda()` (correo.ts)
+ * promete no tirar nunca, pero esa es una promesa de OTRO módulo: la de esta
+ * función —y la de quien la llama, `revierteYAvisa*`— es no hacer fallar a
+ * quien pidió la acción, y depender en silencio de que otro módulo cumpla su
+ * contrato es exactamente la clase de acoplamiento que un `try` de una línea
+ * evita gratis.
+ */
+async function mandaProtegido(contexto: Contexto, carta: Carta): Promise<void> {
+  try {
+    await contexto.correo(carta)
+  } catch (e) {
+    console.error('revertir: el envío de un correo de aviso reventó —', e)
+  }
+}
+
+/**
+ * Corre `revierte()` protegido por su propio `try`, y arma el resumen para
+ * el log/correo de Marcos. Compartido por las dos rutas de aviso —la de
+ * `estadoAccion` y la de `revisaLaCabeza()`—: las dos necesitan exactamente
+ * esto, y solo cambia a quién más se le avisa después.
+ *
+ * [D] `nada-que-revertir` se cuenta con sus propias palabras: no es un
+ * `revertido` (el commit roto se queda en `main`) ni entra en el genérico
+ * «NO se pudo revertir», que suena a que algo salió mal cuando lo que pasó
+ * es que no había NADA de contenido que revertir.
+ */
+async function intentaRevertir(gh: ReturnType<typeof cliente>, sha: string, autor: string): Promise<string> {
+  try {
+    const r = await revierte(gh, { sha, autor })
+    if (r.ok) return `revertido (commit ${r.sha ?? 'sin cambios'})`
+    if (r.motivo === 'nada-que-revertir') {
+      console.error(`revertir: ${sha} no tenía nada que revertir — main sigue con el commit roto (${r.detalle}).`)
+      return 'no había nada que revertir: el commit no tocó ningún documento de contenido'
+    }
+    console.error(`revertir: la reversión automática de ${sha} no se pudo hacer — ${r.motivo}: ${r.detalle}`)
+    return `NO se pudo revertir: ${r.motivo} — ${r.detalle}`
+  } catch (e) {
+    console.error(`revertir: la reversión automática de ${sha} reventó —`, e)
+    return `NO se pudo revertir: ${e instanceof Error ? e.message : String(e)}`
+  }
+}
+
+/** Solo el correo a ella — sin intentar (de nuevo) el revert. Ver el uso en `estadoAccion`, más abajo. */
+async function avisaAElla(correoDeElla: string, contexto: Contexto): Promise<void> {
+  await mandaProtegido(contexto, { a: [correoDeElla], asunto: ASUNTO_PARA_ELLA, texto: TEXTO_PARA_ELLA })
+}
+
+/**
+ * Deshace un commit cuyo despliegue falló y avisa a las DOS personas: es el
+ * camino de `estadoAccion`, el único momento en que ella está esperando el
+ * resultado de SU publicación (Ronda 2, Grupo B).
  *
  * Es `void` a propósito: lo que sale por HTTP es el veredicto —«no salió; lo
  * dejé como estaba»—, que ya es verdad haya podido revertir o no (el sitio
@@ -449,32 +505,54 @@ async function revierteYAvisa(sha: string, correoDeElla: string, contexto: Conte
     fetch: contexto.fetch,
   })
 
-  let resumen: string
-  try {
-    const r = await revierte(gh, { sha, autor: correoDeElla })
-    resumen = r.ok ? `revertido (commit ${r.sha ?? 'sin cambios'})` : `NO se pudo revertir: ${r.motivo} — ${r.detalle}`
-    if (!r.ok) console.error(`estado: la reversión automática de ${sha} no se pudo hacer — ${r.motivo}: ${r.detalle}`)
-  } catch (e) {
-    resumen = `NO se pudo revertir: ${e instanceof Error ? e.message : String(e)}`
-    console.error(`estado: la reversión automática de ${sha} reventó —`, e)
-  }
+  const resumen = await intentaRevertir(gh, sha, correoDeElla)
 
-  // A ella: la misma frase que ve en pantalla, para que el correo y el panel
-  // no cuenten dos historias distintas. Nada técnico (B10).
-  await contexto.correo({
-    a: [correoDeElla],
-    asunto: 'Tu cambio no se pudo publicar',
-    texto: 'No salió; lo dejé como estaba y ya le avisé a Marcos.\n\nPuedes volver a intentarlo cuando quieras.',
-  })
+  await avisaAElla(correoDeElla, contexto)
 
   // A Marcos: todo. El sha, qué pasó con la reversión, y a dónde mirar.
   const paraMarcos = contexto.env.PANEL_AVISOS_A
   if (paraMarcos) {
-    await contexto.correo({
+    await mandaProtegido(contexto, {
       a: [paraMarcos],
       asunto: `[panel] El deploy de ${sha.slice(0, 7)} falló`,
       texto: [
         `El commit ${sha} publicado por ${correoDeElla} no construyó.`,
+        `Reversión automática: ${resumen}.`,
+        '',
+        'El sitio sigue sirviendo el último deploy bueno.',
+      ].join('\n'),
+    })
+  }
+}
+
+/**
+ * Deshace un commit cuyo despliegue falló y avisa SOLO a Marcos: es el
+ * camino de `revisaLaCabeza()`, la red de seguridad (Ronda 2, Grupo B).
+ *
+ * [B] Nadie está mirando el panel cuando esto corre —si alguien estuviera
+ * mirando, sería `estadoAccion` quien lo atendería—, así que no hay a quién
+ * más avisarle del lado de la clienta en este mismo instante. Y el correo NO
+ * le atribuye el commit a quien disparó la acción que trajo esta limpieza
+ * (Marcos entrando al panel, por ejemplo): `autorReal` sale del trailer
+ * `Panel-Autor:` del propio commit, que es quien de verdad lo publicó.
+ */
+async function revierteYAvisaAMarcos(sha: string, autorReal: string, contexto: Contexto): Promise<void> {
+  const gh = cliente({
+    token: contexto.env.PANEL_GITHUB_TOKEN ?? '',
+    duenio: contexto.env.GITHUB_DUENIO ?? '',
+    repo: contexto.env.GITHUB_REPO ?? '',
+    fetch: contexto.fetch,
+  })
+
+  const resumen = await intentaRevertir(gh, sha, autorReal)
+
+  const paraMarcos = contexto.env.PANEL_AVISOS_A
+  if (paraMarcos) {
+    await mandaProtegido(contexto, {
+      a: [paraMarcos],
+      asunto: `[panel] El deploy de ${sha.slice(0, 7)} falló`,
+      texto: [
+        `El commit ${sha} publicado por ${autorReal} no construyó (nadie tenía el panel abierto).`,
         `Reversión automática: ${resumen}.`,
         '',
         'El sitio sigue sirviendo el último deploy bueno.',
@@ -490,27 +568,33 @@ async function revierteYAvisa(sha: string, correoDeElla: string, contexto: Conte
  * esté mirando. Si ella publicó y guardó el teléfono —que es lo que el spec
  * §4.5 dice que va a hacer, y tiene razón—, el fracaso ocurre con el panel
  * cerrado y nadie lo ve. Entonces lo primero que hace cualquier acción
- * autenticada es preguntar si la cabeza de `main` es un commit del panel cuyo
- * despliegue falló, y si lo es, arreglarlo ANTES de hacer lo suyo.
+ * autenticada (después de sus propias validaciones baratas, Grupo C) es
+ * preguntar si la cabeza de `main` es un commit del panel cuyo despliegue
+ * falló, y si lo es, arreglarlo ANTES de hacer lo suyo.
  *
  * El costo de estar equivocado es un pedido de más a la plataforma por acción.
  * El costo de no tenerlo es que el commit malo se quede en `main` y la próxima
  * publicación falle sin que ella haya tocado nada — el WhatsApp que el panel
  * viene a matar.
  *
- * Dónde se llama: como PRIMERA cosa de `estadoAccion` y `publicarAccion`,
- * después de validar la sesión y antes de hacer nada más — en `publicarAccion`
- * antes incluso del chequeo de `base` (Tarea 2): si la cabeza está rota y se
- * revierte, la cabeza cambia, y comparar contra la vieja daría un 409 por un
- * commit que acaba de dejar de existir. `historialAccion` (Tarea 10) todavía
- * no existe; cuando se escriba, corre esto primero también.
+ * Dónde se llama: como PRIMERA cosa (después de las validaciones baratas y
+ * sincrónicas de cada acción) de `estadoAccion` y `publicarAccion` — en
+ * `publicarAccion`, antes del chequeo de `base` (Tarea 2): si la cabeza está
+ * rota y se revierte, la cabeza cambia, y comparar contra la vieja daría un
+ * 409 por un commit que acaba de dejar de existir. `historialAccion` (Tarea
+ * 10) todavía no existe; cuando se escriba, corre esto primero también.
+ *
+ * [B] Devuelve el sha que atendió —el que era la cabeza rota, no el de la
+ * reversión nueva— o `null` si no había nada que hacer. `estadoAccion` lo usa
+ * para no revertir NI avisar dos veces por el mismo sha: si esto ya lo
+ * atendió (y ya le avisó a Marcos), lo único que falta es avisarle a ELLA.
  */
-async function revisaLaCabeza(contexto: Contexto, correoDeQuienPide: string): Promise<void> {
+async function revisaLaCabeza(contexto: Contexto): Promise<string | null> {
   // Todo lo de acá adentro es "mejor esfuerzo": si algo falla, se loguea y se
   // sigue. Esta función NUNCA puede hacer fallar la acción que la llamó — sería
   // impedirle publicar por culpa de una limpieza que ni pidió.
   try {
-    if (!contexto.env.PANEL_VERCEL_TOKEN) return
+    if (!contexto.env.PANEL_VERCEL_TOKEN) return null
 
     const gh = cliente({
       token: contexto.env.PANEL_GITHUB_TOKEN ?? '',
@@ -522,24 +606,40 @@ async function revisaLaCabeza(contexto: Contexto, correoDeQuienPide: string): Pr
     const cabeza = await gh.ref('heads/main')
     const commit = await gh.commit(cabeza.sha)
 
+    // [F-4] Anclado por línea (`tieneTrailer`/`valorDeTrailer`, revertir.ts):
+    // un commit a mano que solo MENCIONE «Panel: sí» en su cuerpo no puede
+    // colarse como si fuera del panel.
+    if (!tieneTrailer(commit.message, 'Panel: sí')) return null
     // Solo los commits del panel, y solo los que no son ya una reversión: sin
-    // el segundo chequeo, un revert cuyo propio deploy falla se revertiría a sí
-    // mismo, y así para siempre.
-    if (!commit.message.includes('Panel: sí')) return
-    if (commit.message.includes(`${TRAILER_REVIERTE}: `)) return
+    // el segundo chequeo, un revert cuyo propio deploy falla se revertiría a
+    // sí mismo, y así para siempre.
+    if (valorDeTrailer(commit.message, TRAILER_REVIERTE) !== undefined) return null
 
-    const vercel = clienteVercel({
-      token: contexto.env.PANEL_VERCEL_TOKEN,
-      proyecto: contexto.env.PANEL_VERCEL_PROYECTO ?? 'maracacao',
-      fetch: contexto.fetch,
-    })
+    // [F-1] Misma expresión que la acción vecina (`estadoAccion`, más abajo):
+    // si ninguna de las dos variables está cargada, esto no puede seguir en
+    // silencio preguntándole a la plataforma por un proyecto sin nombre —eso
+    // vuelve como «no hay despliegues», `estado !== 'falló'`, y la reversión
+    // automática deja de existir sin una sola línea de log.
+    const proyecto = contexto.env.PANEL_VERCEL_PROYECTO ?? contexto.env.GITHUB_REPO ?? ''
+    if (proyecto === '') {
+      console.error('revisaLaCabeza: ni PANEL_VERCEL_PROYECTO ni GITHUB_REPO están cargadas — no sé por qué proyecto preguntar.')
+      return null
+    }
+
+    const vercel = clienteVercel({ token: contexto.env.PANEL_VERCEL_TOKEN, proyecto, fetch: contexto.fetch })
     const { estado } = await vercel.despliegueDe(cabeza.sha)
-    if (estado !== 'falló') return
+    if (estado !== 'falló') return null
+
+    // El autor real —para el correo de Marcos— sale del propio trailer del
+    // commit, nunca de quien disparó esta limpieza.
+    const autorReal = autorDelCommit(commit.message) ?? 'alguien del panel'
 
     console.error(`revisaLaCabeza: ${cabeza.sha} es un commit del panel cuyo despliegue falló — revirtiendo.`)
-    await revierteYAvisa(cabeza.sha, correoDeQuienPide, contexto)
+    await revierteYAvisaAMarcos(cabeza.sha, autorReal, contexto)
+    return cabeza.sha
   } catch (e) {
     console.error('revisaLaCabeza: no se pudo revisar la cabeza de main —', e)
+    return null
   }
 }
 
@@ -642,12 +742,6 @@ async function publicarAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
   const sesion = sesionVigente(pedido.cookie, env, contexto.ahora())
   if (!sesion) return error(401, PROBLEMA_SESION)
 
-  // [B1] Antes de mirar `base` siquiera: si la cabeza quedó rota por un
-  // despliegue que falló con el panel cerrado, arreglarla ahora — si no,
-  // comparar `base` contra una cabeza que está a punto de cambiar sería
-  // rechazar con un 409 un commit que ya va a dejar de existir.
-  await revisaLaCabeza(contexto, sesion.correo)
-
   const cuerpo = (pedido.cuerpo ?? {}) as { documentos?: unknown; base?: unknown }
   if (typeof cuerpo.base !== 'string' || cuerpo.base === '') {
     console.error('publicar: el cuerpo llegó sin `base` — el panel que lo mandó es de antes del sha base.')
@@ -668,6 +762,15 @@ async function publicarAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
   if (ids.length === 0) return error(400, PROBLEMA_SIN_DOCUMENTOS)
 
   const idsConocidos = ids as IdDocumento[]
+
+  // [B1, Grupo C] Recién ACÁ, después de las validaciones baratas y
+  // sincrónicas de arriba (lote vacío, documento desconocido, `base`
+  // ausente): antes tocaba GitHub incluso cuando ninguna de esas iba a dejar
+  // seguir — «400 sin tocar GitHub» dejaba de ser cierto. Y todavía antes de
+  // la comparación de `base` de la Fase 2: si la cabeza está rota y se
+  // revierte acá, esa fase tiene que ver la cabeza YA arreglada, o compara
+  // contra un commit que acaba de dejar de existir.
+  await revisaLaCabeza(contexto)
 
   const gh = cliente({
     token: contexto.env.PANEL_GITHUB_TOKEN ?? '',
@@ -935,8 +1038,10 @@ async function estadoAccion(pedido: Pedido, contexto: Contexto): Promise<Respues
 
   // [B1] Misma red de seguridad que `publicarAccion`: si la cabeza de main
   // quedó rota por un despliegue que falló con el panel cerrado, arreglarla
-  // antes de seguir.
-  await revisaLaCabeza(contexto, sesion.correo)
+  // antes de seguir. `estadoAccion` no tiene un chequeo sincrónico barato
+  // ANTES de esto —a diferencia de `publicarAccion` (Grupo C)—, así que acá
+  // corre apenas pasa la sesión, como siempre.
+  const shaYaAtendido = await revisaLaCabeza(contexto)
 
   if (!env.PANEL_VERCEL_TOKEN) {
     console.error('estado: PANEL_VERCEL_TOKEN no está cargada — no hay forma de saber si el despliegue terminó.')
@@ -993,8 +1098,20 @@ async function estadoAccion(pedido: Pedido, contexto: Contexto): Promise<Respues
   // 60 s y un despliegue tarda más. Si ella cerró el panel antes de que
   // fallara, esto no corre acá — corre en la próxima acción autenticada que
   // pase por `revisaLaCabeza()`.
+  //
+  // [Ronda 2, Grupo B] Si `revisaLaCabeza()` (arriba) YA atendió este mismo
+  // sha —el caso normal: ella publica, su commit es la cabeza, y el panel
+  // sondea por ese mismo sha—, no se vuelve a intentar el revert (sería un
+  // pedido de más para un resultado que ya se sabe) ni se avisa a Marcos de
+  // nuevo (ya le avisó `revisaLaCabeza()`, un instante antes, en esta misma
+  // invocación). Lo único que falta es avisarle a ELLA, que es la única
+  // persona a la que `revisaLaCabeza()` nunca le habla.
   if (veredicto.estado === 'falló') {
-    await revierteYAvisa(cuerpo.sha, sesion.correo, contexto)
+    if (shaYaAtendido === cuerpo.sha) {
+      await avisaAElla(sesion.correo, contexto)
+    } else {
+      await revierteYAvisa(cuerpo.sha, sesion.correo, contexto)
+    }
   }
 
   return ok({ ok: true, ...veredicto })

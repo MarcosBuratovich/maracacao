@@ -15443,6 +15443,17 @@ async function publica(gh, p) {
     return { ok: true, sha, resumen: asunto };
   } catch (primerError) {
     if (!esConflictoDeRef(primerError)) return traduceError(primerError, p);
+    if (p.reintentar === false) {
+      const { status, mensaje: mensajeDeGitHub, sha } = analizaError(primerError);
+      console.error(
+        `publicar: el PATCH del ref choc\xF3 y no se reintenta \u2014reintentar:false\u2014 (autor: ${p.autor}, archivos: ${rutas.join(", ")}${sha ? `, commit hu\xE9rfano: ${sha}` : ""}) \u2014 status ${status ?? "(sin status)"}: ${mensajeDeGitHub}`
+      );
+      return {
+        ok: false,
+        codigo: 409,
+        problema: "Marcos cambi\xF3 algo del sitio mientras editabas: vuelve a intentar la publicaci\xF3n."
+      };
+    }
     try {
       const sha = await intento(gh, p.archivos, mensaje);
       return { ok: true, sha, resumen: asunto };
@@ -17847,10 +17858,19 @@ var DOCUMENTOS = {
 // src/servidor/revertir.ts
 var TRAILER_REVIERTE = "Panel-Revierte";
 var TRAILER_PANEL = "Panel: s\xED";
+var TRAILER_AUTOR = "Panel-Autor";
 var RUTA_DEL_DOCUMENTO = (id) => `src/contenido/datos/${id}.json`;
 var DOCUMENTO_DE_RUTA = new Map(
   Object.keys(DOCUMENTOS).map((id) => [RUTA_DEL_DOCUMENTO(id), id])
 );
+function tieneTrailer(mensaje, lineaExacta) {
+  return mensaje.split("\n").includes(lineaExacta);
+}
+function valorDeTrailer(mensaje, clave) {
+  const prefijo = `${clave}: `;
+  const linea = mensaje.split("\n").find((l) => l.startsWith(prefijo));
+  return linea === void 0 ? void 0 : linea.slice(prefijo.length);
+}
 function fuentesDeSabores(v) {
   const doc = v ?? {};
   return {
@@ -17862,14 +17882,17 @@ async function revierte(gh, p) {
   const cabeza = await gh.ref("heads/main");
   if (cabeza.sha !== p.sha) {
     const cabezaCommit = await gh.commit(cabeza.sha);
-    if (cabezaCommit.message.includes(`${TRAILER_REVIERTE}: ${p.sha}`)) {
+    if (valorDeTrailer(cabezaCommit.message, TRAILER_REVIERTE) === p.sha) {
       return { ok: false, motivo: "ya-revertido", detalle: `${cabeza.sha} ya revierte ${p.sha}` };
     }
     return { ok: false, motivo: "no-es-la-cabeza", detalle: `la cabeza es ${cabeza.sha}` };
   }
   const commit = await gh.commit(p.sha);
-  if (!commit.message.includes(TRAILER_PANEL)) {
+  if (!tieneTrailer(commit.message, TRAILER_PANEL)) {
     return { ok: false, motivo: "no-es-del-panel", detalle: `${p.sha} no lleva \xAB${TRAILER_PANEL}\xBB` };
+  }
+  if (valorDeTrailer(commit.message, TRAILER_REVIERTE) !== void 0) {
+    return { ok: false, motivo: "ya-revertido", detalle: `${p.sha} ya es una reversi\xF3n` };
   }
   const padre = commit.padres[0];
   if (!padre) {
@@ -17881,7 +17904,7 @@ async function revierte(gh, p) {
     return id ? [{ ruta: ruta2, id }] : [];
   });
   if (documentos.length === 0) {
-    return { ok: true, sha: null, revirtio: p.sha };
+    return { ok: false, motivo: "nada-que-revertir", detalle: `${p.sha} no toc\xF3 ning\xFAn documento de contenido` };
   }
   const contenidos = /* @__PURE__ */ new Map();
   for (const { ruta: ruta2, id } of documentos) {
@@ -17890,12 +17913,24 @@ async function revierte(gh, p) {
   const archivos = [];
   for (const { ruta: ruta2, id } of documentos) {
     const viejo = contenidos.get(id);
-    let paraValidar = JSON.parse(viejo);
+    let crudo;
+    try {
+      crudo = JSON.parse(viejo);
+    } catch (e) {
+      return { ok: false, motivo: "fall\xF3", detalle: `${ruta2}: el contenido del padre no es JSON v\xE1lido (${String(e)})` };
+    }
+    let paraValidar = crudo;
     if (id === "sitio") {
       const textoSabores = contenidos.has("sabores") ? contenidos.get("sabores") : await gh.archivoEnRef(RUTA_DEL_DOCUMENTO("sabores"), padre);
-      const fuentes = fuentesDeSabores(JSON.parse(textoSabores));
+      let saboresCrudo;
       try {
-        paraValidar = injerta(paraValidar, fuentes);
+        saboresCrudo = JSON.parse(textoSabores);
+      } catch {
+        saboresCrudo = void 0;
+      }
+      const fuentes = fuentesDeSabores(saboresCrudo);
+      try {
+        paraValidar = injerta(crudo, fuentes);
       } catch {
       }
     }
@@ -17909,11 +17944,30 @@ async function revierte(gh, p) {
     archivos,
     autor: p.autor,
     trailers: { [TRAILER_REVIERTE]: p.sha },
+    // [E] Sin el reintento interno de `publica()`: ese reintento rearmaría
+    // el árbol SOBRE el commit que ganó la carrera, pero con los bytes
+    // VIEJOS de esta reversión — si ese commit es de Marcos, publicado justo
+    // en la ventana entre que se leyó el ref y se movió, su cambio
+    // desaparecería sin 409 y sin log. Perder la carrera acá se traduce
+    // abajo en `no-es-la-cabeza`: la próxima invocación relee todo desde
+    // cero, que es lo correcto para algo idempotente.
+    reintentar: false,
     ...p.bytesDelCuerpo !== void 0 ? { bytesDelCuerpo: p.bytesDelCuerpo } : {}
   });
-  if (!resultado.ok) return { ok: false, motivo: "fall\xF3", detalle: resultado.problema };
+  if (!resultado.ok) {
+    return {
+      ok: false,
+      // [E] El 409 de `publica()` con `reintentar:false` es exactamente la
+      // misma situación que la guardia de arriba detecta ANTES de escribir:
+      // la cabeza cambió. Contarlo con el mismo motivo es lo que le permite a
+      // quien llama tratar los dos casos igual.
+      motivo: resultado.codigo === 409 ? "no-es-la-cabeza" : "fall\xF3",
+      detalle: resultado.problema
+    };
+  }
   return { ok: true, sha: resultado.sha, revirtio: p.sha };
 }
+var autorDelCommit = (mensaje) => valorDeTrailer(mensaje, TRAILER_AUTOR);
 
 // src/servidor/vercel.ts
 var TERMINADOS = {
@@ -18074,6 +18128,33 @@ function listaTiene(lista2, valor) {
   if (!lista2) return false;
   return lista2.split(",").some((x) => x.trim() === valor);
 }
+var ASUNTO_PARA_ELLA = "Tu cambio no se pudo publicar";
+var TEXTO_PARA_ELLA = "No sali\xF3; lo dej\xE9 como estaba y ya le avis\xE9 a Marcos.\n\nPuedes volver a intentarlo cuando quieras.";
+async function mandaProtegido(contexto, carta) {
+  try {
+    await contexto.correo(carta);
+  } catch (e) {
+    console.error("revertir: el env\xEDo de un correo de aviso revent\xF3 \u2014", e);
+  }
+}
+async function intentaRevertir(gh, sha, autor) {
+  try {
+    const r = await revierte(gh, { sha, autor });
+    if (r.ok) return `revertido (commit ${r.sha ?? "sin cambios"})`;
+    if (r.motivo === "nada-que-revertir") {
+      console.error(`revertir: ${sha} no ten\xEDa nada que revertir \u2014 main sigue con el commit roto (${r.detalle}).`);
+      return "no hab\xEDa nada que revertir: el commit no toc\xF3 ning\xFAn documento de contenido";
+    }
+    console.error(`revertir: la reversi\xF3n autom\xE1tica de ${sha} no se pudo hacer \u2014 ${r.motivo}: ${r.detalle}`);
+    return `NO se pudo revertir: ${r.motivo} \u2014 ${r.detalle}`;
+  } catch (e) {
+    console.error(`revertir: la reversi\xF3n autom\xE1tica de ${sha} revent\xF3 \u2014`, e);
+    return `NO se pudo revertir: ${e instanceof Error ? e.message : String(e)}`;
+  }
+}
+async function avisaAElla(correoDeElla, contexto) {
+  await mandaProtegido(contexto, { a: [correoDeElla], asunto: ASUNTO_PARA_ELLA, texto: TEXTO_PARA_ELLA });
+}
 async function revierteYAvisa(sha, correoDeElla, contexto) {
   const gh = cliente({
     token: contexto.env.PANEL_GITHUB_TOKEN ?? "",
@@ -18081,23 +18162,11 @@ async function revierteYAvisa(sha, correoDeElla, contexto) {
     repo: contexto.env.GITHUB_REPO ?? "",
     fetch: contexto.fetch
   });
-  let resumen;
-  try {
-    const r = await revierte(gh, { sha, autor: correoDeElla });
-    resumen = r.ok ? `revertido (commit ${r.sha ?? "sin cambios"})` : `NO se pudo revertir: ${r.motivo} \u2014 ${r.detalle}`;
-    if (!r.ok) console.error(`estado: la reversi\xF3n autom\xE1tica de ${sha} no se pudo hacer \u2014 ${r.motivo}: ${r.detalle}`);
-  } catch (e) {
-    resumen = `NO se pudo revertir: ${e instanceof Error ? e.message : String(e)}`;
-    console.error(`estado: la reversi\xF3n autom\xE1tica de ${sha} revent\xF3 \u2014`, e);
-  }
-  await contexto.correo({
-    a: [correoDeElla],
-    asunto: "Tu cambio no se pudo publicar",
-    texto: "No sali\xF3; lo dej\xE9 como estaba y ya le avis\xE9 a Marcos.\n\nPuedes volver a intentarlo cuando quieras."
-  });
+  const resumen = await intentaRevertir(gh, sha, correoDeElla);
+  await avisaAElla(correoDeElla, contexto);
   const paraMarcos = contexto.env.PANEL_AVISOS_A;
   if (paraMarcos) {
-    await contexto.correo({
+    await mandaProtegido(contexto, {
       a: [paraMarcos],
       asunto: `[panel] El deploy de ${sha.slice(0, 7)} fall\xF3`,
       texto: [
@@ -18109,9 +18178,31 @@ async function revierteYAvisa(sha, correoDeElla, contexto) {
     });
   }
 }
-async function revisaLaCabeza(contexto, correoDeQuienPide) {
+async function revierteYAvisaAMarcos(sha, autorReal, contexto) {
+  const gh = cliente({
+    token: contexto.env.PANEL_GITHUB_TOKEN ?? "",
+    duenio: contexto.env.GITHUB_DUENIO ?? "",
+    repo: contexto.env.GITHUB_REPO ?? "",
+    fetch: contexto.fetch
+  });
+  const resumen = await intentaRevertir(gh, sha, autorReal);
+  const paraMarcos = contexto.env.PANEL_AVISOS_A;
+  if (paraMarcos) {
+    await mandaProtegido(contexto, {
+      a: [paraMarcos],
+      asunto: `[panel] El deploy de ${sha.slice(0, 7)} fall\xF3`,
+      texto: [
+        `El commit ${sha} publicado por ${autorReal} no construy\xF3 (nadie ten\xEDa el panel abierto).`,
+        `Reversi\xF3n autom\xE1tica: ${resumen}.`,
+        "",
+        "El sitio sigue sirviendo el \xFAltimo deploy bueno."
+      ].join("\n")
+    });
+  }
+}
+async function revisaLaCabeza(contexto) {
   try {
-    if (!contexto.env.PANEL_VERCEL_TOKEN) return;
+    if (!contexto.env.PANEL_VERCEL_TOKEN) return null;
     const gh = cliente({
       token: contexto.env.PANEL_GITHUB_TOKEN ?? "",
       duenio: contexto.env.GITHUB_DUENIO ?? "",
@@ -18120,19 +18211,23 @@ async function revisaLaCabeza(contexto, correoDeQuienPide) {
     });
     const cabeza = await gh.ref("heads/main");
     const commit = await gh.commit(cabeza.sha);
-    if (!commit.message.includes("Panel: s\xED")) return;
-    if (commit.message.includes(`${TRAILER_REVIERTE}: `)) return;
-    const vercel = clienteVercel({
-      token: contexto.env.PANEL_VERCEL_TOKEN,
-      proyecto: contexto.env.PANEL_VERCEL_PROYECTO ?? "maracacao",
-      fetch: contexto.fetch
-    });
+    if (!tieneTrailer(commit.message, "Panel: s\xED")) return null;
+    if (valorDeTrailer(commit.message, TRAILER_REVIERTE) !== void 0) return null;
+    const proyecto = contexto.env.PANEL_VERCEL_PROYECTO ?? contexto.env.GITHUB_REPO ?? "";
+    if (proyecto === "") {
+      console.error("revisaLaCabeza: ni PANEL_VERCEL_PROYECTO ni GITHUB_REPO est\xE1n cargadas \u2014 no s\xE9 por qu\xE9 proyecto preguntar.");
+      return null;
+    }
+    const vercel = clienteVercel({ token: contexto.env.PANEL_VERCEL_TOKEN, proyecto, fetch: contexto.fetch });
     const { estado } = await vercel.despliegueDe(cabeza.sha);
-    if (estado !== "fall\xF3") return;
+    if (estado !== "fall\xF3") return null;
+    const autorReal = autorDelCommit(commit.message) ?? "alguien del panel";
     console.error(`revisaLaCabeza: ${cabeza.sha} es un commit del panel cuyo despliegue fall\xF3 \u2014 revirtiendo.`);
-    await revierteYAvisa(cabeza.sha, correoDeQuienPide, contexto);
+    await revierteYAvisaAMarcos(cabeza.sha, autorReal, contexto);
+    return cabeza.sha;
   } catch (e) {
     console.error("revisaLaCabeza: no se pudo revisar la cabeza de main \u2014", e);
+    return null;
   }
 }
 async function publicarAccion(pedido, contexto) {
@@ -18143,7 +18238,6 @@ async function publicarAccion(pedido, contexto) {
   }
   const sesion = sesionVigente(pedido.cookie, env, contexto.ahora());
   if (!sesion) return error51(401, PROBLEMA_SESION);
-  await revisaLaCabeza(contexto, sesion.correo);
   const cuerpo = pedido.cuerpo ?? {};
   if (typeof cuerpo.base !== "string" || cuerpo.base === "") {
     console.error("publicar: el cuerpo lleg\xF3 sin `base` \u2014 el panel que lo mand\xF3 es de antes del sha base.");
@@ -18158,6 +18252,7 @@ async function publicarAccion(pedido, contexto) {
   }
   if (ids.length === 0) return error51(400, PROBLEMA_SIN_DOCUMENTOS);
   const idsConocidos = ids;
+  await revisaLaCabeza(contexto);
   const gh = cliente({
     token: contexto.env.PANEL_GITHUB_TOKEN ?? "",
     duenio: contexto.env.GITHUB_DUENIO ?? "",
@@ -18284,7 +18379,7 @@ async function estadoAccion(pedido, contexto) {
   }
   const sesion = sesionVigente(pedido.cookie, env, contexto.ahora());
   if (!sesion) return error51(401, PROBLEMA_SESION);
-  await revisaLaCabeza(contexto, sesion.correo);
+  const shaYaAtendido = await revisaLaCabeza(contexto);
   if (!env.PANEL_VERCEL_TOKEN) {
     console.error("estado: PANEL_VERCEL_TOKEN no est\xE1 cargada \u2014 no hay forma de saber si el despliegue termin\xF3.");
     return error51(503, PROBLEMA_INESPERADO);
@@ -18320,7 +18415,11 @@ async function estadoAccion(pedido, contexto) {
     desdeHaceMs: contexto.ahora() - publicadoEn
   });
   if (veredicto.estado === "fall\xF3") {
-    await revierteYAvisa(cuerpo.sha, sesion.correo, contexto);
+    if (shaYaAtendido === cuerpo.sha) {
+      await avisaAElla(sesion.correo, contexto);
+    } else {
+      await revierteYAvisa(cuerpo.sha, sesion.correo, contexto);
+    }
   }
   return ok({ ok: true, ...veredicto });
 }

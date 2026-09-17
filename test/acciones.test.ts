@@ -198,11 +198,14 @@ const contextoDePrueba = (p: {
 /**
  * Las tres respuestas que hacen falta para que `revierte()` (Tarea 8) TERMINE
  * contra un commit que es la cabeza, es del panel, y no tocó ningún
- * documento de contenido — el camino más corto que igual devuelve `ok: true`
- * sin escribir nada: `gh.ref` (la cabeza es el propio `sha`), `gh.commit`
+ * documento de contenido: `gh.ref` (la cabeza es el propio `sha`), `gh.commit`
  * (con el trailer del panel y un padre) y `gh.comparaRefs` (sin archivos).
- * Alcanza para probar que `revierteYAvisa()` corre y avisa a las dos
- * personas; el mecanismo de la reversión en sí —qué pasa cuando SÍ hay
+ *
+ * [Ronda 2, Grupo D] Ese camino ya NO es `ok: true`: `revierte()` devuelve
+ * `{ ok: false, motivo: 'nada-que-revertir' }`, porque main sigue con el
+ * commit roto. Sigue alcanzando para probar que `revierteYAvisa*()` corre y
+ * avisa —el resumen que arma dice «no había nada que revertir», no
+ * «revertido»—; el mecanismo de la reversión en sí —qué pasa cuando SÍ hay
  * contenido que revertir, y la revalidación de `sitio`— lo prueba
  * `test/revertir.test.ts`.
  */
@@ -406,12 +409,19 @@ describe('publicar', () => {
   // documento adentro no puede llegar a tocar GitHub (ids.length === 0 se
   // decide antes de armar el cliente de GitHub).
   it('con sesión válida y sin documentos, 400 y sin tocar GitHub', async () => {
+    // [Ronda 2, Grupo C] Antes de la reordenación, este test «pasaba» solo
+    // porque `revisaLaCabeza()` se tragaba el error de `fetchQueNoSeUsa()` en
+    // su propio `try` — el título prometía «sin tocar GitHub» pero nada lo
+    // comprobaba. `contando()` cierra el hueco: ahora si algo llega a tocar
+    // `fetch`, el test lo ve.
+    const usos = { n: 0 }
     const r = await maneja(
       'publicar',
       { cuerpo: { base: 'main-1', documentos: {} }, cookie: cookieValida() },
-      contextoBase(fetchQueNoSeUsa()),
+      contextoBase(contando(usos)),
     )
     expect(r.status).toBe(400)
+    expect(usos.n).toBe(0)
   })
 
   // [RULING T1-1] El test que faltaba: los dos de `publicar.test.ts`
@@ -1269,12 +1279,151 @@ describe('accion=estado', () => {
     expect((r.cuerpo as { estado: string }).estado).toBe('falló')
   })
 
+  // Ronda 2, Grupo B: el camino MEDIDO como normal por la revisión —ella
+  // publica, su commit ES la cabeza, y el panel sondea por ese mismo sha—
+  // antes mandaba CUATRO correos (dos idénticos a ella, uno de
+  // `revisaLaCabeza()` y otro de `estadoAccion`). Con el trabajo repartido
+  // —`revisaLaCabeza()` solo le habla a Marcos, `estadoAccion` no repite el
+  // revert ni el aviso a Marcos cuando `revisaLaCabeza()` ya atendió ESE
+  // sha— quedan dos: uno a cada quien.
+  it('Ronda 2, Grupo B: cuando su propio commit es la cabeza rota, van dos correos, no cuatro', async () => {
+    const cartas: Array<{ a: string[]; asunto: string; texto: string }> = []
+    const sha = 'a'.repeat(40)
+    const { f } = fetchFalso([
+      { cuerpo: { object: { sha } } }, // gh.ref (revisaLaCabeza)
+      {
+        cuerpo: {
+          sha,
+          tree: { sha: 't' },
+          message: 'cambia algo\n\nPanel: sí\nPanel-Autor: clienta@ejemplo.mx',
+          author: { date: '2026-09-17T12:00:00Z' },
+          parents: [{ sha: 'padre' }],
+        },
+      }, // gh.commit (revisaLaCabeza)
+      { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // vercel (revisaLaCabeza)
+      ...respuestasDeUnaReversionCompleta(sha), // revierte() dentro de revierteYAvisaAMarcos()
+      { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // vercel (la lectura propia de estadoAccion)
+    ])
+    const r = await maneja(
+      'estado',
+      { cuerpo: { sha, publicadoEn: 1_000 }, cookie: cookieValida() },
+      contextoDePrueba({
+        fetch: f,
+        ahora: () => 6_000,
+        correo: async (c) => { cartas.push(c); return { ok: true } },
+        env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
+      }),
+    )
+    expect((r.cuerpo as { estado: string }).estado).toBe('falló')
+    expect(cartas).toHaveLength(2)
+    // Primero Marcos —lo avisó `revisaLaCabeza()`, con el autor real del
+    // trailer— y recién después ella, sin que nadie haya vuelto a tocar
+    // GitHub por el mismo sha.
+    expect(cartas[0].a).toEqual(['marcos@ejemplo.mx'])
+    expect(cartas[0].texto).toContain('clienta@ejemplo.mx')
+    expect(cartas[1].a).toEqual(['clienta@ejemplo.mx'])
+  })
+
+  // Ronda 2, F-5: la copia nueva para ELLA —a diferencia de las frases de
+  // `estado`, que ya pasan por `JERGA_PROHIBIDA` en el test B10— no tenía
+  // ningún candado. El texto de hoy está bien; este test es el que protege
+  // a la próxima edición.
+  it('F5: el correo para ella nunca usa jerga técnica', async () => {
+    const cartas: Array<{ a: string[]; asunto: string; texto: string }> = []
+    const sha = 'a'.repeat(40)
+    const { f } = fetchFalso([
+      ...respuestasDeNingunaReversionPendiente(),
+      { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } },
+      ...respuestasDeUnaReversionCompleta(sha),
+    ])
+    await maneja(
+      'estado',
+      { cuerpo: { sha, publicadoEn: 1_000 }, cookie: cookieValida() },
+      contextoDePrueba({ fetch: f, ahora: () => 6_000, correo: async (c) => { cartas.push(c); return { ok: true } } }),
+    )
+    const paraElla = cartas.find((c) => c.a.includes('clienta@ejemplo.mx'))
+    expect(paraElla).toBeDefined()
+    const texto = `${paraElla!.asunto} ${paraElla!.texto}`.toLowerCase()
+    for (const jerga of JERGA_PROHIBIDA) {
+      expect(texto, texto).not.toContain(jerga.toLowerCase())
+    }
+  })
+
+  // Ronda 2, F-2: los `await contexto.correo(...)` de la reversión están
+  // protegidos por su propio `try` (`mandaProtegido()`, acciones.ts) — no
+  // dependen en silencio de la promesa de OTRO módulo («`manda()` nunca
+  // tira»). Acá el `correo` de prueba rompe esa promesa a propósito
+  // (revienta en vez de degradar) para probar que igual no se lleva puesta
+  // la acción.
+  it('F2: si el correo revienta en vez de degradar, la reversión y la acción igual terminan', async () => {
+    const sha = 'a'.repeat(40)
+    const { f } = fetchFalso([
+      ...respuestasDeNingunaReversionPendiente(),
+      { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } },
+      ...respuestasDeUnaReversionCompleta(sha),
+    ])
+    const r = await maneja(
+      'estado',
+      { cuerpo: { sha, publicadoEn: 1_000 }, cookie: cookieValida() },
+      contextoDePrueba({
+        fetch: f,
+        ahora: () => 6_000,
+        correo: async () => { throw new Error('el proveedor de correo explotó') },
+      }),
+    )
+    expect((r.cuerpo as { estado: string }).estado).toBe('falló')
+  })
+
+  // Ronda 2, F-1: mismo candado que la acción vecina (`estadoAccion`, arriba
+  // en este archivo): sin `PANEL_VERCEL_PROYECTO` ni `GITHUB_REPO`,
+  // `revisaLaCabeza()` no puede seguir en silencio preguntándole a la
+  // plataforma por un proyecto sin nombre. Sin este candado, la plataforma
+  // contesta «no hay despliegues», `estado !== 'falló'`, y la reversión
+  // automática deja de existir sin loguear nada — medido en la revisión.
+  it('F1: revisaLaCabeza() no le pregunta a la plataforma por un proyecto sin nombre', async () => {
+    const cabezaRota = 'c'.repeat(40)
+    const { f, pedidos } = fetchFalso([
+      { cuerpo: { object: { sha: cabezaRota } } },
+      {
+        cuerpo: {
+          sha: cabezaRota,
+          tree: { sha: 't' },
+          message: 'algo\n\nPanel: sí\nPanel-Autor: x',
+          author: { date: '2026-09-17T12:00:00Z' },
+          parents: [{ sha: 'p' }],
+        },
+      },
+      // Esta respuesta solo se consumiría si el candado NO existiera: sería
+      // la de `vercel.despliegueDe()`, preguntando por un proyecto vacío.
+      { cuerpo: { deployments: [{ state: 'READY', url: 'x' }] } },
+    ])
+    const ctx = contextoDePrueba({ fetch: f })
+    delete (ctx.env as Record<string, string | undefined>).PANEL_VERCEL_PROYECTO
+    delete (ctx.env as Record<string, string | undefined>).GITHUB_REPO
+    const r = await maneja('publicar', { cuerpo: { base: 'x', documentos: { fichas: {} } }, cookie: cookieValida() }, ctx)
+    expect(r.status).toBe(422) // fichas: {} sigue su curso normal después
+    // Solo el ref y el commit: nunca llegó a preguntarle nada a la plataforma.
+    expect(pedidos).toHaveLength(2)
+  })
+
   // [B1] La red de seguridad: si ella publicó y cerró el panel, y el deploy
   // falló diez minutos después con nadie mirando, la reversión de arriba
   // nunca corre —no hay nadie preguntando `estado`—. La próxima vez que
   // CUALQUIERA entre —acá, ella misma intentando otra publicación— lo
   // primero que pasa es que la cabeza rota se arregla, antes de que la
   // acción que la disparó haga lo suyo.
+  //
+  // [Ronda 2, Grupo C] `revisaLaCabeza()` corre DESPUÉS de las validaciones
+  // baratas de `publicarAccion` (lote vacío, documento desconocido, `base`
+  // ausente), así que el cuerpo de este test tiene que pasarlas todas —`base`
+  // presente, un documento reconocido y no vacío— para llegar a ejercitarla;
+  // el 422 que sigue (Fase 1a, `fichas: {}` no es un documento válido) es
+  // puramente sincrónico, así que no gasta ni un pedido de más.
+  //
+  // [Ronda 2, Grupo B] Un solo correo, y a Marcos: `revisaLaCabeza()` ya no le
+  // habla a «quien pidió» la acción (acá, ella misma) — nadie estaba mirando
+  // el panel cuando el commit se rompió, así que no hay a quién más avisarle
+  // del lado de la clienta en este instante.
   it('B1: cualquier acción autenticada revierte primero una cabeza rota que quedó colgada', async () => {
     const cartas: Array<{ a: string[]; asunto: string; texto: string }> = []
     const cabezaRota = 'b'.repeat(40)
@@ -1284,29 +1433,34 @@ describe('accion=estado', () => {
         cuerpo: {
           sha: cabezaRota,
           tree: { sha: 't' },
-          message: 'cambia algo\n\nPanel: sí',
+          message: 'cambia algo\n\nPanel: sí\nPanel-Autor: clienta@ejemplo.mx',
           author: { date: '2026-09-17T12:00:00Z' },
           parents: [{ sha: 'padre' }],
         },
       }, // gh.commit: es del panel, no es una reversión
       { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // vercel.despliegueDe: falló
-      ...respuestasDeUnaReversionCompleta(cabezaRota),
+      ...respuestasDeUnaReversionCompleta(cabezaRota), // adentro de revierteYAvisaAMarcos()
     ])
     const r = await maneja(
       'publicar',
-      { cuerpo: { documentos: {} }, cookie: cookieValida() }, // sin `base`: no importa, revisaLaCabeza corre ANTES de ese chequeo
+      { cuerpo: { base: 'cualquiera', documentos: { fichas: {} } }, cookie: cookieValida() },
       contextoDePrueba({
         fetch: f,
         correo: async (c) => { cartas.push(c); return { ok: true } },
         env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
       }),
     )
-    // La acción que la disparó sigue su camino normal DESPUÉS: sin `base`,
-    // 400 — la limpieza de la cabeza no le cambia el resultado a quien pidió.
-    expect(r.status).toBe(400)
-    // Pero la cabeza rota SÍ se revirtió, y las dos personas se enteraron.
-    expect(cartas).toHaveLength(2)
-    expect(cartas[1].a).toEqual(['marcos@ejemplo.mx'])
-    expect(cartas[1].texto).toContain(cabezaRota)
+    // La acción que la disparó sigue su camino normal DESPUÉS: `fichas: {}`
+    // no pasa el esquema — la limpieza de la cabeza no le cambia el
+    // resultado a quien pidió.
+    expect(r.status).toBe(422)
+    // Y la cabeza rota SÍ se revirtió (bueno: no tenía contenido que
+    // revertir — el mensaje de `respuestasDeUnaReversionCompleta` no toca
+    // ningún documento — así que el correo lo cuenta con esas palabras, no
+    // como «revertido»), y Marcos —y SOLO Marcos— se enteró.
+    expect(cartas).toHaveLength(1)
+    expect(cartas[0].a).toEqual(['marcos@ejemplo.mx'])
+    expect(cartas[0].texto).toContain(cabezaRota)
+    expect(cartas[0].texto).toContain('clienta@ejemplo.mx') // el autor real, del trailer — no de quien pidió esta publicación
   })
 })
