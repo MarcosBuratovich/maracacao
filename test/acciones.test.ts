@@ -11,6 +11,7 @@ import { hashDeClave, firmaSesion } from '../src/servidor/sesion'
 import { serializa } from '../src/contenido/carga'
 import { esquemaSitio } from '../src/contenido/esquema/sitio'
 import { esquemaSabores } from '../src/contenido/esquema/sabores'
+import { TOPE_CUERPO } from '../src/servidor/rutas-permitidas'
 import { fetchFalso } from './lib/github-falso'
 import { marca } from '@/copy/sitio-marca'
 
@@ -76,10 +77,11 @@ const contextoBase = (fetch: typeof globalThis.fetch) => ({
   fetch,
   ahora: () => Date.now(),
   ip: '1.2.3.4',
-  // M-9: `Contexto` ahora pide esta medida; estos tests no ejercitan el
-  // tope de cuerpo (eso lo cubre `publicar.test.ts`), así que alcanza con
-  // el mismo valor que usa el borde cuando no pudo medir nada.
-  bytesDelCuerpo: 0,
+  // [RULING T1-1] Sin `bytesDelCuerpo`, a propósito: queda `undefined`, que
+  // es justo lo que arma el borde cuando el pedido no trae `Content-Length`
+  // legible — nunca un `0`, que confundiría «no lo sé» con «midió cero» y
+  // desactivaría el tope de cuerpo en `publica()` (ver el test M-9 más
+  // abajo, que prueba exactamente ese camino).
 })
 
 const cookieValida = (correo = 'clienta@ejemplo.mx') =>
@@ -258,6 +260,48 @@ describe('publicar', () => {
   it('con sesión válida y sin documentos, 400 y sin tocar GitHub', async () => {
     const r = await maneja('publicar', { cuerpo: { documentos: {} }, cookie: cookieValida() }, contextoBase(fetchQueNoSeUsa()))
     expect(r.status).toBe(400)
+  })
+
+  // [RULING T1-1] El test que faltaba: los dos de `publicar.test.ts`
+  // prueban el tope con un número explícito y con el campo ausente, pero
+  // ninguno prueba el camino REAL de «no se pudo medir» a través del
+  // router entero. Acá el pedido no trae `Content-Length` —`contextoBase()`
+  // no pone `bytesDelCuerpo`, así que llega `undefined`, tal cual lo arma
+  // el borde cuando la cabecera no vino—, así que `publica()` tiene que
+  // caerse a la suma de los archivos y frenar igual. Con el `0` centinela
+  // del bug original esto pasaba de largo: `0 ?? suma(...)` se quedaba con
+  // el `0`, y el lote se iba a la red sin que nada lo frenara.
+  //
+  // Para que el lote pese de verdad más de `TOPE_CUERPO` sin dejar de ser
+  // un documento válido —hoy ningún JSON real pasa de 24 KB, así que
+  // inflar un campo con tope de caracteres no alcanza, ver el comentario
+  // de «techo de cordura» en sabores.ts— se aprovecha que `catalogo` es
+  // una URL sin tope de longitud (`z.url()`, campos.ts): una sola query
+  // string larga alcanza para pasar el tope sin tocar ningún otro campo.
+  it('M-9: sin Content-Length medible, el lote enorme rebota igual — el fallback se dispara de verdad', async () => {
+    const saboresEnorme = saboresCrudoDeDisco()
+    saboresEnorme.sabores[0].catalogo = 'https://catalogo.maracacao.mx/?x=' + 'a'.repeat(3_000_000)
+    const textoEnorme = serializa(esquemaSabores, saboresEnorme)
+    expect(Buffer.from(textoEnorme, 'utf8').toString('base64').length).toBeGreaterThan(TOPE_CUERPO) // guardia
+
+    const { f, pedidos } = fetchFalso([
+      { cuerpo: { object: { sha: 'main-1' } } }, // gh.ref (Fase 2: el sha base del lote)
+      { cuerpo: { content: Buffer.from(textoSaboresVivo).toString('base64'), encoding: 'base64' } }, // archivoEnRef(sabores): lo vivo, para el diff
+    ])
+
+    const r = await maneja(
+      'publicar',
+      { cuerpo: { documentos: { sabores: saboresEnorme } }, cookie: cookieValida() },
+      contextoBase(f),
+    )
+
+    expect(r.status).toBe(422)
+    expect((r.cuerpo as { problema: string }).problema).toContain('demasiado contenido')
+    // Los dos pedidos de arriba son de LECTURA (hacen falta para saber si
+    // el documento cambió antes de decidir si hay algo que publicar); el
+    // tope frena adentro de `publica()` ANTES de que esta escriba nada —
+    // ni un blob, ni un árbol, ni un commit.
+    expect(pedidos.filter((p) => p.metodo === 'POST' || p.metodo === 'PATCH')).toHaveLength(0)
   })
 
   // RULING T6-d — el bug de fondo: «lo actual» tiene que salir de GitHub,

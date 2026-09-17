@@ -103,18 +103,22 @@ describe('M-4: el borde deja rastro cuando rechaza un Origin', () => {
 })
 
 describe('M-9: el borde mide el cuerpo del pedido', () => {
-  it('el borde mide el cuerpo por Content-Length, y 0 cuando no vino', async () => {
-    const visto: number[] = []
+  it('el borde mide el cuerpo por Content-Length, y undefined cuando no vino', async () => {
+    const visto: Array<number | undefined> = []
     // `maneja()` está mockeado arriba: lo que este test mira es el
     // `Contexto` que el borde le arma, así que alcanza con una acción que
     // no existe para no tener que montar media sesión.
+    //
+    // [RULING T1-1] `undefined`, nunca un `0` centinela: «no lo sé» y
+    // «midió cero» no pueden ser el mismo valor, porque `publica()` decide
+    // si usa el fallback con `??`, que solo cae ante `null`/`undefined`.
     for (const headers of [{ 'content-length': '4096' }, {}, { 'content-length': 'quién sabe' }]) {
       contextosVistos.length = 0
       const { res } = respuestaFalsa()
       await handler({ method: 'GET', headers, query: { accion: 'no-existe' } } as never, res as never)
       const contexto = contextosVistos[0] as { bytesDelCuerpo?: number } | undefined
-      visto.push(contexto?.bytesDelCuerpo ?? -1)
+      visto.push(contexto?.bytesDelCuerpo)
     }
-    expect(visto).toEqual([4096, 0, 0])
+    expect(visto).toEqual([4096, undefined, undefined])
   })
 })

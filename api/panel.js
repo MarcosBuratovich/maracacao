@@ -18043,7 +18043,7 @@ var valorUnico2 = (v) => Array.isArray(v) ? v[0] ?? "" : v ?? "";
 function bytesDeCuerpo(headers) {
   const crudo = valorUnico2(headers["content-length"]);
   const n = Number.parseInt(crudo, 10);
-  return Number.isFinite(n) && n > 0 ? n : 0;
+  return Number.isFinite(n) && n > 0 ? n : void 0;
 }
 function cookieDePanel(header) {
   const cadena = Array.isArray(header) ? header.join("; ") : header ?? "";

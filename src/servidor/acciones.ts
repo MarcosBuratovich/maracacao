@@ -61,13 +61,21 @@ export interface Contexto {
   /** La IP de quien pide, para el freno de intentos de `entrar` (E4). */
   ip: string
   /**
-   * Cuántos bytes pesó el CUERPO del pedido HTTP. `0` cuando el borde no lo
-   * pudo medir (sin `Content-Length`): ahí `publica()` se cae a la suma de
-   * los archivos, que es una cota inferior. Vive en el contexto y no en el
-   * `Pedido` porque no es un dato del pedido de la clienta —ella no lo
-   * manda—: es una medición del transporte, del mismo tipo que la IP.
+   * Cuántos bytes pesó el CUERPO del pedido HTTP, o `undefined` cuando el
+   * borde no lo pudo medir (sin `Content-Length` legible). Vive en el
+   * contexto y no en el `Pedido` porque no es un dato del pedido de la
+   * clienta —ella no lo manda—: es una medición del transporte, del mismo
+   * tipo que la IP.
+   *
+   * [RULING T1-1] `undefined` y NO un `0` centinela. Con `0`, «no lo sé» y
+   * «midió cero» son el mismo valor, y `p.bytesDelCuerpo ?? suma(...)` en
+   * `publica()` se queda con el `0` —`??` solo cae ante `null`/`undefined`—,
+   * así que el tope de cuerpo queda desactivado justo en el caso que el
+   * fallback existía para cubrir. Que el tipo diga la verdad mata la clase
+   * entera de bug; un `||` o un spread condicional solo la tapan en este
+   * llamador y dejan la trampa armada para el siguiente.
    */
-  bytesDelCuerpo: number
+  bytesDelCuerpo?: number
 }
 
 /** Lo que devuelve el router. El borde lo traduce a una respuesta HTTP real. */
