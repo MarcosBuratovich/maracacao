@@ -15486,6 +15486,43 @@ function validarContra(esquema, crudo) {
   });
 }
 
+// src/contenido/derivados.ts
+function precioDesde(items) {
+  if (items.length === 0) throw new Error("No se puede calcular un \xABdesde\xBB de una lista vac\xEDa.");
+  return Math.min(...items.map((i) => i.precio));
+}
+function precioDe(items, clave) {
+  const encontrado = items.find((i) => i.clave === clave);
+  if (!encontrado) {
+    throw new Error(`No hay ning\xFAn elemento con la clave \xAB${clave}\xBB para sacarle el precio.`);
+  }
+  return encontrado.precio;
+}
+var DERIVADOS_DEL_SITIO = [
+  { ruta: "gotas.precioDesde", calcula: (f) => precioDesde(f.gotas) },
+  { ruta: "gotas.precioJengibre", calcula: (f) => precioDe(f.gotas, "jengibreYNaranja") },
+  { ruta: "negocios.tabs.1.precio", calcula: (f) => precioDesde(f.gotas) },
+  { ruta: "negocios.tabs.2.precio", calcula: (f) => precioDesde(f.sabores) },
+  { ruta: "anaquel.contadorDe", calcula: (f) => `de ${f.sabores.length}` }
+];
+function injerta(crudo, fuentes) {
+  const copia = structuredClone(crudo);
+  for (const { ruta: ruta2, calcula } of DERIVADOS_DEL_SITIO) {
+    const partes = ruta2.split(".");
+    const ultima = partes.pop();
+    let donde = copia;
+    for (const parte of partes) {
+      const hijo = donde[parte];
+      if (hijo === null || typeof hijo !== "object") {
+        throw new Error(`injerta(): la ruta \xAB${ruta2}\xBB se corta en \xAB${parte}\xBB.`);
+      }
+      donde = hijo;
+    }
+    donde[ultima] = calcula(fuentes);
+  }
+  return copia;
+}
+
 // src/contenido/esquema/sitio/cabecera.ts
 var enBuscadores = { seccion: "buscadores" };
 var enPortada = { seccion: "portada" };
@@ -17803,6 +17840,13 @@ function comoDocumentos(v) {
   if (v !== null && typeof v === "object" && !Array.isArray(v)) return v;
   return {};
 }
+function fuentesDeSabores(v) {
+  const doc = v ?? {};
+  return {
+    sabores: Array.isArray(doc.sabores) ? doc.sabores : [],
+    gotas: Array.isArray(doc.gotas) ? doc.gotas : []
+  };
+}
 async function publicarAccion(pedido, contexto) {
   const env = contexto.env;
   if (!secretoUtilizable(env)) {
@@ -17822,22 +17866,49 @@ async function publicarAccion(pedido, contexto) {
   }
   if (ids.length === 0) return error51(400, PROBLEMA_SIN_DOCUMENTOS);
   const idsConocidos = ids;
-  for (const id of idsConocidos) {
-    const problemas = validarContra(DOCUMENTOS[id], documentos[id]);
-    if (problemas.length > 0) {
-      return error51(422, problemas[0].titulo, `${id}.${problemas[0].campo}`);
-    }
-  }
   const gh = cliente({
     token: contexto.env.PANEL_GITHUB_TOKEN ?? "",
     duenio: contexto.env.GITHUB_DUENIO ?? "",
     repo: contexto.env.GITHUB_REPO ?? "",
     fetch: contexto.fetch
   });
+  for (const id of idsConocidos) {
+    if (id === "sitio") continue;
+    const problemas = validarContra(DOCUMENTOS[id], documentos[id]);
+    if (problemas.length > 0) {
+      return error51(422, problemas[0].titulo, `${id}.${problemas[0].campo}`);
+    }
+  }
+  let base;
+  if (idsConocidos.includes("sitio")) {
+    let fuentes;
+    try {
+      if (idsConocidos.includes("sabores")) {
+        fuentes = fuentesDeSabores(documentos.sabores);
+      } else {
+        base = await gh.ref("heads/main");
+        const vivoSaboresTexto = await gh.archivoEnRef(RUTA_DEL_DOCUMENTO("sabores"), base.sha);
+        fuentes = fuentesDeSabores(JSON.parse(vivoSaboresTexto));
+      }
+    } catch (e) {
+      console.error("publicar: no se pudo leer \xABsabores\xBB en vivo para calcular los derivados de \xABsitio\xBB \u2014", e);
+      return error51(502, PROBLEMA_NO_SE_PUDO_LEER);
+    }
+    let paraValidar;
+    try {
+      paraValidar = injerta(documentos.sitio, fuentes);
+    } catch {
+      paraValidar = documentos.sitio;
+    }
+    const problemas = validarContra(DOCUMENTOS.sitio, paraValidar);
+    if (problemas.length > 0) {
+      return error51(422, problemas[0].titulo, `sitio.${problemas[0].campo}`);
+    }
+  }
   const archivos = [];
   const cambios = [];
   try {
-    const base = await gh.ref("heads/main");
+    base ??= await gh.ref("heads/main");
     for (const id of idsConocidos) {
       const ruta2 = RUTA_DEL_DOCUMENTO(id);
       const vivoTexto = await gh.archivoEnRef(ruta2, base.sha);

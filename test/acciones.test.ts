@@ -5,12 +5,41 @@
  */
 import { describe, it, expect } from 'vitest'
 import { createHmac } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { maneja } from '../src/servidor/acciones'
 import { hashDeClave, firmaSesion } from '../src/servidor/sesion'
 import { serializa } from '../src/contenido/carga'
 import { esquemaSitio } from '../src/contenido/esquema/sitio'
+import { esquemaSabores } from '../src/contenido/esquema/sabores'
 import { fetchFalso } from './lib/github-falso'
 import { marca } from '@/copy/sitio-marca'
+
+// El JSON tal cual vive en el repo, SIN pasar por la fachada: es
+// exactamente lo que `scripts/humo-panel.sh` publica de verdad (lee el
+// archivo vivo, le cambia `footer.derechos` y manda el documento entero) y
+// exactamente lo que NO tiene ninguno de los cinco campos derivados —
+// `serializa()` nunca los escribe (carga.ts:390-395; ver derivados.ts). Un
+// router que valide esto tal cual llega, sin injertarlos antes, rechaza
+// CUALQUIER publicación real con «el campo quedó vacío».
+const sitioCrudoDeDisco = () => JSON.parse(readFileSync('src/contenido/datos/sitio.json', 'utf8'))
+
+// Lo mismo para `sabores`: la fuente de la que `sitio` saca sus cinco
+// derivados. `sabores` no tiene NINGÚN campo derivado propio (esquema
+// sabores.ts — ningún `derivado`/`derivadoTexto`), así que su versión
+// «vivo» es sencillamente el archivo del repo, serializado.
+const textoSaboresVivo = serializa(esquemaSabores, JSON.parse(readFileSync('src/contenido/datos/sabores.json', 'utf8')))
+
+/**
+ * Las dos respuestas que el router necesita para calcular los derivados de
+ * `sitio` cuando el lote no trae `sabores`: el sha base del lote y lo vivo
+ * de `sabores` en ese sha. Un helper porque de acá en más CASI todo test
+ * de `publicar` que mande `sitio` sin `sabores` las necesita — repetirlas
+ * a mano en cada test es la clase de copia que se desincroniza sola.
+ */
+const respuestasFuentesDeSitio = (sha = 'main-1') => [
+  { cuerpo: { object: { sha } } }, // gh.ref (router: sha base del lote, y fuente de los derivados de sitio)
+  { cuerpo: { content: Buffer.from(textoSaboresVivo).toString('base64'), encoding: 'base64' } }, // gh.archivoEnRef: lo vivo de sabores
+]
 
 // [C-1] 40 caracteres: por encima de LARGO_MIN_SECRETO (32), para que estos
 // tests ejerciten el camino normal. El propio candado de C-1 se prueba
@@ -172,20 +201,27 @@ describe('publicar', () => {
     expect(usos.n).toBe(0) // ni siquiera llega a tocar GitHub
   })
 
-  it('con contenido inválido, 422 con el campo y sin tocar GitHub', async () => {
-    const usos = { n: 0 }
+  // `sitio` no puede validarse sin sus cinco derivados injertados (ver
+  // derivados.ts), y como este lote no manda `sabores`, el router tiene
+  // que leerlo vivo de GitHub para calcularlos ANTES de poder decidir que
+  // el problema de verdad es `anaquel.titulo` — así que esto SÍ toca
+  // GitHub (dos lecturas: el sha base y lo vivo de sabores), lo que no
+  // hace es ESCRIBIR nada.
+  it('con contenido inválido, 422 con el campo y sin escribir nada en GitHub', async () => {
     const roto = JSON.parse(JSON.stringify(marca))
     roto.anaquel.titulo = ''      // texto vacío: el esquema lo rechaza
-    const r = await maneja('publicar', { cuerpo: { documentos: { sitio: roto } }, cookie: cookieValida() }, contextoBase(contando(usos)))
+    const { f, pedidos } = fetchFalso(respuestasFuentesDeSitio())
+    const r = await maneja('publicar', { cuerpo: { documentos: { sitio: roto } }, cookie: cookieValida() }, contextoBase(f))
     expect(r.status).toBe(422)
-    expect(usos.n).toBe(0)
     expect((r.cuerpo as { campo?: string }).campo).toContain('anaquel.titulo')
+    expect(pedidos.filter((p) => p.metodo === 'POST' || p.metodo === 'PATCH')).toHaveLength(0)
   })
 
   it('el mensaje de un contenido inválido no habla como una computadora', async () => {
     const roto = JSON.parse(JSON.stringify(marca))
     roto.anaquel.titulo = ''
-    const r = await maneja('publicar', { cuerpo: { documentos: { sitio: roto } }, cookie: cookieValida() }, contextoBase(fetchQueNoSeUsa()))
+    const { f } = fetchFalso(respuestasFuentesDeSitio())
+    const r = await maneja('publicar', { cuerpo: { documentos: { sitio: roto } }, cookie: cookieValida() }, contextoBase(f))
     const texto = String((r.cuerpo as { problema: string }).problema)
     expect(texto).not.toMatch(/zod|schema|422|undefined|parse/i)
   })
@@ -193,6 +229,20 @@ describe('publicar', () => {
   it('un documento que no existe se rechaza antes de mirar su contenido', async () => {
     const r = await maneja('publicar', { cuerpo: { documentos: { inventado: {} } }, cookie: cookieValida() }, contextoBase(fetchQueNoSeUsa()))
     expect(r.status).toBe(422)
+  })
+
+  // `injerta()` tira cuando al documento le falta un CONTENEDOR entero
+  // (`gotas`, no solo `gotas.precioDesde`): ahí no sabe dónde escribir el
+  // derivado. Eso no puede escapar como un 500 genérico — Zod sabe decir
+  // exactamente qué falta, igual que con cualquier otro campo ausente.
+  it('un documento de sitio al que le falta un bloque entero da 422, nunca un 500', async () => {
+    const sinGotas = JSON.parse(JSON.stringify(marca))
+    delete sinGotas.gotas
+    const { f, pedidos } = fetchFalso(respuestasFuentesDeSitio())
+    const r = await maneja('publicar', { cuerpo: { documentos: { sitio: sinGotas } }, cookie: cookieValida() }, contextoBase(f))
+    expect(r.status).toBe(422)
+    expect((r.cuerpo as { campo?: string }).campo).toContain('gotas')
+    expect(pedidos.filter((p) => p.metodo === 'POST' || p.metodo === 'PATCH')).toHaveLength(0)
   })
 
   // RULING T6-d — de la revisión: con sesión válida, un lote sin ningún
@@ -221,8 +271,8 @@ describe('publicar', () => {
       expect(textoEnviado).not.toBe(textoVivo) // guardia: si esto fallara, el test no prueba nada
 
       const { f, pedidos } = fetchFalso([
-        { cuerpo: { object: { sha: 'main-1' } } }, // gh.ref (router, base del lote)
-        { cuerpo: { content: Buffer.from(textoVivo).toString('base64'), encoding: 'base64' } }, // gh.archivoEnRef (router, lo vivo)
+        ...respuestasFuentesDeSitio(), // gh.ref (router, base del lote — también sirve de fuente de derivados) + gh.archivoEnRef(sabores)
+        { cuerpo: { content: Buffer.from(textoVivo).toString('base64'), encoding: 'base64' } }, // gh.archivoEnRef (router, lo vivo de sitio)
         { cuerpo: { object: { sha: 'main-1' } } }, // gh.ref (dentro de publica())
         { cuerpo: { sha: 'commit-viejo', tree: { sha: 'arbol-viejo' } } }, // gh.commit
         { cuerpo: { sha: 'blob-nuevo' } }, // creaBlob
@@ -246,8 +296,8 @@ describe('publicar', () => {
       const textoEnviado = serializa(esquemaSitio, enviado)
 
       const { f, pedidos } = fetchFalso([
-        { cuerpo: { object: { sha: 'main-1' } } }, // gh.ref
-        { cuerpo: { content: Buffer.from(textoEnviado).toString('base64'), encoding: 'base64' } }, // gh.archivoEnRef: igual a lo enviado
+        ...respuestasFuentesDeSitio(), // gh.ref (base + fuente de derivados) + gh.archivoEnRef(sabores)
+        { cuerpo: { content: Buffer.from(textoEnviado).toString('base64'), encoding: 'base64' } }, // gh.archivoEnRef(sitio): igual a lo enviado
       ])
 
       const r = await maneja('publicar', { cuerpo: { documentos: { sitio: enviado } }, cookie: cookieValida() }, contextoBase(f))
@@ -273,6 +323,96 @@ describe('publicar', () => {
       expect(cuerpo.problema).toMatch(/prueba de nuevo|intenta/i)
       expect(cuerpo.problema).not.toMatch(/500|ups|fetch|github/i)
       expect(pedidos.filter((p) => p.metodo === 'POST' || p.metodo === 'PATCH')).toHaveLength(0)
+    })
+  })
+
+  // El humo de producción (`scripts/humo-panel.sh`) publicó el documento
+  // TAL CUAL lo trae el repo —sin pasar por la fachada, que es la única
+  // que hoy injerta los derivados— y el router lo rechazó con «el campo
+  // quedó vacío» sobre `anaquel.contadorDe`: NINGUNA publicación real
+  // podía pasar nunca. Este describe reproduce EXACTAMENTE ese camino.
+  describe('publicar el documento tal cual está en el repo (el bug que encontró el humo)', () => {
+    it('un documento crudo, leído de disco y con un campo editado, se publica — no rebota por los derivados que le faltan', async () => {
+      const crudo = sitioCrudoDeDisco()
+      // El mismo campo, y el mismo tipo de edición, que
+      // `scripts/humo-panel.sh` prueba en producción (paso 4a).
+      crudo.footer.derechos = 'Prueba del humo — arreglo de derivados'
+      // Ninguno de los cinco derivados está en el archivo: serializa() los
+      // omite siempre (carga.ts:390-395). Si esto no fuera cierto, el
+      // resto del test no probaría nada.
+      expect(crudo.anaquel.contadorDe).toBeUndefined()
+      expect(crudo.gotas.precioDesde).toBeUndefined()
+
+      const { f, pedidos } = fetchFalso([
+        ...respuestasFuentesDeSitio(), // fuentes de los derivados: sabores no viene en el lote
+        { cuerpo: { content: Buffer.from(serializa(esquemaSitio, marca)).toString('base64'), encoding: 'base64' } }, // lo vivo de sitio
+        { cuerpo: { object: { sha: 'main-1' } } }, // gh.ref (dentro de publica())
+        { cuerpo: { sha: 'commit-viejo', tree: { sha: 'arbol-viejo' } } }, // gh.commit
+        { cuerpo: { sha: 'blob-nuevo' } }, // creaBlob
+        { cuerpo: { sha: 'arbol-nuevo' } }, // creaArbol
+        { cuerpo: { sha: 'commit-nuevo' } }, // creaCommit
+        { cuerpo: {} }, // mueveRef
+      ])
+
+      const r = await maneja('publicar', { cuerpo: { documentos: { sitio: crudo } }, cookie: cookieValida() }, contextoBase(f))
+
+      expect(r.status).toBe(200)
+      const cuerpo = r.cuerpo as { ok: boolean; sha: string | null }
+      expect(cuerpo.ok).toBe(true)
+      expect(cuerpo.sha).toBe('commit-nuevo')
+      // Y lo que se escribió tampoco lleva los derivados: siguen sin
+      // pertenecer al archivo, injertados o no (serializa() los omite
+      // siempre — ver el test de bytes idénticos más abajo).
+      const blob = pedidos.find((p) => p.metodo === 'POST' && (p.cuerpo as { encoding?: string })?.encoding === 'base64')
+      const escrito = Buffer.from((blob?.cuerpo as { content: string }).content, 'base64').toString('utf8')
+      expect(JSON.parse(escrito).anaquel.contadorDe).toBeUndefined()
+    })
+
+    // La prueba directa de la regla 3: los bytes que se escriben no
+    // dependen de si el documento que llegó traía los derivados
+    // injertados o no — `injerta()` overwrites, así que el mismo campo
+    // editado sobre las DOS formas de entrada (el archivo crudo, y lo que
+    // va a tener en memoria el panel de la fase 6, que sí los trae) tiene
+    // que producir el MISMO commit.
+    it('el mismo documento, con o sin los derivados ya injertados, publica bytes idénticos', async () => {
+      const crudo = sitioCrudoDeDisco()
+      crudo.footer.derechos = 'Prueba del humo — arreglo de derivados'
+
+      const yaInjertado = JSON.parse(JSON.stringify(marca))
+      yaInjertado.footer.derechos = 'Prueba del humo — arreglo de derivados'
+      // Deliberadamente con un valor DISTINTO del que calcularía injerta():
+      // si el router escribiera lo que injertó en vez de descartarlo, este
+      // valor absurdo terminaría en el archivo.
+      yaInjertado.anaquel.contadorDe = 'de 999'
+
+      const contextoParaOtroLote = () => {
+        const { f, pedidos } = fetchFalso([
+          ...respuestasFuentesDeSitio(),
+          { cuerpo: { content: Buffer.from(serializa(esquemaSitio, marca)).toString('base64'), encoding: 'base64' } },
+          { cuerpo: { object: { sha: 'main-1' } } },
+          { cuerpo: { sha: 'commit-viejo', tree: { sha: 'arbol-viejo' } } },
+          { cuerpo: { sha: 'blob-nuevo' } },
+          { cuerpo: { sha: 'arbol-nuevo' } },
+          { cuerpo: { sha: 'commit-nuevo' } },
+          { cuerpo: {} },
+        ])
+        return { ctx: contextoBase(f), pedidos }
+      }
+
+      const a = contextoParaOtroLote()
+      const rCrudo = await maneja('publicar', { cuerpo: { documentos: { sitio: crudo } }, cookie: cookieValida() }, a.ctx)
+
+      const b = contextoParaOtroLote()
+      const rInjertado = await maneja('publicar', { cuerpo: { documentos: { sitio: yaInjertado } }, cookie: cookieValida() }, b.ctx)
+
+      expect(rCrudo.status).toBe(200)
+      expect(rInjertado.status).toBe(200)
+
+      const blobDe = (pedidos: typeof a.pedidos) => {
+        const blob = pedidos.find((p) => p.metodo === 'POST' && (p.cuerpo as { encoding?: string })?.encoding === 'base64')
+        return (blob?.cuerpo as { content: string }).content
+      }
+      expect(blobDe(a.pedidos)).toBe(blobDe(b.pedidos))
     })
   })
 })

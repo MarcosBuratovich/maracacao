@@ -26,6 +26,7 @@ import type { Cambio } from '../contenido/diff'
 import { resume } from '../contenido/diff'
 import { validarContra, type Problema } from '../contenido/validacion'
 import { serializa } from '../contenido/carga'
+import { injerta, type FuentesDeDerivados } from '../contenido/derivados'
 import { DOCUMENTOS, type IdDocumento } from '../contenido/esquema'
 
 /** Lo que le llega al router, ya despojado de HTTP: el borde lo arma. */
@@ -254,6 +255,25 @@ function comoDocumentos(v: unknown): Record<string, unknown> {
 }
 
 /**
+ * Las fuentes de los cinco derivados de `sitio` (`DERIVADOS_DEL_SITIO` en
+ * derivados.ts), sacadas de un documento de `sabores` crudo — sea el que
+ * vino en el mismo lote o el que se acaba de leer vivo de GitHub. Misma
+ * forma que `injerta()` exige (`FuentesDeDerivados`): la lista de barras,
+ * para el «desde» y el «de N» del anaquel, y la de gotas, para su propio
+ * «desde» y el precio del jengibre. Nunca tira: si el documento vino
+ * incompleto, listas vacías hacen que `injerta()` sea quien tire —con un
+ * mensaje que nombra el cálculo, no esta función— y esa excepción la
+ * atrapa el catch-all de `maneja()` (E7).
+ */
+function fuentesDeSabores(v: unknown): FuentesDeDerivados {
+  const doc = (v ?? {}) as { sabores?: unknown; gotas?: unknown }
+  return {
+    sabores: (Array.isArray(doc.sabores) ? doc.sabores : []) as FuentesDeDerivados['sabores'],
+    gotas: (Array.isArray(doc.gotas) ? doc.gotas : []) as FuentesDeDerivados['gotas'],
+  }
+}
+
+/**
  * `publicar`: documento → commit (E5, E6, E7).
  *
  * [RULING T6-d, coordinador] «lo actual» NO puede salir de un `import`
@@ -279,14 +299,53 @@ function comoDocumentos(v: unknown): Record<string, unknown> {
  * nunca un `ok: true`— y jamás se cae de vuelta a ninguna copia
  * empaquetada: una base vieja es EXACTAMENTE lo que produjo este bug.
  *
- * La validación de esquema (`validarContra`, no `validar`) corre ANTES de
- * tocar GitHub y no necesita conteos: los avisos de conteo
- * (`gravedad: 'avisa'`) nunca bloquean una publicación —son la misma
- * comodidad que el navegador ya le mostró antes de que ella apretara
- * publicar—, así que no hace falta leer un documento que no se va a
- * escribir solo para calcularlos. Si algún día un aviso tiene que
- * bloquear o mostrarse en la respuesta, ESE es el momento de traer los
- * conteos de vuelta, con el caso real delante.
+ * La validación de esquema (`validarContra`, no `validar`) no necesita
+ * conteos: los avisos de conteo (`gravedad: 'avisa'`) nunca bloquean una
+ * publicación —son la misma comodidad que el navegador ya le mostró antes
+ * de que ella apretara publicar—, así que no hace falta leer un documento
+ * que no se va a escribir solo para calcularlos. Si algún día un aviso
+ * tiene que bloquear o mostrarse en la respuesta, ESE es el momento de
+ * traer los conteos de vuelta, con el caso real delante.
+ *
+ * Esa validación corre ANTES de tocar GitHub para escribir, PERO no
+ * siempre antes de tocar GitHub del todo: `sitio` tiene cinco campos
+ * derivados (`DERIVADOS_DEL_SITIO`, derivados.ts) que `serializa()` nunca
+ * escribe en el archivo (carga.ts:390-395) —así que el JSON del repo
+ * nunca los trae— y que el esquema exige igual. Validar `documentos.sitio`
+ * tal cual llega, sin injertarlos antes, rechaza CUALQUIER publicación
+ * real con «el campo quedó vacío» sobre el primer derivado que el esquema
+ * encuentre — el bug que encontró el humo de producción
+ * (`scripts/humo-panel.sh`, paso 4a) en el primer ensayo contra
+ * producción: nada se llegó a escribir, pero ninguna publicación de
+ * verdad podía pasar nunca. La fachada del sitio (`src/copy/sitio-marca.ts`)
+ * los injerta antes de validar; este router hace EXACTAMENTE lo mismo,
+ * con las MISMAS fuentes (`injerta()`, con `sabores`/`gotas` de un
+ * documento de `sabores`), o el sitio publicado y el panel que lo edita
+ * terminan de acuerdo en cosas distintas.
+ *
+ * Esas fuentes salen del propio lote cuando lo trae —si se publican
+ * `sitio` y `sabores` juntos (un sabor nuevo, más el texto que lo
+ * menciona), el texto se valida contra los precios y la cantidad NUEVOS,
+ * nunca contra los quince viejos— y si no, de lo vivo de GitHub, nunca de
+ * la foto que `pnpm bundle:api` congeló en el paquete: es la misma razón
+ * de RULING T6-d, aplicada a la fuente de un cálculo en vez de a la
+ * comparación de bytes. Ese único caso —`sitio` sin `sabores` en el
+ * lote— es la única vez que este router toca GitHub para algo que no va a
+ * escribir, y por eso corre en su propia fase, después de validar todo lo
+ * que SÍ se puede validar sin red (para no gastar ese pedido si el lote
+ * ya iba a rechazarse por otra razón) y antes de la Fase 2 de escritura,
+ * que reutiliza el MISMO sha base si esta fase ya lo pidió — «un solo sha
+ * base para todo el lote» sigue valiendo, ahora para dos preguntas en vez
+ * de una.
+ *
+ * Lo que se INJERTA es solo para validar: lo que se ESCRIBE —Fase 2, más
+ * abajo— sigue siendo el documento tal cual llegó, nunca la copia
+ * injertada. No hace falta que sea otra cosa: `serializa()` omite los
+ * derivados sea cual sea el valor que traigan, así que los bytes finales
+ * son los mismos exista o no ese campo en la entrada (`injerta()`
+ * sobrescribe, así que un documento que YA trae sus derivados —lo que va
+ * a tener en memoria el panel de la fase 6— también funciona, sin caso
+ * especial).
  *
  * [C-1] Antes de mirar la cookie siquiera: si `PANEL_SECRETO` falta o es
  * demasiado corto, 503 —nunca el 401 de sesión inválida, que le haría
@@ -333,17 +392,6 @@ async function publicarAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
 
   const idsConocidos = ids as IdDocumento[]
 
-  // Fase 1, sin tocar GitHub: el esquema COMPLETO de cada documento, no
-  // solo los campos que cambiaron. Un solo documento inválido rechaza el
-  // lote entero antes de gastar un solo pedido.
-  for (const id of idsConocidos) {
-    const problemas: Problema[] = validarContra(DOCUMENTOS[id], documentos[id])
-    if (problemas.length > 0) {
-      return error(422, problemas[0].titulo, `${id}.${problemas[0].campo}`)
-    }
-  }
-
-  // Fase 2: recién acá se toca GitHub. Un solo sha base para todo el lote.
   const gh = cliente({
     token: contexto.env.PANEL_GITHUB_TOKEN ?? '',
     duenio: contexto.env.GITHUB_DUENIO ?? '',
@@ -351,11 +399,79 @@ async function publicarAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
     fetch: contexto.fetch,
   })
 
+  // Fase 1a, sin tocar GitHub: el esquema COMPLETO de cada documento que
+  // NO necesita nada inyectado —hoy, cualquiera menos `sitio`—, en el
+  // orden en que llegó. `sabores` y `fichas` no declaran un solo campo
+  // `derivado` (ver el punto 6 del informe de esta tarea), así que su
+  // esquema completo es justo lo que la clienta mandó: nada que calcular
+  // antes de validar. `sitio` se deja para la Fase 1b, después de esta,
+  // para no gastar un pedido de red por sus derivados si el lote ya iba a
+  // rechazarse por CUALQUIER otro documento.
+  for (const id of idsConocidos) {
+    if (id === 'sitio') continue
+    const problemas: Problema[] = validarContra(DOCUMENTOS[id], documentos[id])
+    if (problemas.length > 0) {
+      return error(422, problemas[0].titulo, `${id}.${problemas[0].campo}`)
+    }
+  }
+
+  // El sha base del lote, pedido a lo sumo una vez y reusado: tanto la
+  // Fase 1b (fuentes de los derivados de `sitio`, si hace falta leerlas
+  // vivas) como la Fase 2 (lo vivo de cada documento a escribir) tienen
+  // que comparar contra el MISMO instante.
+  let base: { sha: string } | undefined
+
+  // Fase 1b: `sitio`, si vino, con sus cinco derivados injertados antes
+  // de validar (ver el docstring de esta función).
+  if (idsConocidos.includes('sitio')) {
+    let fuentes: FuentesDeDerivados
+    try {
+      if (idsConocidos.includes('sabores')) {
+        // El lote trae `sabores`: sus valores son los que van a quedar
+        // vivos después de este commit, así que son los que hay que usar
+        // —nunca los de GitHub, que están a punto de quedar viejos.
+        fuentes = fuentesDeSabores(documentos.sabores)
+      } else {
+        base = await gh.ref('heads/main')
+        const vivoSaboresTexto = await gh.archivoEnRef(RUTA_DEL_DOCUMENTO('sabores'), base.sha)
+        fuentes = fuentesDeSabores(JSON.parse(vivoSaboresTexto))
+      }
+    } catch (e) {
+      // Mismo tratamiento que la Fase 2 cuando GitHub no contesta: un
+      // error fuerte, nunca un `ok: true`, y jamás una foto vieja del
+      // bundle en su lugar (RULING T6-d).
+      console.error('publicar: no se pudo leer «sabores» en vivo para calcular los derivados de «sitio» —', e)
+      return error(502, PROBLEMA_NO_SE_PUDO_LEER)
+    }
+
+    // `injerta()` tira si al documento le falta un CONTENEDOR intermedio
+    // —`gotas` entero, no solo `gotas.precioDesde`— porque ahí ya no sabe
+    // dónde escribir el derivado (derivados.ts). Eso es un documento con
+    // una forma rota de verdad, no el caso que este fix existe para
+    // arreglar: se valida el documento TAL CUAL llegó en su lugar, para
+    // que sea Zod —no un 500 genérico— quien le diga a la clienta qué
+    // parte falta, con el mismo criterio que cualquier otro campo
+    // ausente.
+    let paraValidar: unknown
+    try {
+      paraValidar = injerta(documentos.sitio, fuentes)
+    } catch {
+      paraValidar = documentos.sitio
+    }
+
+    const problemas: Problema[] = validarContra(DOCUMENTOS.sitio, paraValidar)
+    if (problemas.length > 0) {
+      return error(422, problemas[0].titulo, `sitio.${problemas[0].campo}`)
+    }
+  }
+
+  // Fase 2: recién acá se toca GitHub para escribir. Reusa el sha base de
+  // la Fase 1b si ya se pidió.
   const archivos: Archivo[] = []
   const cambios: Cambio[] = []
 
   try {
-    const base = await gh.ref('heads/main')
+    base ??= await gh.ref('heads/main')
 
     for (const id of idsConocidos) {
       const ruta = RUTA_DEL_DOCUMENTO(id)
