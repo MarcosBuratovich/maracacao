@@ -6,7 +6,8 @@
 import { describe, it, expect } from 'vitest'
 import { createHmac } from 'node:crypto'
 import { readFileSync } from 'node:fs'
-import { maneja, idDeDispositivo } from '../src/servidor/acciones'
+import { maneja, idDeDispositivo, type Entorno } from '../src/servidor/acciones'
+import type { Carta, ResultadoCorreo } from '../src/servidor/correo'
 import { hashDeClave, firmaSesion } from '../src/servidor/sesion'
 import { cliente } from '../src/servidor/github'
 import { publica } from '../src/servidor/publicar'
@@ -14,7 +15,7 @@ import { serializa } from '../src/contenido/carga'
 import { esquemaSitio } from '../src/contenido/esquema/sitio'
 import { esquemaSabores } from '../src/contenido/esquema/sabores'
 import { TOPE_CUERPO } from '../src/servidor/rutas-permitidas'
-import { fetchFalso } from './lib/github-falso'
+import { fetchFalso, respuestasDeUnaPublicacionCompleta } from './lib/github-falso'
 import { marca } from '@/copy/sitio-marca'
 import { JERGA_PROHIBIDA } from '../src/servidor/estado'
 
@@ -48,23 +49,11 @@ const respuestasFuentesDeSitio = (sha = 'main-1') => [
   { cuerpo: { content: Buffer.from(textoSaboresVivo).toString('base64'), encoding: 'base64' } }, // gh.archivoEnRef: lo vivo de sabores
 ]
 
-/**
- * Las siete respuestas que hacen falta para que la Fase 2 TERMINE de
- * publicar un solo documento, una vez que el chequeo de la base ya pasó:
- * leer lo vivo de ese documento, y las seis de siempre de `publica()` (ref,
- * commit padre, blob, árbol, commit, mover el ref). `vivo` por defecto es
- * `textoSaboresVivo` —el archivo de disco, sin editar— así que un lote que
- * mande `sabores` con algo cambiado sí encuentra una diferencia y escribe.
- */
-const respuestasDeUnaPublicacionCompleta = (vivo = textoSaboresVivo) => [
-  { cuerpo: { content: Buffer.from(vivo).toString('base64'), encoding: 'base64' } }, // gh.archivoEnRef: lo vivo del documento
-  { cuerpo: { object: { sha: 'main-2' } } },                            // gh.ref (dentro de publica())
-  { cuerpo: { sha: 'commit-viejo2', tree: { sha: 'arbol-viejo2' } } },  // gh.commit
-  { cuerpo: { sha: 'blob-nuevo2' } },                                    // creaBlob
-  { cuerpo: { sha: 'arbol-nuevo2' } },                                   // creaArbol
-  { cuerpo: { sha: 'commit-nuevo2' } },                                  // creaCommit
-  { cuerpo: {} },                                                        // mueveRef
-]
+// `respuestasDeUnaPublicacionCompleta()` (Fase 2 completa: lo vivo del
+// documento + las seis de `publica()`) vive en `test/lib/github-falso.ts`
+// desde la Tarea 8 — la usan también `test/publicar.test.ts` y
+// `test/revertir.test.ts`, y dos copias del mismo array de mentira son la
+// forma en que dos suites terminan creyendo cosas distintas del mismo cable.
 
 /**
  * Un `sabores` válido, pero con un precio distinto del que vive hoy en el
@@ -93,6 +82,31 @@ const respuestasDeDosChoquesDeRef = () => {
     { cuerpo: { sha: 'b' } }, { cuerpo: { sha: 'a4' } }, { cuerpo: { sha: 'c4' } }, choque,
   ]
 }
+
+/**
+ * Las DOS respuestas que `revisaLaCabeza()` (Tarea 8, paso 9) gasta antes de
+ * irse sin hacer nada: lee la cabeza de main, lee su commit, ve que el
+ * mensaje no lleva `Panel: sí` y se va. Desde la Tarea 8, `publicarAccion` y
+ * `estadoAccion` corren esto como lo PRIMERO que hacen con una sesión válida
+ * —antes que cualquier otra cosa—, así que todo test de esas dos acciones
+ * que llegue con sesión y un `fetch` de mentira que cuenta pedidos tiene que
+ * pagar este costo fijo al principio de su lote. Los tests que prueban el
+ * mecanismo en sí (más abajo, «B1: la red de seguridad») arman su propio
+ * escenario; este ayudante es para los que no quieren ejercitarlo, solo no
+ * chocar con él.
+ */
+const respuestasDeNingunaReversionPendiente = () => [
+  { cuerpo: { object: { sha: 'cabeza-sin-revertir' } } }, // gh.ref (dentro de revisaLaCabeza)
+  {
+    cuerpo: {
+      sha: 'cabeza-sin-revertir',
+      tree: { sha: 't' },
+      message: 'algo cualquiera, no es del panel',
+      author: { date: '2026-09-17T12:00:00Z' },
+      parents: [{ sha: 'p' }],
+    },
+  }, // gh.commit: sin «Panel: sí», revisaLaCabeza se va acá
+]
 
 // [C-1] 40 caracteres: por encima de LARGO_MIN_SECRETO (32), para que estos
 // tests ejerciten el camino normal. El propio candado de C-1 se prueba
@@ -158,6 +172,53 @@ const sinNombreDeProyecto = (fetch: typeof globalThis.fetch) => {
   delete (ctx.env as Record<string, string | undefined>).GITHUB_REPO
   return ctx
 }
+
+/**
+ * `contextoBase()`, pero para los tests de la reversión automática (Tarea
+ * 8): permite fijar el reloj, capturar (o hacer fallar) el correo, y sumar
+ * variables de entorno POR ENCIMA de las que ya arma `contextoBase()` — sin
+ * perder las que hacen falta para que `secretoUtilizable`, `sesionVigente` y
+ * las guardias de `estado` sigan pasando.
+ */
+const contextoDePrueba = (p: {
+  fetch: typeof globalThis.fetch
+  ahora?: () => number
+  correo?: (carta: Carta) => Promise<ResultadoCorreo>
+  env?: Partial<Entorno>
+}) => {
+  const base = contextoBase(p.fetch)
+  return {
+    ...base,
+    ...(p.ahora ? { ahora: p.ahora } : {}),
+    ...(p.correo ? { correo: p.correo } : {}),
+    env: { ...base.env, ...(p.env ?? {}) },
+  }
+}
+
+/**
+ * Las tres respuestas que hacen falta para que `revierte()` (Tarea 8) TERMINE
+ * contra un commit que es la cabeza, es del panel, y no tocó ningún
+ * documento de contenido — el camino más corto que igual devuelve `ok: true`
+ * sin escribir nada: `gh.ref` (la cabeza es el propio `sha`), `gh.commit`
+ * (con el trailer del panel y un padre) y `gh.comparaRefs` (sin archivos).
+ * Alcanza para probar que `revierteYAvisa()` corre y avisa a las dos
+ * personas; el mecanismo de la reversión en sí —qué pasa cuando SÍ hay
+ * contenido que revertir, y la revalidación de `sitio`— lo prueba
+ * `test/revertir.test.ts`.
+ */
+const respuestasDeUnaReversionCompleta = (sha: string) => [
+  { cuerpo: { object: { sha } } }, // gh.ref (dentro de revierte())
+  {
+    cuerpo: {
+      sha,
+      tree: { sha: 't' },
+      message: 'cambia algo\n\nPanel: sí',
+      author: { date: '2026-09-17T12:00:00Z' },
+      parents: [{ sha: 'padre' }],
+    },
+  }, // gh.commit
+  { cuerpo: { files: [] } }, // gh.comparaRefs: no tocó contenido
+]
 
 const cookieValida = (correo = 'clienta@ejemplo.mx') =>
   firmaSesion({ correo, vence: Date.now() + 86_400_000, dispositivo: 'test', emitida: Date.now() }, SECRETO)
@@ -302,7 +363,7 @@ describe('publicar', () => {
   it('con contenido inválido, 422 con el campo y sin escribir nada en GitHub', async () => {
     const roto = JSON.parse(JSON.stringify(marca))
     roto.anaquel.titulo = ''      // texto vacío: el esquema lo rechaza
-    const { f, pedidos } = fetchFalso(respuestasFuentesDeSitio())
+    const { f, pedidos } = fetchFalso([...respuestasDeNingunaReversionPendiente(), ...respuestasFuentesDeSitio()])
     const r = await maneja('publicar', { cuerpo: { base: 'main-1', documentos: { sitio: roto } }, cookie: cookieValida() }, contextoBase(f))
     expect(r.status).toBe(422)
     expect((r.cuerpo as { campo?: string }).campo).toContain('anaquel.titulo')
@@ -312,7 +373,7 @@ describe('publicar', () => {
   it('el mensaje de un contenido inválido no habla como una computadora', async () => {
     const roto = JSON.parse(JSON.stringify(marca))
     roto.anaquel.titulo = ''
-    const { f } = fetchFalso(respuestasFuentesDeSitio())
+    const { f } = fetchFalso([...respuestasDeNingunaReversionPendiente(), ...respuestasFuentesDeSitio()])
     const r = await maneja('publicar', { cuerpo: { base: 'main-1', documentos: { sitio: roto } }, cookie: cookieValida() }, contextoBase(f))
     const texto = String((r.cuerpo as { problema: string }).problema)
     expect(texto).not.toMatch(/zod|schema|422|undefined|parse/i)
@@ -334,7 +395,7 @@ describe('publicar', () => {
   it('un documento de sitio al que le falta un bloque entero da 422, nunca un 500', async () => {
     const sinGotas = JSON.parse(JSON.stringify(marca))
     delete sinGotas.gotas
-    const { f, pedidos } = fetchFalso(respuestasFuentesDeSitio())
+    const { f, pedidos } = fetchFalso([...respuestasDeNingunaReversionPendiente(), ...respuestasFuentesDeSitio()])
     const r = await maneja('publicar', { cuerpo: { base: 'main-1', documentos: { sitio: sinGotas } }, cookie: cookieValida() }, contextoBase(f))
     expect(r.status).toBe(422)
     expect((r.cuerpo as { campo?: string }).campo).toContain('gotas')
@@ -384,6 +445,7 @@ describe('publicar', () => {
     expect(Buffer.from(textoEnorme, 'utf8').toString('base64').length).toBeGreaterThan(TOPE_CUERPO) // guardia
 
     const { f, pedidos } = fetchFalso([
+      ...respuestasDeNingunaReversionPendiente(),
       { cuerpo: { object: { sha: 'main-1' } } }, // gh.ref (Fase 2: el sha base del lote)
       { cuerpo: { content: Buffer.from(textoSaboresVivo).toString('base64'), encoding: 'base64' } }, // archivoEnRef(sabores): lo vivo, para el diff
     ])
@@ -421,6 +483,7 @@ describe('publicar', () => {
       expect(textoEnviado).not.toBe(textoVivo) // guardia: si esto fallara, el test no prueba nada
 
       const { f, pedidos } = fetchFalso([
+        ...respuestasDeNingunaReversionPendiente(),
         ...respuestasFuentesDeSitio(), // gh.ref (router, base del lote — también sirve de fuente de derivados) + gh.archivoEnRef(sabores)
         { cuerpo: { content: Buffer.from(textoVivo).toString('base64'), encoding: 'base64' } }, // gh.archivoEnRef (router, lo vivo de sitio)
         { cuerpo: { object: { sha: 'main-1' } } }, // gh.ref (dentro de publica())
@@ -446,6 +509,7 @@ describe('publicar', () => {
       const textoEnviado = serializa(esquemaSitio, enviado)
 
       const { f, pedidos } = fetchFalso([
+        ...respuestasDeNingunaReversionPendiente(),
         ...respuestasFuentesDeSitio(), // gh.ref (base + fuente de derivados) + gh.archivoEnRef(sabores)
         { cuerpo: { content: Buffer.from(textoEnviado).toString('base64'), encoding: 'base64' } }, // gh.archivoEnRef(sitio): igual a lo enviado
       ])
@@ -463,7 +527,10 @@ describe('publicar', () => {
     it('si GitHub no contesta al leer lo vivo, no publica nada y nunca dice que salió bien', async () => {
       const enviado = JSON.parse(JSON.stringify(marca))
 
-      const { f, pedidos } = fetchFalso([{ status: 500, cuerpo: { message: 'ups, caído' } }]) // gh.ref falla
+      const { f, pedidos } = fetchFalso([
+        ...respuestasDeNingunaReversionPendiente(),
+        { status: 500, cuerpo: { message: 'ups, caído' } }, // gh.ref falla
+      ])
 
       const r = await maneja('publicar', { cuerpo: { base: 'main-1', documentos: { sitio: enviado } }, cookie: cookieValida() }, contextoBase(f))
 
@@ -494,6 +561,7 @@ describe('publicar', () => {
       expect(crudo.gotas.precioDesde).toBeUndefined()
 
       const { f, pedidos } = fetchFalso([
+        ...respuestasDeNingunaReversionPendiente(),
         ...respuestasFuentesDeSitio(), // fuentes de los derivados: sabores no viene en el lote
         { cuerpo: { content: Buffer.from(serializa(esquemaSitio, marca)).toString('base64'), encoding: 'base64' } }, // lo vivo de sitio
         { cuerpo: { object: { sha: 'main-1' } } }, // gh.ref (dentro de publica())
@@ -544,6 +612,7 @@ describe('publicar', () => {
 
       const contextoParaOtroLote = () => {
         const { f, pedidos } = fetchFalso([
+          ...respuestasDeNingunaReversionPendiente(),
           ...respuestasFuentesDeSitio(),
           { cuerpo: { content: Buffer.from(serializa(esquemaSitio, marca)).toString('base64'), encoding: 'base64' } },
           { cuerpo: { object: { sha: 'main-1' } } },
@@ -615,9 +684,12 @@ describe('publicar', () => {
 
       // Ni una respuesta de más que las que hacen falta para ESCRIBIR los
       // dos documentos: si el router leyera `sabores` vivo además de
-      // usar el del lote, pediría una respuesta de más que las 10
-      // programadas y `fetchFalso` lo denuncia (M-11).
+      // usar el del lote, pediría una respuesta de más que las programadas
+      // y `fetchFalso` lo denuncia (M-11). Las dos primeras son el costo
+      // fijo de `revisaLaCabeza()` (Tarea 8, paso 9), que corre antes que
+      // cualquier otra cosa.
       const { f, pedidos } = fetchFalso([
+        ...respuestasDeNingunaReversionPendiente(),
         { cuerpo: { object: { sha: 'main-1' } } }, // gh.ref (Fase 2 — la Fase 1b no tocó GitHub: sabores vino en el lote)
         { cuerpo: { content: Buffer.from(textoSitioVivo).toString('base64'), encoding: 'base64' } }, // archivoEnRef(sitio)
         { cuerpo: { content: Buffer.from(textoSaboresVivo).toString('base64'), encoding: 'base64' } }, // archivoEnRef(sabores): 15, distinto del lote
@@ -688,17 +760,19 @@ describe('publicar', () => {
       const crudo = sitioCrudoDeDisco()
 
       const { f, pedidos } = fetchFalso([
+        ...respuestasDeNingunaReversionPendiente(), // costo fijo de revisaLaCabeza() (Tarea 8, paso 9)
         { cuerpo: { object: { sha: 'main-1' } } }, // gh.ref (Fase 1b)
         { cuerpo: { content: Buffer.from(textoSaboresVivoSinJengibre).toString('base64'), encoding: 'base64' } }, // archivoEnRef(sabores): lo vivo, sin jengibreYNaranja
       ])
 
       const r = await maneja('publicar', { cuerpo: { base: 'main-1', documentos: { sitio: crudo } }, cookie: cookieValida() }, contextoBase(f))
 
-      // Dos pedidos, ni uno más ni uno menos: de verdad leyó lo vivo. Un
-      // «swapped branch» que tratara «sabores no vino» como si hubiera
-      // venido habría llamado `fuentesDeSabores(undefined)` SIN tocar
-      // GitHub — cero pedidos, no dos.
-      expect(pedidos).toHaveLength(2)
+      // Cuatro pedidos, ni uno más ni uno menos: los dos primeros son
+      // `revisaLaCabeza()`, los otros dos son la Fase 1b leyendo lo vivo de
+      // verdad. Un «swapped branch» que tratara «sabores no vino» como si
+      // hubiera venido habría llamado `fuentesDeSabores(undefined)` SIN
+      // tocar GitHub para esa parte — dos pedidos, no cuatro.
+      expect(pedidos).toHaveLength(4)
       expect(r.status).toBe(422)
       expect((r.cuerpo as { campo?: string }).campo).toBe('sitio.anaquel.contadorDe')
     })
@@ -729,6 +803,7 @@ describe('publicar', () => {
       // que cambió incluye el documento que ella está publicando: publicar
       // ahora es pisar ese cambio sin conflicto y sin log. Es el bug.
       const { f, pedidos } = fetchFalso([
+        ...respuestasDeNingunaReversionPendiente(),                                      // revisaLaCabeza()
         { cuerpo: { object: { sha: 'cabezaNueva' } } },                                  // gh.ref
         { cuerpo: { files: [{ filename: 'src/contenido/datos/sabores.json' }] } },        // gh.comparaRefs
       ])
@@ -741,14 +816,16 @@ describe('publicar', () => {
       expect((r.cuerpo as { problema: string }).problema).toBe(
         'Marcos cambió algo del sitio mientras editabas: vuelve a intentar la publicación.',
       )
-      // Lo único que se pidió fue leer y comparar. Nada de blobs, árboles ni refs.
-      expect(pedidos.map((p) => p.metodo)).toEqual(['GET', 'GET'])
+      // Lo único que se pidió fue leer y comparar (más el costo fijo de
+      // `revisaLaCabeza()`). Nada de blobs, árboles ni refs que se muevan.
+      expect(pedidos.map((p) => p.metodo)).toEqual(['GET', 'GET', 'GET', 'GET'])
     })
 
     it('si lo que cambió en el medio NO es contenido, la publicación sigue', async () => {
       // Marcos arregló una plantilla. Eso no toca ningún documento del lote,
       // así que frenarla sería pedirle que reintente por nada.
       const { f } = fetchFalso([
+        ...respuestasDeNingunaReversionPendiente(),                        // revisaLaCabeza()
         { cuerpo: { object: { sha: 'cabezaNueva' } } },                    // gh.ref
         { cuerpo: { files: [{ filename: 'src/pages/index.astro' }] } },    // gh.comparaRefs
         ...respuestasDeUnaPublicacionCompleta(),
@@ -770,6 +847,7 @@ describe('publicar', () => {
     // las dos frases se desincronicen sin que nadie lo note.
     it('las dos formas de detectar una pisada le dicen a la clienta exactamente lo mismo', async () => {
       const { f } = fetchFalso([
+        ...respuestasDeNingunaReversionPendiente(),
         { cuerpo: { object: { sha: 'cabezaNueva' } } },
         { cuerpo: { files: [{ filename: 'src/contenido/datos/sabores.json' }] } },
       ])
@@ -1017,6 +1095,7 @@ describe('accion=estado', () => {
   it('cruza las dos fuentes y devuelve el veredicto', async () => {
     const sha = 'a'.repeat(40)
     const { f, pedidos } = fetchFalso([
+      ...respuestasDeNingunaReversionPendiente(), // revisaLaCabeza(), primero que nada
       { cuerpo: { deployments: [{ state: 'READY', url: 'maracacao-abc.vercel.app' }] } },
       { cuerpo: { sha, construido: '2026-09-17T12:00:00.000Z' } },
     ])
@@ -1034,8 +1113,9 @@ describe('accion=estado', () => {
       url: 'https://maracacao-abc.vercel.app',
     })
     // La segunda lectura tiene que saltear el caché: si `version.json` viene
-    // de un caché intermedio, deja de decir qué está sirviendo AHORA.
-    expect(pedidos[1].url).toContain('/version.json?')
+    // de un caché intermedio, deja de decir qué está sirviendo AHORA. Índice
+    // 3: los dos primeros pedidos son el costo fijo de `revisaLaCabeza()`.
+    expect(pedidos[3].url).toContain('/version.json?')
   })
 
   it('si version.json no contesta, no se canta «listo»: se sigue esperando', async () => {
@@ -1043,6 +1123,7 @@ describe('accion=estado', () => {
     // omisión. La respuesta correcta es «todavía no sé», que es enCurso.
     const sha = 'a'.repeat(40)
     const { f } = fetchFalso([
+      ...respuestasDeNingunaReversionPendiente(), // revisaLaCabeza(), primero que nada
       { cuerpo: { deployments: [{ state: 'READY', url: 'x.vercel.app' }] } },
       { status: 500, cuerpo: {} },
     ])
@@ -1140,5 +1221,92 @@ describe('accion=estado', () => {
         expect(frase.toLowerCase(), frase).not.toContain(jerga.toLowerCase())
       }
     }
+  })
+
+  // Tarea 8 (spec §4.6): «el sitio se arregla solo y las dos personas se
+  // enteran». `estadoAccion` es quien VE el fracaso —la primera de las dos
+  // fuentes ya dice `falló`, así que ni se llega a preguntar por
+  // `version.json`— y por eso es quien dispara la reversión automática.
+  it('cuando el despliegue falla, revierte y avisa a las dos personas', async () => {
+    const cartas: Array<{ a: string[]; asunto: string }> = []
+    const sha = 'a'.repeat(40)
+    const { f } = fetchFalso([
+      ...respuestasDeNingunaReversionPendiente(), // revisaLaCabeza(), primero que nada
+      { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } },
+      ...respuestasDeUnaReversionCompleta(sha),
+    ])
+    const r = await maneja(
+      'estado',
+      { cuerpo: { sha, publicadoEn: 1_000 }, cookie: cookieValida() },
+      contextoDePrueba({
+        fetch: f,
+        ahora: () => 6_000,
+        correo: async (c) => { cartas.push(c); return { ok: true } },
+        env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
+      }),
+    )
+    expect((r.cuerpo as { estado: string }).estado).toBe('falló')
+    // Uno a ella, con su frase; uno a Marcos, con el detalle.
+    expect(cartas).toHaveLength(2)
+    expect(cartas[0].a).toEqual(['clienta@ejemplo.mx']) // el correo de la sesión de prueba (cookieValida())
+    expect(cartas[1].a).toEqual(['marcos@ejemplo.mx'])
+  })
+
+  it('si el correo no está configurado, la reversión igual pasa', async () => {
+    // B3: el aviso degrada, la reversión no. Lo importante es que el sitio
+    // quede sano; el correo es para que ella se entere sin estar mirando.
+    const sha = 'a'.repeat(40)
+    const { f } = fetchFalso([
+      ...respuestasDeNingunaReversionPendiente(),
+      { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } },
+      ...respuestasDeUnaReversionCompleta(sha),
+    ])
+    const r = await maneja(
+      'estado',
+      { cuerpo: { sha, publicadoEn: 1_000 }, cookie: cookieValida() },
+      contextoDePrueba({ fetch: f, ahora: () => 6_000, correo: async () => ({ ok: false, motivo: 'sin-configurar' as const }) }),
+    )
+    expect((r.cuerpo as { estado: string }).estado).toBe('falló')
+  })
+
+  // [B1] La red de seguridad: si ella publicó y cerró el panel, y el deploy
+  // falló diez minutos después con nadie mirando, la reversión de arriba
+  // nunca corre —no hay nadie preguntando `estado`—. La próxima vez que
+  // CUALQUIERA entre —acá, ella misma intentando otra publicación— lo
+  // primero que pasa es que la cabeza rota se arregla, antes de que la
+  // acción que la disparó haga lo suyo.
+  it('B1: cualquier acción autenticada revierte primero una cabeza rota que quedó colgada', async () => {
+    const cartas: Array<{ a: string[]; asunto: string; texto: string }> = []
+    const cabezaRota = 'b'.repeat(40)
+    const { f } = fetchFalso([
+      { cuerpo: { object: { sha: cabezaRota } } }, // gh.ref (revisaLaCabeza)
+      {
+        cuerpo: {
+          sha: cabezaRota,
+          tree: { sha: 't' },
+          message: 'cambia algo\n\nPanel: sí',
+          author: { date: '2026-09-17T12:00:00Z' },
+          parents: [{ sha: 'padre' }],
+        },
+      }, // gh.commit: es del panel, no es una reversión
+      { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // vercel.despliegueDe: falló
+      ...respuestasDeUnaReversionCompleta(cabezaRota),
+    ])
+    const r = await maneja(
+      'publicar',
+      { cuerpo: { documentos: {} }, cookie: cookieValida() }, // sin `base`: no importa, revisaLaCabeza corre ANTES de ese chequeo
+      contextoDePrueba({
+        fetch: f,
+        correo: async (c) => { cartas.push(c); return { ok: true } },
+        env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
+      }),
+    )
+    // La acción que la disparó sigue su camino normal DESPUÉS: sin `base`,
+    // 400 — la limpieza de la cabeza no le cambia el resultado a quien pidió.
+    expect(r.status).toBe(400)
+    // Pero la cabeza rota SÍ se revirtió, y las dos personas se enteraron.
+    expect(cartas).toHaveLength(2)
+    expect(cartas[1].a).toEqual(['marcos@ejemplo.mx'])
+    expect(cartas[1].texto).toContain(cabezaRota)
   })
 })

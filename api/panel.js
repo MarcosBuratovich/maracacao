@@ -119,10 +119,21 @@ function cliente(c) {
       const cuerpo = await pedir(`/git/ref/${codificaRuta(nombre)}`);
       return { sha: cuerpo.object.sha };
     },
-    /** Los datos de un commit: su árbol, su mensaje, cuándo lo hizo su autor. */
+    /**
+     * Los datos de un commit: su árbol, su mensaje, cuándo lo hizo su autor y
+     * de quién viene. Los PADRES los necesita la reversión (`revertir.ts`):
+     * volver atrás un commit es publicar lo que decían sus archivos en el
+     * padre, así que sin el padre no hay a qué volver.
+     */
     async commit(sha) {
       const cuerpo = await pedir(`/git/commits/${sha}`);
-      return { sha: cuerpo.sha, tree: cuerpo.tree.sha, message: cuerpo.message, author: cuerpo.author };
+      return {
+        sha: cuerpo.sha,
+        tree: cuerpo.tree.sha,
+        message: cuerpo.message,
+        author: cuerpo.author,
+        padres: (cuerpo.parents ?? []).map((p) => p.sha)
+      };
     },
     /** El contenido de un blob, decodificado de base64 a texto. Necesita el SHA del blob, no la ruta. */
     async contenido(sha) {
@@ -15425,10 +15436,8 @@ async function publica(gh, p) {
   if (asunto === "") {
     return { ok: true, sha: null, resumen: "No hab\xEDa nada que publicar: no cambiaste ning\xFAn dato del sitio." };
   }
-  const mensaje = `${asunto}
-
-Panel: s\xED
-Panel-Autor: ${p.autor}`;
+  const extras = Object.entries(p.trailers ?? {}).map(([k, v]) => `${k}: ${v}`);
+  const mensaje = [`${asunto}`, "", "Panel: s\xED", `Panel-Autor: ${p.autor}`, ...extras].join("\n");
   try {
     const sha = await intento(gh, p.archivos, mensaje);
     return { ok: true, sha, resumen: asunto };
@@ -17835,6 +17844,77 @@ var DOCUMENTOS = {
   fichas: esquemaFichas
 };
 
+// src/servidor/revertir.ts
+var TRAILER_REVIERTE = "Panel-Revierte";
+var TRAILER_PANEL = "Panel: s\xED";
+var RUTA_DEL_DOCUMENTO = (id) => `src/contenido/datos/${id}.json`;
+var DOCUMENTO_DE_RUTA = new Map(
+  Object.keys(DOCUMENTOS).map((id) => [RUTA_DEL_DOCUMENTO(id), id])
+);
+function fuentesDeSabores(v) {
+  const doc = v ?? {};
+  return {
+    sabores: Array.isArray(doc.sabores) ? doc.sabores : [],
+    gotas: Array.isArray(doc.gotas) ? doc.gotas : []
+  };
+}
+async function revierte(gh, p) {
+  const cabeza = await gh.ref("heads/main");
+  if (cabeza.sha !== p.sha) {
+    const cabezaCommit = await gh.commit(cabeza.sha);
+    if (cabezaCommit.message.includes(`${TRAILER_REVIERTE}: ${p.sha}`)) {
+      return { ok: false, motivo: "ya-revertido", detalle: `${cabeza.sha} ya revierte ${p.sha}` };
+    }
+    return { ok: false, motivo: "no-es-la-cabeza", detalle: `la cabeza es ${cabeza.sha}` };
+  }
+  const commit = await gh.commit(p.sha);
+  if (!commit.message.includes(TRAILER_PANEL)) {
+    return { ok: false, motivo: "no-es-del-panel", detalle: `${p.sha} no lleva \xAB${TRAILER_PANEL}\xBB` };
+  }
+  const padre = commit.padres[0];
+  if (!padre) {
+    return { ok: false, motivo: "fall\xF3", detalle: `${p.sha} no tiene padre` };
+  }
+  const { archivos: tocadas } = await gh.comparaRefs(padre, p.sha);
+  const documentos = tocadas.flatMap((ruta2) => {
+    const id = DOCUMENTO_DE_RUTA.get(ruta2);
+    return id ? [{ ruta: ruta2, id }] : [];
+  });
+  if (documentos.length === 0) {
+    return { ok: true, sha: null, revirtio: p.sha };
+  }
+  const contenidos = /* @__PURE__ */ new Map();
+  for (const { ruta: ruta2, id } of documentos) {
+    contenidos.set(id, await gh.archivoEnRef(ruta2, padre));
+  }
+  const archivos = [];
+  for (const { ruta: ruta2, id } of documentos) {
+    const viejo = contenidos.get(id);
+    let paraValidar = JSON.parse(viejo);
+    if (id === "sitio") {
+      const textoSabores = contenidos.has("sabores") ? contenidos.get("sabores") : await gh.archivoEnRef(RUTA_DEL_DOCUMENTO("sabores"), padre);
+      const fuentes = fuentesDeSabores(JSON.parse(textoSabores));
+      try {
+        paraValidar = injerta(paraValidar, fuentes);
+      } catch {
+      }
+    }
+    const problemas = validarContra(DOCUMENTOS[id], paraValidar);
+    if (problemas.length > 0) {
+      return { ok: false, motivo: "no-valida", detalle: `${ruta2}: ${problemas[0].titulo}` };
+    }
+    archivos.push({ ruta: ruta2, contenido: viejo });
+  }
+  const resultado = await publica(gh, {
+    archivos,
+    autor: p.autor,
+    trailers: { [TRAILER_REVIERTE]: p.sha },
+    ...p.bytesDelCuerpo !== void 0 ? { bytesDelCuerpo: p.bytesDelCuerpo } : {}
+  });
+  if (!resultado.ok) return { ok: false, motivo: "fall\xF3", detalle: resultado.problema };
+  return { ok: true, sha: resultado.sha, revirtio: p.sha };
+}
+
 // src/servidor/vercel.ts
 var TERMINADOS = {
   READY: "listo",
@@ -17960,13 +18040,13 @@ var PROBLEMA_NO_SE_PUDO_LEER = "No pudimos revisar el contenido actual del sitio
 var SIN_CAMBIOS = "No hab\xEDa nada que publicar: no cambiaste ning\xFAn dato del sitio.";
 var PROBLEMA_SIN_BASE = "No pudimos publicar: vuelve a abrir el panel y hazlo de nuevo.";
 var PROBLEMA_PISARIA = "Marcos cambi\xF3 algo del sitio mientras editabas: vuelve a intentar la publicaci\xF3n.";
-var RUTA_DEL_DOCUMENTO = (id) => `src/contenido/datos/${id}.json`;
+var RUTA_DEL_DOCUMENTO2 = (id) => `src/contenido/datos/${id}.json`;
 var esIdDocumento = (v) => Object.prototype.hasOwnProperty.call(DOCUMENTOS, v);
 function comoDocumentos(v) {
   if (v !== null && typeof v === "object" && !Array.isArray(v)) return v;
   return {};
 }
-function fuentesDeSabores(v) {
+function fuentesDeSabores2(v) {
   const doc = v ?? {};
   return {
     sabores: Array.isArray(doc.sabores) ? doc.sabores : [],
@@ -17994,6 +18074,67 @@ function listaTiene(lista2, valor) {
   if (!lista2) return false;
   return lista2.split(",").some((x) => x.trim() === valor);
 }
+async function revierteYAvisa(sha, correoDeElla, contexto) {
+  const gh = cliente({
+    token: contexto.env.PANEL_GITHUB_TOKEN ?? "",
+    duenio: contexto.env.GITHUB_DUENIO ?? "",
+    repo: contexto.env.GITHUB_REPO ?? "",
+    fetch: contexto.fetch
+  });
+  let resumen;
+  try {
+    const r = await revierte(gh, { sha, autor: correoDeElla });
+    resumen = r.ok ? `revertido (commit ${r.sha ?? "sin cambios"})` : `NO se pudo revertir: ${r.motivo} \u2014 ${r.detalle}`;
+    if (!r.ok) console.error(`estado: la reversi\xF3n autom\xE1tica de ${sha} no se pudo hacer \u2014 ${r.motivo}: ${r.detalle}`);
+  } catch (e) {
+    resumen = `NO se pudo revertir: ${e instanceof Error ? e.message : String(e)}`;
+    console.error(`estado: la reversi\xF3n autom\xE1tica de ${sha} revent\xF3 \u2014`, e);
+  }
+  await contexto.correo({
+    a: [correoDeElla],
+    asunto: "Tu cambio no se pudo publicar",
+    texto: "No sali\xF3; lo dej\xE9 como estaba y ya le avis\xE9 a Marcos.\n\nPuedes volver a intentarlo cuando quieras."
+  });
+  const paraMarcos = contexto.env.PANEL_AVISOS_A;
+  if (paraMarcos) {
+    await contexto.correo({
+      a: [paraMarcos],
+      asunto: `[panel] El deploy de ${sha.slice(0, 7)} fall\xF3`,
+      texto: [
+        `El commit ${sha} publicado por ${correoDeElla} no construy\xF3.`,
+        `Reversi\xF3n autom\xE1tica: ${resumen}.`,
+        "",
+        "El sitio sigue sirviendo el \xFAltimo deploy bueno."
+      ].join("\n")
+    });
+  }
+}
+async function revisaLaCabeza(contexto, correoDeQuienPide) {
+  try {
+    if (!contexto.env.PANEL_VERCEL_TOKEN) return;
+    const gh = cliente({
+      token: contexto.env.PANEL_GITHUB_TOKEN ?? "",
+      duenio: contexto.env.GITHUB_DUENIO ?? "",
+      repo: contexto.env.GITHUB_REPO ?? "",
+      fetch: contexto.fetch
+    });
+    const cabeza = await gh.ref("heads/main");
+    const commit = await gh.commit(cabeza.sha);
+    if (!commit.message.includes("Panel: s\xED")) return;
+    if (commit.message.includes(`${TRAILER_REVIERTE}: `)) return;
+    const vercel = clienteVercel({
+      token: contexto.env.PANEL_VERCEL_TOKEN,
+      proyecto: contexto.env.PANEL_VERCEL_PROYECTO ?? "maracacao",
+      fetch: contexto.fetch
+    });
+    const { estado } = await vercel.despliegueDe(cabeza.sha);
+    if (estado !== "fall\xF3") return;
+    console.error(`revisaLaCabeza: ${cabeza.sha} es un commit del panel cuyo despliegue fall\xF3 \u2014 revirtiendo.`);
+    await revierteYAvisa(cabeza.sha, correoDeQuienPide, contexto);
+  } catch (e) {
+    console.error("revisaLaCabeza: no se pudo revisar la cabeza de main \u2014", e);
+  }
+}
 async function publicarAccion(pedido, contexto) {
   const env = contexto.env;
   if (!secretoUtilizable(env)) {
@@ -18002,6 +18143,7 @@ async function publicarAccion(pedido, contexto) {
   }
   const sesion = sesionVigente(pedido.cookie, env, contexto.ahora());
   if (!sesion) return error51(401, PROBLEMA_SESION);
+  await revisaLaCabeza(contexto, sesion.correo);
   const cuerpo = pedido.cuerpo ?? {};
   if (typeof cuerpo.base !== "string" || cuerpo.base === "") {
     console.error("publicar: el cuerpo lleg\xF3 sin `base` \u2014 el panel que lo mand\xF3 es de antes del sha base.");
@@ -18034,11 +18176,11 @@ async function publicarAccion(pedido, contexto) {
     let fuentes;
     try {
       if (idsConocidos.includes("sabores")) {
-        fuentes = fuentesDeSabores(documentos.sabores);
+        fuentes = fuentesDeSabores2(documentos.sabores);
       } else {
         base = await gh.ref("heads/main");
-        const vivoSaboresTexto = await gh.archivoEnRef(RUTA_DEL_DOCUMENTO("sabores"), base.sha);
-        fuentes = fuentesDeSabores(JSON.parse(vivoSaboresTexto));
+        const vivoSaboresTexto = await gh.archivoEnRef(RUTA_DEL_DOCUMENTO2("sabores"), base.sha);
+        fuentes = fuentesDeSabores2(JSON.parse(vivoSaboresTexto));
       }
     } catch (e) {
       console.error("publicar: no se pudo leer \xABsabores\xBB en vivo para calcular los derivados de \xABsitio\xBB \u2014", e);
@@ -18061,7 +18203,7 @@ async function publicarAccion(pedido, contexto) {
     base ??= await gh.ref("heads/main");
     if (cuerpo.base !== base.sha) {
       const { archivos: movidos } = await gh.comparaRefs(cuerpo.base, base.sha);
-      const delLote = new Set(idsConocidos.map(RUTA_DEL_DOCUMENTO));
+      const delLote = new Set(idsConocidos.map(RUTA_DEL_DOCUMENTO2));
       const pisados = movidos.filter((ruta2) => delLote.has(ruta2));
       if (pisados.length > 0) {
         console.error(
@@ -18071,7 +18213,7 @@ async function publicarAccion(pedido, contexto) {
       }
     }
     for (const id of idsConocidos) {
-      const ruta2 = RUTA_DEL_DOCUMENTO(id);
+      const ruta2 = RUTA_DEL_DOCUMENTO2(id);
       const vivoTexto = await gh.archivoEnRef(ruta2, base.sha);
       const crudo = documentos[id];
       const esquema = DOCUMENTOS[id];
@@ -18142,6 +18284,7 @@ async function estadoAccion(pedido, contexto) {
   }
   const sesion = sesionVigente(pedido.cookie, env, contexto.ahora());
   if (!sesion) return error51(401, PROBLEMA_SESION);
+  await revisaLaCabeza(contexto, sesion.correo);
   if (!env.PANEL_VERCEL_TOKEN) {
     console.error("estado: PANEL_VERCEL_TOKEN no est\xE1 cargada \u2014 no hay forma de saber si el despliegue termin\xF3.");
     return error51(503, PROBLEMA_INESPERADO);
@@ -18176,6 +18319,9 @@ async function estadoAccion(pedido, contexto) {
     shaPublicado: cuerpo.sha,
     desdeHaceMs: contexto.ahora() - publicadoEn
   });
+  if (veredicto.estado === "fall\xF3") {
+    await revierteYAvisa(cuerpo.sha, sesion.correo, contexto);
+  }
   return ok({ ok: true, ...veredicto });
 }
 async function shaQueSirveElCdn(contexto) {

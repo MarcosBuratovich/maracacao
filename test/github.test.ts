@@ -140,4 +140,22 @@ describe('el cliente de GitHub', () => {
     const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
     expect(await gh.comparaRefs('a', 'a')).toEqual({ archivos: [] })
   })
+
+  it('commit devuelve su árbol, su mensaje y sus padres', async () => {
+    const { f } = fetchFalso([
+      {
+        cuerpo: {
+          sha: 'c1',
+          tree: { sha: 't1' },
+          message: 'cambia Línea de cierre\n\nPanel: sí',
+          author: { date: '2026-09-17T12:00:00Z' },
+          parents: [{ sha: 'p1' }],
+        },
+      },
+    ])
+    const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+    const c = await gh.commit('c1')
+    expect(c.padres).toEqual(['p1'])
+    expect(c.message).toContain('Panel: sí')
+  })
 })

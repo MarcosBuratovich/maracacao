@@ -9,7 +9,7 @@ import { cliente } from '../src/servidor/github'
 import { publica } from '../src/servidor/publicar'
 import { frase, type Cambio } from '../src/contenido/diff'
 import { TOPE_CUERPO } from '../src/servidor/rutas-permitidas'
-import { fetchFalso } from './lib/github-falso'
+import { fetchFalso, respuestasDeUnaPublicacionDirecta } from './lib/github-falso'
 
 describe('publicar', () => {
   it('hace blobs, árbol, commit y mueve el ref, en ese orden', async () => {
@@ -182,5 +182,19 @@ describe('publicar', () => {
     })
 
     expect(r.ok).toBe(false)
+  })
+
+  it('los trailers extra salen después de los dos de siempre, uno por línea', async () => {
+    const { f, pedidos } = fetchFalso([...respuestasDeUnaPublicacionDirecta()])
+    const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+    await publica(gh, {
+      archivos: [{ ruta: 'src/contenido/datos/sitio.json', contenido: '{}' }],
+      autor: 'ella@ejemplo.mx',
+      trailers: { 'Panel-Revierte': 'abc123' },
+    })
+    const creaCommit = pedidos.find((p) => p.url.endsWith('/git/commits') && p.metodo === 'POST')!
+    expect((creaCommit.cuerpo as { message: string }).message).toBe(
+      'Actualiza contenido del panel\n\nPanel: sí\nPanel-Autor: ella@ejemplo.mx\nPanel-Revierte: abc123',
+    )
   })
 })

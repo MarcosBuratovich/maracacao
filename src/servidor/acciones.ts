@@ -25,6 +25,7 @@ import {
 } from './sesion'
 import { cliente } from './github'
 import { publica, type Archivo } from './publicar'
+import { revierte, TRAILER_REVIERTE } from './revertir'
 import type { Cambio } from '../contenido/diff'
 import { resume } from '../contenido/diff'
 import { validarContra, type Problema } from '../contenido/validacion'
@@ -422,6 +423,126 @@ function listaTiene(lista: string | undefined, valor: string): boolean {
   return lista.split(',').some((x) => x.trim() === valor)
 }
 
+/*
+ * ---------------------------------------------------------------------
+ * la reversión automática (Tarea 8, spec §4.6)
+ * ---------------------------------------------------------------------
+ */
+
+/**
+ * Deshace un commit cuyo despliegue falló y avisa a las dos personas.
+ *
+ * Es `void` a propósito: lo que sale por HTTP es el veredicto —«no salió; lo
+ * dejé como estaba»—, que ya es verdad haya podido revertir o no (el sitio
+ * sigue sirviendo el último despliegue bueno; esa es la capa 3 de la
+ * compuerta). Si la reversión falla, eso es un problema de Marcos, no de
+ * ella: va entero al log y al correo de él.
+ *
+ * [B3] El correo degrada: que no esté configurado no puede impedir que el
+ * repo vuelva a estar sano.
+ */
+async function revierteYAvisa(sha: string, correoDeElla: string, contexto: Contexto): Promise<void> {
+  const gh = cliente({
+    token: contexto.env.PANEL_GITHUB_TOKEN ?? '',
+    duenio: contexto.env.GITHUB_DUENIO ?? '',
+    repo: contexto.env.GITHUB_REPO ?? '',
+    fetch: contexto.fetch,
+  })
+
+  let resumen: string
+  try {
+    const r = await revierte(gh, { sha, autor: correoDeElla })
+    resumen = r.ok ? `revertido (commit ${r.sha ?? 'sin cambios'})` : `NO se pudo revertir: ${r.motivo} — ${r.detalle}`
+    if (!r.ok) console.error(`estado: la reversión automática de ${sha} no se pudo hacer — ${r.motivo}: ${r.detalle}`)
+  } catch (e) {
+    resumen = `NO se pudo revertir: ${e instanceof Error ? e.message : String(e)}`
+    console.error(`estado: la reversión automática de ${sha} reventó —`, e)
+  }
+
+  // A ella: la misma frase que ve en pantalla, para que el correo y el panel
+  // no cuenten dos historias distintas. Nada técnico (B10).
+  await contexto.correo({
+    a: [correoDeElla],
+    asunto: 'Tu cambio no se pudo publicar',
+    texto: 'No salió; lo dejé como estaba y ya le avisé a Marcos.\n\nPuedes volver a intentarlo cuando quieras.',
+  })
+
+  // A Marcos: todo. El sha, qué pasó con la reversión, y a dónde mirar.
+  const paraMarcos = contexto.env.PANEL_AVISOS_A
+  if (paraMarcos) {
+    await contexto.correo({
+      a: [paraMarcos],
+      asunto: `[panel] El deploy de ${sha.slice(0, 7)} falló`,
+      texto: [
+        `El commit ${sha} publicado por ${correoDeElla} no construyó.`,
+        `Reversión automática: ${resumen}.`,
+        '',
+        'El sitio sigue sirviendo el último deploy bueno.',
+      ].join('\n'),
+    })
+  }
+}
+
+/**
+ * [B1] La red de seguridad del revert automático.
+ *
+ * `estadoAccion` revierte cuando VE el fracaso, pero eso exige que alguien
+ * esté mirando. Si ella publicó y guardó el teléfono —que es lo que el spec
+ * §4.5 dice que va a hacer, y tiene razón—, el fracaso ocurre con el panel
+ * cerrado y nadie lo ve. Entonces lo primero que hace cualquier acción
+ * autenticada es preguntar si la cabeza de `main` es un commit del panel cuyo
+ * despliegue falló, y si lo es, arreglarlo ANTES de hacer lo suyo.
+ *
+ * El costo de estar equivocado es un pedido de más a la plataforma por acción.
+ * El costo de no tenerlo es que el commit malo se quede en `main` y la próxima
+ * publicación falle sin que ella haya tocado nada — el WhatsApp que el panel
+ * viene a matar.
+ *
+ * Dónde se llama: como PRIMERA cosa de `estadoAccion` y `publicarAccion`,
+ * después de validar la sesión y antes de hacer nada más — en `publicarAccion`
+ * antes incluso del chequeo de `base` (Tarea 2): si la cabeza está rota y se
+ * revierte, la cabeza cambia, y comparar contra la vieja daría un 409 por un
+ * commit que acaba de dejar de existir. `historialAccion` (Tarea 10) todavía
+ * no existe; cuando se escriba, corre esto primero también.
+ */
+async function revisaLaCabeza(contexto: Contexto, correoDeQuienPide: string): Promise<void> {
+  // Todo lo de acá adentro es "mejor esfuerzo": si algo falla, se loguea y se
+  // sigue. Esta función NUNCA puede hacer fallar la acción que la llamó — sería
+  // impedirle publicar por culpa de una limpieza que ni pidió.
+  try {
+    if (!contexto.env.PANEL_VERCEL_TOKEN) return
+
+    const gh = cliente({
+      token: contexto.env.PANEL_GITHUB_TOKEN ?? '',
+      duenio: contexto.env.GITHUB_DUENIO ?? '',
+      repo: contexto.env.GITHUB_REPO ?? '',
+      fetch: contexto.fetch,
+    })
+
+    const cabeza = await gh.ref('heads/main')
+    const commit = await gh.commit(cabeza.sha)
+
+    // Solo los commits del panel, y solo los que no son ya una reversión: sin
+    // el segundo chequeo, un revert cuyo propio deploy falla se revertiría a sí
+    // mismo, y así para siempre.
+    if (!commit.message.includes('Panel: sí')) return
+    if (commit.message.includes(`${TRAILER_REVIERTE}: `)) return
+
+    const vercel = clienteVercel({
+      token: contexto.env.PANEL_VERCEL_TOKEN,
+      proyecto: contexto.env.PANEL_VERCEL_PROYECTO ?? 'maracacao',
+      fetch: contexto.fetch,
+    })
+    const { estado } = await vercel.despliegueDe(cabeza.sha)
+    if (estado !== 'falló') return
+
+    console.error(`revisaLaCabeza: ${cabeza.sha} es un commit del panel cuyo despliegue falló — revirtiendo.`)
+    await revierteYAvisa(cabeza.sha, correoDeQuienPide, contexto)
+  } catch (e) {
+    console.error('revisaLaCabeza: no se pudo revisar la cabeza de main —', e)
+  }
+}
+
 /**
  * `publicar`: documento → commit (E5, E6, E7).
  *
@@ -520,6 +641,12 @@ async function publicarAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
 
   const sesion = sesionVigente(pedido.cookie, env, contexto.ahora())
   if (!sesion) return error(401, PROBLEMA_SESION)
+
+  // [B1] Antes de mirar `base` siquiera: si la cabeza quedó rota por un
+  // despliegue que falló con el panel cerrado, arreglarla ahora — si no,
+  // comparar `base` contra una cabeza que está a punto de cambiar sería
+  // rechazar con un 409 un commit que ya va a dejar de existir.
+  await revisaLaCabeza(contexto, sesion.correo)
 
   const cuerpo = (pedido.cuerpo ?? {}) as { documentos?: unknown; base?: unknown }
   if (typeof cuerpo.base !== 'string' || cuerpo.base === '') {
@@ -806,6 +933,11 @@ async function estadoAccion(pedido: Pedido, contexto: Contexto): Promise<Respues
   const sesion = sesionVigente(pedido.cookie, env, contexto.ahora())
   if (!sesion) return error(401, PROBLEMA_SESION)
 
+  // [B1] Misma red de seguridad que `publicarAccion`: si la cabeza de main
+  // quedó rota por un despliegue que falló con el panel cerrado, arreglarla
+  // antes de seguir.
+  await revisaLaCabeza(contexto, sesion.correo)
+
   if (!env.PANEL_VERCEL_TOKEN) {
     console.error('estado: PANEL_VERCEL_TOKEN no está cargada — no hay forma de saber si el despliegue terminó.')
     return error(503, PROBLEMA_INESPERADO)
@@ -855,6 +987,15 @@ async function estadoAccion(pedido: Pedido, contexto: Contexto): Promise<Respues
     shaPublicado: cuerpo.sha,
     desdeHaceMs: contexto.ahora() - publicadoEn,
   })
+
+  // [B1] La reversión automática la hace la invocación que VE el fracaso. No
+  // hay ningún proceso sondeando: una función de la plataforma muere a los
+  // 60 s y un despliegue tarda más. Si ella cerró el panel antes de que
+  // fallara, esto no corre acá — corre en la próxima acción autenticada que
+  // pase por `revisaLaCabeza()`.
+  if (veredicto.estado === 'falló') {
+    await revierteYAvisa(cuerpo.sha, sesion.correo, contexto)
+  }
 
   return ok({ ok: true, ...veredicto })
 }

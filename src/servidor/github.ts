@@ -98,15 +98,33 @@ export function cliente(c: Credenciales) {
       return { sha: cuerpo.object.sha }
     },
 
-    /** Los datos de un commit: su árbol, su mensaje, cuándo lo hizo su autor. */
-    async commit(sha: string): Promise<{ sha: string; tree: string; message: string; author: { date: string } }> {
+    /**
+     * Los datos de un commit: su árbol, su mensaje, cuándo lo hizo su autor y
+     * de quién viene. Los PADRES los necesita la reversión (`revertir.ts`):
+     * volver atrás un commit es publicar lo que decían sus archivos en el
+     * padre, así que sin el padre no hay a qué volver.
+     */
+    async commit(sha: string): Promise<{
+      sha: string
+      tree: string
+      message: string
+      author: { date: string }
+      padres: string[]
+    }> {
       const cuerpo = await pedir(`/git/commits/${sha}`) as {
         sha: string
         tree: { sha: string }
         message: string
         author: { date: string }
+        parents?: Array<{ sha: string }>
       }
-      return { sha: cuerpo.sha, tree: cuerpo.tree.sha, message: cuerpo.message, author: cuerpo.author }
+      return {
+        sha: cuerpo.sha,
+        tree: cuerpo.tree.sha,
+        message: cuerpo.message,
+        author: cuerpo.author,
+        padres: (cuerpo.parents ?? []).map((p) => p.sha),
+      }
     },
 
     /** El contenido de un blob, decodificado de base64 a texto. Necesita el SHA del blob, no la ruta. */

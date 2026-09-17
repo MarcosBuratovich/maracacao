@@ -42,6 +42,14 @@ export interface Publicacion {
    * para frenar un lote descomunal, nomás que con menos margen.
    */
   bytesDelCuerpo?: number
+  /**
+   * Líneas extra del cuerpo del commit, después de `Panel: sí` y
+   * `Panel-Autor:`. Hoy la usa una sola cosa —`Panel-Revierte: <sha>`, que es
+   * cómo la reversión automática se reconoce a sí misma para no revertir dos
+   * veces el mismo commit— y por eso vive acá y no como un campo con nombre
+   * propio: el próximo trailer no debería pedir tocar esta interfaz otra vez.
+   */
+  trailers?: Record<string, string>
 }
 
 export type Resultado =
@@ -201,7 +209,8 @@ export async function publica(gh: ReturnType<typeof cliente>, p: Publicacion): P
     return { ok: true, sha: null, resumen: 'No había nada que publicar: no cambiaste ningún dato del sitio.' }
   }
 
-  const mensaje = `${asunto}\n\nPanel: sí\nPanel-Autor: ${p.autor}`
+  const extras = Object.entries(p.trailers ?? {}).map(([k, v]) => `${k}: ${v}`)
+  const mensaje = [`${asunto}`, '', 'Panel: sí', `Panel-Autor: ${p.autor}`, ...extras].join('\n')
 
   try {
     const sha = await intento(gh, p.archivos, mensaje)
