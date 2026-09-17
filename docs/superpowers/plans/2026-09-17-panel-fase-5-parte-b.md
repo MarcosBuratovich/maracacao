@@ -1167,7 +1167,64 @@ En `publicarAccion`, reemplazá las dos líneas de sesión por una:
   if (!sesion) return error(401, PROBLEMA_SESION)
 ```
 
-Y en `entrar`, al armar la sesión, sumá `emitida: contexto.ahora()`.
+Y en `entrar`, al armar la sesión, sumá `emitida: contexto.ahora()` **y
+normalizá el id de dispositivo**:
+
+```ts
+/**
+ * [RULING T3-1] El id de dispositivo llega del navegador y hoy es texto
+ * libre: el panel manda lo que quiera. Eso choca de frente con
+ * `PANEL_DISPOSITIVOS_REVOCADOS`, que es una lista separada por comas — un
+ * id con una coma adentro («iPhone 15, de Marcos») se parte al leer la
+ * lista, ninguno de los dos pedazos coincide con el id entero que viaja en
+ * la cookie, y **la revocación falla en silencio justo cuando Marcos cree
+ * haberla hecho bien**. Está medido: con ese id, `publicar` sigue pasando.
+ *
+ * Se arregla en el ORIGEN y no en el lector: acá, donde el id entra al
+ * sistema por primera vez, se lo normaliza a un alfabeto que no puede
+ * romper ninguna lista. Arreglarlo del lado de `listaTiene` —escapando, o
+ * cambiando el separador— dejaría el id crudo dando vueltas por el resto
+ * del sistema para que el próximo lugar que lo use se vuelva a tropezar.
+ *
+ * Que dos aparatos con nombres parecidos colapsen al mismo id es un costo
+ * aceptable hoy: el id de hoy lo elige el navegador y no identifica nada
+ * por sí solo. La fase 6, cuando dibuje la pantalla de «¿desde qué aparato
+ * estás editando?», va a querer separar las dos cosas —un id opaco que
+ * genera el servidor para revocar, y una etiqueta legible para mostrar— y
+ * ese es el momento de hacerlo, con la pantalla delante.
+ */
+const idDeDispositivo = (crudo: unknown): string => {
+  const texto = typeof crudo === 'string' ? crudo : ''
+  const limpio = texto.replace(/[^A-Za-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64)
+  return limpio === '' ? 'sin-nombre' : limpio
+}
+```
+
+Con su test:
+
+```ts
+it('C-2: un id de dispositivo con coma no puede anular su propia revocación', () => {
+  // Medido en la revisión de esta tarea: con el id crudo, poner ESE MISMO id
+  // en la lista de revocados no revocaba nada —la coma partía la lista— y
+  // `publicar` seguía pasando. El id se normaliza al entrar, así que la coma
+  // no llega nunca a la cookie.
+  expect(idDeDispositivo('iPhone 15, de Marcos')).toBe('iPhone-15-de-Marcos')
+  expect(idDeDispositivo('iPhone 15, de Marcos')).not.toContain(',')
+  expect(idDeDispositivo('')).toBe('sin-nombre')
+  expect(idDeDispositivo(undefined)).toBe('sin-nombre')
+  expect(idDeDispositivo(',,,')).toBe('sin-nombre')
+  expect(idDeDispositivo('x'.repeat(200))).toHaveLength(64)
+})
+
+it('C-2: y revocarlo funciona de punta a punta', async () => {
+  const r = await maneja(
+    'publicar',
+    { cuerpo: { base: 'x', documentos: {} }, cookie: cookieDeDispositivo('iPhone-15-de-Marcos') },
+    contextoDePrueba({ env: { PANEL_DISPOSITIVOS_REVOCADOS: 'otro, iPhone-15-de-Marcos' } }),
+  )
+  expect(r.status).toBe(401)
+})
+```
 
 - [ ] **Step 8: Corré y verificá que pasan**
 
@@ -1195,6 +1252,22 @@ mágicos que estén en vuelo.
 3. **Sacar a una persona para siempre:** quitá su dirección de `PANEL_CORREOS`.
    Se relee en cada pedido, así que corta enseguida.
 ```
+
+**[RULING T3-2] Y hay que CORREGIR la sección vieja, no solo agregar esta.**
+`docs/panel-operacion.md` ya trae «Cómo cerrar TODAS las sesiones abiertas»,
+que dice —textual— que «la única forma de invalidar TODAS las cookies ya
+emitidas, de una sola vez, es cambiar `PANEL_SECRETO`». Desde esta tarea eso es
+**falso**, y es falso de la peor manera posible: el título de la sección vieja
+es el que coincide con lo que alguien busca a las dos de la mañana, aparece
+primero en el documento, y contesta con seguridad la opción más cara —rotar el
+secreto desloguea a todo el mundo y, desde la Tarea 12, mata los enlaces
+mágicos en vuelo—. Un runbook con dos respuestas a la misma pregunta, donde la
+más fácil de encontrar es la peor, es peor que un runbook incompleto.
+
+Reescribí esa sección para que diga la verdad de hoy: que ahora hay tres
+botones, cuál es el barato, y que rotar `PANEL_SECRETO` queda como el último
+recurso —el de «se filtró el secreto», no el de «se perdió un celular»—.
+Corregí también la misma afirmación repetida en el bloque «Dos advertencias».
 
 - [ ] **Step 10: Corré la suite entera**
 
