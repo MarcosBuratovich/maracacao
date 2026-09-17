@@ -145,6 +145,20 @@ const contextoBase = (fetch: typeof globalThis.fetch) => ({
   correo: async () => ({ ok: true as const }),
 })
 
+/**
+ * `contextoBase()` sin ningún nombre de proyecto para preguntarle a la
+ * plataforma: `PANEL_VERCEL_PROYECTO` (que `contextoBase()` nunca carga) ni
+ * `GITHUB_REPO` (que sí, y acá se borra a mano). Para T7-2: la guardia que
+ * evita que `estado` le pregunte a la plataforma por un proyecto sin
+ * nombre.
+ */
+const sinNombreDeProyecto = (fetch: typeof globalThis.fetch) => {
+  const ctx = contextoBase(fetch)
+  delete (ctx.env as Record<string, string | undefined>).PANEL_VERCEL_PROYECTO
+  delete (ctx.env as Record<string, string | undefined>).GITHUB_REPO
+  return ctx
+}
+
 const cookieValida = (correo = 'clienta@ejemplo.mx') =>
   firmaSesion({ correo, vence: Date.now() + 86_400_000, dispositivo: 'test', emitida: Date.now() }, SECRETO)
 
@@ -1049,6 +1063,22 @@ describe('accion=estado', () => {
       ctx,
     )
     expect(r.status).toBe(503)
+  })
+
+  it('T7-2: sin ningún nombre de proyecto, 503 y ni un pedido a la red', async () => {
+    // Sin esta guardia el código seguía en silencio y le preguntaba a la
+    // plataforma por un proyecto sin nombre: terminaba en un 502 seguro pero
+    // MUDO, que le dice a Marcos «no pudimos conectarnos» cuando lo que pasa
+    // es que falta una variable. Son dos diagnósticos distintos y él
+    // necesita el segundo. Una guardia sin test es una intención, no un
+    // candado —ya pasó una vez en este panel con `PANEL_SECRETO` ausente— así
+    // que el `toHaveLength(0)` de abajo prueba que la guardia corta ANTES de
+    // gastar el pedido, no solo que el status final da 503.
+    const sha = 'a'.repeat(40)
+    const { f, pedidos } = fetchFalso([])
+    const r = await maneja('estado', { cuerpo: { sha, publicadoEn: 1_000 }, cookie: cookieValida() }, sinNombreDeProyecto(f))
+    expect(r.status).toBe(503)
+    expect(pedidos, 'la guardia corta antes de gastar un pedido').toHaveLength(0)
   })
 
   it('B10: NINGUNA respuesta de `estado` le habla a la clienta con jerga, ni las frases compartidas', async () => {
