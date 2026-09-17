@@ -51,18 +51,14 @@ import {
  * (vista previa textual, sin resaltado), y esta lista es de dónde lo saca.
  */
 const SIN_NODO = new Set<string>([
-  // El nodo de este campo SOLO existe cuando `t.precio` no es `null` —
-  // index.astro lo envuelve en `i === 0 ? <span data-campo="…">…</span> :
-  // …`, adentro de la rama que YA exige precio no nulo (si es `null` se
-  // muestra la nota sola, sin número). El polvo (tab 0, la única de las
-  // tres con precio editable — las otras dos son `derivado`) hoy tiene
-  // `null`, así que esa rama nunca corre y el nodo no nace. No hace
-  // falta tocar la plantilla el día que la clienta le ponga un precio: el
-  // nodo aparece solo. Lo que sí hay que tocar es ESTA línea — y lo que
-  // avisa que toca borrarla es la prueba de más abajo («la lista de
-  // excepciones no está podrida»), que ese día va a encontrarle nodo y
-  // va a poner esta excepción en `yaHechas`.
-  'sitio:negocios.tabs.0.precio',
+  // Acá vivía `sitio:negocios.tabs.0.precio`, y la excepción estaba mal
+  // planteada: decía «hoy este campo no tiene nodo» y agregaba «el día que
+  // la clienta le ponga un precio, hay que venir a borrar esta línea». O
+  // sea que la clienta ponía un precio y su propio deploy se caía. Ese
+  // campo no necesita una excepción con nombre: no tiene nodo porque HOY
+  // vale `null`, y eso ya lo sabe el test (a) mirando el contenido
+  // (`tieneValorHoy`). Esta lista es solo para los campos que SÍ tienen
+  // valor y aun así no se renderizan en ninguna página.
 
   // Es un campo editable, pero ninguna plantilla lo renderiza: el precio
   // que se ve del bloque de gotas es el derivado `gotas.precioDesde` (el
@@ -98,6 +94,11 @@ const TRANSFORMADOS = new Map<string, string>([
   ['sitio:footer.lema', 'la marquesina le agrega el separador " ·" a cada copia'],
   ['sitio:footer.legalesNota', 'va en minúsculas y entre paréntesis'],
   ['sitio:minis.precio', 'precioMXN() le pone el signo $'],
+  // Hoy vale `null` y no tiene nodo, así que no hay nada que comparar;
+  // la entrada está puesta de antemano para el día que la clienta le
+  // ponga un precio y el nodo aparezca solo. Por eso el test de
+  // podredumbre de más abajo no exige que cada entrada tenga nodo hoy.
+  ['sitio:negocios.tabs.0.precio', 'precioMXN() le pone el signo $'],
   ['sabores:sabores[].precio', 'precioMXN() le pone el signo $'],
   ['sabores:polvo[].nombre', 'se muestra en minúsculas'],
   ['sitio:anaquel.envolturaAltPrefijo', 'el alt le agrega el nombre del sabor elegido'],
@@ -127,6 +128,37 @@ function rutasEditables(id: IdDocumento): string[] {
     salida.push(sinVariante(ruta))
   })
   return salida
+}
+
+/**
+ * Si el contenido de HOY tiene algún valor mostrable en ese PATRÓN de ruta.
+ *
+ * Un campo opcional que hoy está en `null` —o una clave opcional que hoy no
+ * está en ningún elemento de la lista— no puede tener nodo: la plantilla lo
+ * saltea, y con razón. Exigirle nodo igual convierte una edición legítima
+ * de la clienta («sacale el chip de polvo a esa receta», «todavía no hay
+ * precio de lista para el polvo») en un deploy en rojo. Esto lo mide contra
+ * el dato en vez de pedir una excepción escrita a mano por campo.
+ *
+ * Lo que NO afloja: un campo que sí tiene valor y no tiene nodo sigue
+ * siendo huérfano, que es la regresión que (a) existe para atajar.
+ */
+function tieneValorHoy(id: IdDocumento, patron: string): boolean {
+  const camina = (dato: unknown, partes: string[]): boolean => {
+    if (dato == null) return false
+    if (partes.length === 0) return typeof dato === 'string' || typeof dato === 'number'
+    const [cabeza, ...resto] = partes
+    const corchetes = (cabeza.match(/\[\]/g) ?? []).length
+    const clave = cabeza.replace(/(\[\])+$/, '')
+    let hijo: unknown = (dato as Record<string, unknown>)[clave]
+    for (let nivel = 0; nivel < corchetes; nivel += 1) {
+      if (!Array.isArray(hijo)) return false
+      if (nivel === corchetes - 1) return hijo.some((elemento) => camina(elemento, resto))
+      hijo = hijo.flat()
+    }
+    return camina(hijo, resto)
+  }
+  return camina(DOCUMENTOS[id].datos, patron.split('.'))
 }
 
 /** El valor que hay en esa ruta con índices concretos, o undefined. */
@@ -203,6 +235,8 @@ describe('la biyección campo ↔ data-campo (spec §3.1)', () => {
         )
         if (tieneNodo) continue
         if (SIN_NODO.has(clave)) continue
+        // Sin valor hoy no hay nada que renderizar: ver `tieneValorHoy`.
+        if (!tieneValorHoy(id, ruta)) continue
         huerfanas.push(clave)
       }
     }
@@ -273,6 +307,13 @@ describe('la biyección campo ↔ data-campo (spec §3.1)', () => {
       const corte = clave.indexOf(':')
       const documento = clave.slice(0, corte)
       const patron = clave.slice(corte + 1)
+      // Una entrada DORMIDA no está podrida: es el caso de un campo
+      // opcional que hoy vale `null`, así que la plantilla no lo renderiza
+      // y no hay ningún nodo contra el cual medir la transformación. La
+      // entrada se deja escrita para el día que la clienta le ponga valor
+      // —ese día el nodo aparece solo y la transformación ya está
+      // declarada—, en vez de hacer que ESE día el deploy se caiga.
+      if (!tieneValorHoy(documento as IdDocumento, patron)) continue
       const sigueSiendoDescalce = referencias.some((r) => {
         if (r.documento !== documento) return false
         if (!coincideConPatron(r.ruta, patron)) return false
@@ -304,7 +345,7 @@ describe('la biyección campo ↔ data-campo (spec §3.1)', () => {
     expect({ inventadas, yaHechas }).toEqual({ inventadas: [], yaHechas: [] })
   })
 
-  it('las excepciones son exactamente estas cinco y ninguna más', () => {
+  it('las excepciones son exactamente estas cuatro y ninguna más', () => {
     // Si alguien agrega un campo editable y no lo marca, la salida más
     // barata es meterlo acá. Este test hace que esa salida cueste: hay
     // que editar la lista Y editar este número, y el diff lo muestra.
@@ -313,7 +354,6 @@ describe('la biyección campo ↔ data-campo (spec §3.1)', () => {
       'sitio:contacto.direccionPostal.codigoPostal',
       'sitio:contacto.direccionPostal.estado',
       'sitio:contacto.direccionPostal.localidad',
-      'sitio:negocios.tabs.0.precio',
     ])
   })
 })

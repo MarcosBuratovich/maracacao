@@ -1,66 +1,92 @@
 /*
- * EL CERTIFICADO. Es permanente: no muere con la migración.
+ * LAS ASERCIONES DE FORMA de las tres fachadas.
  *
- * Compara lo que las tres fachadas EXPORTAN contra la foto del árbol viejo
- * (`test/fixtures/contenido-2026-09-10.json`, capturada antes de tocar
- * nada). Si algún día alguien edita el contenido a propósito, este test se
- * pone rojo y ESO ES CORRECTO: el fixture se actualiza a mano, en el mismo
- * commit, y el diff muestra exactamente qué cambió. Lo que no puede pasar
- * es que cambie sin que nadie se entere.
+ * Este archivo tuvo hasta el 2026-09-17 un CERTIFICADO: tres `toEqual`
+ * que comparaban lo que las fachadas exportan contra la foto del árbol
+ * viejo (`test/fixtures/contenido-2026-09-10.json`). Existía para que la
+ * migración a `src/contenido/datos/**` no moviera una coma sin que nadie
+ * se enterara, y cumplió: las catorce tareas de la fase 2 pasaron por él.
+ *
+ * SE BORRÓ porque el panel lo convirtió en una trampa. `pnpm verifica`
+ * —o sea estos tests— es el comando de deploy de Vercel, así que desde el
+ * día que la clienta publica su primera edición, el certificado deja el
+ * build en rojo y la publicación no llega al sitio. La primera prueba de
+ * humo en producción terminó exactamente así: el panel publicó bien
+ * (commit e51ca6b) y el deploy murió acá. La auditoría de la fase 0 ya
+ * había escrito el destino de esta clase de assert: «BORRAR — el valor
+ * pasa a ser editable; la verdad histórica queda en el fixture de la
+ * migración, que es el acta, no la ley».
+ *
+ * El fixture sigue en el repo —es el acta— y lo siguen usando
+ * `contenido.test.ts` y `contenido-mutaciones.test.ts` como dato de
+ * entrada. Lo que reemplaza al certificado para su trabajo real («que el
+ * contenido no cambie sin que nadie se entere») es el diff que el panel
+ * arma en cada publicación (`src/contenido/diff.ts` → `frase()`), que se
+ * lo muestra a la clienta ANTES de publicar y queda escrito en el
+ * mensaje del commit.
+ *
+ * Lo que queda acá son las aserciones de FORMA: las expresiones de
+ * `index.astro` que dependen de la forma del dato y no de su valor.
+ * Ninguna se rompe con una edición de contenido legítima.
  */
 import { describe, it, expect } from 'vitest'
-import fixture from './fixtures/contenido-2026-09-10.json'
 import { marca } from '@/copy/sitio-marca'
-import { sabores, gotas, polvo, urlCatalogoBarras } from '@/copy/sabores'
-import { fichasBase } from '@/fichas/base'
+import { sabores } from '@/copy/sabores'
 import { sabor as colorSabor, tintaSabor } from '@/tokens/color'
 import { jsonParaHtml } from '@/lib/json-en-html'
 
-/**
- * La forma pura, sin readonly, sin undefined y sin prototipos:
- * exactamente lo que un JSON representa. Es la misma transformación que
- * usó el script al capturar el fixture, así que compara lo que importa.
- */
-const estructura = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
-
-describe('el certificado de la migración', () => {
-  it('marca exporta el mismo objeto que antes de la migración', () => {
-    expect(estructura(marca)).toEqual(fixture.marca)
-  })
-
-  it('los productos exportan el mismo objeto que antes', () => {
-    expect(estructura(sabores)).toEqual(fixture.sabores)
-    expect(estructura(gotas)).toEqual(fixture.gotas)
-    expect(estructura(polvo)).toEqual(fixture.polvo)
-    expect(urlCatalogoBarras).toBe(fixture.urlCatalogoBarras)
-  })
-
-  it('las fichas exportan el mismo objeto que antes', () => {
-    expect(estructura(fichasBase)).toEqual(fixture.fichas)
-  })
-})
-
-describe('las nueve aserciones de forma', () => {
+describe('las aserciones de forma', () => {
   // Las expresiones de index.astro que dependen de la FORMA del dato y no
   // de su valor. Cada una nombra la línea que la necesita.
+  //
+  // Eran nueve y quedan SIETE. Los números NO se corrieron: los planes de
+  // las fases 1 y 2 las citan por número.
+  //
+  // Cayó la 4 («el nombre del puesto se une con un espacio y da el nombre
+  // real»), que comparaba `puestoTitulo.join(' ')` contra «Mercado de
+  // Coyoacán»: eso es un VALOR que la clienta edita, no una forma — el día
+  // que el puesto se mude, ese assert le bloquea la publicación. Lo que sí
+  // importa —que el JSON-LD de la dirección salga de ese mismo join y no de
+  // una copia a mano— ya lo mide `test/seo.test.ts` contra el copy, no
+  // contra un literal.
+  //
+  // Y cayó la 8 («los nueve espacios duros siguen siendo espacios duros»),
+  // que exigía un U+00A0 en cada uno de ocho campos y NUEVE en total. El
+  // espacio duro es de verdad importante —sin él, en el celular la «g» o el
+  // «kg» quedan solas en el renglón siguiente—, pero la regla real es «si
+  // hay una cifra seguida de una unidad, el espacio del medio es duro», y
+  // eso ya lo exige el esquema (`medida`, MEDIDA_MAL_ESCRITA) en el panel,
+  // antes de publicar. Lo que este assert agregaba encima era «y tiene que
+  // haber una medida»: medido, el esquema acepta «Polvo de cacao» y este
+  // test lo rechazaba. Eso es copy legítimo, y el precio de rechazarlo era
+  // dejarle el deploy en rojo a la clienta.
 
-  it('1 · el chip de polvo NO existe como clave en las tres recetas sin chip', () => {
+  it('1 · la receta que trae chip de polvo lo trae con texto, nunca vacío', () => {
     // index.astro:448 pregunta `'chipPolvo' in r`, que es existencia de
     // CLAVE, no contenido. Un '' guardado renderiza una cajita amarilla
     // vacía de 6×10 px que estira las cuatro tarjetas.
-    const conChip = marca.recetas.lista.filter((r) => 'chipPolvo' in r)
-    expect(conChip).toHaveLength(1)
-    expect(conChip[0].chipPolvo).toBeTruthy()
+    //
+    // CUÁNTAS recetas lo traen no se mide: hoy es una, mañana pueden ser
+    // tres, y eso es una decisión de la clienta, no una regresión. Antes
+    // esto exigía `toHaveLength(1)` y —medido— le ponía el deploy en rojo
+    // tanto si le agregaba el chip a otra receta como si se lo sacaba a la
+    // única que lo tiene.
+    for (const r of marca.recetas.lista) {
+      if (!('chipPolvo' in r)) continue
+      expect(r.chipPolvo, `receta «${r.titulo}»`).toBeTruthy()
+    }
   })
 
-  it('2 · el precio es null exactamente en el tab del polvo', () => {
+  it('2 · el precio de cada tab de negocios es null o un entero, nunca undefined', () => {
     // index.astro:538 se estrecha con `t.precio === null`. Un undefined
     // en vez de null renderiza «$NaN».
-    const nulos = marca.negocios.tabs.filter((t) => t.precio === null)
-    expect(nulos).toHaveLength(1)
-    expect(nulos[0].id).toBe('polvo')
+    //
+    // CUÁL de los tres tabs tiene el precio en null no se mide: el del
+    // polvo lo tiene hoy porque todavía no hay precio de lista, y el día
+    // que la clienta se lo ponga, el sitio tiene que publicarlo, no
+    // rechazarlo. Antes esto exigía «exactamente uno, y es el polvo».
     for (const t of marca.negocios.tabs) {
-      expect(t.precio === null || Number.isInteger(t.precio)).toBe(true)
+      expect(t.precio === null || Number.isInteger(t.precio), `tab «${t.id}»`).toBe(true)
     }
   })
 
@@ -68,11 +94,6 @@ describe('las nueve aserciones de forma', () => {
     // index.astro:146 hace `.replace(/,$/, '')` y pinta una coma roja en
     // su lugar. Con dos comas, el h1 dice «…DE VERDAD,,».
     expect(marca.hero.titular[1]).toMatch(/^[^,]+,$/)
-  })
-
-  it('4 · el nombre del puesto se une con un espacio y da el nombre real', () => {
-    // index.astro hace puestoTitulo.join(' ').
-    expect(marca.contacto.puestoTitulo.join(' ')).toBe('Mercado de Coyoacán')
   })
 
   it('5 · la clave de los 15 sabores indexa los tokens de color', () => {
@@ -116,28 +137,6 @@ describe('las nueve aserciones de forma', () => {
     // TypeScript no dice nada y la portada del anaquel se pinta con
     // `undefined`: banda sin color y nombre vacío.
     expect(sabores.find((s) => s.clave === marca.anaquel.saborInicial)).toBeDefined()
-  })
-
-  it('8 · los nueve espacios duros siguen siendo espacios duros', () => {
-    // Sin ellos, en el celular la «g» o el «kg» quedan solas en el renglón
-    // siguiente. Es el modo de falla que la clienta no puede ver desde su
-    // escritorio.
-    const DURO = '\u00a0' // escrito como escape, SIEMPRE
-    const conDuro = [
-      marca.anaquel.pesoInsignia,
-      marca.gotas.titulo,
-      marca.polvoCard.titulo,
-      marca.negocios.tabs[0].titulo,
-      marca.negocios.tabs[1].titulo,
-      marca.negocios.tabs[2].titulo,
-      marca.footer.productos[0].texto,
-      marca.footer.productos[1].texto,
-    ]
-    for (const texto of conDuro) expect(texto, texto).toContain(DURO)
-    // El del panel de polvo lleva DOS: «250 g y 1 kg».
-    expect(marca.negocios.tabs[0].titulo.split(DURO)).toHaveLength(3)
-    const total = conDuro.join('').split(DURO).length - 1
-    expect(total, 'son nueve, medidos').toBe(9)
   })
 
   it('9 · el contador del anaquel sale de cuántas barras hay', () => {
