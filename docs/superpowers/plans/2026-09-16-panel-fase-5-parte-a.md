@@ -1398,3 +1398,67 @@ correo y la vigilancia del vencimiento del PAT.
   inyectado.
 - **El panel todavía no existe**: al terminar esta parte se publica con `curl`.
   La pantalla es la fase 6.
+
+---
+
+## Cierre de la Parte A (2026-09-17)
+
+Las siete tareas se ejecutaron con subagent-driven-development. Cada una pasó
+su revisión; la revisión final de la rama (opus) dio «ready to merge with
+fixes» con **1 Critical y 5 Important**, todas arregladas antes de mergear.
+Estado al cerrar: **999 tests verdes en 47 archivos**, `astro check` 0 errores
+/ 0 warnings / 3 hints, y el canal desplegado en producción.
+
+**Lo que encontraron las revisiones y se arregló:**
+
+- **Un bypass de autenticación (Critical).** Con `PANEL_SECRETO` ausente, las
+  sesiones se firmaban con clave vacía: el reviewer forjó una cookie y pasó la
+  puerta. Y era el estado real de Vercel en ese momento — token de escritura
+  cargado, secreto no. Ahora la ausencia del secreto es falla dura (503).
+- **El deshacer fallaba en silencio.** La función comparaba contra una copia
+  del contenido que esbuild congelaba en el paquete, así que republicar el
+  valor original daba «no había nada que publicar» mientras el sitio se
+  quedaba con el cambio. Lee el contenido vivo de GitHub y decide por bytes.
+- **`serializa()` no terminaba en salto de línea** y los archivos del repo sí:
+  un byte de diferencia desactivaba esa misma guarda en la primera publicación
+  de cada documento. Hay un test permanente que compara contra los archivos
+  reales, que es además la prueba de que el esquema sigue describiendo el
+  contenido de hoy byte por byte.
+- **El login filtraba por tiempo** si un correo tenía acceso: 107 ms contra
+  0.03 ms, medido. Ahora corre el mismo trabajo en los dos casos.
+- **Sacar a alguien de `PANEL_CORREOS` no revocaba nada** hasta rotar la llave
+  de firma. Se relee en cada publicación.
+- **`salud` dejaba quemar la cuota del PAT** desde afuera: la sonda a GitHub
+  quedó detrás del mismo freno por IP.
+- Y los parámetros de scrypt decían ser «el mínimo de OWASP» sin serlo: hacían
+  un quinto de ese trabajo. Ahora son la fila que citan, con los números
+  medidos en vez de citados.
+
+**Lo que la Parte B tiene que resolver, en orden de importancia:**
+
+1. **La pérdida silenciosa de una edición concurrente.** El panel escribe
+   documentos ENTEROS: si el contenido vivo cambió entre que la clienta abrió
+   el editor y apretó publicar, su documento pisa el cambio de Marcos con un
+   fast-forward limpio — sin conflicto, sin log, y con el resumen atribuyéndole
+   a ella lo que él escribió. El spec §4.2 lo preveía («comparando qué cambió
+   en el medio») y este plan lo perdió. La solución es un sha base en el cuerpo
+   de la publicación y el 409 que ya existe. **Hoy hay una sola persona con
+   acceso; deja de ser aceptable el día que entre la segunda.**
+2. **Revocar una sesión sin rotar la llave.** Releer `PANEL_CORREOS` ya ayuda,
+   pero sacar a alguien hoy no cierra su sesión hasta que caduque.
+3. **Los avisos de conteo** (`conteosDe`) salieron del router porque exigen
+   leer documentos que el lote no escribe. Cuando haya pantalla que los
+   muestre, hay que traerlos de vuelta.
+4. **Antes de las imágenes:** `archivoEnRef` no sirve para archivos de más de
+   1 MB (la API de contenidos contesta `encoding: "none"`), y `TOPE_CUERPO` se
+   mide contra los archivos serializados y no contra el cuerpo del pedido.
+5. **Corregir el spec**: la aritmética del tope de cuerpo en §4.2 está al revés
+   respecto de lo que el código implementa bien, y §4.4 dice que la capa 2 corre
+   «antes de tocar GitHub», que hoy vale para la mitad del esquema y no para la
+   de tamaño.
+
+**Lo que la fase 6 tiene que saber:** la forma del cuerpo de `entrar`
+(`recuerdame`/`dispositivo`) es invención de esta fase y está esperando que la
+pantalla la confirme; `salud` contesta un 503 sin frase para la clienta; y el
+422 de un documento desconocido devuelve texto del pedido, que hay que escapar
+antes de pintarlo.
