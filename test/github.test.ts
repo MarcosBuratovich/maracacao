@@ -141,6 +141,28 @@ describe('el cliente de GitHub', () => {
     expect(await gh.comparaRefs('a', 'a')).toEqual({ archivos: [] })
   })
 
+  it('listaCommits trae los últimos commits de un ref', async () => {
+    const { f, pedidos } = fetchFalso([
+      { cuerpo: [{ sha: 'c1', commit: { message: 'cambia X\n\nPanel: sí\nPanel-Autor: e@x.mx', author: { date: '2026-09-17T12:00:00Z' } } }] },
+    ])
+    const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+    expect(await gh.listaCommits('heads/main', 20)).toEqual([
+      { sha: 'c1', mensaje: 'cambia X\n\nPanel: sí\nPanel-Autor: e@x.mx', fecha: '2026-09-17T12:00:00Z' },
+    ])
+    expect(pedidos[0].url).toContain('/commits?sha=main&per_page=20')
+  })
+
+  it('listaCommits pela «heads/» pero deja intacto un nombre de rama que ya viene pelado', async () => {
+    // El resto del cliente siempre recibe `heads/main` (ref(), mueveRef());
+    // este endpoint es la única excepción, y el pelado vive ADENTRO de
+    // listaCommits — no en cada llamador. Este test cubre el otro caso: un
+    // `ref` que ya llega pelado no debe perder ningún carácter de más.
+    const { f, pedidos } = fetchFalso([{ cuerpo: [] }])
+    const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+    expect(await gh.listaCommits('main', 5)).toEqual([])
+    expect(pedidos[0].url).toContain('/commits?sha=main&per_page=5')
+  })
+
   it('commit devuelve su árbol, su mensaje y sus padres', async () => {
     const { f } = fetchFalso([
       {

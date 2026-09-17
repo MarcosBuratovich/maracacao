@@ -235,5 +235,32 @@ export function cliente(c: Credenciales) {
         body: { sha, force: forzar },
       })
     },
+
+    /**
+     * Los últimos `cuantos` commits de `ref`, del más nuevo al más viejo —tal
+     * cual los da GitHub, sin reordenar—. Es la fuente del historial
+     * (`historial.ts`, Tarea 10): el asunto de cada commit ES el resumen que
+     * la clienta vio antes de publicar, así que esto es lo único que hace
+     * falta leer para reconstruirlo.
+     *
+     * [Inconsistencia de la API] Este endpoint —la API de "Commits" (REST),
+     * no la Git Data API que usa el resto de este cliente— quiere el nombre
+     * de la rama PELADO: `?sha=main`, nunca `?sha=heads/main`. Con
+     * `heads/main` contesta 404, no un error obvio, y un 404 tratado como
+     * "no hay commits" daría una lista vacía indistinguible de "no hay
+     * historial" — un bug silencioso. Por eso quien llama sigue pasando
+     * `ref` con la MISMA forma que el resto de este cliente (`heads/main`,
+     * como `ref()` y `mueveRef()`) y el pelado pasa ACÁ ADENTRO: la
+     * excepción de esta API queda en un solo lugar, no en la cabeza de cada
+     * llamador.
+     */
+    async listaCommits(ref: string, cuantos: number): Promise<Array<{ sha: string; mensaje: string; fecha: string }>> {
+      const rama = ref.startsWith('heads/') ? ref.slice('heads/'.length) : ref
+      const cuerpo = await pedir(`/commits?sha=${encodeURIComponent(rama)}&per_page=${cuantos}`) as Array<{
+        sha: string
+        commit: { message: string; author: { date: string } }
+      }>
+      return cuerpo.map((c) => ({ sha: c.sha, mensaje: c.commit.message, fecha: c.commit.author.date }))
+    },
   }
 }

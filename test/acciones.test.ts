@@ -1099,7 +1099,7 @@ describe('C-1: PANEL_SECRETO ausente o corto falla cerrado, nunca abierto', () =
 
 describe('las acciones que todavía no existen', () => {
   it('devuelven 404, no 500', async () => {
-    for (const accion of ['borrador', 'historial', 'revertir']) {
+    for (const accion of ['borrador', 'revertir']) {
       const r = await maneja(accion, { cuerpo: {}, cookie: cookieValida() }, contextoBase(fetchQueNoSeUsa()))
       expect(r.status).toBe(404)
     }
@@ -2001,5 +2001,68 @@ describe('accion=deshacer', () => {
     for (const frase of salidas) {
       expect(jergaEn(frase), frase).toBeNull()
     }
+  })
+})
+
+// Tarea 10 (spec §4.6, §4.5): qué se publicó, cuándo y quién — leído de
+// `main` con `gh.listaCommits()` y traducido con `lee()` (`historial.ts`).
+// La traducción en sí —qué cuenta como «del panel», cómo se separan asunto
+// y trailers, cómo se ve una reversión— la cubre `test/historial.test.ts`;
+// acá solo se prueba el cableado del router: sesión obligatoria,
+// `revisaLaCabeza()` como red de seguridad, y que lo que devuelve `lee()`
+// llegue intacto (filtrado y en el orden en que vino).
+describe('accion=historial', () => {
+  /**
+   * Un commit, en la forma que da la API de Commits que usa
+   * `gh.listaCommits()` —anidado bajo `commit`, no plano como da `gh.commit()`
+   * (la Git Data API que usa `revisaLaCabeza()`)— así que este ayudante es
+   * DISTINTO de `commitDelPanel`/`commitDeMarcos` de `describe('accion=deshacer')`,
+   * que arman la forma plana.
+   */
+  const commitDelPanelEnLista = (sha: string, fecha = '2026-09-17T12:00:00Z') => ({
+    sha,
+    commit: { message: `cambia sabores (${sha})\n\nPanel: sí\nPanel-Autor: clienta@ejemplo.mx`, author: { date: fecha } },
+  })
+
+  /** Un commit a mano de Marcos, en la misma forma anidada — no es del panel. */
+  const commitDeMarcosEnLista = (sha: string) => ({
+    sha,
+    commit: { message: 'fix: un ajuste a mano', author: { date: '2026-09-17T11:00:00Z' } },
+  })
+
+  it('sin sesión, 401 — y no gasta ni un pedido', async () => {
+    const { f, pedidos } = fetchFalso([])
+    const r = await maneja('historial', { cuerpo: {}, cookie: '' }, contextoBase(f))
+    expect(r.status).toBe(401)
+    expect(pedidos).toHaveLength(0)
+  })
+
+  it('corre revisaLaCabeza() y devuelve lo que publicó el panel, filtrado y en el orden en que vino', async () => {
+    const { f, pedidos } = fetchFalso([
+      ...respuestasDeNingunaReversionPendiente(), // revisaLaCabeza(): costo fijo, antes que nada
+      {
+        cuerpo: [
+          commitDelPanelEnLista('c3'), // más nuevo
+          commitDeMarcosEnLista('c2'), // de Marcos: no es su historial
+          commitDelPanelEnLista('c1'), // más viejo
+        ],
+      },
+    ])
+    const r = await maneja('historial', { cuerpo: {}, cookie: cookieValida() }, contextoBase(f))
+
+    expect(r.status).toBe(200)
+    const { publicaciones } = r.cuerpo as { ok: true; publicaciones: Array<{ sha: string }> }
+    expect(publicaciones.map((p) => p.sha)).toEqual(['c3', 'c1']) // filtrado (sin c2) y en el mismo orden en que vino
+
+    // La lista se pide con el nombre de rama pelado (ver github.ts): el
+    // router sigue pasando `heads/main`, y el pelado pasa adentro del
+    // cliente — acá alcanza con confirmar que se pidió la rama correcta.
+    expect(pedidos.at(-1)!.url).toContain('/commits?sha=main&per_page=20')
+  })
+
+  it('si GitHub no contesta al pedir la lista, un 502 franco — nunca una lista vacía que se confunda con «no hay historial»', async () => {
+    const { f } = fetchFalso([...respuestasDeNingunaReversionPendiente(), { status: 500, cuerpo: {} }])
+    const r = await maneja('historial', { cuerpo: {}, cookie: cookieValida() }, contextoBase(f))
+    expect(r.status).toBe(502)
   })
 })

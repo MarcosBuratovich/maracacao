@@ -26,6 +26,7 @@ import {
 import { cliente } from './github'
 import { publica, PROBLEMA_NO_SE_PUDO_PUBLICAR, type Archivo } from './publicar'
 import { revierte, TRAILER_REVIERTE, TRAILER_PANEL, tieneTrailer, valorDeTrailer, autorDelCommit } from './revertir'
+import { lee } from './historial'
 import type { Cambio } from '../contenido/diff'
 import { resume } from '../contenido/diff'
 import { validarContra, type Problema } from '../contenido/validacion'
@@ -610,11 +611,11 @@ async function revierteYAvisaAMarcos(sha: string, autorReal: string, contexto: C
  * viene a matar.
  *
  * Dónde se llama: como PRIMERA cosa (después de las validaciones baratas y
- * sincrónicas de cada acción) de `estadoAccion` y `publicarAccion` — en
- * `publicarAccion`, antes del chequeo de `base` (Tarea 2): si la cabeza está
- * rota y se revierte, la cabeza cambia, y comparar contra la vieja daría un
- * 409 por un commit que acaba de dejar de existir. `historialAccion` (Tarea
- * 10) todavía no existe; cuando se escriba, corre esto primero también.
+ * sincrónicas de cada acción) de `estadoAccion`, `publicarAccion`,
+ * `deshacerAccion` e `historialAccion` — en `publicarAccion`, antes del
+ * chequeo de `base` (Tarea 2): si la cabeza está rota y se revierte, la
+ * cabeza cambia, y comparar contra la vieja daría un 409 por un commit que
+ * acaba de dejar de existir.
  *
  * [B] Devuelve el sha que atendió —el que era la cabeza rota, no el de la
  * reversión nueva— o `null` si no había nada que hacer. `estadoAccion` lo usa
@@ -1333,6 +1334,65 @@ async function deshacerAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
 
 /*
  * ---------------------------------------------------------------------
+ * historial (Tarea 10, spec §4.6 y §4.5)
+ * ---------------------------------------------------------------------
+ */
+
+// Alcanza y sobra para "qué pasó últimamente": el spec (§4.6) pide poder
+// entender su última tanda de cambios, no un archivo completo del sitio —
+// y una lista más larga es una pantalla más larga en un celular.
+const CANTIDAD_HISTORIAL = 20
+
+/**
+ * `historial`: qué se publicó, cuándo y quién (spec §4.6). Es también la
+ * respuesta a "¿qué pasó con lo que acabo de publicar?" cuando ella reabre
+ * el panel (spec §4.5) — las dos preguntas salen del mismo lugar: la lista
+ * de commits del panel en `main`, leída una sola vez.
+ *
+ * Sin ningún cuerpo que validar —esta acción no recibe más que la sesión—,
+ * así que no hay ninguna validación barata y sincrónica propia entre la
+ * sesión y `revisaLaCabeza()` (Tarea 8): corre apenas la sesión es válida,
+ * como PRIMERA cosa, igual que en `estadoAccion`/`deshacerAccion`. Si la
+ * cabeza de `main` es un commit del panel cuyo despliegue falló, se arregla
+ * ANTES de armar la lista — si no, ella vería su propia publicación fallida
+ * en el historial como si hubiera salido bien.
+ *
+ * Toda la traducción —qué cuenta como "del panel", cómo se separan asunto y
+ * trailers, cómo se ve una reversión— vive en `lee()` (`historial.ts`); acá
+ * solo se pide la lista y se delega.
+ */
+async function historialAccion(pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
+  const env = contexto.env
+  if (!secretoUtilizable(env)) {
+    console.error('historial: PANEL_SECRETO falta o mide menos de 32 caracteres.')
+    return error(503, PROBLEMA_INESPERADO)
+  }
+
+  const sesion = sesionVigente(pedido.cookie, env, contexto.ahora())
+  if (!sesion) return error(401, PROBLEMA_SESION)
+
+  await revisaLaCabeza(contexto)
+
+  const gh = cliente({
+    token: env.PANEL_GITHUB_TOKEN ?? '',
+    duenio: env.GITHUB_DUENIO ?? '',
+    repo: env.GITHUB_REPO ?? '',
+    fetch: contexto.fetch,
+  })
+
+  let commits: Array<{ sha: string; mensaje: string; fecha: string }>
+  try {
+    commits = await gh.listaCommits('heads/main', CANTIDAD_HISTORIAL)
+  } catch (e) {
+    console.error('historial: no se pudo leer la lista de commits de GitHub —', e)
+    return error(502, PROBLEMA_NO_SE_PUDO_LEER)
+  }
+
+  return ok({ ok: true, publicaciones: lee(commits, contexto.ahora()) })
+}
+
+/*
+ * ---------------------------------------------------------------------
  * El router
  * ---------------------------------------------------------------------
  */
@@ -1360,6 +1420,8 @@ export async function maneja(accion: string, pedido: Pedido, contexto: Contexto)
         return await estadoAccion(pedido, contexto)
       case 'deshacer':
         return await deshacerAccion(pedido, contexto)
+      case 'historial':
+        return await historialAccion(pedido, contexto)
       default:
         return error(404, PROBLEMA_ACCION_INEXISTENTE)
     }

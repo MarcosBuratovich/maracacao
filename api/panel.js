@@ -232,6 +232,29 @@ function cliente(c) {
         method: "PATCH",
         body: { sha, force: forzar }
       });
+    },
+    /**
+     * Los últimos `cuantos` commits de `ref`, del más nuevo al más viejo —tal
+     * cual los da GitHub, sin reordenar—. Es la fuente del historial
+     * (`historial.ts`, Tarea 10): el asunto de cada commit ES el resumen que
+     * la clienta vio antes de publicar, así que esto es lo único que hace
+     * falta leer para reconstruirlo.
+     *
+     * [Inconsistencia de la API] Este endpoint —la API de "Commits" (REST),
+     * no la Git Data API que usa el resto de este cliente— quiere el nombre
+     * de la rama PELADO: `?sha=main`, nunca `?sha=heads/main`. Con
+     * `heads/main` contesta 404, no un error obvio, y un 404 tratado como
+     * "no hay commits" daría una lista vacía indistinguible de "no hay
+     * historial" — un bug silencioso. Por eso quien llama sigue pasando
+     * `ref` con la MISMA forma que el resto de este cliente (`heads/main`,
+     * como `ref()` y `mueveRef()`) y el pelado pasa ACÁ ADENTRO: la
+     * excepción de esta API queda en un solo lugar, no en la cabeza de cada
+     * llamador.
+     */
+    async listaCommits(ref, cuantos) {
+      const rama = ref.startsWith("heads/") ? ref.slice("heads/".length) : ref;
+      const cuerpo = await pedir(`/commits?sha=${encodeURIComponent(rama)}&per_page=${cuantos}`);
+      return cuerpo.map((c2) => ({ sha: c2.sha, mensaje: c2.commit.message, fecha: c2.commit.author.date }));
     }
   };
 }
@@ -17970,6 +17993,18 @@ async function revierte(gh, p) {
 }
 var autorDelCommit = (mensaje) => valorDeTrailer(mensaje, TRAILER_AUTOR);
 
+// src/servidor/historial.ts
+function lee(commits, ahora) {
+  void ahora;
+  return commits.filter((c) => tieneTrailer(c.mensaje, TRAILER_PANEL)).map((c) => ({
+    sha: c.sha,
+    resumen: c.mensaje.split("\n")[0],
+    autor: autorDelCommit(c.mensaje) ?? null,
+    cuando: c.fecha,
+    revierteA: valorDeTrailer(c.mensaje, TRAILER_REVIERTE) ?? null
+  }));
+}
+
 // src/servidor/vercel.ts
 var TERMINADOS = {
   READY: "listo",
@@ -18511,6 +18546,31 @@ async function deshacerAccion(pedido, contexto) {
       return error51(502, PROBLEMA_NO_SE_PUDO_PUBLICAR);
   }
 }
+var CANTIDAD_HISTORIAL = 20;
+async function historialAccion(pedido, contexto) {
+  const env = contexto.env;
+  if (!secretoUtilizable(env)) {
+    console.error("historial: PANEL_SECRETO falta o mide menos de 32 caracteres.");
+    return error51(503, PROBLEMA_INESPERADO);
+  }
+  const sesion = sesionVigente(pedido.cookie, env, contexto.ahora());
+  if (!sesion) return error51(401, PROBLEMA_SESION);
+  await revisaLaCabeza(contexto);
+  const gh = cliente({
+    token: env.PANEL_GITHUB_TOKEN ?? "",
+    duenio: env.GITHUB_DUENIO ?? "",
+    repo: env.GITHUB_REPO ?? "",
+    fetch: contexto.fetch
+  });
+  let commits;
+  try {
+    commits = await gh.listaCommits("heads/main", CANTIDAD_HISTORIAL);
+  } catch (e) {
+    console.error("historial: no se pudo leer la lista de commits de GitHub \u2014", e);
+    return error51(502, PROBLEMA_NO_SE_PUDO_LEER);
+  }
+  return ok({ ok: true, publicaciones: lee(commits, contexto.ahora()) });
+}
 var PROBLEMA_ACCION_INEXISTENTE = "Esta acci\xF3n todav\xEDa no existe.";
 async function maneja(accion, pedido, contexto) {
   try {
@@ -18525,6 +18585,8 @@ async function maneja(accion, pedido, contexto) {
         return await estadoAccion(pedido, contexto);
       case "deshacer":
         return await deshacerAccion(pedido, contexto);
+      case "historial":
+        return await historialAccion(pedido, contexto);
       default:
         return error51(404, PROBLEMA_ACCION_INEXISTENTE);
     }
