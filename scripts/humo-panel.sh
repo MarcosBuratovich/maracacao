@@ -106,7 +106,10 @@ cuerpo_publicar() {
   # entero contra lo que se manda) — mandar solo
   # `{"footer":{"derechos":"…"}}` rebota con «el campo quedó vacío» en
   # todos los demás campos.
-  jq -n --argjson sitio "$(cat "$1")" '{documentos: {sitio: $sitio}}'
+  # $2 = el sha contra el que se "editó" (la Tarea 2 de la Parte B): sin
+  # esto el servidor rebota con 400 antes de mirar el documento siquiera —
+  # es la declaración de contra qué versión del sitio se escribió.
+  jq -n --argjson sitio "$(cat "$1")" --arg base "$2" '{base: $base, documentos: {sitio: $sitio}}'
 }
 
 # Login con la contraseña REAL (la de `$CLAVE`), usado tanto en el paso 3
@@ -160,11 +163,23 @@ publica_derechos() {
   fi
   jq --arg v "$valor" '.footer.derechos = $v' "$TMPDIR_HUMO/vivo-pub.json" > "$TMPDIR_HUMO/doc-pub.json"
 
+  # El sha contra el que se "editó": para el ensayo es, sencillamente, la
+  # cabeza de main en este momento —la misma que se acaba de leer arriba con
+  # `git show origin/main:...`—, así que el servidor no encuentra nada que
+  # haya cambiado en el medio y deja pasar la publicación. El panel de la
+  # fase 6 va a mandar el sha que leyó al ABRIR el editor, que es la misma
+  # idea con más tiempo (y más chance de que algo haya cambiado) en el medio.
+  # Nombrada `SHA_BASE_PUBLICACION` y no `BASE`: `$BASE` ya es la URL del
+  # sitio (línea de arriba de todo el script) — una `local BASE` acá adentro
+  # la taparía para el resto de esta función y rompería el `curl` de abajo.
+  local SHA_BASE_PUBLICACION
+  SHA_BASE_PUBLICACION="$(git rev-parse origin/main)"
+
   local status
   status="$(curl -s -b "$COOKIES" -o "$TMPDIR_HUMO/resp-pub.json" -w '%{http_code}' \
     -X POST "$BASE/api/panel?accion=publicar" \
     -H 'Content-Type: application/json' -H "Origin: $ORIGEN" \
-    -d "$(cuerpo_publicar "$TMPDIR_HUMO/doc-pub.json")")"
+    -d "$(cuerpo_publicar "$TMPDIR_HUMO/doc-pub.json" "$SHA_BASE_PUBLICACION")")"
   echo "  respuesta: $(cat "$TMPDIR_HUMO/resp-pub.json")"
   if [ "$status" != '200' ]; then
     echo "  esperado: 200 — obtuve: $status — MAL" >&2
@@ -410,7 +425,23 @@ if ! publica_derechos "$DERECHOS_NUEVO"; then
 fi
 SITIO_MODIFICADO=1  # a partir de acá, si algo corta, la trampa de salida avisa fuerte.
 
-paso '4b) El commit que publicó el cambio — autor y trailers'
+# 4c) El freno de mano de esta tarea (Tarea 2 de la Parte B — el sha base):
+# si el sha contra el que se declara haber editado no es la cabeza de main
+# de verdad —acá, a propósito, uno que nunca existió—, el servidor tiene
+# que negarse a publicar, no pisar en silencio lo que haya cambiado en el
+# medio. Reusa el mismo documento que acaba de publicarse en 4a: lo que se
+# prueba acá es el chequeo de la base, no el contenido. Probado contra
+# producción: si algún día alguien saca este chequeo, este paso lo delata.
+
+paso '4c) Publicar con una base vieja tiene que rebotar con 409'
+status4c="$(curl -s -b "$COOKIES" -o "$TMPDIR_HUMO/resp-base-vieja.json" -w '%{http_code}' \
+  -X POST "$BASE/api/panel?accion=publicar" \
+  -H 'Content-Type: application/json' -H "Origin: $ORIGEN" \
+  -d "$(cuerpo_publicar "$TMPDIR_HUMO/doc-pub.json" '0000000000000000000000000000000000000000')")"
+echo "  respuesta: $(cat "$TMPDIR_HUMO/resp-base-vieja.json")"
+espera_status 409 "$status4c" 'base vieja: alguien "cambió el sitio en el medio", tiene que rebotar'
+
+paso '4d) El commit que publicó el cambio — autor y trailers'
 git fetch origin main --quiet
 git log origin/main -1 --format='%an <%ae>%n%s%n%n%b'
 
@@ -427,10 +458,10 @@ if ! git log origin/main -1 --format='%b' | grep -q "Panel-Autor: $CORREO"; then
 fi
 echo '  autor y trailers correctos.'
 
-paso '4c) Esperar el deploy y verificar que la portada muestra el texto nuevo'
+paso '4e) Esperar el deploy y verificar que la portada muestra el texto nuevo'
 if ! espera_en_vivo "$DERECHOS_NUEVO"; then
   echo "Corto en «$PASO_ACTUAL»: pasaron 6 minutos y la portada todavía no muestra el texto" \
-    'nuevo. El commit YA está en GitHub (paso 4b), así que lo peor que pasó es que el' \
+    'nuevo. El commit YA está en GitHub (paso 4d), así que lo peor que pasó es que el' \
     'deploy tarda — revisá Deployments en Vercel a mano antes de asumir algo peor.' >&2
   exit 1
 fi
@@ -504,11 +535,12 @@ echo "  el freno saltó en el intento $intentos_hechos de esta tanda — no es u
 
 echo
 echo '=== Prueba de humo completa ==='
-echo 'Un resultado en verde acá prueba cuatro cosas, cada una por su cuenta:'
+echo 'Un resultado en verde acá prueba cinco cosas, cada una por su cuenta:'
 echo '  1. La puerta funciona: la contraseña equivocada no entra (paso 2), y la correcta sí (paso 3).'
 echo '  2. Un cambio de la clienta llega de verdad al sitio en vivo, no solo a GitHub (paso 4).'
-echo '  3. Cada commit queda a nombre del panel («Panel Maracacao»), nunca al tuyo (paso 4b).'
-echo '  4. Deshacer un cambio funciona por el mismo canal que publicarlo, sin Git ni computadora (paso 5).'
+echo '  3. Publicar contra una base vieja se rechaza, sin pisar en silencio lo que cambió en el medio (paso 4c).'
+echo '  4. Cada commit queda a nombre del panel («Panel Maracacao»), nunca al tuyo (paso 4d).'
+echo '  5. Deshacer un cambio funciona por el mismo canal que publicarlo, sin Git ni computadora (paso 5).'
 echo
 echo 'IMPORTANTE: el freno de intentos (paso 6) quedó gastado para esta IP durante los' \
   'próximos 15 minutos — a propósito, es la prueba que hicimos recién. Si corrés' \

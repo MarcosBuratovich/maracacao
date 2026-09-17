@@ -114,4 +114,30 @@ describe('el cliente de GitHub', () => {
     const { f } = fetchFalso([{ status: 409, cuerpo: { message: 'Conflicto raro' } }])
     await expect(cliente(creds(f)).ref('heads/main')).rejects.toThrow(/Conflicto raro/)
   })
+
+  it('comparaRefs devuelve las rutas que cambiaron entre dos shas', async () => {
+    const { f, pedidos } = fetchFalso([
+      {
+        cuerpo: {
+          files: [
+            { filename: 'src/contenido/datos/sitio.json', status: 'modified' },
+            { filename: 'src/pages/index.astro', status: 'modified' },
+          ],
+        },
+      },
+    ])
+    const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+
+    expect(await gh.comparaRefs('viejo', 'nuevo')).toEqual({
+      archivos: ['src/contenido/datos/sitio.json', 'src/pages/index.astro'],
+    })
+    expect(pedidos[0].url).toContain('/compare/viejo...nuevo')
+  })
+
+  it('comparaRefs no explota si GitHub no manda `files`', async () => {
+    // La comparación de dos shas idénticos viene sin la clave.
+    const { f } = fetchFalso([{ cuerpo: { status: 'identical' } }])
+    const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+    expect(await gh.comparaRefs('a', 'a')).toEqual({ archivos: [] })
+  })
 })

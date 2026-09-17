@@ -144,6 +144,28 @@ export function cliente(c: Credenciales) {
       return Buffer.from(cuerpo.content, 'base64').toString('utf8')
     },
 
+    /**
+     * Qué RUTAS cambiaron entre dos shas. Es la pregunta que el router
+     * necesita para distinguir las dos formas de «alguien publicó mientras
+     * ella editaba»: si lo que cambió en el medio son documentos de
+     * contenido, la publicación de ella los pisaría y hay que frenarla; si
+     * es código del sitio (Marcos arreglando una plantilla), no se tocan y
+     * puede seguir.
+     *
+     * Devuelve solo los nombres, no el diff: el router no tiene nada que
+     * hacer con el contenido del cambio ajeno, y traerlo sería traer texto
+     * arbitrario a una función que después lo podría loguear.
+     *
+     * `files` no viene cuando los dos shas son el mismo, así que se lee con
+     * un default en vez de asumir que está.
+     */
+    async comparaRefs(base: string, cabeza: string): Promise<{ archivos: string[] }> {
+      const cuerpo = await pedir(
+        `/compare/${encodeURIComponent(base)}...${encodeURIComponent(cabeza)}`,
+      ) as { files?: Array<{ filename: string }> }
+      return { archivos: (cuerpo.files ?? []).map((f) => f.filename) }
+    },
+
     /** Crea un blob con este contenido (codificado a base64) y devuelve su sha. */
     async creaBlob(contenido: string): Promise<string> {
       const cuerpo = await pedir('/git/blobs', {

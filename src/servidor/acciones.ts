@@ -260,6 +260,20 @@ const PROBLEMA_SIN_DOCUMENTOS = 'No mandaste ningún documento para publicar.'
 const PROBLEMA_NO_SE_PUDO_LEER = 'No pudimos revisar el contenido actual del sitio: prueba de nuevo en unos minutos.'
 const SIN_CAMBIOS = 'No había nada que publicar: no cambiaste ningún dato del sitio.'
 
+// Una publicación sin `base` no es un pedido viejo que se pueda atender con
+// buena voluntad: es un pedido que no declara contra qué versión del sitio se
+// escribió, y atenderlo es justamente cómo se pisa el trabajo de otro sin que
+// nadie se entere. A la clienta no se le explica nada de esto —no es su
+// problema ni su vocabulario—: se le dice que vuelva a abrir el panel, que es
+// lo que de verdad lo arregla (el panel nuevo manda `base`).
+const PROBLEMA_SIN_BASE = 'No pudimos publicar: vuelve a abrir el panel y hazlo de nuevo.'
+
+// La MISMA frase que devuelve `publica()` cuando el `PATCH` del ref choca dos
+// veces (publicar.ts). Es el mismo hecho contado dos veces —«alguien movió el
+// sitio mientras editabas»— y tiene que sonar igual, se detecte antes (acá,
+// comparando shas) o después (allá, al chocar el ref).
+const PROBLEMA_PISARIA = 'Marcos cambió algo del sitio mientras editabas: vuelve a intentar la publicación.'
+
 const RUTA_DEL_DOCUMENTO = (id: IdDocumento): string => `src/contenido/datos/${id}.json`
 
 const esIdDocumento = (v: string): v is IdDocumento => Object.prototype.hasOwnProperty.call(DOCUMENTOS, v)
@@ -392,7 +406,12 @@ async function publicarAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
   // puede seguir publicando solo porque la firma es válida.
   if (!correoEnLista(sesion.correo, env.PANEL_CORREOS)) return error(401, PROBLEMA_SESION)
 
-  const cuerpo = (pedido.cuerpo ?? {}) as { documentos?: unknown }
+  const cuerpo = (pedido.cuerpo ?? {}) as { documentos?: unknown; base?: unknown }
+  if (typeof cuerpo.base !== 'string' || cuerpo.base === '') {
+    console.error('publicar: el cuerpo llegó sin `base` — el panel que lo mandó es de antes del sha base.')
+    return error(400, PROBLEMA_SIN_BASE)
+  }
+
   const documentos = comoDocumentos(cuerpo.documentos)
   const ids = Object.keys(documentos)
 
@@ -492,6 +511,23 @@ async function publicarAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
 
   try {
     base ??= await gh.ref('heads/main')
+
+    // [B4] El sha contra el que ella editó vs. la cabeza de hoy. Si son el
+    // mismo, no hay nada que mirar. Si no, la pregunta no es «¿avanzó main?»
+    // —avanza todo el tiempo, Marcos publica código— sino «¿avanzó sobre
+    // ALGO QUE ESTE LOTE ESCRIBE?». Solo eso se pisaría.
+    if (cuerpo.base !== base.sha) {
+      const { archivos: movidos } = await gh.comparaRefs(cuerpo.base, base.sha)
+      const delLote = new Set(idsConocidos.map(RUTA_DEL_DOCUMENTO))
+      const pisados = movidos.filter((ruta) => delLote.has(ruta))
+      if (pisados.length > 0) {
+        console.error(
+          `publicar: rechazado por pisada (autor: ${sesion.correo}) — editó contra ${cuerpo.base}, ` +
+            `la cabeza es ${base.sha}, y en el medio cambiaron: ${pisados.join(', ')}`,
+        )
+        return error(409, PROBLEMA_PISARIA)
+      }
+    }
 
     for (const id of idsConocidos) {
       const ruta = RUTA_DEL_DOCUMENTO(id)

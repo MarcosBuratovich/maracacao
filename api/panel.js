@@ -151,6 +151,27 @@ function cliente(c) {
       }
       return Buffer.from(cuerpo.content, "base64").toString("utf8");
     },
+    /**
+     * Qué RUTAS cambiaron entre dos shas. Es la pregunta que el router
+     * necesita para distinguir las dos formas de «alguien publicó mientras
+     * ella editaba»: si lo que cambió en el medio son documentos de
+     * contenido, la publicación de ella los pisaría y hay que frenarla; si
+     * es código del sitio (Marcos arreglando una plantilla), no se tocan y
+     * puede seguir.
+     *
+     * Devuelve solo los nombres, no el diff: el router no tiene nada que
+     * hacer con el contenido del cambio ajeno, y traerlo sería traer texto
+     * arbitrario a una función que después lo podría loguear.
+     *
+     * `files` no viene cuando los dos shas son el mismo, así que se lee con
+     * un default en vez de asumir que está.
+     */
+    async comparaRefs(base2, cabeza) {
+      const cuerpo = await pedir(
+        `/compare/${encodeURIComponent(base2)}...${encodeURIComponent(cabeza)}`
+      );
+      return { archivos: (cuerpo.files ?? []).map((f) => f.filename) };
+    },
     /** Crea un blob con este contenido (codificado a base64) y devuelve su sha. */
     async creaBlob(contenido) {
       const cuerpo = await pedir("/git/blobs", {
@@ -17858,6 +17879,8 @@ var PROBLEMA_SESION = "Tu sesi\xF3n no es v\xE1lida: vuelve a entrar.";
 var PROBLEMA_SIN_DOCUMENTOS = "No mandaste ning\xFAn documento para publicar.";
 var PROBLEMA_NO_SE_PUDO_LEER = "No pudimos revisar el contenido actual del sitio: prueba de nuevo en unos minutos.";
 var SIN_CAMBIOS = "No hab\xEDa nada que publicar: no cambiaste ning\xFAn dato del sitio.";
+var PROBLEMA_SIN_BASE = "No pudimos publicar: vuelve a abrir el panel y hazlo de nuevo.";
+var PROBLEMA_PISARIA = "Marcos cambi\xF3 algo del sitio mientras editabas: vuelve a intentar la publicaci\xF3n.";
 var RUTA_DEL_DOCUMENTO = (id) => `src/contenido/datos/${id}.json`;
 var esIdDocumento = (v) => Object.prototype.hasOwnProperty.call(DOCUMENTOS, v);
 function comoDocumentos(v) {
@@ -17881,6 +17904,10 @@ async function publicarAccion(pedido, contexto) {
   if (!sesion) return error51(401, PROBLEMA_SESION);
   if (!correoEnLista(sesion.correo, env.PANEL_CORREOS)) return error51(401, PROBLEMA_SESION);
   const cuerpo = pedido.cuerpo ?? {};
+  if (typeof cuerpo.base !== "string" || cuerpo.base === "") {
+    console.error("publicar: el cuerpo lleg\xF3 sin `base` \u2014 el panel que lo mand\xF3 es de antes del sha base.");
+    return error51(400, PROBLEMA_SIN_BASE);
+  }
   const documentos = comoDocumentos(cuerpo.documentos);
   const ids = Object.keys(documentos);
   for (const id of ids) {
@@ -17933,6 +17960,17 @@ async function publicarAccion(pedido, contexto) {
   const cambios = [];
   try {
     base ??= await gh.ref("heads/main");
+    if (cuerpo.base !== base.sha) {
+      const { archivos: movidos } = await gh.comparaRefs(cuerpo.base, base.sha);
+      const delLote = new Set(idsConocidos.map(RUTA_DEL_DOCUMENTO));
+      const pisados = movidos.filter((ruta2) => delLote.has(ruta2));
+      if (pisados.length > 0) {
+        console.error(
+          `publicar: rechazado por pisada (autor: ${sesion.correo}) \u2014 edit\xF3 contra ${cuerpo.base}, la cabeza es ${base.sha}, y en el medio cambiaron: ${pisados.join(", ")}`
+        );
+        return error51(409, PROBLEMA_PISARIA);
+      }
+    }
     for (const id of idsConocidos) {
       const ruta2 = RUTA_DEL_DOCUMENTO(id);
       const vivoTexto = await gh.archivoEnRef(ruta2, base.sha);

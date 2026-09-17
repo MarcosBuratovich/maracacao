@@ -8,6 +8,8 @@ import { createHmac } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { maneja } from '../src/servidor/acciones'
 import { hashDeClave, firmaSesion } from '../src/servidor/sesion'
+import { cliente } from '../src/servidor/github'
+import { publica } from '../src/servidor/publicar'
 import { serializa } from '../src/contenido/carga'
 import { esquemaSitio } from '../src/contenido/esquema/sitio'
 import { esquemaSabores } from '../src/contenido/esquema/sabores'
@@ -44,6 +46,52 @@ const respuestasFuentesDeSitio = (sha = 'main-1') => [
   { cuerpo: { object: { sha } } }, // gh.ref (router: sha base del lote, y fuente de los derivados de sitio)
   { cuerpo: { content: Buffer.from(textoSaboresVivo).toString('base64'), encoding: 'base64' } }, // gh.archivoEnRef: lo vivo de sabores
 ]
+
+/**
+ * Las siete respuestas que hacen falta para que la Fase 2 TERMINE de
+ * publicar un solo documento, una vez que el chequeo de la base ya pasó:
+ * leer lo vivo de ese documento, y las seis de siempre de `publica()` (ref,
+ * commit padre, blob, árbol, commit, mover el ref). `vivo` por defecto es
+ * `textoSaboresVivo` —el archivo de disco, sin editar— así que un lote que
+ * mande `sabores` con algo cambiado sí encuentra una diferencia y escribe.
+ */
+const respuestasDeUnaPublicacionCompleta = (vivo = textoSaboresVivo) => [
+  { cuerpo: { content: Buffer.from(vivo).toString('base64'), encoding: 'base64' } }, // gh.archivoEnRef: lo vivo del documento
+  { cuerpo: { object: { sha: 'main-2' } } },                            // gh.ref (dentro de publica())
+  { cuerpo: { sha: 'commit-viejo2', tree: { sha: 'arbol-viejo2' } } },  // gh.commit
+  { cuerpo: { sha: 'blob-nuevo2' } },                                    // creaBlob
+  { cuerpo: { sha: 'arbol-nuevo2' } },                                   // creaArbol
+  { cuerpo: { sha: 'commit-nuevo2' } },                                  // creaCommit
+  { cuerpo: {} },                                                        // mueveRef
+]
+
+/**
+ * Un `sabores` válido, pero con un precio distinto del que vive hoy en el
+ * repo: sirve para forzar que la Fase 2 encuentre una diferencia real
+ * contra `textoSaboresVivo` y escriba de verdad, en vez de tomar el atajo
+ * de «bytes idénticos, no hay nada que publicar».
+ */
+const saboresConUnPrecioDistinto = () => {
+  const doc = saboresCrudoDeDisco()
+  doc.sabores[0].precio = doc.sabores[0].precio + 1
+  return doc
+}
+
+/**
+ * Dos intentos completos cuyo `PATCH` final falla con 422 «not a fast
+ * forward» las dos veces — lo que hace que `publica()` agote su reintento
+ * (ver publicar.ts) y devuelva el 409 de PROBLEMA_PISARIA. La usa el test
+ * del Paso 8b para comparar esa frase contra la que arma el router.
+ */
+const respuestasDeDosChoquesDeRef = () => {
+  const choque = { status: 422, cuerpo: { message: 'Update is not a fast forward' } }
+  return [
+    { cuerpo: { object: { sha: 'm' } } }, { cuerpo: { sha: 'c', tree: { sha: 'a' } } },
+    { cuerpo: { sha: 'b' } }, { cuerpo: { sha: 'a2' } }, { cuerpo: { sha: 'c2' } }, choque,
+    { cuerpo: { object: { sha: 'm2' } } }, { cuerpo: { sha: 'c3', tree: { sha: 'a3' } } },
+    { cuerpo: { sha: 'b' } }, { cuerpo: { sha: 'a4' } }, { cuerpo: { sha: 'c4' } }, choque,
+  ]
+}
 
 // [C-1] 40 caracteres: por encima de LARGO_MIN_SECRETO (32), para que estos
 // tests ejerciten el camino normal. El propio candado de C-1 se prueba
@@ -220,7 +268,7 @@ describe('publicar', () => {
     const roto = JSON.parse(JSON.stringify(marca))
     roto.anaquel.titulo = ''      // texto vacío: el esquema lo rechaza
     const { f, pedidos } = fetchFalso(respuestasFuentesDeSitio())
-    const r = await maneja('publicar', { cuerpo: { documentos: { sitio: roto } }, cookie: cookieValida() }, contextoBase(f))
+    const r = await maneja('publicar', { cuerpo: { base: 'main-1', documentos: { sitio: roto } }, cookie: cookieValida() }, contextoBase(f))
     expect(r.status).toBe(422)
     expect((r.cuerpo as { campo?: string }).campo).toContain('anaquel.titulo')
     expect(pedidos.filter((p) => p.metodo === 'POST' || p.metodo === 'PATCH')).toHaveLength(0)
@@ -230,13 +278,17 @@ describe('publicar', () => {
     const roto = JSON.parse(JSON.stringify(marca))
     roto.anaquel.titulo = ''
     const { f } = fetchFalso(respuestasFuentesDeSitio())
-    const r = await maneja('publicar', { cuerpo: { documentos: { sitio: roto } }, cookie: cookieValida() }, contextoBase(f))
+    const r = await maneja('publicar', { cuerpo: { base: 'main-1', documentos: { sitio: roto } }, cookie: cookieValida() }, contextoBase(f))
     const texto = String((r.cuerpo as { problema: string }).problema)
     expect(texto).not.toMatch(/zod|schema|422|undefined|parse/i)
   })
 
   it('un documento que no existe se rechaza antes de mirar su contenido', async () => {
-    const r = await maneja('publicar', { cuerpo: { documentos: { inventado: {} } }, cookie: cookieValida() }, contextoBase(fetchQueNoSeUsa()))
+    const r = await maneja(
+      'publicar',
+      { cuerpo: { base: 'main-1', documentos: { inventado: {} } }, cookie: cookieValida() },
+      contextoBase(fetchQueNoSeUsa()),
+    )
     expect(r.status).toBe(422)
   })
 
@@ -248,7 +300,7 @@ describe('publicar', () => {
     const sinGotas = JSON.parse(JSON.stringify(marca))
     delete sinGotas.gotas
     const { f, pedidos } = fetchFalso(respuestasFuentesDeSitio())
-    const r = await maneja('publicar', { cuerpo: { documentos: { sitio: sinGotas } }, cookie: cookieValida() }, contextoBase(f))
+    const r = await maneja('publicar', { cuerpo: { base: 'main-1', documentos: { sitio: sinGotas } }, cookie: cookieValida() }, contextoBase(f))
     expect(r.status).toBe(422)
     expect((r.cuerpo as { campo?: string }).campo).toContain('gotas')
     expect(pedidos.filter((p) => p.metodo === 'POST' || p.metodo === 'PATCH')).toHaveLength(0)
@@ -258,7 +310,11 @@ describe('publicar', () => {
   // documento adentro no puede llegar a tocar GitHub (ids.length === 0 se
   // decide antes de armar el cliente de GitHub).
   it('con sesión válida y sin documentos, 400 y sin tocar GitHub', async () => {
-    const r = await maneja('publicar', { cuerpo: { documentos: {} }, cookie: cookieValida() }, contextoBase(fetchQueNoSeUsa()))
+    const r = await maneja(
+      'publicar',
+      { cuerpo: { base: 'main-1', documentos: {} }, cookie: cookieValida() },
+      contextoBase(fetchQueNoSeUsa()),
+    )
     expect(r.status).toBe(400)
   })
 
@@ -278,6 +334,14 @@ describe('publicar', () => {
   // de «techo de cordura» en sabores.ts— se aprovecha que `catalogo` es
   // una URL sin tope de longitud (`z.url()`, campos.ts): una sola query
   // string larga alcanza para pasar el tope sin tocar ningún otro campo.
+  //
+  // Ojo con lo que este test NO prueba: acá el `Contexto` se arma a mano
+  // (`contextoBase()`), así que `bytesDelCuerpo` llega `undefined` porque
+  // el test lo dejó afuera, no porque el borde haya medido un
+  // `Content-Length` ausente de verdad. Esto cubre el camino del ROUTER
+  // —que un lote enorme rebota con 422 antes de escribir—; quien guarda el
+  // fix de fondo del BORDE (que el `Content-Length` ilegible de verdad
+  // produzca ese mismo `undefined`) es el M-9 de `test/panel-entrada.test.ts`.
   it('M-9: sin Content-Length medible, el lote enorme rebota igual — el fallback se dispara de verdad', async () => {
     const saboresEnorme = saboresCrudoDeDisco()
     saboresEnorme.sabores[0].catalogo = 'https://catalogo.maracacao.mx/?x=' + 'a'.repeat(3_000_000)
@@ -291,7 +355,7 @@ describe('publicar', () => {
 
     const r = await maneja(
       'publicar',
-      { cuerpo: { documentos: { sabores: saboresEnorme } }, cookie: cookieValida() },
+      { cuerpo: { base: 'main-1', documentos: { sabores: saboresEnorme } }, cookie: cookieValida() },
       contextoBase(f),
     )
 
@@ -332,7 +396,7 @@ describe('publicar', () => {
         { cuerpo: {} }, // mueveRef
       ])
 
-      const r = await maneja('publicar', { cuerpo: { documentos: { sitio: enviado } }, cookie: cookieValida() }, contextoBase(f))
+      const r = await maneja('publicar', { cuerpo: { base: 'main-1', documentos: { sitio: enviado } }, cookie: cookieValida() }, contextoBase(f))
 
       expect(r.status).toBe(200)
       expect((r.cuerpo as { ok: boolean; sha: string | null }).ok).toBe(true)
@@ -351,7 +415,7 @@ describe('publicar', () => {
         { cuerpo: { content: Buffer.from(textoEnviado).toString('base64'), encoding: 'base64' } }, // gh.archivoEnRef(sitio): igual a lo enviado
       ])
 
-      const r = await maneja('publicar', { cuerpo: { documentos: { sitio: enviado } }, cookie: cookieValida() }, contextoBase(f))
+      const r = await maneja('publicar', { cuerpo: { base: 'main-1', documentos: { sitio: enviado } }, cookie: cookieValida() }, contextoBase(f))
 
       expect(r.status).toBe(200)
       const cuerpo = r.cuerpo as { ok: boolean; sha: string | null; resumen: string }
@@ -366,7 +430,7 @@ describe('publicar', () => {
 
       const { f, pedidos } = fetchFalso([{ status: 500, cuerpo: { message: 'ups, caído' } }]) // gh.ref falla
 
-      const r = await maneja('publicar', { cuerpo: { documentos: { sitio: enviado } }, cookie: cookieValida() }, contextoBase(f))
+      const r = await maneja('publicar', { cuerpo: { base: 'main-1', documentos: { sitio: enviado } }, cookie: cookieValida() }, contextoBase(f))
 
       expect(r.status).toBe(502)
       const cuerpo = r.cuerpo as { ok: boolean; problema: string }
@@ -405,7 +469,7 @@ describe('publicar', () => {
         { cuerpo: {} }, // mueveRef
       ])
 
-      const r = await maneja('publicar', { cuerpo: { documentos: { sitio: crudo } }, cookie: cookieValida() }, contextoBase(f))
+      const r = await maneja('publicar', { cuerpo: { base: 'main-1', documentos: { sitio: crudo } }, cookie: cookieValida() }, contextoBase(f))
 
       expect(r.status).toBe(200)
       const cuerpo = r.cuerpo as { ok: boolean; sha: string | null }
@@ -458,10 +522,10 @@ describe('publicar', () => {
       }
 
       const a = contextoParaOtroLote()
-      const rCrudo = await maneja('publicar', { cuerpo: { documentos: { sitio: crudo } }, cookie: cookieValida() }, a.ctx)
+      const rCrudo = await maneja('publicar', { cuerpo: { base: 'main-1', documentos: { sitio: crudo } }, cookie: cookieValida() }, a.ctx)
 
       const b = contextoParaOtroLote()
-      const rInjertado = await maneja('publicar', { cuerpo: { documentos: { sitio: yaInjertado } }, cookie: cookieValida() }, b.ctx)
+      const rInjertado = await maneja('publicar', { cuerpo: { base: 'main-1', documentos: { sitio: yaInjertado } }, cookie: cookieValida() }, b.ctx)
 
       expect(rCrudo.status).toBe(200)
       expect(rInjertado.status).toBe(200)
@@ -533,7 +597,7 @@ describe('publicar', () => {
 
       const r = await maneja(
         'publicar',
-        { cuerpo: { documentos: { sitio: sitioConCambio, sabores: saboresConUnoNuevo } }, cookie: cookieValida() },
+        { cuerpo: { base: 'main-1', documentos: { sitio: sitioConCambio, sabores: saboresConUnoNuevo } }, cookie: cookieValida() },
         contextoBase(f),
       )
 
@@ -564,7 +628,7 @@ describe('publicar', () => {
 
       const r = await maneja(
         'publicar',
-        { cuerpo: { documentos: { sitio: crudo, sabores: saboresSinJengibre } }, cookie: cookieValida() },
+        { cuerpo: { base: 'main-1', documentos: { sitio: crudo, sabores: saboresSinJengibre } }, cookie: cookieValida() },
         contextoBase(f),
       )
 
@@ -593,7 +657,7 @@ describe('publicar', () => {
         { cuerpo: { content: Buffer.from(textoSaboresVivoSinJengibre).toString('base64'), encoding: 'base64' } }, // archivoEnRef(sabores): lo vivo, sin jengibreYNaranja
       ])
 
-      const r = await maneja('publicar', { cuerpo: { documentos: { sitio: crudo } }, cookie: cookieValida() }, contextoBase(f))
+      const r = await maneja('publicar', { cuerpo: { base: 'main-1', documentos: { sitio: crudo } }, cookie: cookieValida() }, contextoBase(f))
 
       // Dos pedidos, ni uno más ni uno menos: de verdad leyó lo vivo. Un
       // «swapped branch» que tratara «sabores no vino» como si hubiera
@@ -602,6 +666,92 @@ describe('publicar', () => {
       expect(pedidos).toHaveLength(2)
       expect(r.status).toBe(422)
       expect((r.cuerpo as { campo?: string }).campo).toBe('sitio.anaquel.contadorDe')
+    })
+  })
+
+  // Tarea 2 de la Parte B: el sha base. Hasta acá, `publicar` ignoraba
+  // contra qué versión del sitio editó la clienta, así que un reintento
+  // limpio (fast-forward) podía pisar en silencio lo que Marcos acababa de
+  // cambiar. Estos tres tests fijan la regla: sin `base` no se publica, y
+  // con `base` vieja se compara qué cambió en el medio ANTES de escribir.
+  describe('publicar exige declarar contra qué versión se editó', () => {
+    it('sin `base` en el cuerpo, 400 y ni un pedido a GitHub', async () => {
+      const { f, pedidos } = fetchFalso([])
+      const r = await maneja(
+        'publicar',
+        { cuerpo: { documentos: { sabores: saboresCrudoDeDisco() } }, cookie: cookieValida() },
+        contextoBase(f),
+      )
+      expect(r.status).toBe(400)
+      expect((r.cuerpo as { problema: string }).problema).toBe(
+        'No pudimos publicar: vuelve a abrir el panel y hazlo de nuevo.',
+      )
+      expect(pedidos).toHaveLength(0)
+    })
+
+    it('si alguien tocó un documento del lote en el medio, 409 y CERO escrituras', async () => {
+      // La cabeza de main avanzó desde el sha contra el que ella editó, y lo
+      // que cambió incluye el documento que ella está publicando: publicar
+      // ahora es pisar ese cambio sin conflicto y sin log. Es el bug.
+      const { f, pedidos } = fetchFalso([
+        { cuerpo: { object: { sha: 'cabezaNueva' } } },                                  // gh.ref
+        { cuerpo: { files: [{ filename: 'src/contenido/datos/sabores.json' }] } },        // gh.comparaRefs
+      ])
+      const r = await maneja(
+        'publicar',
+        { cuerpo: { base: 'loQueEllaLeyo', documentos: { sabores: saboresCrudoDeDisco() } }, cookie: cookieValida() },
+        contextoBase(f),
+      )
+      expect(r.status).toBe(409)
+      expect((r.cuerpo as { problema: string }).problema).toBe(
+        'Marcos cambió algo del sitio mientras editabas: vuelve a intentar la publicación.',
+      )
+      // Lo único que se pidió fue leer y comparar. Nada de blobs, árboles ni refs.
+      expect(pedidos.map((p) => p.metodo)).toEqual(['GET', 'GET'])
+    })
+
+    it('si lo que cambió en el medio NO es contenido, la publicación sigue', async () => {
+      // Marcos arregló una plantilla. Eso no toca ningún documento del lote,
+      // así que frenarla sería pedirle que reintente por nada.
+      const { f } = fetchFalso([
+        { cuerpo: { object: { sha: 'cabezaNueva' } } },                    // gh.ref
+        { cuerpo: { files: [{ filename: 'src/pages/index.astro' }] } },    // gh.comparaRefs
+        ...respuestasDeUnaPublicacionCompleta(),
+      ])
+      const r = await maneja(
+        'publicar',
+        { cuerpo: { base: 'loQueEllaLeyo', documentos: { sabores: saboresConUnPrecioDistinto() } }, cookie: cookieValida() },
+        contextoBase(f),
+      )
+      expect(r.status).toBe(200)
+    })
+
+    // Paso 8b: `PROBLEMA_PISARIA` (acciones.ts) repite letra por letra el
+    // 409 que devuelve `publica()` (publicar.ts) cuando el PATCH del ref
+    // choca dos veces. Es el MISMO hecho contado dos veces —acá detectado
+    // ANTES, comparando shas; allá detectado DESPUÉS, al chocar el ref— y
+    // están duplicadas a propósito: compartirlas acoplaría el router con
+    // `publicar.ts` por una cadena de texto. Este test es lo que evita que
+    // las dos frases se desincronicen sin que nadie lo note.
+    it('las dos formas de detectar una pisada le dicen a la clienta exactamente lo mismo', async () => {
+      const { f } = fetchFalso([
+        { cuerpo: { object: { sha: 'cabezaNueva' } } },
+        { cuerpo: { files: [{ filename: 'src/contenido/datos/sabores.json' }] } },
+      ])
+      const porElRouter = await maneja(
+        'publicar',
+        { cuerpo: { base: 'viejo', documentos: { sabores: saboresCrudoDeDisco() } }, cookie: cookieValida() },
+        contextoBase(f),
+      )
+
+      const { f: f2 } = fetchFalso([...respuestasDeDosChoquesDeRef()])
+      const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f2 })
+      const porElRef = await publica(gh, {
+        archivos: [{ ruta: 'src/contenido/datos/sabores.json', contenido: '{}' }],
+        autor: 'ella@ejemplo.mx',
+      })
+
+      expect((porElRouter.cuerpo as { problema: string }).problema).toBe((porElRef as { problema: string }).problema)
     })
   })
 })
