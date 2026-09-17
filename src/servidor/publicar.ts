@@ -12,7 +12,7 @@
  * toca `globalThis.fetch`.
  */
 import { cliente, type EntradaArbol } from './github'
-import { revisaLote } from './rutas-permitidas'
+import { revisaLote, rutaPermitida, rutaDeBorradorPermitida } from './rutas-permitidas'
 import { frase, type Cambio } from '../contenido/diff'
 
 export interface Archivo {
@@ -61,17 +61,50 @@ export interface Publicacion {
    * ya se perdió.
    */
   reintentar?: boolean
+  /**
+   * [Tarea 11, decisión B5] En qué ref escribir, en la MISMA forma que
+   * `github.ts` usa en todos lados (`heads/main`, nunca `main` pelado).
+   * Default `'heads/main'`: todo lo que ya llamaba a `publica()` antes de
+   * esta tarea sigue escribiendo exactamente donde escribía, sin tocar este
+   * campo.
+   */
+  ref?: string
+  /**
+   * [Tarea 11, decisión B5] Si el `PATCH` (o el `POST` de creación) del ref
+   * va con `force: true`. Default `false` —el de siempre—: en `heads/main`
+   * es la única forma de que un choque avise en vez de pisar en silencio, y
+   * eso no puede cambiar por accidente. La ÚNICA razón legítima para pedir
+   * `true` es el ref del borrador (`borrador.ts`), que no tiene historia que
+   * preservar —es «lo último que ella escribió», no una serie de commits—;
+   * por eso `publica()` TIRA si `forzar: true` llega junto con el `ref` de
+   * `main` (ver más abajo): esa combinación no es una opción de negocio, es
+   * un bug de quien llama, y tiene que reventar fuerte, no colarse como un
+   * 409 cualquiera.
+   */
+  forzar?: boolean
 }
 
 export type Resultado =
   | { ok: true; sha: string | null; resumen: string }
   | { ok: false; codigo: 409 | 422 | 502; problema: string }
 
-/** Quien firma cada commit del panel: nunca la clienta ni Marcos, siempre esta identidad (E5). */
-const AUTOR_PANEL = { name: 'Panel Maracacao', email: 'panel@maracacao.mx' }
+/**
+ * Quien firma cada commit del panel: nunca la clienta ni Marcos, siempre
+ * esta identidad (E5). Exportada desde la Tarea 11: `borrador.ts` la
+ * reusa para el commit raíz del primer borrador —el bootstrap no pasa
+ * por `publica()` (ver su docstring), pero el AUTOR git tiene que ser el
+ * mismo de siempre, no una copia que se pueda desincronizar.
+ */
+export const AUTOR_PANEL = { name: 'Panel Maracacao', email: 'panel@maracacao.mx' }
 
-/** La única rama que este código toca. */
-const REF = 'heads/main'
+/**
+ * [Tarea 11] El default de `p.ref`, y el único valor contra el que
+ * `forzar: true` está prohibido (ver `Publicacion.forzar`). Ya no es «la
+ * única rama que este código toca» —desde esta tarea, `publica()` también
+ * escribe el ref del borrador— pero sigue siendo la única que se mueve SIN
+ * forzar nunca.
+ */
+const REF_MAIN = 'heads/main'
 
 /** Se usa cuando `publica()` no recibió `cambios`: no hay diff para nombrar, pero sí algo que publicar. */
 const ASUNTO_GENERICO = 'Actualiza contenido del panel'
@@ -176,14 +209,25 @@ function esConflictoDeRef(e: unknown): boolean {
 /**
  * Un intento completo, de punta a punta: leer el ref, leer su commit, crear
  * los blobs que hagan falta, armar el árbol SOBRE ESE commit, crear el
- * commit y —recién al final— mover el ref sin forzar. Cada llamada a esta
- * función parte de leer el ref de nuevo: el reintento (E7 par de errores,
- * regla del controlador) arma el árbol sobre el commit NUEVO, nunca sobre
- * el viejo — repetir contra la base vieja sería pisar en silencio lo que
- * Marcos acaba de publicar.
+ * commit y —recién al final— mover el ref. Cada llamada a esta función
+ * parte de leer el ref de nuevo: el reintento (E7 par de errores, regla del
+ * controlador) arma el árbol sobre el commit NUEVO, nunca sobre el viejo —
+ * repetir contra la base vieja sería pisar en silencio lo que Marcos acaba
+ * de publicar.
+ *
+ * [Tarea 11] `ref` y `forzar` viajan por parámetro —nunca una constante
+ * fija acá adentro— porque `publica()` los resuelve una sola vez (de
+ * `p.ref`/`p.forzar`) y los pasa iguales al primer intento y al reintento:
+ * ningún camino de este archivo vuelve a mirar `p` después de entrar acá.
  */
-async function intento(gh: ReturnType<typeof cliente>, archivos: readonly Archivo[], mensaje: string): Promise<string> {
-  const { sha: shaDelRef } = await gh.ref(REF)
+async function intento(
+  gh: ReturnType<typeof cliente>,
+  archivos: readonly Archivo[],
+  mensaje: string,
+  ref: string,
+  forzar: boolean,
+): Promise<string> {
+  const { sha: shaDelRef } = await gh.ref(ref)
   const padre = await gh.commit(shaDelRef)
 
   const shasDeBlobs = await mapaConcurrencia(archivos, CONCURRENCIA_BLOBS, (a) => gh.creaBlob(a.contenido))
@@ -193,7 +237,7 @@ async function intento(gh: ReturnType<typeof cliente>, archivos: readonly Archiv
 
   const shaDelCommit = await gh.creaCommit({ mensaje, arbol, padre: padre.sha, autor: AUTOR_PANEL })
   try {
-    await gh.mueveRef(REF, shaDelCommit, false)
+    await gh.mueveRef(ref, shaDelCommit, forzar)
   } catch (e) {
     // El commit ya quedó escrito en GitHub cuando esto revienta: se
     // envuelve el error con su sha para que el log (más abajo, en
@@ -205,10 +249,13 @@ async function intento(gh: ReturnType<typeof cliente>, archivos: readonly Archiv
 }
 
 /**
- * Publica un documento como un solo commit en `main`, o no publica nada.
+ * Publica un documento como un solo commit en el ref que pida `p.ref`
+ * (`heads/main` si no lo pasa), o no publica nada.
  *
- * Orden, y por qué es ESE orden (regla del controlador): la lista blanca
- * primero —una ruta prohibida no gasta ni un pedido—, después leer el ref y
+ * Orden, y por qué es ESE orden (regla del controlador): [Tarea 11] primero
+ * la guardia de `forzar` contra `main` —un `throw`, no un `Resultado`,
+ * porque es un bug de quien llama, no un dato malo—, después la lista
+ * blanca —una ruta prohibida no gasta ni un pedido—, después leer el ref y
  * su commit, después los blobs en paralelo, después el árbol, después el
  * commit, y el `PATCH` del ref AL FINAL. Si cualquier paso anterior al
  * `PATCH` tira, el repo queda exactamente como estaba: nada apunta a los
@@ -218,11 +265,30 @@ async function intento(gh: ReturnType<typeof cliente>, archivos: readonly Archiv
  * publicó), se reintenta UNA vez desde el principio —el árbol nuevo se arma
  * sobre el commit nuevo—. Si choca otra vez, es un 409 en español mexicano
  * que nombra a Marcos y no habla de refs ni de fast-forward (E7): el detalle
- * técnico va al log del servidor, no a la clienta.
+ * técnico va al log del servidor, no a la clienta. (Con `forzar: true` —el
+ * ref del borrador— este choque no puede pasar: `force` le gana a la
+ * protección de fast-forward, así que la rama de reintento queda para
+ * `main`, que es la única que la necesita.)
  */
 export async function publica(gh: ReturnType<typeof cliente>, p: Publicacion): Promise<Resultado> {
+  const ref = p.ref ?? REF_MAIN
+  const forzar = p.forzar ?? false
+
+  // [Tarea 11, decisión B5] Esta combinación no es un caso de negocio: es un
+  // bug de quien llama `publica()`. Por eso truena acá mismo, ANTES de
+  // cualquier otra cosa —ni siquiera gasta el chequeo de la lista blanca—,
+  // en vez de devolver un `Resultado` que alguien podría capturar y tratar
+  // como un 409 más. `main` se mueve SIN forzar siempre: es la única forma
+  // de que un choque avise en vez de pisar en silencio.
+  if (forzar && ref === REF_MAIN) {
+    throw new Error(
+      `publica(): forzar:true contra ${REF_MAIN} no es una opción — es un bug de quien llama, nunca un caso legítimo.`,
+    )
+  }
+
   const rutas = p.archivos.map((a) => a.ruta)
-  const chequeo = revisaLote(rutas, p.bytesDelCuerpo ?? bytesDelCuerpo(p.archivos))
+  const permiteRuta = ref === REF_MAIN ? rutaPermitida : rutaDeBorradorPermitida
+  const chequeo = revisaLote(rutas, p.bytesDelCuerpo ?? bytesDelCuerpo(p.archivos), permiteRuta)
   if (!chequeo.ok) return { ok: false, codigo: 422, problema: chequeo.problema }
 
   const asunto = p.cambios !== undefined ? frase(p.cambios) : ASUNTO_GENERICO
@@ -236,7 +302,7 @@ export async function publica(gh: ReturnType<typeof cliente>, p: Publicacion): P
   const mensaje = [`${asunto}`, '', 'Panel: sí', `Panel-Autor: ${p.autor}`, ...extras].join('\n')
 
   try {
-    const sha = await intento(gh, p.archivos, mensaje)
+    const sha = await intento(gh, p.archivos, mensaje, ref, forzar)
     return { ok: true, sha, resumen: asunto }
   } catch (primerError) {
     if (!esConflictoDeRef(primerError)) return traduceError(primerError, p)
@@ -260,7 +326,7 @@ export async function publica(gh: ReturnType<typeof cliente>, p: Publicacion): P
     }
 
     try {
-      const sha = await intento(gh, p.archivos, mensaje)
+      const sha = await intento(gh, p.archivos, mensaje, ref, forzar)
       return { ok: true, sha, resumen: asunto }
     } catch (segundoError) {
       if (!esConflictoDeRef(segundoError)) return traduceError(segundoError, p)

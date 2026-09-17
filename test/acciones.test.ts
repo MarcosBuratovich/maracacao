@@ -15,7 +15,9 @@ import { serializa } from '../src/contenido/carga'
 import { esquemaSitio } from '../src/contenido/esquema/sitio'
 import { esquemaSabores } from '../src/contenido/esquema/sabores'
 import { TOPE_CUERPO } from '../src/servidor/rutas-permitidas'
-import { fetchFalso, respuestasDeUnaPublicacionCompleta, respuestasDeUnaPublicacionDirecta } from './lib/github-falso'
+import {
+  fetchFalso, respuestasDeUnaPublicacionCompleta, respuestasDeUnaPublicacionDirecta, respuestasDeUnBlobArbolYCommit,
+} from './lib/github-falso'
 import { marca } from '@/copy/sitio-marca'
 import { jergaEn } from '../src/servidor/estado'
 
@@ -2064,5 +2066,144 @@ describe('accion=historial', () => {
     const { f } = fetchFalso([...respuestasDeNingunaReversionPendiente(), { status: 500, cuerpo: {} }])
     const r = await maneja('historial', { cuerpo: {}, cookie: cookieValida() }, contextoBase(f))
     expect(r.status).toBe(502)
+  })
+})
+
+// Tarea 11 (spec §4.3, capa 2): el borrador del servidor. La mecánica de
+// `guarda()`/`leeBorrador()` en sí —crear el ref la primera vez, moverlo
+// después, el chequeo de conflicto entre aparatos— la cubre
+// `test/borrador.test.ts`; acá solo el cableado del router: sesión
+// obligatoria, que NO corre `revisaLaCabeza()` (no tiene nada que ver con
+// el pipeline de `main`), y que el autor sale de la sesión, nunca del
+// cuerpo.
+describe('accion=borrador.guardar', () => {
+  it('sin sesión, 401 — y no gasta ni un pedido', async () => {
+    const { f, pedidos } = fetchFalso([])
+    const r = await maneja(
+      'borrador.guardar',
+      { cuerpo: { base: 'main-1', documentos: {} }, cookie: '' },
+      contextoBase(f),
+    )
+    expect(r.status).toBe(401)
+    expect(pedidos).toHaveLength(0)
+  })
+
+  it('sin `base`, 400 — y no gasta ni un pedido', async () => {
+    const { f, pedidos } = fetchFalso([])
+    const r = await maneja(
+      'borrador.guardar',
+      { cuerpo: { documentos: {} }, cookie: cookieValida() },
+      contextoBase(f),
+    )
+    expect(r.status).toBe(400)
+    expect(pedidos).toHaveLength(0)
+  })
+
+  it('NO corre revisaLaCabeza(): guardar un borrador no tiene nada que ver con el pipeline de main', async () => {
+    // Si esto corriera revisaLaCabeza() primero, la primera respuesta
+    // programada (el 404 del ref del borrador) se consumiría en el lugar
+    // equivocado y el conteo de pedidos de abajo no cerraría. Exactamente
+    // las cinco del bootstrap del borrador, ni una de más.
+    const { f, pedidos } = fetchFalso([
+      { status: 404, cuerpo: { message: 'Not Found' } },
+      ...respuestasDeUnBlobArbolYCommit(),
+      { cuerpo: { ref: 'refs/panel/borrador' } },
+    ])
+    const r = await maneja(
+      'borrador.guardar',
+      {
+        cuerpo: { base: 'main-1', documentos: { sitio: { footer: { derechos: 'x' } } }, dispositivo: 'celu' },
+        cookie: cookieValida(),
+      },
+      contextoBase(f),
+    )
+    expect(r.status).toBe(200)
+    expect((r.cuerpo as { ok: boolean }).ok).toBe(true)
+    expect(pedidos).toHaveLength(5)
+  })
+
+  it('el autor que se guarda es el de la SESIÓN, nunca lo que mande el cuerpo', async () => {
+    const { f, pedidos } = fetchFalso([
+      { status: 404, cuerpo: { message: 'Not Found' } },
+      ...respuestasDeUnBlobArbolYCommit(),
+      { cuerpo: { ref: 'refs/panel/borrador' } },
+    ])
+    await maneja(
+      'borrador.guardar',
+      {
+        cuerpo: { base: 'main-1', documentos: {}, dispositivo: 'celu', autor: 'quien-sea@otro.mx' },
+        cookie: cookieValida('clienta@ejemplo.mx'),
+      },
+      contextoBase(f),
+    )
+    const blob = pedidos.find((p) => p.url.endsWith('/git/blobs') && p.metodo === 'POST')!
+    const escrito = JSON.parse(Buffer.from((blob.cuerpo as { content: string }).content, 'base64').toString('utf8'))
+    expect(escrito.autor).toBe('clienta@ejemplo.mx')
+  })
+
+  it('si hay un borrador más nuevo de OTRO aparato, 409 con el hecho crudo — no lo resuelve acá', async () => {
+    const yaGuardado = JSON.stringify({
+      documentos: {},
+      base: 'main-1',
+      dispositivo: 'la-compu',
+      autor: 'clienta@ejemplo.mx',
+      hora: 2_000,
+    })
+    const { f, pedidos } = fetchFalso([
+      { cuerpo: { object: { sha: 'refViejo' } } },
+      { cuerpo: { content: Buffer.from(yaGuardado).toString('base64'), encoding: 'base64', sha: 'b' } },
+    ])
+    const r = await maneja(
+      'borrador.guardar',
+      { cuerpo: { base: 'main-1', documentos: {}, dispositivo: 'celu' }, cookie: cookieValida() },
+      { ...contextoBase(f), ahora: () => 1_000 },
+    )
+    expect(r.status).toBe(409)
+    expect(r.cuerpo).toMatchObject({ ok: false, motivo: 'hay-uno-mas-nuevo', otro: { dispositivo: 'la-compu', hora: 2_000 } })
+    expect(jergaEn((r.cuerpo as { problema: string }).problema)).toBeNull()
+    expect(pedidos).toHaveLength(2) // el chequeo no escribió nada
+  })
+})
+
+describe('accion=borrador.leer', () => {
+  it('sin sesión, 401 — y no gasta ni un pedido', async () => {
+    const { f, pedidos } = fetchFalso([])
+    const r = await maneja('borrador.leer', { cuerpo: {}, cookie: '' }, contextoBase(f))
+    expect(r.status).toBe(401)
+    expect(pedidos).toHaveLength(0)
+  })
+
+  it('sin ningún borrador guardado, `borrador: null` — no un error', async () => {
+    // Es el estado normal de un panel recién estrenado (o de cualquier
+    // sesión antes del primer guardado). Un error acá sería la primera
+    // pantalla que ella ve en su vida.
+    const { f } = fetchFalso([{ status: 404, cuerpo: { message: 'Not Found' } }])
+    const r = await maneja('borrador.leer', { cuerpo: {}, cookie: cookieValida() }, contextoBase(f))
+    expect(r.status).toBe(200)
+    expect((r.cuerpo as { borrador: unknown }).borrador).toBeNull()
+  })
+
+  it('con un borrador guardado, lo devuelve tal cual — sin comparar ni decidir nada', async () => {
+    const guardado = {
+      documentos: { sitio: { footer: { derechos: 'x' } } },
+      base: 'main-1',
+      dispositivo: 'celu',
+      autor: 'clienta@ejemplo.mx',
+      hora: 5_000,
+    }
+    const { f } = fetchFalso([
+      { cuerpo: { object: { sha: 'sha-borrador' } } },
+      { cuerpo: { content: Buffer.from(JSON.stringify(guardado)).toString('base64'), encoding: 'base64', sha: 'b' } },
+    ])
+    const r = await maneja('borrador.leer', { cuerpo: {}, cookie: cookieValida() }, contextoBase(f))
+    expect(r.status).toBe(200)
+    expect((r.cuerpo as { borrador: unknown }).borrador).toEqual(guardado)
+  })
+
+  it('si GitHub no contesta, 502 — nunca "no hay borrador" por una falla de red', async () => {
+    const { f } = fetchFalso([{ status: 500, cuerpo: { message: 'boom' } }])
+    const r = await maneja('borrador.leer', { cuerpo: {}, cookie: cookieValida() }, contextoBase(f))
+    expect(r.status).toBe(502)
+    expect(jergaEn((r.cuerpo as { problema: string }).problema)).toBeNull()
   })
 })

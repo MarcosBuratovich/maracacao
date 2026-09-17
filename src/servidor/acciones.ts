@@ -25,6 +25,7 @@ import {
 } from './sesion'
 import { cliente } from './github'
 import { publica, PROBLEMA_NO_SE_PUDO_PUBLICAR, type Archivo } from './publicar'
+import { guarda, leeBorrador } from './borrador'
 import { revierte, TRAILER_REVIERTE, TRAILER_PANEL, tieneTrailer, valorDeTrailer, autorDelCommit } from './revertir'
 import { lee } from './historial'
 import type { Cambio } from '../contenido/diff'
@@ -1393,6 +1394,146 @@ async function historialAccion(pedido: Pedido, contexto: Contexto): Promise<Resp
 
 /*
  * ---------------------------------------------------------------------
+ * el borrador (Tarea 11, spec §4.3 capa 2)
+ * ---------------------------------------------------------------------
+ */
+
+const PROBLEMA_BORRADOR_INCOMPLETO = 'Falta información para guardar tu borrador: vuelve a abrir el panel.'
+const PROBLEMA_NO_SE_PUDO_GUARDAR_BORRADOR = 'No pudimos guardar tu borrador: prueba de nuevo en unos minutos.'
+const PROBLEMA_NO_SE_PUDO_LEER_BORRADOR = 'No pudimos abrir tu borrador: prueba de nuevo en unos minutos.'
+// [Producto] No es un error de nadie: es el aviso que existe para que
+// NINGÚN aparato pise en silencio el trabajo de otro (mismo criterio que la
+// Tarea 2 aplica a publicar, un nivel más abajo). El servidor no decide qué
+// preguntarle a ella sobre esto —esa pantalla es de la fase 6 (spec
+// §4.3)—; esta frase es solo un acompañante por si algo la muestra sin
+// mirar `otro`.
+const PROBLEMA_BORRADOR_MAS_NUEVO = 'Alguien más guardó un cambio más reciente desde otro aparato.'
+
+interface CuerpoBorradorGuardar {
+  documentos?: unknown
+  base?: unknown
+  dispositivo?: unknown
+  /** Si hay que pisar el borrador de OTRO aparato aunque sea más nuevo (ver `guarda()`, `borrador.ts`). */
+  pisar?: unknown
+}
+
+/**
+ * `borrador.guardar`: la capa 2 del borrador (spec §4.3) — la capa 1,
+ * IndexedDB tecla a tecla, es de la fase 6. Esta es la que hace que lo que
+ * ella escribió a medias sobreviva a cambiar de aparato.
+ *
+ * [B1] Sin `revisaLaCabeza()`, a propósito, y es una decisión —no un
+ * olvido—: esa limpieza es del pipeline de PUBLICACIÓN de `main` (¿el
+ * último commit del panel desplegó bien?), y el ref del borrador no tiene
+ * nada que ver con eso —la plataforma ni siquiera lo mira, decisión B5—.
+ * Correrla acá sería un pedido de más a GitHub y a la plataforma por cada
+ * guardado —y ella puede guardar cada pocos segundos, fase 6— sin que haya
+ * ningún commit de `main` que este camino pueda dejar roto.
+ *
+ * `autor` sale de la SESIÓN, nunca del cuerpo —mismo criterio que
+ * `publicarAccion`—: quien firma el borrador es quien está autenticada, no
+ * lo que el navegador diga que es. `ahora` sale del reloj inyectado, nunca
+ * de lo que mande el cliente: si el aparato tiene la hora mal, el chequeo
+ * de conflicto de `guarda()` tiene que seguir siendo correcto contra la
+ * hora del SERVIDOR, que es la única que los dos aparatos comparten.
+ */
+async function borradorGuardarAccion(pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
+  const env = contexto.env
+  if (!secretoUtilizable(env)) {
+    console.error('borrador.guardar: PANEL_SECRETO falta o mide menos de 32 caracteres.')
+    return error(503, PROBLEMA_INESPERADO)
+  }
+
+  const sesion = sesionVigente(pedido.cookie, env, contexto.ahora())
+  if (!sesion) return error(401, PROBLEMA_SESION)
+
+  const cuerpo = (pedido.cuerpo ?? {}) as CuerpoBorradorGuardar
+  if (typeof cuerpo.base !== 'string' || cuerpo.base === '') {
+    return error(400, PROBLEMA_BORRADOR_INCOMPLETO)
+  }
+  const documentos = comoDocumentos(cuerpo.documentos)
+  const dispositivo = idDeDispositivo(cuerpo.dispositivo)
+  const pisar = cuerpo.pisar === true
+
+  const gh = cliente({
+    token: env.PANEL_GITHUB_TOKEN ?? '',
+    duenio: env.GITHUB_DUENIO ?? '',
+    repo: env.GITHUB_REPO ?? '',
+    fetch: contexto.fetch,
+  })
+
+  try {
+    const r = await guarda(gh, {
+      documentos,
+      base: cuerpo.base,
+      dispositivo,
+      autor: sesion.correo,
+      ahora: contexto.ahora(),
+      pisar,
+    })
+
+    if (r.ok) return ok({ ok: true })
+
+    if (r.motivo === 'hay-uno-mas-nuevo') {
+      return {
+        status: 409,
+        cuerpo: { ok: false, motivo: 'hay-uno-mas-nuevo', otro: r.otro, problema: PROBLEMA_BORRADOR_MAS_NUEVO },
+      }
+    }
+
+    console.error(`borrador.guardar: no se pudo guardar (autor: ${sesion.correo}) — ${r.problema}`)
+    return error(502, PROBLEMA_NO_SE_PUDO_GUARDAR_BORRADOR)
+  } catch (e) {
+    console.error('borrador.guardar: reventó al guardar —', e)
+    return error(502, PROBLEMA_NO_SE_PUDO_GUARDAR_BORRADOR)
+  }
+}
+
+/**
+ * `borrador.leer`: el borrador del servidor tal cual está, sin comparar
+ * nada contra lo que el aparato que pregunta tenga guardado localmente.
+ * `leeBorrador()` (`borrador.ts`) ya devuelve `null` cuando no hay
+ * ninguno —el estado normal de un panel recién estrenado, o de cualquier
+ * sesión antes del primer guardado—, así que esta acción tampoco distingue
+ * «no hay borrador» de un error: lo único que puede fallar acá es que
+ * GitHub no conteste, y eso sí es un 502.
+ *
+ * No resuelve ningún conflicto entre dos aparatos: la pantalla que decide
+ * qué preguntarle a ella («celular, ayer 11:04, 3 cambios» / «esta compu,
+ * hace 6 días, 1 cambio», spec §4.3) es de la fase 6 — acá solo se lee el
+ * servidor y se le entrega tal cual.
+ *
+ * Sin `revisaLaCabeza()`, mismo motivo que `borradorGuardarAccion`: no hay
+ * ningún commit de `main` que leer un borrador pueda dejar roto.
+ */
+async function borradorLeerAccion(pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
+  const env = contexto.env
+  if (!secretoUtilizable(env)) {
+    console.error('borrador.leer: PANEL_SECRETO falta o mide menos de 32 caracteres.')
+    return error(503, PROBLEMA_INESPERADO)
+  }
+
+  const sesion = sesionVigente(pedido.cookie, env, contexto.ahora())
+  if (!sesion) return error(401, PROBLEMA_SESION)
+
+  const gh = cliente({
+    token: env.PANEL_GITHUB_TOKEN ?? '',
+    duenio: env.GITHUB_DUENIO ?? '',
+    repo: env.GITHUB_REPO ?? '',
+    fetch: contexto.fetch,
+  })
+
+  try {
+    const borrador = await leeBorrador(gh)
+    return ok({ ok: true, borrador })
+  } catch (e) {
+    console.error('borrador.leer: no se pudo leer el borrador —', e)
+    return error(502, PROBLEMA_NO_SE_PUDO_LEER_BORRADOR)
+  }
+}
+
+/*
+ * ---------------------------------------------------------------------
  * El router
  * ---------------------------------------------------------------------
  */
@@ -1422,6 +1563,10 @@ export async function maneja(accion: string, pedido: Pedido, contexto: Contexto)
         return await deshacerAccion(pedido, contexto)
       case 'historial':
         return await historialAccion(pedido, contexto)
+      case 'borrador.guardar':
+        return await borradorGuardarAccion(pedido, contexto)
+      case 'borrador.leer':
+        return await borradorLeerAccion(pedido, contexto)
       default:
         return error(404, PROBLEMA_ACCION_INEXISTENTE)
     }

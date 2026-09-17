@@ -1,8 +1,11 @@
 /*
- * El cliente de la Git Data API de GitHub: los siete pasos de bajo nivel que
- * hacen falta para armar un commit a mano (leer un ref, leer un commit, leer
- * un blob, crear un blob, crear un árbol, crear un commit, mover un ref).
- * `publicar.ts` (Tarea 5) los encadena para publicar un documento entero.
+ * El cliente de la Git Data API de GitHub: los pasos de bajo nivel que hacen
+ * falta para armar un commit a mano (leer un ref, leer un commit, leer un
+ * blob, crear un blob, crear un árbol, crear un commit, mover un ref, y
+ * —desde la Tarea 11— crear un ref que todavía no existe). `publicar.ts`
+ * (Tarea 5) encadena la mayoría para publicar un documento entero;
+ * `borrador.ts` (Tarea 11) usa `creaRef` una sola vez, para el primer
+ * commit del ref del borrador.
  *
  * Puro e inyectable (regla de `src/servidor/**`): el token, el dueño, el
  * repo y el propio `fetch` llegan por `Credenciales`. Nada acá lee
@@ -33,6 +36,14 @@ export interface EntradaArbol {
 export interface DatosCommit {
   mensaje: string
   arbol: string
+  /**
+   * [Tarea 11] `''` es el commit RAÍZ, sin padre: el ÚNICO caso que lo pide
+   * es el primer commit del ref del borrador, que no desciende de nada —ni
+   * de `main`, ni de un commit anterior propio, porque no existe— y por eso
+   * `creaCommit` manda `parents: []` en vez de `[padre]` cuando esto llega
+   * vacío. Todo lo demás del repo (`main`, cada reversión) siempre pasa un
+   * sha real acá, así que ese camino queda exactamente como estaba.
+   */
   padre: string
   autor: { name: string; email: string }
 }
@@ -208,14 +219,18 @@ export function cliente(c: Credenciales) {
       return cuerpo.sha
     },
 
-    /** Crea un commit con un solo padre y devuelve su sha. */
+    /**
+     * Crea un commit y devuelve su sha. Con un padre —el caso de siempre—
+     * manda `parents: [padre]`; con `padre: ''` manda `parents: []`, un
+     * commit RAÍZ (ver el comentario de `DatosCommit.padre`).
+     */
     async creaCommit(datos: DatosCommit): Promise<string> {
       const cuerpo = await pedir('/git/commits', {
         method: 'POST',
         body: {
           message: datos.mensaje,
           tree: datos.arbol,
-          parents: [datos.padre],
+          parents: datos.padre ? [datos.padre] : [],
           author: datos.autor,
         },
       }) as { sha: string }
@@ -233,6 +248,20 @@ export function cliente(c: Credenciales) {
       await pedir(`/git/refs/${nombre}`, {
         method: 'PATCH',
         body: { sha, force: forzar },
+      })
+    },
+
+    /**
+     * [Tarea 11] Crea un ref NUEVO apuntando a `sha`. `mueveRef` mueve un ref
+     * que YA existe —GitHub lo rechaza si no—, así que este es el único
+     * camino para el PRIMER commit de un ref que la plataforma todavía no
+     * conoce: sin esto, el primer borrador de la vida del panel moriría con
+     * un 404 que no le dice nada a nadie.
+     */
+    async creaRef(nombre: string, sha: string): Promise<void> {
+      await pedir('/git/refs', {
+        method: 'POST',
+        body: { ref: `refs/${nombre}`, sha },
       })
     },
 

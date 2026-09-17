@@ -34,6 +34,29 @@ export function rutaPermitida(ruta: string): boolean {
   return RUTAS_PERMITIDAS.some((patron) => patron.test(ruta))
 }
 
+/**
+ * [Tarea 11] La lista blanca del ref del borrador —OTRA lista, separada a
+ * propósito de `RUTAS_PERMITIDAS` de arriba, no una entrada más ahí adentro.
+ *
+ * Por qué dos listas y no una sola con más entradas: `publica()` elige cuál
+ * de las dos aplicar según el `ref` que le piden escribir —esta para
+ * `panel/borrador`, la de arriba para `heads/main`—. Si fuera UNA lista
+ * compartida entre los dos refs, un bug del router que mandara el ref
+ * equivocado (el archivo del borrador hacia `main`, o un documento de
+ * contenido hacia el ref del borrador) pasaría el chequeo igual —la ruta
+ * ESTARÍA en la lista, nomás que pensada para el otro ref— y el borrador a
+ * medio escribir terminaría en el sitio público, o un documento del sitio en
+ * un ref que la plataforma no despliega. Con dos listas disjuntas, esa
+ * combinación no tiene ninguna entrada que la deje pasar: el bug del router
+ * queda contenido acá adentro, nunca llega a publicarse.
+ */
+const RUTA_BORRADOR_PERMITIDA = /^panel\/borrador\.json$/
+
+/** Si el ref del borrador puede escribir esta ruta exacta. Ver el comentario de arriba: solo su propio archivo. */
+export function rutaDeBorradorPermitida(ruta: string): boolean {
+  return RUTA_BORRADOR_PERMITIDA.test(ruta)
+}
+
 /** Cuántos archivos puede tocar una sola publicación. */
 export const TOPE_ARCHIVOS = 40
 
@@ -51,8 +74,19 @@ export const TOPE_CUERPO = 3.5 * 1024 * 1024
  * UNA ruta no está permitida, se rechaza el lote entero (no se publica una
  * parte) — el mensaje nombra esa ruta para que quien lo lea en el log
  * sepa cuál fue.
+ *
+ * [Tarea 11] `permiteRuta` por defecto es `rutaPermitida` —la lista de
+ * `main`, el caso de siempre— para que ningún llamador existente note el
+ * cambio. `publica()` es quien pasa `rutaDeBorradorPermitida` cuando el
+ * `ref` que está escribiendo es el del borrador: la elección de CUÁL lista
+ * usar vive ahí, no acá — este archivo solo sabe revisar contra la que le
+ * pasen.
  */
-export function revisaLote(rutas: string[], bytesDelCuerpo: number): { ok: true } | { ok: false; problema: string } {
+export function revisaLote(
+  rutas: string[],
+  bytesDelCuerpo: number,
+  permiteRuta: (ruta: string) => boolean = rutaPermitida,
+): { ok: true } | { ok: false; problema: string } {
   if (rutas.length > TOPE_ARCHIVOS) {
     return { ok: false, problema: `Son demasiadas fotos para una sola publicación: manda hasta ${TOPE_ARCHIVOS} por vez.` }
   }
@@ -62,7 +96,7 @@ export function revisaLote(rutas: string[], bytesDelCuerpo: number): { ok: true 
   }
 
   for (const ruta of rutas) {
-    if (!rutaPermitida(ruta)) {
+    if (!permiteRuta(ruta)) {
       return { ok: false, problema: `No se puede publicar "${ruta}": no es un archivo que el panel pueda tocar.` }
     }
   }

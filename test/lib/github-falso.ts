@@ -92,3 +92,17 @@ export const respuestasDeUnaPublicacionCompleta = (vivo = textoSaboresVivoDeDisc
  * chequeo previo de «¿cambió?» que gaste ese primer pedido.
  */
 export const respuestasDeUnaPublicacionDirecta = () => respuestasDeUnaPublicacionCompleta().slice(1)
+
+/**
+ * [Tarea 11] Las tres respuestas del bootstrap de `borrador.ts` (`guarda()`,
+ * la primera vez que alguien guarda en la vida del panel): crear el blob,
+ * crear el árbol y crear el commit RAÍZ. Sin el `PATCH`/`POST /git/refs`
+ * final —ese varía según el caso (`creaRef`)— y sin el `GET` del ref de
+ * arranque —ese 404 se scriptea aparte, porque es la señal de "no existe
+ * todavía" que dispara este camino—.
+ */
+export const respuestasDeUnBlobArbolYCommit = () => [
+  { cuerpo: { sha: 'blob-borrador' } }, // creaBlob
+  { cuerpo: { sha: 'arbol-borrador' } }, // creaArbol
+  { cuerpo: { sha: 'commit-borrador' } }, // creaCommit (raíz, sin padre)
+]

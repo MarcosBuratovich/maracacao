@@ -207,14 +207,18 @@ function cliente(c) {
       });
       return cuerpo.sha;
     },
-    /** Crea un commit con un solo padre y devuelve su sha. */
+    /**
+     * Crea un commit y devuelve su sha. Con un padre —el caso de siempre—
+     * manda `parents: [padre]`; con `padre: ''` manda `parents: []`, un
+     * commit RAÍZ (ver el comentario de `DatosCommit.padre`).
+     */
     async creaCommit(datos) {
       const cuerpo = await pedir("/git/commits", {
         method: "POST",
         body: {
           message: datos.mensaje,
           tree: datos.arbol,
-          parents: [datos.padre],
+          parents: datos.padre ? [datos.padre] : [],
           author: datos.autor
         }
       });
@@ -231,6 +235,19 @@ function cliente(c) {
       await pedir(`/git/refs/${nombre}`, {
         method: "PATCH",
         body: { sha, force: forzar }
+      });
+    },
+    /**
+     * [Tarea 11] Crea un ref NUEVO apuntando a `sha`. `mueveRef` mueve un ref
+     * que YA existe —GitHub lo rechaza si no—, así que este es el único
+     * camino para el PRIMER commit de un ref que la plataforma todavía no
+     * conoce: sin esto, el primer borrador de la vida del panel moriría con
+     * un 404 que no le dice nada a nadie.
+     */
+    async creaRef(nombre, sha) {
+      await pedir("/git/refs", {
+        method: "POST",
+        body: { ref: `refs/${nombre}`, sha }
       });
     },
     /**
@@ -268,9 +285,13 @@ var RUTAS_PERMITIDAS = [
 function rutaPermitida(ruta2) {
   return RUTAS_PERMITIDAS.some((patron) => patron.test(ruta2));
 }
+var RUTA_BORRADOR_PERMITIDA = /^panel\/borrador\.json$/;
+function rutaDeBorradorPermitida(ruta2) {
+  return RUTA_BORRADOR_PERMITIDA.test(ruta2);
+}
 var TOPE_ARCHIVOS = 40;
 var TOPE_CUERPO = 3.5 * 1024 * 1024;
-function revisaLote(rutas, bytesDelCuerpo2) {
+function revisaLote(rutas, bytesDelCuerpo2, permiteRuta = rutaPermitida) {
   if (rutas.length > TOPE_ARCHIVOS) {
     return { ok: false, problema: `Son demasiadas fotos para una sola publicaci\xF3n: manda hasta ${TOPE_ARCHIVOS} por vez.` };
   }
@@ -278,7 +299,7 @@ function revisaLote(rutas, bytesDelCuerpo2) {
     return { ok: false, problema: "Es demasiado contenido para una sola publicaci\xF3n: manda menos fotos, o de menor tama\xF1o." };
   }
   for (const ruta2 of rutas) {
-    if (!rutaPermitida(ruta2)) {
+    if (!permiteRuta(ruta2)) {
       return { ok: false, problema: `No se puede publicar "${ruta2}": no es un archivo que el panel pueda tocar.` };
     }
   }
@@ -15392,7 +15413,7 @@ function frase(cambios) {
 
 // src/servidor/publicar.ts
 var AUTOR_PANEL = { name: "Panel Maracacao", email: "panel@maracacao.mx" };
-var REF = "heads/main";
+var REF_MAIN = "heads/main";
 var ASUNTO_GENERICO = "Actualiza contenido del panel";
 var PROBLEMA_NO_SE_PUDO_PUBLICAR = "No pudimos publicar: hubo un problema para conectarnos con el sitio. Prueba de nuevo en unos minutos.";
 var CONCURRENCIA_BLOBS = 4;
@@ -15438,23 +15459,31 @@ function esConflictoDeRef(e) {
   const { status, mensaje } = analizaError(e);
   return status === 422 && /fast forward/i.test(mensaje);
 }
-async function intento(gh, archivos, mensaje) {
-  const { sha: shaDelRef } = await gh.ref(REF);
+async function intento(gh, archivos, mensaje, ref, forzar) {
+  const { sha: shaDelRef } = await gh.ref(ref);
   const padre = await gh.commit(shaDelRef);
   const shasDeBlobs = await mapaConcurrencia(archivos, CONCURRENCIA_BLOBS, (a) => gh.creaBlob(a.contenido));
   const entradas = archivos.map((a, i) => ({ path: a.ruta, sha: shasDeBlobs[i] }));
   const arbol = await gh.creaArbol(padre.tree, entradas);
   const shaDelCommit = await gh.creaCommit({ mensaje, arbol, padre: padre.sha, autor: AUTOR_PANEL });
   try {
-    await gh.mueveRef(REF, shaDelCommit, false);
+    await gh.mueveRef(ref, shaDelCommit, forzar);
   } catch (e) {
     throw new FalloAlMoverRef(e, shaDelCommit);
   }
   return shaDelCommit;
 }
 async function publica(gh, p) {
+  const ref = p.ref ?? REF_MAIN;
+  const forzar = p.forzar ?? false;
+  if (forzar && ref === REF_MAIN) {
+    throw new Error(
+      `publica(): forzar:true contra ${REF_MAIN} no es una opci\xF3n \u2014 es un bug de quien llama, nunca un caso leg\xEDtimo.`
+    );
+  }
   const rutas = p.archivos.map((a) => a.ruta);
-  const chequeo = revisaLote(rutas, p.bytesDelCuerpo ?? bytesDelCuerpo(p.archivos));
+  const permiteRuta = ref === REF_MAIN ? rutaPermitida : rutaDeBorradorPermitida;
+  const chequeo = revisaLote(rutas, p.bytesDelCuerpo ?? bytesDelCuerpo(p.archivos), permiteRuta);
   if (!chequeo.ok) return { ok: false, codigo: 422, problema: chequeo.problema };
   const asunto = p.cambios !== void 0 ? frase(p.cambios) : ASUNTO_GENERICO;
   if (asunto === "") {
@@ -15463,7 +15492,7 @@ async function publica(gh, p) {
   const extras = Object.entries(p.trailers ?? {}).map(([k, v]) => `${k}: ${v}`);
   const mensaje = [`${asunto}`, "", "Panel: s\xED", `Panel-Autor: ${p.autor}`, ...extras].join("\n");
   try {
-    const sha = await intento(gh, p.archivos, mensaje);
+    const sha = await intento(gh, p.archivos, mensaje, ref, forzar);
     return { ok: true, sha, resumen: asunto };
   } catch (primerError) {
     if (!esConflictoDeRef(primerError)) return traduceError(primerError, p);
@@ -15479,7 +15508,7 @@ async function publica(gh, p) {
       };
     }
     try {
-      const sha = await intento(gh, p.archivos, mensaje);
+      const sha = await intento(gh, p.archivos, mensaje, ref, forzar);
       return { ok: true, sha, resumen: asunto };
     } catch (segundoError) {
       if (!esConflictoDeRef(segundoError)) return traduceError(segundoError, p);
@@ -15505,6 +15534,55 @@ function traduceError(e, p) {
     codigo: 502,
     problema: PROBLEMA_NO_SE_PUDO_PUBLICAR
   };
+}
+
+// src/servidor/borrador.ts
+var REF_BORRADOR = "panel/borrador";
+var RUTA_BORRADOR = "panel/borrador.json";
+var ARBOL_VACIO = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+function es404(e) {
+  return e instanceof Error && /^GitHub respondió 404:/.test(e.message);
+}
+async function intentaLeer(gh) {
+  try {
+    const { sha } = await gh.ref(REF_BORRADOR);
+    const texto2 = await gh.archivoEnRef(RUTA_BORRADOR, sha);
+    return { sha, borrador: JSON.parse(texto2) };
+  } catch (e) {
+    if (es404(e)) return null;
+    throw e;
+  }
+}
+async function leeBorrador(gh) {
+  const actual = await intentaLeer(gh);
+  return actual ? actual.borrador : null;
+}
+async function guarda(gh, args) {
+  const actual = await intentaLeer(gh);
+  if (actual && !args.pisar && actual.borrador.dispositivo !== args.dispositivo && actual.borrador.hora > args.ahora) {
+    return { ok: false, motivo: "hay-uno-mas-nuevo", otro: { dispositivo: actual.borrador.dispositivo, hora: actual.borrador.hora } };
+  }
+  const contenido = JSON.stringify({
+    documentos: args.documentos,
+    base: args.base,
+    dispositivo: args.dispositivo,
+    autor: args.autor,
+    hora: args.ahora
+  });
+  if (actual === null) {
+    const shaDelBlob = await gh.creaBlob(contenido);
+    const shaDelArbol = await gh.creaArbol(ARBOL_VACIO, [{ path: RUTA_BORRADOR, sha: shaDelBlob }]);
+    const shaDelCommit = await gh.creaCommit({ mensaje: "Borrador", arbol: shaDelArbol, padre: "", autor: AUTOR_PANEL });
+    await gh.creaRef(REF_BORRADOR, shaDelCommit);
+    return { ok: true };
+  }
+  const r = await publica(gh, {
+    archivos: [{ ruta: RUTA_BORRADOR, contenido }],
+    autor: args.autor,
+    ref: REF_BORRADOR,
+    forzar: true
+  });
+  return r.ok ? { ok: true } : { ok: false, motivo: "no-se-pudo-guardar", problema: r.problema };
 }
 
 // src/contenido/validacion.ts
@@ -18571,6 +18649,76 @@ async function historialAccion(pedido, contexto) {
   }
   return ok({ ok: true, publicaciones: lee(commits, contexto.ahora()) });
 }
+var PROBLEMA_BORRADOR_INCOMPLETO = "Falta informaci\xF3n para guardar tu borrador: vuelve a abrir el panel.";
+var PROBLEMA_NO_SE_PUDO_GUARDAR_BORRADOR = "No pudimos guardar tu borrador: prueba de nuevo en unos minutos.";
+var PROBLEMA_NO_SE_PUDO_LEER_BORRADOR = "No pudimos abrir tu borrador: prueba de nuevo en unos minutos.";
+var PROBLEMA_BORRADOR_MAS_NUEVO = "Alguien m\xE1s guard\xF3 un cambio m\xE1s reciente desde otro aparato.";
+async function borradorGuardarAccion(pedido, contexto) {
+  const env = contexto.env;
+  if (!secretoUtilizable(env)) {
+    console.error("borrador.guardar: PANEL_SECRETO falta o mide menos de 32 caracteres.");
+    return error51(503, PROBLEMA_INESPERADO);
+  }
+  const sesion = sesionVigente(pedido.cookie, env, contexto.ahora());
+  if (!sesion) return error51(401, PROBLEMA_SESION);
+  const cuerpo = pedido.cuerpo ?? {};
+  if (typeof cuerpo.base !== "string" || cuerpo.base === "") {
+    return error51(400, PROBLEMA_BORRADOR_INCOMPLETO);
+  }
+  const documentos = comoDocumentos(cuerpo.documentos);
+  const dispositivo = idDeDispositivo(cuerpo.dispositivo);
+  const pisar = cuerpo.pisar === true;
+  const gh = cliente({
+    token: env.PANEL_GITHUB_TOKEN ?? "",
+    duenio: env.GITHUB_DUENIO ?? "",
+    repo: env.GITHUB_REPO ?? "",
+    fetch: contexto.fetch
+  });
+  try {
+    const r = await guarda(gh, {
+      documentos,
+      base: cuerpo.base,
+      dispositivo,
+      autor: sesion.correo,
+      ahora: contexto.ahora(),
+      pisar
+    });
+    if (r.ok) return ok({ ok: true });
+    if (r.motivo === "hay-uno-mas-nuevo") {
+      return {
+        status: 409,
+        cuerpo: { ok: false, motivo: "hay-uno-mas-nuevo", otro: r.otro, problema: PROBLEMA_BORRADOR_MAS_NUEVO }
+      };
+    }
+    console.error(`borrador.guardar: no se pudo guardar (autor: ${sesion.correo}) \u2014 ${r.problema}`);
+    return error51(502, PROBLEMA_NO_SE_PUDO_GUARDAR_BORRADOR);
+  } catch (e) {
+    console.error("borrador.guardar: revent\xF3 al guardar \u2014", e);
+    return error51(502, PROBLEMA_NO_SE_PUDO_GUARDAR_BORRADOR);
+  }
+}
+async function borradorLeerAccion(pedido, contexto) {
+  const env = contexto.env;
+  if (!secretoUtilizable(env)) {
+    console.error("borrador.leer: PANEL_SECRETO falta o mide menos de 32 caracteres.");
+    return error51(503, PROBLEMA_INESPERADO);
+  }
+  const sesion = sesionVigente(pedido.cookie, env, contexto.ahora());
+  if (!sesion) return error51(401, PROBLEMA_SESION);
+  const gh = cliente({
+    token: env.PANEL_GITHUB_TOKEN ?? "",
+    duenio: env.GITHUB_DUENIO ?? "",
+    repo: env.GITHUB_REPO ?? "",
+    fetch: contexto.fetch
+  });
+  try {
+    const borrador = await leeBorrador(gh);
+    return ok({ ok: true, borrador });
+  } catch (e) {
+    console.error("borrador.leer: no se pudo leer el borrador \u2014", e);
+    return error51(502, PROBLEMA_NO_SE_PUDO_LEER_BORRADOR);
+  }
+}
 var PROBLEMA_ACCION_INEXISTENTE = "Esta acci\xF3n todav\xEDa no existe.";
 async function maneja(accion, pedido, contexto) {
   try {
@@ -18587,6 +18735,10 @@ async function maneja(accion, pedido, contexto) {
         return await deshacerAccion(pedido, contexto);
       case "historial":
         return await historialAccion(pedido, contexto);
+      case "borrador.guardar":
+        return await borradorGuardarAccion(pedido, contexto);
+      case "borrador.leer":
+        return await borradorLeerAccion(pedido, contexto);
       default:
         return error51(404, PROBLEMA_ACCION_INEXISTENTE);
     }

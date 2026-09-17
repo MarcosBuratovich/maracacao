@@ -223,4 +223,76 @@ describe('publicar', () => {
     expect(pedidos.filter((p) => p.metodo === 'PATCH')).toHaveLength(1)
     expect(pedidos).toHaveLength(6)
   })
+
+  // Tarea 11, decisión B5: el ref del borrador (`borrador.ts`) no tiene
+  // historia que preservar, así que se mueve con `force: true` — la ÚNICA
+  // excepción de todo el proyecto a la regla de `force: false`.
+  describe('B5: el ref del borrador (force) — y por qué NUNCA es main', () => {
+    it('el ref de borrador se mueve con force; main NUNCA', async () => {
+      const { f, pedidos } = fetchFalso([...respuestasDeUnaPublicacionDirecta()])
+      const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+      await publica(gh, {
+        archivos: [{ ruta: 'panel/borrador.json', contenido: '{}' }],
+        autor: 'ella@x.mx',
+        ref: 'panel/borrador',
+        forzar: true,
+      })
+      const patch = pedidos.find((p) => p.metodo === 'PATCH')!
+      expect(patch.url).toContain('/git/refs/panel/borrador')
+      expect((patch.cuerpo as { force: boolean }).force).toBe(true)
+    })
+
+    it('la lista blanca que se aplica depende del ref', async () => {
+      // Un archivo de contenido mandado al ref de borrador se rechaza, y el
+      // archivo del borrador mandado a main también. Si una sola lista
+      // valiera para los dos, un bug del router podría publicar el
+      // borrador en el sitio, o un documento del sitio en el ref que la
+      // plataforma no despliega.
+      const { f } = fetchFalso([])
+      const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+      expect(
+        (await publica(gh, { archivos: [{ ruta: 'src/contenido/datos/sitio.json', contenido: '{}' }], autor: 'a@b.mx', ref: 'panel/borrador', forzar: true })).ok,
+      ).toBe(false)
+      expect((await publica(gh, { archivos: [{ ruta: 'panel/borrador.json', contenido: '{}' }], autor: 'a@b.mx' })).ok).toBe(false)
+    })
+
+    it('forzar:true contra `heads/main` (el default) tira: es un bug de quien llama, no un caso legítimo', async () => {
+      const { f, pedidos } = fetchFalso([])
+      const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+      await expect(
+        publica(gh, { archivos: [{ ruta: 'src/contenido/datos/sitio.json', contenido: '{}' }], autor: 'a@b.mx', forzar: true }),
+      ).rejects.toThrow()
+      // Ni un pedido: revienta ANTES de tocar GitHub, no a mitad de camino.
+      expect(pedidos).toHaveLength(0)
+    })
+
+    it('forzar:true contra `ref: \'heads/main\'` explícito también tira, no solo contra el default', async () => {
+      const { f, pedidos } = fetchFalso([])
+      const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+      await expect(
+        publica(gh, {
+          archivos: [{ ruta: 'src/contenido/datos/sitio.json', contenido: '{}' }],
+          autor: 'a@b.mx',
+          ref: 'heads/main',
+          forzar: true,
+        }),
+      ).rejects.toThrow()
+      expect(pedidos).toHaveLength(0)
+    })
+
+    it('sin `ref`/`forzar`, todo sigue exactamente igual: se escribe en main, sin force', async () => {
+      // El default nuevo tiene que ser invisible para todo lo que ya
+      // llamaba a publica() antes de esta tarea.
+      const { f, pedidos } = fetchFalso([...respuestasDeUnaPublicacionDirecta()])
+      const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+      const r = await publica(gh, {
+        archivos: [{ ruta: 'src/contenido/datos/sitio.json', contenido: '{}' }],
+        autor: 'x@y.mx',
+      })
+      expect(r.ok).toBe(true)
+      const patch = pedidos.find((p) => p.metodo === 'PATCH')!
+      expect(patch.url).toContain('/git/refs/heads/main')
+      expect((patch.cuerpo as { force: boolean }).force).toBe(false)
+    })
+  })
 })
