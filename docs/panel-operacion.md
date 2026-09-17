@@ -6,10 +6,18 @@ no de una sola vez.
 
 Si algo del panel deja de andar, `scripts/humo-panel.sh` es el ensayo de
 este documento en forma de script: pega contra `www.maracacao.mx` de
-verdad —salud, un login que falla a propósito, el freno de intentos, un
-login que funciona, una publicación real y su vuelta atrás— y en el camino
-confirma o descarta la mitad de las preguntas que este runbook contesta por
-escrito. Correrlo primero, antes de tocar nada a mano, ahorra tiempo.
+verdad —salud, un login que falla a propósito, un login que funciona, una
+publicación real y su vuelta atrás, y por último el freno de intentos— y
+en el camino confirma o descarta la mitad de las preguntas que este
+runbook contesta por escrito. El freno va al final a propósito: no
+depende de nada de lo que hace `publicar`, así que probarlo antes solo
+agregaría una espera de quince minutos en el medio de un ensayo que se
+supone hay que poder repetir. Correrlo primero, antes de tocar nada a
+mano, ahorra tiempo. Si una corrida se corta justo después de publicar el
+cambio de prueba y antes de restaurarlo, el propio script te deja, en el
+mensaje de error, el comando exacto para arreglarlo
+(`scripts/humo-panel.sh --restaurar '…'`) — no hace falta ni leer el
+script ni tocar Git a mano.
 
 ## Cómo se escribe una función
 
@@ -312,8 +320,14 @@ de esta parte, son límites conocidos de lo que se construyó hasta acá:
   simplemente tenga paciencia y espere a que Vercel recicle una instancia,
   se salta el freno sin mucho esfuerzo. No es la defensa principal —esa es
   tener una contraseña larga (E2)— sino el freno al intento casual y al
-  script tonto. Por la misma razón, `scripts/humo-panel.sh` (paso 3) puede
-  ver el freno saltar antes o después de lo que uno cuenta a mano: no es
-  una falla del script, es este mismo límite. Si algún día hace falta un
-  freno de verdad, contra un atacante de verdad, hace falta un almacén
-  compartido entre instancias (Redis, o algo así) — hoy no existe.
+  script tonto. Por la misma razón, `scripts/humo-panel.sh` prueba el
+  freno AL FINAL (paso 6) y sin asumir un número fijo de intentos: `salud`
+  y `entrar` comparten el mismo contador por IP, así que para cuando el
+  script llega a probar el freno a propósito, `salud` y los dos logins de
+  antes ya gastaron parte del mismo presupuesto de cinco cada quince
+  minutos — cuántos intentos hacen falta para ver el 429 depende de eso,
+  no es una cuenta que se pueda fijar de antemano. No es una falla del
+  script, es este mismo límite, y por eso el script lo dice en su salida
+  en vez de asumir un número. Si algún día hace falta un freno de verdad,
+  contra un atacante de verdad, hace falta un almacén compartido entre
+  instancias (Redis, o algo así) — hoy no existe.

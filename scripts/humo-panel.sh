@@ -10,10 +10,24 @@
 # es el script al que hay que volver — por eso cada paso explica el PORQUÉ,
 # no el QUÉ (el comando ya dice el qué).
 #
+# El freno de intentos (paso 6) va AL FINAL, después de publicar y
+# restaurar, no antes: el freno no depende de nada de lo que hace
+# `publicar`, así que el orden es libre, y probarlo primero significaba
+# dispararlo y quedarte mirando una terminal quince minutos antes de que
+# pasara algo interesante. Un ensayo de veinticinco minutos con una espera
+# muerta en el medio es un ensayo que nadie repite — y un ensayo que nadie
+# repite deja de ser un ensayo (RULING T7-b).
+#
 # Lo corrés vos, a mano, desde tu máquina:
 #   scripts/humo-panel.sh tu-correo@ejemplo.com
 # o sin argumento, y te lo pide:
 #   scripts/humo-panel.sh
+#
+# Si una corrida anterior se cortó a mitad de camino y el sitio quedó con
+# el texto de prueba puesto, no hace falta leer el script para arreglarlo:
+# el mensaje de error de esa corrida ya te da el comando exacto, con esta
+# forma:
+#   scripts/humo-panel.sh --restaurar 'el texto original de footer.derechos' [correo]
 #
 # La contraseña NUNCA es un argumento: un argumento de shell queda en el
 # historial (`history`) y en la lista de procesos (`ps aux`) mientras el
@@ -40,11 +54,173 @@ ORIGEN='https://www.maracacao.mx'
 # pelado (sin `-H Origin`) la dispara. Por eso el Origin va en TODOS los
 # POST de este script.
 
+# Estas dos se inicializan ACÁ, antes de que pueda pasar cualquier cosa que
+# corte el script (falta una herramienta, falta el correo, lo que sea): la
+# trampa de salida (`limpieza`, más abajo) las lee siempre, y con `set -u`
+# leer una variable que todavía no existe corta el script con un error feo
+# en vez del aviso claro que se supone que tiene que dar.
+SITIO_MODIFICADO=0
+DERECHOS_ORIGINAL=''
+MODO_RESTAURAR=0
+
 # ---------------------------------------------------------------------
-# 0) Quién sos y con qué contraseña — nunca al repo, nunca al historial.
+# Funciones compartidas — se definen todas ANTES de usarlas en ningún
+# lado de abajo (paso normal o modo `--restaurar`), así los dos caminos
+# arman el pedido exactamente igual y un bug de forma de JSON no puede
+# arreglarse en un camino y quedar roto en el otro.
 # ---------------------------------------------------------------------
 
-CORREO="${1:-}"
+PASO_ACTUAL=''
+paso() {
+  PASO_ACTUAL="$1"
+  printf '\n=== %s ===\n' "$1"
+}
+
+# El corazón del script: compara lo que se esperaba contra lo que llegó, y
+# si no matchea, corta ACÁ — nunca sigue con un supuesto que ya se probó
+# falso. `$3` es una pista para quien lea el log, no el detalle técnico
+# (ese va aparte, si hace falta).
+espera_status() {
+  local esperado="$1" obtenido="$2" pista="$3"
+  if [ "$obtenido" = "$esperado" ]; then
+    echo "  esperado: $esperado — obtuve: $obtenido — bien ($pista)"
+    return 0
+  fi
+  echo "  esperado: $esperado — obtuve: $obtenido — MAL ($pista)" >&2
+  echo "Corto en «$PASO_ACTUAL»: esto no dio lo que tenía que dar." >&2
+  exit 1
+}
+
+cuerpo_login() {
+  # jq arma el JSON, no un printf a mano: si el correo o la clave traen
+  # comillas o barras, escribir el JSON a mano manda un pedido roto sin que
+  # se note por qué falló.
+  jq -n --arg correo "$1" --arg clave "$2" --arg dispositivo "$3" \
+    '{correo: $correo, clave: $clave, dispositivo: $dispositivo}'
+}
+
+cuerpo_publicar() {
+  # $1 = ruta a un JSON con el documento «sitio» COMPLETO, ya modificado.
+  # `publicar` exige el documento ENTERO, no un parche (acciones.ts,
+  # `validarContra(DOCUMENTOS[id], documentos[id])` corre el esquema
+  # entero contra lo que se manda) — mandar solo
+  # `{"footer":{"derechos":"…"}}` rebota con «el campo quedó vacío» en
+  # todos los demás campos.
+  jq -n --argjson sitio "$(cat "$1")" '{documentos: {sitio: $sitio}}'
+}
+
+# Login con la contraseña REAL (la de `$CLAVE`), usado tanto en el paso 3
+# del flujo normal como en el modo `--restaurar`. Guarda la cookie en
+# `$COOKIES` con `-c`. Nunca imprime el valor de la cookie: solo confirma
+# que llegó con las banderas que la protegen (E3).
+hacer_login_real() {
+  local etiqueta="$1" status
+  status="$(curl -s -D "$TMPDIR_HUMO/headers-login.txt" -o "$TMPDIR_HUMO/resp-login.json" -w '%{http_code}' \
+    -X POST "$BASE/api/panel?accion=entrar" \
+    -H 'Content-Type: application/json' -H "Origin: $ORIGEN" \
+    -c "$COOKIES" \
+    -d "$(cuerpo_login "$CORREO" "$CLAVE" "$etiqueta")")"
+  echo "  respuesta: $(cat "$TMPDIR_HUMO/resp-login.json")"
+  if [ "$status" != '200' ]; then
+    echo "  esperado: 200 — obtuve: $status — MAL (contraseña real)" >&2
+    return 1
+  fi
+  echo '  esperado: 200 — obtuve: 200 — bien (contraseña real)'
+
+  if grep -qi '^set-cookie:.*panel_sesion=' "$TMPDIR_HUMO/headers-login.txt" \
+    && grep -qi '^set-cookie:.*httponly' "$TMPDIR_HUMO/headers-login.txt" \
+    && grep -qi '^set-cookie:.*secure' "$TMPDIR_HUMO/headers-login.txt" \
+    && grep -qi '^set-cookie:.*samesite=lax' "$TMPDIR_HUMO/headers-login.txt"; then
+    echo '  Set-Cookie: sí, con HttpOnly; Secure; SameSite=Lax (el valor no se imprime nunca)'
+  else
+    echo '  Set-Cookie: faltó, o le faltó alguna bandera de protección — MAL' >&2
+    return 1
+  fi
+  if [ ! -s "$COOKIES" ]; then
+    echo '  curl no guardó ninguna cookie en el archivo temporal — sin eso no puedo publicar.' >&2
+    return 1
+  fi
+  return 0
+}
+
+# Publica un valor nuevo de `footer.derechos`, trayendo primero el
+# `sitio.json` VIVO de GitHub —nunca el archivo local, que podría estar
+# desactualizado si alguien publicó algo después del último `git pull`— y
+# cambiándole ese único campo. Deja `SHA_PUBLICADO` seteado si salió bien.
+# La usan el paso 4 (publicar la prueba), el paso 5 (restaurar) y el modo
+# `--restaurar`: un solo lugar que arma el pedido es un solo lugar donde
+# puede haber un bug, no tres.
+publica_derechos() {
+  local valor="$1"
+  git fetch origin main --quiet
+  if ! git show origin/main:src/contenido/datos/sitio.json > "$TMPDIR_HUMO/vivo-pub.json" 2>/dev/null; then
+    echo '  no pude leer src/contenido/datos/sitio.json de origin/main — revisá la conexión' \
+      'o si el archivo sigue existiendo con ese nombre.' >&2
+    return 1
+  fi
+  jq --arg v "$valor" '.footer.derechos = $v' "$TMPDIR_HUMO/vivo-pub.json" > "$TMPDIR_HUMO/doc-pub.json"
+
+  local status
+  status="$(curl -s -b "$COOKIES" -o "$TMPDIR_HUMO/resp-pub.json" -w '%{http_code}' \
+    -X POST "$BASE/api/panel?accion=publicar" \
+    -H 'Content-Type: application/json' -H "Origin: $ORIGEN" \
+    -d "$(cuerpo_publicar "$TMPDIR_HUMO/doc-pub.json")")"
+  echo "  respuesta: $(cat "$TMPDIR_HUMO/resp-pub.json")"
+  if [ "$status" != '200' ]; then
+    echo "  esperado: 200 — obtuve: $status — MAL" >&2
+    return 1
+  fi
+  if ! grep -q '"ok":true' "$TMPDIR_HUMO/resp-pub.json"; then
+    echo '  status 200 pero ok no es true.' >&2
+    return 1
+  fi
+  SHA_PUBLICADO="$(jq -r '.sha' "$TMPDIR_HUMO/resp-pub.json")"
+  if [ -z "$SHA_PUBLICADO" ] || [ "$SHA_PUBLICADO" = 'null' ]; then
+    echo '  ok:true pero sha vino null — según acciones.ts eso significa «no había nada' \
+      'que publicar», y acá se esperaba un cambio real.' >&2
+    return 1
+  fi
+  echo "  sha del commit: $SHA_PUBLICADO"
+  return 0
+}
+
+# Sondea la portada cada 10 segundos (hasta 6 minutos) en vez de dormir un
+# tiempo fijo: así este chequeo ni se queda corto un día que Vercel tarda
+# más, ni espera de más un día que anda rápido. `$1` = texto que tiene que
+# aparecer; `$2` (opcional) = texto que YA NO tiene que estar (para
+# confirmar que la marca de prueba se fue de verdad, no solo que el texto
+# original volvió a aparecer en OTRO lado de la página).
+espera_en_vivo() {
+  local debe="$1" nodebe="${2:-}" intento cuerpo
+  for intento in $(seq 1 36); do
+    cuerpo="$(curl -s "$BASE/")"
+    if printf '%s' "$cuerpo" | grep -qF -- "$debe"; then
+      if [ -z "$nodebe" ] || ! printf '%s' "$cuerpo" | grep -qF -- "$nodebe"; then
+        echo "  apareció en vivo (intento $intento de 36, ~$((intento * 10))s)"
+        return 0
+      fi
+    fi
+    sleep 10
+  done
+  return 1
+}
+
+# ---------------------------------------------------------------------
+# Argumentos y credenciales.
+# ---------------------------------------------------------------------
+
+if [ "${1:-}" = '--restaurar' ]; then
+  MODO_RESTAURAR=1
+  VALOR_RESTAURAR="${2:-}"
+  CORREO="${3:-}"
+  if [ -z "$VALOR_RESTAURAR" ]; then
+    echo "Uso: $0 --restaurar 'el texto original de footer.derechos' [correo]" >&2
+    exit 1
+  fi
+else
+  CORREO="${1:-}"
+fi
+
 if [ -z "$CORREO" ]; then
   read -rp 'Correo de la clienta (el que está en PANEL_CORREOS): ' CORREO
 fi
@@ -72,48 +248,78 @@ done
 # cookie ES la sesión (E3 del plan): tratarla como si fuera la contraseña
 # misma es lo correcto, no una exageración.
 TMPDIR_HUMO="$(mktemp -d)"
+COOKIES="$TMPDIR_HUMO/cookies.txt"
+
 limpieza() {
-  # `unset` no borra la memoria de un proceso que ya terminó, pero sí evita
-  # que la variable siga viva el resto de la corrida si algo de acá abajo
-  # falla a mitad de camino y el script sigue por otro lado.
+  local salida=$?
   unset CLAVE
+  # El caso peligroso no es que el script falle — es que falle DESPUÉS de
+  # publicar el cambio de prueba y ANTES de restaurar el original: ahí el
+  # sitio queda modificado de verdad y quien lo lea se encuentra con un
+  # stack trace en vez de con el comando que lo arregla. `SITIO_MODIFICADO`
+  # marca exactamente esa ventana (se prende después de publicar el
+  # cambio, se apaga después de publicar la vuelta) — así que si seguía
+  # prendida al salir, esto lo dice fuerte, con el comando exacto para
+  # arreglarlo, en vez de dejarlo para que alguien lo adivine.
+  if [ "$MODO_RESTAURAR" -eq 0 ] && [ "$SITIO_MODIFICADO" -eq 1 ]; then
+    printf '\n'
+    printf '#####################################################################\n'
+    printf '###   OJO: EL SITIO QUEDO CON EL TEXTO DE PRUEBA, SIN RESTAURAR   ###\n'
+    printf '#####################################################################\n'
+    printf 'footer.derechos en vivo (o a punto de estarlo) tiene el texto de prueba\n'
+    printf 'de esta corrida, no el original. Para dejarlo como estaba, corré:\n\n'
+    printf "  %s --restaurar '%s'\n\n" "$0" "$DERECHOS_ORIGINAL"
+    printf 'Eso entra con tu contraseña y publica el valor de arriba por el mismo\n'
+    printf 'canal que usa la clienta — nunca hace falta `git revert` a mano.\n'
+    printf '#####################################################################\n'
+  fi
   rm -rf "$TMPDIR_HUMO"
+  exit "$salida"
 }
 trap limpieza EXIT
 
-COOKIES="$TMPDIR_HUMO/cookies.txt"
+# ---------------------------------------------------------------------
+# Modo `--restaurar`: rescate directo, sin salud, sin logins de prueba,
+# sin freno. Es lo que el mensaje de arriba te manda a correr si una
+# corrida normal se cortó con el sitio a mitad de camino.
+# ---------------------------------------------------------------------
 
-PASO_ACTUAL=''
-paso() {
-  PASO_ACTUAL="$1"
-  printf '\n=== %s ===\n' "$1"
-}
-
-# El corazón del script: compara lo que se esperaba contra lo que llegó, y
-# si no matchea, corta ACÁ — nunca sigue con un supuesto que ya se probó
-# falso. `$3` es una pista para quien lea el log, no el detalle técnico
-# (ese va aparte, si hace falta).
-espera_status() {
-  local esperado="$1" obtenido="$2" pista="$3"
-  if [ "$obtenido" = "$esperado" ]; then
-    echo "  esperado: $esperado — obtuve: $obtenido — bien ($pista)"
-    return 0
+if [ "$MODO_RESTAURAR" -eq 1 ]; then
+  paso "Modo restaurar: publicando \"$VALOR_RESTAURAR\" en footer.derechos"
+  if ! hacer_login_real 'humo-panel.sh --restaurar'; then
+    echo "Corto en «$PASO_ACTUAL»: no pude entrar. Revisá la contraseña, o entrá al panel" \
+      'a mano y publicá el valor ahí.' >&2
+    exit 1
   fi
-  echo "  esperado: $esperado — obtuve: $obtenido — MAL ($pista)" >&2
-  echo "Corto en «$PASO_ACTUAL»: esto no dio lo que tenía que dar." >&2
-  exit 1
-}
+  if ! publica_derechos "$VALOR_RESTAURAR"; then
+    echo "Corto en «$PASO_ACTUAL»: la publicación de rescate falló. El sitio puede seguir" \
+      'con el texto de prueba — reintentá este mismo comando, o entrá al panel a mano.' >&2
+    exit 1
+  fi
+  echo '  esperando el deploy...'
+  if ! espera_en_vivo "$VALOR_RESTAURAR"; then
+    echo "Corto en «$PASO_ACTUAL»: el commit de rescate ya está en GitHub (sha de arriba)," \
+      'pero pasaron 6 minutos y todavía no se ve en vivo. Revisá Deployments en Vercel a' \
+      'mano — el dato ya está bien, es el deploy que tarda.' >&2
+    exit 1
+  fi
+  echo
+  echo '=== Restaurado y confirmado en vivo. ==='
+  exit 0
+fi
 
 # ---------------------------------------------------------------------
-# 1) Salud — ¿están las seis variables, y responde GitHub?
+# Flujo normal (RULING T7-b: salud → login malo → login bueno → publicar
+# y restaurar → freno AL FINAL, sin espera de 16 minutos en el medio).
 # ---------------------------------------------------------------------
-# Sin sesión (E8: `salud` es la única acción que no la pide), así que este
-# paso no gasta ningún intento de login. OJO: si las variables están, este
-# pedido SÍ gasta un lugar del freno de intentos de abajo (paso 3) — `salud`
-# y `entrar` comparten el mismo contador por IP (src/servidor/sesion.ts,
-# `intentoPermitido`). No es un bug de este script: es el sistema real, y
-# por eso el freno se puede disparar un pedido antes de lo que uno cuenta a
-# mano si alguien ya pegó contra `salud` en los últimos quince minutos.
+
+# 1) Salud — ¿están las seis variables, y responde GitHub?
+# Sin sesión (E8: `salud` es la única acción que no la pide). OJO: si las
+# variables están, este pedido SÍ gasta un lugar del freno de intentos del
+# paso 6 — `salud` y `entrar` comparten el mismo contador por IP
+# (src/servidor/sesion.ts, `intentoPermitido`). Es justo por esto que el
+# paso 6 no asume un número fijo de intentos: para cuando llega ahí, salud
+# y los dos logins de abajo ya gastaron parte del mismo presupuesto.
 
 paso '1) Salud'
 salud_cuerpo="$(curl -s "$BASE/api/panel?accion=salud")"
@@ -131,126 +337,44 @@ if ! echo "$salud_cuerpo" | grep -q '"github":true'; then
 fi
 echo '  variables completas, GitHub responde — sigo.'
 
-# ---------------------------------------------------------------------
 # 2) Entrar con la contraseña equivocada, una vez — tiene que dar 401.
-# ---------------------------------------------------------------------
-# Prueba que el rechazo funciona ANTES de probar que el freno funciona: si
-# esto no da 401 (por ejemplo, porque el freno ya estaba gastado de una
-# corrida anterior en los últimos quince minutos y da 429), es más honesto
-# cortar acá y decirlo que seguir con un freno que ya estaba a mitad de
-# camino antes de que este script empezara.
+# Prueba que el rechazo funciona ANTES de tocar nada más. Si esto no da
+# 401 (por ejemplo 429, porque el freno ya venía gastado de una corrida en
+# los últimos quince minutos), es más honesto cortar acá y decirlo que
+# seguir adelante con un freno a mitad de camino.
 
 paso '2) Entrar con contraseña equivocada (una vez) — esperado: 401'
-cuerpo_login() {
-  # jq arma el JSON, no un printf a mano: si el correo o la clave traen
-  # comillas o barras, escribir el JSON a mano manda un pedido roto sin que
-  # se note por qué falló.
-  jq -n --arg correo "$1" --arg clave "$2" --arg dispositivo "$3" \
-    '{correo: $correo, clave: $clave, dispositivo: $dispositivo}'
-}
-
 status2="$(curl -s -o "$TMPDIR_HUMO/resp-2.json" -w '%{http_code}' -X POST "$BASE/api/panel?accion=entrar" \
   -H 'Content-Type: application/json' -H "Origin: $ORIGEN" \
   -d "$(cuerpo_login "$CORREO" 'esta-no-es-la-clave-de-nadie' 'humo-panel.sh')")"
 echo "  respuesta: $(cat "$TMPDIR_HUMO/resp-2.json")"
 espera_status 401 "$status2" 'clave mal a propósito, una sola vez'
 
-# ---------------------------------------------------------------------
-# 3) Entrar con la contraseña equivocada, seis veces seguidas — el sexto
-#    intento tiene que dar 429: es la prueba de que el freno de verdad
-#    frena (E4).
-# ---------------------------------------------------------------------
-# El freno deja pasar 5 intentos por IP cada 15 minutos y frena del sexto
-# en adelante (TOPE_INTENTOS = 5 en sesion.ts). Contando lo que ya gastaron
-# los pasos 1 y 2 de este mismo script, es MUY probable que el freno salte
-# antes del sexto intento de este bucle — y esta bien: lo único que este
-# paso exige es que, para cuando termine el sexto, YA esté en 429. Si
-# saltó antes, es el mismo freno funcionando más temprano, no una falla.
+# 3) Entrar con la contraseña de verdad — 200 y un Set-Cookie con las
+# banderas correctas. Nunca se imprime el valor de la cookie: eso ES la
+# sesión (E3).
 
-paso '3) Entrar con contraseña equivocada, seis veces seguidas — el sexto tiene que dar 429'
-status_ultimo=''
-for i in 1 2 3 4 5 6; do
-  status_ultimo="$(curl -s -o "$TMPDIR_HUMO/resp-3-$i.json" -w '%{http_code}' -X POST "$BASE/api/panel?accion=entrar" \
-    -H 'Content-Type: application/json' -H "Origin: $ORIGEN" \
-    -d "$(cuerpo_login "$CORREO" "esta-tampoco-es-la-clave-$i" 'humo-panel.sh')")"
-  echo "  intento $i: status $status_ultimo — $(cat "$TMPDIR_HUMO/resp-3-$i.json")"
-done
-espera_status 429 "$status_ultimo" 'sexto intento seguido con clave mal — el freno tiene que haber saltado'
-
-# ---------------------------------------------------------------------
-# 4) Esperar a que se vacíe la ventana del freno.
-# ---------------------------------------------------------------------
-# El freno cuenta por IP en los últimos 15 minutos (VENTANA_MS en
-# sesion.ts). `entrar` lo chequea ANTES de mirar la contraseña — así que
-# mientras la ventana no se vacíe, ni siquiera la contraseña CORRECTA del
-# paso 5 va a pasar: va a chocar con el mismo 429. No hay forma de saltarse
-# esta espera desde este script; 16 minutos (un minuto de margen sobre los
-# 15 exactos) es la única salida honesta.
-
-paso '4) Esperando que se vacíe la ventana de 15 minutos del freno'
-echo '  esto es el freno funcionando, no un problema: mientras más espera, más' \
-  'seguro es que la ventana está limpia para el login de verdad del paso 5.'
-SEGUNDOS_ESPERA=$((16 * 60))
-restantes=$SEGUNDOS_ESPERA
-while [ "$restantes" -gt 0 ]; do
-  printf '\r  faltan %d:%02d minutos ' $((restantes / 60)) $((restantes % 60))
-  sleep 10
-  restantes=$((restantes - 10))
-done
-printf '\r  listo, ya pasaron los 16 minutos.        \n'
-
-# ---------------------------------------------------------------------
-# 5) Entrar con la contraseña de verdad — 200 y un Set-Cookie con las
-#    banderas correctas.
-# ---------------------------------------------------------------------
-# Nunca se imprime el valor de la cookie: eso ES la sesión (E3). Lo único
-# que este paso verifica es que el header llegó y que trae las banderas que
-# lo protegen — `-c "$COOKIES"` la guarda en el archivo temporal para los
-# pasos siguientes, sin que este script la vea en texto en ningún momento.
-
-paso '5) Entrar con la contraseña real — esperado: 200 y Set-Cookie'
-status5="$(curl -s -D "$TMPDIR_HUMO/headers-5.txt" -o "$TMPDIR_HUMO/resp-5.json" -w '%{http_code}' \
-  -X POST "$BASE/api/panel?accion=entrar" \
-  -H 'Content-Type: application/json' -H "Origin: $ORIGEN" \
-  -c "$COOKIES" \
-  -d "$(cuerpo_login "$CORREO" "$CLAVE" 'humo-panel.sh')")"
-echo "  respuesta: $(cat "$TMPDIR_HUMO/resp-5.json")"
-espera_status 200 "$status5" 'contraseña real'
-
-if grep -qi '^set-cookie:.*panel_sesion=' "$TMPDIR_HUMO/headers-5.txt" \
-  && grep -qi '^set-cookie:.*httponly' "$TMPDIR_HUMO/headers-5.txt" \
-  && grep -qi '^set-cookie:.*secure' "$TMPDIR_HUMO/headers-5.txt" \
-  && grep -qi '^set-cookie:.*samesite=lax' "$TMPDIR_HUMO/headers-5.txt"; then
-  echo '  Set-Cookie: sí, con HttpOnly; Secure; SameSite=Lax (el valor no se imprime nunca)'
-else
-  echo '  Set-Cookie: faltó, o le faltó alguna bandera de protección — MAL' >&2
-  echo "Corto en «$PASO_ACTUAL»: sin cookie completa no hay sesión para publicar." >&2
-  exit 1
-fi
-if [ ! -s "$COOKIES" ]; then
-  echo 'curl no guardó ninguna cookie en el archivo temporal — sin eso no puedo publicar.' >&2
+paso '3) Entrar con la contraseña real — esperado: 200 y Set-Cookie'
+if ! hacer_login_real 'humo-panel.sh'; then
+  echo "Corto en «$PASO_ACTUAL»: sin login real no hay sesión para publicar nada." >&2
   exit 1
 fi
 
-# ---------------------------------------------------------------------
-# 6) Publicar UN cambio chico, visible y fácil de revertir.
-# ---------------------------------------------------------------------
-# `publicar` exige el documento COMPLETO, no un parche (acciones.ts,
-# `validarContra(DOCUMENTOS[id], documentos[id])` corre el esquema entero
-# contra lo que se manda — un objeto con un solo campo rebota con «el campo
-# quedó vacío» en todos los demás). Por eso este paso trae el `sitio.json`
-# VIVO de GitHub —vía `git fetch` + `git show origin/main:...`, el mismo
-# contenido contra el que el servidor va a comparar— y le cambia un solo
-# campo, en vez de mandar el archivo local (que podría estar desactualizado
-# si alguien publicó algo después del último `git pull`).
+# 4) Publicar UN cambio chico, visible y fácil de revertir; mostrar el
+# commit; esperar el deploy; confirmar que se ve en vivo.
 #
 # El campo es `footer.derechos`: texto libre, sin banda de espacio duro que
 # cuidar, tope de 90 caracteres (src/contenido/esquema/sitio/paginas.ts), y
 # se ve en la última línea del pie de página de TODO el sitio — visible,
 # cosmético, y a nadie se le rompe nada si por un rato dice una palabra de
 # más.
+#
+# Acá arranca la ventana peligrosa: desde que este `publicar` sale bien
+# hasta que el del paso 5 también sale bien, el sitio en vivo (o a punto de
+# estarlo) tiene el texto de prueba puesto. `SITIO_MODIFICADO=1` marca esa
+# ventana para la trampa de salida de arriba.
 
-paso '6) Publicar el cambio de prueba en footer.derechos'
+paso '4a) Publicar el cambio de prueba en footer.derechos'
 git fetch origin main --quiet
 git show origin/main:src/contenido/datos/sitio.json > "$TMPDIR_HUMO/vivo.json"
 
@@ -277,41 +401,13 @@ fi
 echo "  antes:  $DERECHOS_ORIGINAL"
 echo "  nuevo:  $DERECHOS_NUEVO"
 
-jq --arg v "$DERECHOS_NUEVO" '.footer.derechos = $v' "$TMPDIR_HUMO/vivo.json" > "$TMPDIR_HUMO/modificado.json"
-
-cuerpo_publicar() {
-  # $1 = ruta a un JSON con el documento «sitio» COMPLETO, ya modificado.
-  jq -n --argjson sitio "$(cat "$1")" '{documentos: {sitio: $sitio}}'
-}
-
-status6="$(curl -s -b "$COOKIES" -o "$TMPDIR_HUMO/resp-6.json" -w '%{http_code}' \
-  -X POST "$BASE/api/panel?accion=publicar" \
-  -H 'Content-Type: application/json' -H "Origin: $ORIGEN" \
-  -d "$(cuerpo_publicar "$TMPDIR_HUMO/modificado.json")")"
-echo "  respuesta: $(cat "$TMPDIR_HUMO/resp-6.json")"
-espera_status 200 "$status6" 'publicar el cambio de prueba'
-
-if ! grep -q '"ok":true' "$TMPDIR_HUMO/resp-6.json"; then
-  echo "Corto en «$PASO_ACTUAL»: la respuesta fue 200 pero ok no es true." >&2
+if ! publica_derechos "$DERECHOS_NUEVO"; then
+  echo "Corto en «$PASO_ACTUAL»: no se pudo publicar el cambio de prueba." >&2
   exit 1
 fi
-SHA_PUBLICADO="$(jq -r '.sha' "$TMPDIR_HUMO/resp-6.json")"
-if [ -z "$SHA_PUBLICADO" ] || [ "$SHA_PUBLICADO" = 'null' ]; then
-  echo "Corto en «$PASO_ACTUAL»: publicó ok:true pero sha es null — según acciones.ts eso" \
-    'significa «no había nada que publicar», y acá SÍ había un cambio. Algo no matchea' \
-    '(¿el sitio.json vivo ya tenía la marca de una corrida anterior sin revertir?).' >&2
-  exit 1
-fi
-echo "  sha del commit: $SHA_PUBLICADO"
+SITIO_MODIFICADO=1  # a partir de acá, si algo corta, la trampa de salida avisa fuerte.
 
-# ---------------------------------------------------------------------
-# 7) Mostrar el commit: el autor tiene que ser el panel, no vos.
-# ---------------------------------------------------------------------
-# Si esto dijera tu nombre de Git en vez de «Panel Maracacao», el commit no
-# salió por la función serverless — salió de otro lado, y hay que
-# desconfiar de todo lo demás que este script reportó como éxito.
-
-paso '7) El commit que publicó el cambio — autor y trailers'
+paso '4b) El commit que publicó el cambio — autor y trailers'
 git fetch origin main --quiet
 git log origin/main -1 --format='%an <%ae>%n%s%n%n%b'
 
@@ -319,7 +415,7 @@ AUTOR_COMMIT="$(git log origin/main -1 --format='%an <%ae>')"
 if [ "$AUTOR_COMMIT" != 'Panel Maracacao <panel@maracacao.mx>' ]; then
   echo "Corto en «$PASO_ACTUAL»: el autor del último commit en origin/main es" \
     "«$AUTOR_COMMIT», no «Panel Maracacao <panel@maracacao.mx>». Este commit no lo hizo" \
-    'el panel — no sigas con la verificación en vivo hasta entender qué pasó.' >&2
+    'el panel — no sigas hasta entender qué pasó.' >&2
   exit 1
 fi
 if ! git log origin/main -1 --format='%b' | grep -q "Panel-Autor: $CORREO"; then
@@ -328,96 +424,90 @@ if ! git log origin/main -1 --format='%b' | grep -q "Panel-Autor: $CORREO"; then
 fi
 echo '  autor y trailers correctos.'
 
-# ---------------------------------------------------------------------
-# 8) Esperar el deploy y comprobar que el sitio EN VIVO ya muestra el texto
-#    nuevo — no alcanza con que GitHub tenga el commit.
-# ---------------------------------------------------------------------
-# El commit dispara un deploy en Vercel (integración de Git), pero el
-# deploy tarda — no es instantáneo. Sondear la portada cada 10 segundos, en
-# vez de dormir un tiempo fijo, es lo que hace que este paso ni se quede
-# corto un día que Vercel tarda más, ni se quede esperando de más un día
-# que anda rápido.
-
-paso '8) Esperar el deploy y verificar que la portada muestra el texto nuevo'
-DEPLOY_OK=0
-for intento in $(seq 1 36); do  # 36 × 10s = 6 minutos de margen
-  if curl -s "$BASE/" | grep -qF -- "$DERECHOS_NUEVO"; then
-    echo "  apareció en vivo (intento $intento de 36, ~$((intento * 10))s)"
-    DEPLOY_OK=1
-    break
-  fi
-  sleep 10
-done
-if [ "$DEPLOY_OK" -ne 1 ]; then
+paso '4c) Esperar el deploy y verificar que la portada muestra el texto nuevo'
+if ! espera_en_vivo "$DERECHOS_NUEVO"; then
   echo "Corto en «$PASO_ACTUAL»: pasaron 6 minutos y la portada todavía no muestra el texto" \
-    'nuevo. Puede ser que el deploy esté tardando más de lo normal — revisá el panel de' \
-    'Vercel (Deployments) a mano antes de asumir que algo se rompió. El commit YA está en' \
-    'GitHub (paso 7), así que lo peor que pasó es que el deploy tarda, no que se perdió.' >&2
+    'nuevo. El commit YA está en GitHub (paso 4b), así que lo peor que pasó es que el' \
+    'deploy tarda — revisá Deployments en Vercel a mano antes de asumir algo peor.' >&2
   exit 1
 fi
 
-# ---------------------------------------------------------------------
-# 9) Dejar el sitio como estaba — publicando el valor ORIGINAL por el
-#    MISMO canal. Nunca con `git revert` desde la computadora: la vuelta
-#    tiene que probar el mismo camino que la clienta usa de verdad, si no
-#    esta prueba no prueba nada sobre lo que le importa (que ELLA pueda
-#    deshacer un cambio, no que vos puedas arreglarlo con Git).
-# ---------------------------------------------------------------------
+# 5) Dejar el sitio como estaba — publicando el valor ORIGINAL por el
+# MISMO canal. Nunca con `git revert` desde la computadora: la vuelta
+# tiene que probar el mismo camino que la clienta usa de verdad, si no
+# esta prueba no prueba nada sobre lo que le importa (que ELLA pueda
+# deshacer un cambio, no que vos puedas arreglarlo con Git).
 
-paso '9) Publicar el valor original (revertir por el mismo canal)'
-git fetch origin main --quiet
-git show origin/main:src/contenido/datos/sitio.json > "$TMPDIR_HUMO/vivo-2.json"
-jq --arg v "$DERECHOS_ORIGINAL" '.footer.derechos = $v' "$TMPDIR_HUMO/vivo-2.json" > "$TMPDIR_HUMO/restaurado.json"
-
-status9="$(curl -s -b "$COOKIES" -o "$TMPDIR_HUMO/resp-9.json" -w '%{http_code}' \
-  -X POST "$BASE/api/panel?accion=publicar" \
-  -H 'Content-Type: application/json' -H "Origin: $ORIGEN" \
-  -d "$(cuerpo_publicar "$TMPDIR_HUMO/restaurado.json")")"
-echo "  respuesta: $(cat "$TMPDIR_HUMO/resp-9.json")"
-espera_status 200 "$status9" 'restaurar el valor original'
-
-if ! grep -q '"ok":true' "$TMPDIR_HUMO/resp-9.json"; then
-  echo "Corto en «$PASO_ACTUAL»: la respuesta fue 200 pero ok no es true — EL SITIO QUEDÓ" \
-    'CON EL TEXTO DE PRUEBA. Revisalo a mano en el panel o con otro publicar antes de' \
-    'irte.' >&2
+paso '5a) Publicar el valor original (revertir por el mismo canal)'
+if ! publica_derechos "$DERECHOS_ORIGINAL"; then
+  echo "Corto en «$PASO_ACTUAL»: LA RESTAURACIÓN FALLÓ — el sitio sigue con el texto de" \
+    'prueba. Reintentá este script (o entrá al panel a mano); el mensaje final de esta' \
+    'corrida también te va a dejar el comando exacto para arreglarlo.' >&2
   exit 1
 fi
-SHA_RESTAURADO="$(jq -r '.sha' "$TMPDIR_HUMO/resp-9.json")"
-if [ -z "$SHA_RESTAURADO" ] || [ "$SHA_RESTAURADO" = 'null' ]; then
-  echo "Corto en «$PASO_ACTUAL»: sha vino null al restaurar — revisá a mano si el sitio ya" \
-    'quedó como estaba o si sigue con el texto de prueba.' >&2
-  exit 1
-fi
-echo "  sha del commit de reversión: $SHA_RESTAURADO"
+SITIO_MODIFICADO=0  # la publicación de vuelta ya salió — se cierra la ventana peligrosa.
 
-paso '9b) El commit de la reversión'
+paso '5b) El commit de la reversión'
 git fetch origin main --quiet
 git log origin/main -1 --format='%an <%ae>%n%s%n%n%b'
 
-# ---------------------------------------------------------------------
-# 10) Esperar el segundo deploy y confirmar que la portada volvió a la
-#     normalidad — el script no termina «bien» hasta que esto pasa.
-# ---------------------------------------------------------------------
-
-paso '10) Esperar el segundo deploy y verificar que la portada volvió al texto original'
-RESTAURADO_OK=0
-for intento in $(seq 1 36); do
-  cuerpo_home="$(curl -s "$BASE/")"
-  if echo "$cuerpo_home" | grep -qF -- "$DERECHOS_ORIGINAL" && ! echo "$cuerpo_home" | grep -qF -- "$MARCA_DE_HUMO"; then
-    echo "  la portada ya muestra el texto original de nuevo (intento $intento de 36)"
-    RESTAURADO_OK=1
-    break
-  fi
-  sleep 10
-done
-if [ "$RESTAURADO_OK" -ne 1 ]; then
+paso '5c) Esperar el segundo deploy y verificar que la portada volvió al texto original'
+if ! espera_en_vivo "$DERECHOS_ORIGINAL" "$MARCA_DE_HUMO"; then
   echo "Corto en «$PASO_ACTUAL»: pasaron 6 minutos y la portada TODAVÍA muestra el texto de" \
-    'prueba (o algo raro). El commit de reversión ya está en GitHub (paso 9b) — andá al' \
-    'panel de Vercel y mirá el deploy a mano; si tarda mucho más, revisá si hay algo' \
-    'trabado ahí, no en el panel.' >&2
+    'prueba (o algo raro). El commit de reversión ya está en GitHub (paso 5b) — el dato ya' \
+    'está bien, andá a Deployments en Vercel y mirá el deploy a mano.' >&2
   exit 1
 fi
 
+# 6) El freno de intentos, al final — sin dependencia de lo de arriba, así
+# que no hace falta probarlo antes de lo que sí importa mirar en vivo
+# (RULING T7-b). Se manda contraseña mala hasta que UNA conteste 429, con
+# margen (hasta 8 intentos) en vez de asumir que va a ser exactamente la
+# sexta: salud (paso 1) y los dos logins (pasos 2 y 3) ya gastaron parte
+# del mismo presupuesto de 5 cada 15 minutos —el freno es un único
+# contador por IP, compartido entre `salud` y `entrar` (E4, sesion.ts)—
+# así que cuántos intentos hacen falta ACÁ depende de cuánto quedaba, no
+# de un número fijo.
+
+paso '6) El freno de intentos: mandar contraseñas malas hasta que una dé 429'
+TOPE_INTENTOS_FRENO=8
+freno_saltado=0
+intentos_hechos=0
+for i in $(seq 1 "$TOPE_INTENTOS_FRENO"); do
+  intentos_hechos=$i
+  status_freno="$(curl -s -o "$TMPDIR_HUMO/resp-freno-$i.json" -w '%{http_code}' -X POST "$BASE/api/panel?accion=entrar" \
+    -H 'Content-Type: application/json' -H "Origin: $ORIGEN" \
+    -d "$(cuerpo_login "$CORREO" "esto-tampoco-es-la-clave-$i" 'humo-panel.sh')")"
+  echo "  intento $i: status $status_freno"
+  if [ "$status_freno" = '429' ]; then
+    freno_saltado=1
+    break
+  fi
+done
+
+if [ "$freno_saltado" -ne 1 ]; then
+  echo "Corto en «$PASO_ACTUAL»: mandé $intentos_hechos contraseñas malas seguidas y el freno" \
+    'nunca contestó 429. Con TOPE_INTENTOS=5 en sesion.ts, y el presupuesto ya gastado por' \
+    'salud y los dos logins de arriba, tendría que haber saltado bastante antes. O el freno' \
+    'no está funcionando, o cada pedido cayó en una instancia serverless distinta con su' \
+    'propia memoria (E4: el freno vive en memoria de proceso, no en un almacén compartido) —' \
+    'cualquiera de las dos vale la pena mirarla, no es un simple «reintentá».' >&2
+  exit 1
+fi
+echo "  el freno saltó en el intento $intentos_hechos de esta tanda — no es un número fijo:" \
+  'salud y los dos logins de arriba ya habían gastado parte del mismo presupuesto de 5' \
+  'cada 15 minutos (freno compartido, E4), así que cuánto tarda acá depende de cuánto' \
+  'quedaba, no de una cuenta que se pueda fijar de antemano.'
+
 echo
-echo '=== Prueba de humo completa — los diez pasos dieron lo esperado ==='
-echo '  el sitio quedó exactamente como estaba antes de empezar.'
+echo '=== Prueba de humo completa ==='
+echo 'Un resultado en verde acá prueba cuatro cosas, cada una por su cuenta:'
+echo '  1. La puerta funciona: la contraseña equivocada no entra (paso 2), y la correcta sí (paso 3).'
+echo '  2. Un cambio de la clienta llega de verdad al sitio en vivo, no solo a GitHub (paso 4).'
+echo '  3. Cada commit queda a nombre del panel («Panel Maracacao»), nunca al tuyo (paso 4b).'
+echo '  4. Deshacer un cambio funciona por el mismo canal que publicarlo, sin Git ni computadora (paso 5).'
+echo
+echo 'IMPORTANTE: el freno de intentos (paso 6) quedó gastado para esta IP durante los' \
+  'próximos 15 minutos — a propósito, es la prueba que hicimos recién. Si corrés' \
+  '`entrar` o `salud` de nuevo antes de que se vacíe la ventana, vas a ver 429: es' \
+  'exactamente lo que tiene que pasar, no es que algo se rompió.'
