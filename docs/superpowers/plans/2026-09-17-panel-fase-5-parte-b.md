@@ -237,8 +237,9 @@ el pedido de verdad, así que lo mide él y lo pasa por `Contexto`.
 **Interfaces:**
 - Consumes: `fetchFalso` de `test/lib/github-falso.ts`.
 - Produces:
-  - `Contexto` gana `bytesDelCuerpo: number` — cuántos bytes pesó el cuerpo del
-    pedido HTTP. `0` cuando el borde no lo pudo medir.
+  - `Contexto` gana `bytesDelCuerpo?: number` — cuántos bytes pesó el cuerpo
+    del pedido HTTP, o `undefined` cuando el borde no lo pudo medir. **Nunca un
+    `0` centinela** (ruling T1-1).
   - `Publicacion` gana `bytesDelCuerpo?: number` — si viene, es lo que se
     compara contra `TOPE_CUERPO`; si no viene, se cae a la suma de los archivos
     en base64, que es lo que hacía antes.
@@ -407,13 +408,21 @@ En `src/servidor/acciones.ts`, dentro de `export interface Contexto`, después d
 
 ```ts
   /**
-   * Cuántos bytes pesó el CUERPO del pedido HTTP. `0` cuando el borde no lo
-   * pudo medir (sin `Content-Length`): ahí `publica()` se cae a la suma de
-   * los archivos, que es una cota inferior. Vive en el contexto y no en el
-   * `Pedido` porque no es un dato del pedido de la clienta —ella no lo
-   * manda—: es una medición del transporte, del mismo tipo que la IP.
+   * Cuántos bytes pesó el CUERPO del pedido HTTP, o `undefined` cuando el
+   * borde no lo pudo medir (sin `Content-Length` legible). Vive en el
+   * contexto y no en el `Pedido` porque no es un dato del pedido de la
+   * clienta —ella no lo manda—: es una medición del transporte, del mismo
+   * tipo que la IP.
+   *
+   * [RULING T1-1] `undefined` y NO un `0` centinela. Con `0`, «no lo sé» y
+   * «midió cero» son el mismo valor, y `p.bytesDelCuerpo ?? suma(...)` en
+   * `publica()` se queda con el `0` —`??` solo cae ante `null`/`undefined`—,
+   * así que el tope de cuerpo queda desactivado justo en el caso que el
+   * fallback existía para cubrir. Que el tipo diga la verdad mata la clase
+   * entera de bug; un `||` o un spread condicional solo la tapan en este
+   * llamador y dejan la trampa armada para el siguiente.
    */
-  bytesDelCuerpo: number
+  bytesDelCuerpo?: number
 ```
 
 En `publicarAccion`, la llamada a `publica()` suma el campo:
@@ -443,17 +452,18 @@ y arriba, al lado de `cookieDePanel`:
 
 ```ts
 /**
- * Cuánto pesó el cuerpo del pedido, según `Content-Length`. Devuelve `0`
- * cuando la cabecera no vino o no es un número: el router lo entiende como
- * «no se pudo medir» y se cae a la cuenta vieja. No se mide serializando
- * `req.body` de nuevo —eso sería medir la reconstrucción, no el pedido— ni
- * se confía en que el número sea honesto: es un tope de comodidad contra el
- * límite de la plataforma, no un control de seguridad.
+ * Cuánto pesó el cuerpo del pedido, según `Content-Length`. Devuelve
+ * `undefined` cuando la cabecera no vino o no es un número — «no lo sé», que
+ * es distinto de «midió cero»— y con eso `publica()` se cae a la suma de los
+ * archivos. No se mide serializando `req.body` de nuevo —eso sería medir la
+ * reconstrucción, no el pedido— ni se confía en que el número sea honesto: es
+ * un tope de comodidad contra el límite de la plataforma, no un control de
+ * seguridad.
  */
-function bytesDeCuerpo(headers: Record<string, string | string[] | undefined>): number {
+function bytesDeCuerpo(headers: Record<string, string | string[] | undefined>): number | undefined {
   const crudo = valorUnico(headers['content-length'])
   const n = Number.parseInt(crudo, 10)
-  return Number.isFinite(n) && n > 0 ? n : 0
+  return Number.isFinite(n) && n > 0 ? n : undefined
 }
 ```
 
@@ -470,16 +480,50 @@ it('el borde mide el cuerpo por Content-Length, y 0 cuando no vino', async () =>
   for (const headers of [{ 'content-length': '4096' }, {}, { 'content-length': 'quién sabe' }]) {
     const res = respuestaFalsa()
     await handler({ method: 'GET', headers, query: { accion: 'no-existe' } } as never, res as never)
-    visto.push(res.contexto?.bytesDelCuerpo ?? -1)
+    visto.push(res.contexto?.bytesDelCuerpo)
   }
-  expect(visto).toEqual([4096, 0, 0])
+  expect(visto).toEqual([4096, undefined, undefined])
 })
 ```
 
 **Ojo:** `test/panel-entrada.test.ts` ya tiene su forma de espiar el contexto
 (mockea `../src/servidor/acciones` con `vi.mock`, que en vitest es por archivo).
 Usá la que ya está en ese archivo en vez de inventar `respuestaFalsa`/
-`res.contexto`; el assert que importa es el `toEqual([4096, 0, 0])`.
+`res.contexto`; el assert que importa es el `toEqual([4096, undefined, undefined])`.
+
+- [ ] **Step 10b: El test que prueba que el fallback de verdad se dispara**
+
+Los dos tests del Step 5 prueban el tope con un número explícito y con el campo
+ausente, pero ninguno prueba el camino REAL de «no se pudo medir»: el pedido
+llega sin `Content-Length`, el borde no mide, y el lote enorme tiene que rebotar
+igual. Sin este test, el fallback puede estar roto y los 1005 tests siguen
+verdes — que es exactamente lo que pasó la primera vez.
+
+En `test/acciones.test.ts`:
+
+```ts
+it('M-9: sin Content-Length medible, el lote enorme rebota igual — el fallback se dispara', async () => {
+  // El camino completo: el borde no pudo medir, así que `Contexto` trae
+  // `undefined` (no un 0), `publica()` cae a la suma de los archivos, y el
+  // tope sigue frenando. Con un 0 centinela esto pasaba de largo y se iba a
+  // la red con un lote de cualquier tamaño.
+  const { f, pedidos } = fetchFalso([])
+  const r = await maneja(
+    'publicar',
+    { cuerpo: { documentos: { sabores: saboresEnormes() } }, cookie: cookieValida() },
+    contextoDePrueba({ fetch: f, bytesDelCuerpo: undefined }),
+  )
+  expect(r.status).toBe(422)
+  expect((r.cuerpo as { problema: string }).problema).toContain('demasiado contenido')
+  expect(pedidos, 'no se gastó un solo pedido: el tope frena antes de la red').toHaveLength(0)
+})
+```
+
+`saboresEnormes()` es un documento válido cuyo serializado pasa `TOPE_CUERPO`
+(por ejemplo, el `sabores.json` real con un campo de texto largo repetido hasta
+pasarse). Si armarlo válido cuesta más de lo que vale, usá el documento real con
+un `ingredientes` inflado: lo único que importa es que `serializa()` devuelva
+más de 3.5 MB.
 
 - [ ] **Step 11: Corré la suite entera**
 
@@ -732,6 +776,47 @@ declararla dos veces, y sacá la línea vieja.
 
 Run: `pnpm vitest run test/acciones.test.ts`
 Expected: PASS.
+
+- [ ] **Step 8b: El candado de la frase duplicada**
+
+`PROBLEMA_PISARIA` repite letra por letra el 409 que devuelve `publica()` en
+`publicar.ts`. **Está duplicada a propósito** —es el MISMO hecho detectado en
+dos lugares distintos (acá comparando shas, allá al chocar el ref) y tiene que
+sonar igual desde donde la clienta lo lee—, y extraerla a un módulo compartido
+acoplaría `publicar.ts` con el router por una cadena de texto. Lo que sí hace
+falta es que no se puedan desincronizar:
+
+```ts
+it('las dos formas de detectar una pisada le dicen a la clienta exactamente lo mismo', async () => {
+  // El router la detecta ANTES (comparando shas) y `publicar.ts` la detecta
+  // DESPUÉS (al chocar el ref). Son dos caminos para el mismo hecho, y desde
+  // donde ella lo lee tienen que ser una sola frase. Están duplicadas a
+  // propósito —compartirlas acoplaría los dos módulos por un string— así que
+  // este test es lo que evita que se separen.
+  const { f } = fetchFalso([
+    { cuerpo: { object: { sha: 'cabezaNueva' } } },
+    { cuerpo: { files: [{ filename: 'src/contenido/datos/sabores.json' }] } },
+  ])
+  const porElRouter = await maneja(
+    'publicar',
+    { cuerpo: { base: 'viejo', documentos: { sabores: saboresValidos() } }, cookie: cookieValida() },
+    contextoDePrueba({ fetch: f }),
+  )
+
+  const { f: f2 } = fetchFalso([...respuestasDeDosChoquesDeRef()])
+  const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f2 })
+  const porElRef = await publica(gh, {
+    archivos: [{ ruta: 'src/contenido/datos/sabores.json', contenido: '{}' }],
+    autor: 'ella@ejemplo.mx',
+  })
+
+  expect((porElRouter.cuerpo as { problema: string }).problema).toBe((porElRef as { problema: string }).problema)
+})
+```
+
+`respuestasDeDosChoquesDeRef()` scriptea dos intentos completos cuyo `PATCH`
+falla con 422 «not a fast forward», que es lo que hace que `publica()` agote su
+reintento y devuelva el 409.
 
 - [ ] **Step 9: Actualizá el ensayo de humo**
 
@@ -1519,7 +1604,22 @@ En `docs/panel-operacion.md`, en la tabla de variables:
 | `PANEL_VERCEL_PROYECTO` | No | El nombre del proyecto. Por defecto sale del repo (`maracacao`). Solo hace falta si algún día el proyecto se llama distinto del repo. |
 ```
 
-- [ ] **Step 8: Corré la suite entera, reempaquetá y commiteá**
+- [ ] **Step 8: Avisale a Marcos ANTES de que esto se despliegue**
+
+[RULING P-2 del preflight] Sumar `PANEL_VERCEL_TOKEN` a `VARIABLES_REQUERIDAS`
+tiene una consecuencia en producción que hay que decir en voz alta: **desde que
+esto mergee, `GET /api/panel?accion=salud` contesta 503 hasta que la variable
+esté cargada.** Es información correcta —falta una variable obligatoria (spec
+§4.5)— y es justo lo que la fase 6 necesita para apagar el botón Publicar. Pero
+si nadie avisa, se lee como «rompimos algo».
+
+Dejalo escrito en tu reporte, con estas palabras: *«Marcos tiene que crear un
+token de la API de Vercel con lectura de despliegues del proyecto y cargarlo
+como `PANEL_VERCEL_TOKEN` en el entorno Production ANTES de que esta rama
+mergee. Mientras no esté, `salud` contesta 503; publicar sigue funcionando.»*
+No lo cargues vos ni le pidas el token: no entra al repo ni al chat.
+
+- [ ] **Step 9: Corré la suite entera, reempaquetá y commiteá**
 
 ```bash
 pnpm vitest run
