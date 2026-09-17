@@ -248,3 +248,59 @@ concretos — por eso quedan QUEDA con nota, no listados assert por assert.
   atributo, así que el `<form>` de contacto marca `asuntoPersonal` Y
   `asuntoNegocio` a la vez sin competir por el único atributo HTML que
   tenía antes.
+
+---
+
+## Actualización 2026-09-17 — la compuerta deja de congelar contenido (rama `compuerta-no-congela`)
+
+**Por qué ahora.** La primera prueba de humo en producción terminó con el
+panel publicando bien (commit `e51ca6b`, autor `Panel Maracacao
+<panel@maracacao.mx>`) y el deploy de Vercel en rojo: `vercel.json` corre
+`pnpm build` = `astro build && vitest run && astro check`, así que **cualquier
+test que compare contra un valor de contenido le bloquea la publicación a la
+clienta**. Era el pendiente que esta misma auditoría venía anotando fase tras
+fase; hoy se ejecutó.
+
+**Cómo se buscó, para que se pueda repetir.** No a ojo: se escribió un script
+temporal que recorre los tres esquemas (`recorre()`), se queda con los campos
+que la clienta edita (`quien !== 'marcos'`, control `texto`/`parrafo`/`medida`/
+`precio`/`renglones`), instancia cada patrón contra el JSON real —incluidas
+las tablas `filas[][]`— y **edita todos**, descartando la edición cuando el
+esquema la rechaza. Dos pasadas, porque una sola no alcanza: con el sufijo
+(`«…ç»`) un `toContain('Contiene soya…')` sigue pasando, y solo cae con el
+prefijo (`«ç…»`). Después, `pnpm build` completo. Medido: **647 campos
+editados, 4 rechazados por el esquema** (el esquema los rechaza en el panel,
+que es donde tiene que pasar). A eso se sumaron los tres casos de campo
+opcional, que ningún reemplazo de texto encuentra: agregarle el chip de polvo
+a otra receta, sacárselo a la única que lo tiene, y ponerle precio al tab del
+polvo.
+
+**Resultado antes del arreglo:** 31 tests en rojo en 3 archivos, por cinco
+causas; más 3 rojos por los casos de campo opcional. **Después:** los cinco
+escenarios pasan la compuerta entera en verde, y el contenido sin tocar sigue
+en 1000 tests verdes + `astro check` limpio.
+
+| Assert | Qué edición lo rompía | Destino |
+|---|---|---|
+| `test/contenido-fachada.test.ts` — **el certificado** (3 `toEqual` contra `test/fixtures/contenido-2026-09-10.json`) | CUALQUIERA. Es lo que rompió el deploy de la prueba de humo | **BORRADO.** Era el destino que esta tabla ya le tenía escrito a esta clase de assert. El fixture QUEDA (es el acta, y lo siguen usando `contenido.test.ts` y `contenido-mutaciones.test.ts` como dato de entrada). Lo que lo reemplaza para su trabajo real —«que el contenido no cambie sin que nadie se entere»— es el diff que el panel le muestra a la clienta antes de publicar (`src/contenido/diff.ts` → `frase()`) y que queda escrito en el mensaje del commit |
+| `contenido-fachada.test.ts` — aserción de forma **4** (`puestoTitulo.join(' ')` `toBe('Mercado de Coyoacán')`) | Mudar el puesto, o renombrarlo | **BORRADA.** No era una forma: era el valor. Lo que sí importa —que el `streetAddress` del JSON-LD salga de ese join y no de una copia a mano— ya lo mide `test/seo.test.ts:138` contra el copy |
+| `contenido-fachada.test.ts` — aserción de forma **8** (`toContain(' ')` en ocho campos, y NUEVE espacios duros en total) | Escribir un título sin medida («Polvo de cacao»), o dejar una sola medida donde hay dos | **BORRADA.** La regla de verdad —«si hay cifra seguida de unidad, el espacio del medio es duro»— la exige el esquema (`medida` / `MEDIDA_MAL_ESCRITA`) en el panel, antes de publicar. Medido: el esquema acepta «Polvo de cacao» y este test lo rechazaba |
+| `contenido-fachada.test.ts` — aserción **1** (`conChip` `toHaveLength(1)`) | Agregarle el chip de polvo a otra receta, o sacárselo a la única que lo tiene | **A FORMA.** Queda «la receta que trae chip lo trae con texto, nunca vacío», que es la regresión real (un `''` pinta una cajita amarilla de 6×10 px). Cuántas lo traen es decisión de la clienta |
+| `contenido-fachada.test.ts` — aserción **2** («el precio es null exactamente en el tab del polvo») | Ponerle precio de lista al polvo | **A FORMA.** Queda «null o entero, nunca undefined», que es lo que evita el «$NaN». Cuál de los tres está en null es contenido |
+| `test/sitio.test.ts` — `aria-label="Canela"` y `--fondo:#7D0303;--texto:#FFFFFF` | Reordenar el anaquel, renombrar el sabor inicial, o cambiar cuál abre | **A FORMA**, como esta tabla preveía desde la fase 0: el assert sale de `marca.anaquel.saborInicial` + los tokens de color, sin un solo literal |
+| `test/marca-copy.test.ts` — `ingredientes` y `cacao` contra `src/contenido/datos/envolturas.json` (26 tests) | Corregirle una coma a los ingredientes, o tocar el «Cacao 70%» | **EL TEST QUEDA; los dos campos pasan a `quien: 'marcos'`.** Es la única fila que se resolvió del otro lado, y a propósito: los ingredientes son información de alérgenos y `cacao` es lo que dice el empaque físico. Dejarlos editables no era «más libertad»: era permitir que el sitio contradiga a la envoltura impresa. El camino correcto va al revés —se reimprime, Marcos actualiza `envolturas.json`, y de ahí baja al sitio—. Se les sacó el `data-campo` de `index.astro` (348 y 353), porque el panel no resalta lo que no edita |
+| `test/panel.test.ts` — `SIN_NODO` con `sitio:negocios.tabs.0.precio`, y el test de «excepciones no podridas» | Ponerle precio al polvo: aparece el nodo y la excepción queda «ya hecha» | **BORRADA la excepción**, reemplazada por una regla general: (a) saltea el campo que HOY no tiene valor mostrable (`tieneValorHoy`), porque un `null` no puede tener nodo. No afloja nada: un campo con valor y sin nodo sigue siendo huérfano. Las excepciones bajaron de cinco a CUATRO |
+| `test/panel.test.ts` — el test de `TRANSFORMADOS` podridos | Ponerle precio al polvo: el nodo aparece mostrando «$90» donde el campo dice `90` | **Entrada nueva** (`sitio:negocios.tabs.0.precio` → `precioMXN()`), y el chequeo de podredumbre ahora distingue **dormida** de **podrida**: una entrada sin ningún nodo hoy está esperando, no mintiendo |
+
+**Lo que NO se tocó, y por qué.** Los `toHaveLength` de la fase 7 (15 sabores,
+4 recetas, 8 preguntas, 6 gotas, 8 etiquetas de polvo, 4 fichas) siguen en
+pie: el panel de hoy edita HOJAS, no da de alta ni de baja elementos de lista,
+así que ninguna edición que la clienta pueda hacer los rompe. Cuando la fase 7
+le dé de alta un sabor, se ejecutan las filas que esta tabla ya les tiene
+asignadas.
+
+**Cómo mantenerlo.** La regla es la misma de siempre y ahora tiene una prueba
+barata: antes de sumar un assert que mire contenido, preguntarse si la clienta
+puede escribir ese valor desde el panel. Si puede, el assert no va en
+`pnpm verifica` — va como regla del esquema (que le avisa a ella antes de
+publicar) o no va.

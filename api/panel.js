@@ -17450,11 +17450,23 @@ var sabor2 = grupo({
         maxCaracteres: 40
       })
     ),
+    // `cacao` e `ingredientes` son los DOS campos que tienen que decir lo
+    // mismo que la envoltura impresa, y por eso son de Marcos y no de la
+    // clienta (`test/marca-copy.test.ts` los compara contra
+    // `src/contenido/datos/envolturas.json`, el texto extraído de los PDF
+    // de imprenta). No es una restricción de comodidad: si el panel los
+    // dejara editar, una edición legítima —corregir una coma— dejaría el
+    // sitio diciendo algo distinto de lo que dice el empaque físico, que
+    // en el caso de los ingredientes es información de alérgenos, y de
+    // paso rompería el build y le bloquearía la publicación a ella. El
+    // camino correcto es al revés: se reimprime la envoltura, Marcos
+    // actualiza `envolturas.json` y de ahí baja al sitio.
     cacao: sinMenorQue(
       texto({
         etiqueta: "Porcentaje de cacao",
         seccion: "sabores",
-        ayuda: "La l\xEDnea chica bajo el nombre: \xABCacao 70%\xBB o \xABChocolate blanco\xBB.",
+        quien: "marcos",
+        ayuda: "La l\xEDnea chica bajo el nombre: \xABCacao 70%\xBB o \xABChocolate blanco\xBB. Sale de la envoltura impresa.",
         maxCaracteres: 30
       })
     ),
@@ -17467,6 +17479,7 @@ var sabor2 = grupo({
       texto({
         etiqueta: "Ingredientes",
         seccion: "sabores",
+        quien: "marcos",
         ayuda: "Copiados de la envoltura impresa, en el mismo orden. Es informaci\xF3n legal.",
         maxCaracteres: 190
       })

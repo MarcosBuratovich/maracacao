@@ -12,7 +12,7 @@ import { experimental_AstroContainer as AstroContainer } from 'astro/container'
 import { marca } from '@/copy/sitio-marca'
 import { sabores } from '@/copy/sabores'
 import { esc } from './regex'
-import { editorial } from '@/tokens/color'
+import { editorial, sabor as colorSabor, tintaSabor } from '@/tokens/color'
 import { customProperties } from '@/tokens/css'
 import Borrador from '@/pages/index.astro'
 import Presentacion from '@/pages/presentacion.astro'
@@ -64,10 +64,23 @@ describe('la página / (rediseño de marca, 2026-08-13; en la raíz desde 2026-0
     for (const paso of marca.catar.pasos) expect(html).toContain(paso.nombre)
   })
 
-  it('la ficha del anaquel arranca en canela y la banda trae su color y su tinta medida', async () => {
+  it('la ficha del anaquel arranca en el sabor inicial, y la banda trae SU color y SU tinta', async () => {
+    // Antes esto decía «Canela» y «#7D0303/#FFFFFF» a mano. Eran tres
+    // valores congelados: el día que la clienta reordene el anaquel o le
+    // cambie el nombre al sabor, el assert se pone rojo y le bloquea la
+    // publicación, sin que nada esté roto. La regla que de verdad importa
+    // —que la ficha abierta y la banda de color sean las del MISMO sabor,
+    // el que `anaquel.saborInicial` declara— no necesita ningún literal:
+    // sale del copy y de los tokens, igual que la plantilla.
+    const inicial = sabores.find((s) => s.clave === marca.anaquel.saborInicial)
+    expect(inicial, `anaquel.saborInicial = «${marca.anaquel.saborInicial}»`).toBeDefined()
     const html = await container.renderToString(Borrador)
-    expect(html).toContain('aria-checked="true" aria-label="Canela"')
-    expect(html).toMatch(/data-anaquel-banda[^>]*--fondo:#7D0303;--texto:#FFFFFF/)
+    expect(html).toContain(`aria-checked="true" aria-label="${inicial!.nombre}"`)
+    expect(html).toMatch(
+      new RegExp(
+        `data-anaquel-banda[^>]*--fondo:${esc(colorSabor[inicial!.clave])};--texto:${esc(tintaSabor[inicial!.clave])}`,
+      ),
+    )
   })
 
   it('la ilustración no se renderiza si el sabor no tiene dibujo', async () => {

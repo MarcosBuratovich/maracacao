@@ -345,12 +345,12 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
                   <p class="ficha-precio" data-campo={`sabores:sabores.${i}.precio`}>{d.precio}</p>
                 </div>
                 <div class="chips">
-                  <Insignia tono="rojo" campo={`sabores:sabores.${i}.cacao`}>{d.cacao}</Insignia>
+                  <Insignia tono="rojo">{d.cacao}</Insignia>
                   <Insignia tono="cacao" campo="sitio:anaquel.pesoInsignia">{marca.anaquel.pesoInsignia}</Insignia>
                   <Insignia tono="amarillo" campo="sitio:anaquel.manoInsignia">{marca.anaquel.manoInsignia}</Insignia>
                 </div>
                 <p class="ficha-ingredientes mono">
-                  <span data-campo="sitio:anaquel.ingredientesEtiqueta">{marca.anaquel.ingredientesEtiqueta}</span>: <span data-campo={`sabores:sabores.${i}.ingredientes`}>{d.ingredientes}</span>.
+                  <span data-campo="sitio:anaquel.ingredientesEtiqueta">{marca.anaquel.ingredientesEtiqueta}</span>: {d.ingredientes}.
                 </p>
                 <div class="ficha-ctas">
                   <BotonMarca href={d.url} externo><span data-campo="sitio:anaquel.cta">{marca.anaquel.cta}</span></BotonMarca>
