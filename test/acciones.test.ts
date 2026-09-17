@@ -972,9 +972,81 @@ describe('C-1: PANEL_SECRETO ausente o corto falla cerrado, nunca abierto', () =
 
 describe('las acciones que todavía no existen', () => {
   it('devuelven 404, no 500', async () => {
-    for (const accion of ['borrador', 'historial', 'revertir', 'estado']) {
+    for (const accion of ['borrador', 'historial', 'revertir']) {
       const r = await maneja(accion, { cuerpo: {}, cookie: cookieValida() }, contextoBase(fetchQueNoSeUsa()))
       expect(r.status).toBe(404)
     }
+  })
+})
+
+// Tarea 7: «¿ya está en el sitio?» (spec §4.5). Cruza dos fuentes — la
+// plataforma dice que el despliegue TERMINÓ, `version.json` dice qué commit
+// está sirviendo el CDN AHORA — y por eso el `fetchFalso` de cada test que
+// llega a tocar red programa DOS respuestas, en ese orden. El cálculo del
+// veredicto en sí (las once combinaciones) lo cubre `test/estado.test.ts`;
+// acá solo se prueba que el router lee las dos fuentes correctas, en el
+// orden correcto, y con las mismas cuatro capas (secreto, sesión, luego lo
+// suyo) que ya tienen `entrar` y `publicarAccion`.
+describe('accion=estado', () => {
+  it('sin sesión, 401 y ni un pedido', async () => {
+    const { f, pedidos } = fetchFalso([])
+    const r = await maneja(
+      'estado',
+      { cuerpo: { sha: 'a'.repeat(40), publicadoEn: 1_000 }, cookie: '' },
+      contextoBase(f),
+    )
+    expect(r.status).toBe(401)
+    expect(pedidos).toHaveLength(0)
+  })
+
+  it('cruza las dos fuentes y devuelve el veredicto', async () => {
+    const sha = 'a'.repeat(40)
+    const { f, pedidos } = fetchFalso([
+      { cuerpo: { deployments: [{ state: 'READY', url: 'maracacao-abc.vercel.app' }] } },
+      { cuerpo: { sha, construido: '2026-09-17T12:00:00.000Z' } },
+    ])
+    const r = await maneja(
+      'estado',
+      { cuerpo: { sha, publicadoEn: 1_000 }, cookie: cookieValida() },
+      { ...contextoBase(f), ahora: () => 6_000 },
+    )
+    expect(r.status).toBe(200)
+    expect(r.cuerpo).toEqual({
+      ok: true,
+      estado: 'listo',
+      frase: 'Tu cambio ya está en el sitio.',
+      reintentarEn: null,
+      url: 'https://maracacao-abc.vercel.app',
+    })
+    // La segunda lectura tiene que saltear el caché: si `version.json` viene
+    // de un caché intermedio, deja de decir qué está sirviendo AHORA.
+    expect(pedidos[1].url).toContain('/version.json?')
+  })
+
+  it('si version.json no contesta, no se canta «listo»: se sigue esperando', async () => {
+    // Una de las dos fuentes caída no puede convertirse en un «sí» por
+    // omisión. La respuesta correcta es «todavía no sé», que es enCurso.
+    const sha = 'a'.repeat(40)
+    const { f } = fetchFalso([
+      { cuerpo: { deployments: [{ state: 'READY', url: 'x.vercel.app' }] } },
+      { status: 500, cuerpo: {} },
+    ])
+    const r = await maneja(
+      'estado',
+      { cuerpo: { sha, publicadoEn: 1_000 }, cookie: cookieValida() },
+      { ...contextoBase(f), ahora: () => 6_000 },
+    )
+    expect((r.cuerpo as { estado: string }).estado).toBe('enCurso')
+  })
+
+  it('sin PANEL_VERCEL_TOKEN, 503 con frase — no un estado inventado', async () => {
+    const ctx = contextoBase(fetchQueNoSeUsa())
+    delete (ctx.env as Record<string, string | undefined>).PANEL_VERCEL_TOKEN
+    const r = await maneja(
+      'estado',
+      { cuerpo: { sha: 'a'.repeat(40), publicadoEn: 1_000 }, cookie: cookieValida() },
+      ctx,
+    )
+    expect(r.status).toBe(503)
   })
 })

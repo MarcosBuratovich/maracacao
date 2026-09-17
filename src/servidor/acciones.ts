@@ -32,6 +32,8 @@ import { serializa } from '../contenido/carga'
 import { injerta, type FuentesDeDerivados } from '../contenido/derivados'
 import { DOCUMENTOS, type IdDocumento } from '../contenido/esquema'
 import type { Carta, ResultadoCorreo } from './correo'
+import { clienteVercel, type EstadoDeDespliegue } from './vercel'
+import { decide, SITIO } from './estado'
 
 /** Lo que le llega al router, ya despojado de HTTP: el borde lo arma. */
 export interface Pedido {
@@ -772,6 +774,106 @@ async function salud(_pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
 
 /*
  * ---------------------------------------------------------------------
+ * estado
+ * ---------------------------------------------------------------------
+ */
+
+/**
+ * `estado`: ¿el cambio que publicó ya está en el sitio? (spec §4.5).
+ *
+ * [B1] El panel pregunta; el servidor dice cada cuánto volver a preguntar y
+ * cuándo parar. El sondeo NO vive en la función: una función de la plataforma
+ * muere a los 60 s y un despliegue tarda más, así que «la función sondea»
+ * —como lo escribió el spec— no se puede implementar. Lo que sí se puede, y
+ * es lo mismo desde donde ella lo mira, es que cada respuesta traiga su
+ * `reintentarEn`.
+ *
+ * Las dos lecturas van en este orden porque la primera es la que puede
+ * ahorrar la segunda: si el despliegue falló, no hace falta preguntarle nada
+ * al CDN.
+ *
+ * Si `version.json` no contesta, NO se asume nada: se sigue con
+ * `shaServido: null`, que nunca coincide, así que el veredicto es «en curso».
+ * Una de las dos fuentes caída no puede volverse un «sí» por omisión.
+ */
+async function estadoAccion(pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
+  const env = contexto.env
+  if (!secretoUtilizable(env)) {
+    console.error('estado: PANEL_SECRETO falta o mide menos de 32 caracteres.')
+    return error(503, PROBLEMA_INESPERADO)
+  }
+
+  const sesion = sesionVigente(pedido.cookie, env, contexto.ahora())
+  if (!sesion) return error(401, PROBLEMA_SESION)
+
+  if (!env.PANEL_VERCEL_TOKEN) {
+    console.error('estado: PANEL_VERCEL_TOKEN no está cargada — no hay forma de saber si el despliegue terminó.')
+    return error(503, PROBLEMA_INESPERADO)
+  }
+
+  const cuerpo = (pedido.cuerpo ?? {}) as { sha?: unknown; publicadoEn?: unknown }
+  if (typeof cuerpo.sha !== 'string' || !/^[0-9a-f]{40}$/.test(cuerpo.sha)) {
+    return error(400, PROBLEMA_INESPERADO)
+  }
+  const publicadoEn = typeof cuerpo.publicadoEn === 'number' ? cuerpo.publicadoEn : contexto.ahora()
+
+  const vercel = clienteVercel({
+    token: env.PANEL_VERCEL_TOKEN,
+    // Sin `PANEL_VERCEL_PROYECTO`, el del repo (ver el docstring de la
+    // variable en `Entorno`, arriba): el nombre del proyecto en la
+    // plataforma no es un dato de negocio para inventar acá, es el mismo
+    // nombre que ya usan `GITHUB_DUENIO`/`GITHUB_REPO` para todo lo demás.
+    proyecto: env.PANEL_VERCEL_PROYECTO ?? env.GITHUB_REPO ?? '',
+    fetch: contexto.fetch,
+  })
+
+  let despliegue: { estado: EstadoDeDespliegue; url: string | null }
+  try {
+    despliegue = await vercel.despliegueDe(cuerpo.sha)
+  } catch (e) {
+    console.error('estado: la plataforma no contestó por el despliegue —', e)
+    return error(502, PROBLEMA_NO_SE_PUDO_LEER)
+  }
+
+  const shaServido = despliegue.estado === 'listo' ? await shaQueSirveElCdn(contexto) : null
+
+  const veredicto = decide({
+    despliegue: despliegue.estado,
+    url: despliegue.url,
+    shaServido,
+    shaPublicado: cuerpo.sha,
+    desdeHaceMs: contexto.ahora() - publicadoEn,
+  })
+
+  return ok({ ok: true, ...veredicto })
+}
+
+/**
+ * Qué commit está sirviendo el CDN, según `version.json` (Tarea 4).
+ *
+ * El `?t=` es obligatorio y no es paranoia: aunque `vercel.json` le ponga
+ * `no-store`, entre esta función y el archivo puede haber un caché que no
+ * conocemos. Un `version.json` cacheado dice qué se servía CUANDO SE CACHEÓ,
+ * que es justo la mentira que este archivo existe para no contar.
+ *
+ * Devuelve `null` ante cualquier problema: eso nunca coincide con el sha
+ * publicado, así que el veredicto queda en «en curso». Una fuente caída no
+ * puede convertirse en un «ya está» por omisión.
+ */
+async function shaQueSirveElCdn(contexto: Contexto): Promise<string | null> {
+  try {
+    const r = await contexto.fetch(`${SITIO}/version.json?t=${contexto.ahora()}`, { cache: 'no-store' })
+    if (!r.ok) return null
+    const v = (await r.json()) as { sha?: unknown }
+    return typeof v.sha === 'string' ? v.sha : null
+  } catch (e) {
+    console.error('estado: no se pudo leer version.json del sitio —', e)
+    return null
+  }
+}
+
+/*
+ * ---------------------------------------------------------------------
  * El router
  * ---------------------------------------------------------------------
  */
@@ -795,6 +897,8 @@ export async function maneja(accion: string, pedido: Pedido, contexto: Contexto)
         return await publicarAccion(pedido, contexto)
       case 'salud':
         return await salud(pedido, contexto)
+      case 'estado':
+        return await estadoAccion(pedido, contexto)
       default:
         return error(404, PROBLEMA_ACCION_INEXISTENTE)
     }

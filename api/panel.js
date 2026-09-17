@@ -17835,6 +17835,78 @@ var DOCUMENTOS = {
   fichas: esquemaFichas
 };
 
+// src/servidor/vercel.ts
+var TERMINADOS = {
+  READY: "listo",
+  ERROR: "fall\xF3",
+  CANCELED: "fall\xF3"
+};
+function clienteVercel(c) {
+  return {
+    /**
+     * El estado del despliegue de un commit, y la dirección donde quedó
+     * servido. `'desconocido'` cuando la plataforma todavía no tiene ningún
+     * despliegue para ese commit — que NO es lo mismo que «en curso»: puede
+     * ser que el webhook no haya llegado aún, o que no vaya a llegar nunca.
+     * Qué hacer con esa diferencia lo decide `estado.ts`, que es el que sabe
+     * cuánto hace que se publicó.
+     */
+    async despliegueDe(sha) {
+      const url3 = `https://api.vercel.com/v6/deployments?app=${encodeURIComponent(c.proyecto)}&sha=${encodeURIComponent(sha)}&limit=1`;
+      const respuesta = await c.fetch(url3, {
+        headers: { Authorization: `Bearer ${c.token}`, "User-Agent": "panel-maracacao" }
+      });
+      const cuerpo = await respuesta.json().catch(() => void 0);
+      if (!respuesta.ok) {
+        const mensaje = cuerpo?.error?.message;
+        throw new Error(
+          `La plataforma respondi\xF3 ${respuesta.status}: ${typeof mensaje === "string" ? mensaje : "sin mensaje"}`
+        );
+      }
+      if (cuerpo === void 0) {
+        throw new Error(`La plataforma respondi\xF3 ${respuesta.status} con un cuerpo que no se pudo leer.`);
+      }
+      const despliegues = cuerpo?.deployments ?? [];
+      const primero = despliegues[0];
+      if (!primero) return { estado: "desconocido", url: null };
+      return {
+        estado: TERMINADOS[primero.state ?? ""] ?? "enCurso",
+        // La API devuelve el host pelado («maracacao-abc.vercel.app»); lo que
+        // el panel necesita es algo que se pueda abrir.
+        url: primero.url ? `https://${primero.url}` : null
+      };
+    }
+  };
+}
+
+// src/servidor/estado.ts
+var SITIO = "https://www.maracacao.mx";
+var CADENCIA_RAPIDA_MS = 3e3;
+var CADENCIA_LENTA_MS = 6e3;
+var CAMBIA_DE_CADENCIA_MS = 6e4;
+var DEJA_DE_PREGUNTAR_MS = 3e5;
+var FRASE_LISTO = "Tu cambio ya est\xE1 en el sitio.";
+var FRASE_EN_CURSO = "Estamos subiendo tu cambio al sitio.";
+var FRASE_FALLO = "No sali\xF3; lo dej\xE9 como estaba y ya le avis\xE9 a Marcos.";
+var FRASE_TARDA = "Tu cambio est\xE1 tardando m\xE1s de lo normal. Vuelve a abrir el panel en un rato para ver c\xF3mo qued\xF3.";
+function decide(e) {
+  if (e.despliegue === "fall\xF3") {
+    return { estado: "fall\xF3", frase: FRASE_FALLO, reintentarEn: null, url: e.url };
+  }
+  if (e.despliegue === "listo" && e.shaServido === e.shaPublicado) {
+    return { estado: "listo", frase: FRASE_LISTO, reintentarEn: null, url: e.url };
+  }
+  if (e.desdeHaceMs > DEJA_DE_PREGUNTAR_MS) {
+    return { estado: "enCurso", frase: FRASE_TARDA, reintentarEn: null, url: e.url };
+  }
+  return {
+    estado: "enCurso",
+    frase: FRASE_EN_CURSO,
+    reintentarEn: e.desdeHaceMs > CAMBIA_DE_CADENCIA_MS ? CADENCIA_LENTA_MS : CADENCIA_RAPIDA_MS,
+    url: e.url
+  };
+}
+
 // src/servidor/acciones.ts
 var ok = (cuerpo, cookie) => ({ status: 200, cuerpo, cookie });
 var error51 = (status, problema, campo) => ({
@@ -18062,6 +18134,60 @@ async function salud(_pedido, contexto) {
     return { status: 503, cuerpo: { ok: false, faltan: [], github: false } };
   }
 }
+async function estadoAccion(pedido, contexto) {
+  const env = contexto.env;
+  if (!secretoUtilizable(env)) {
+    console.error("estado: PANEL_SECRETO falta o mide menos de 32 caracteres.");
+    return error51(503, PROBLEMA_INESPERADO);
+  }
+  const sesion = sesionVigente(pedido.cookie, env, contexto.ahora());
+  if (!sesion) return error51(401, PROBLEMA_SESION);
+  if (!env.PANEL_VERCEL_TOKEN) {
+    console.error("estado: PANEL_VERCEL_TOKEN no est\xE1 cargada \u2014 no hay forma de saber si el despliegue termin\xF3.");
+    return error51(503, PROBLEMA_INESPERADO);
+  }
+  const cuerpo = pedido.cuerpo ?? {};
+  if (typeof cuerpo.sha !== "string" || !/^[0-9a-f]{40}$/.test(cuerpo.sha)) {
+    return error51(400, PROBLEMA_INESPERADO);
+  }
+  const publicadoEn = typeof cuerpo.publicadoEn === "number" ? cuerpo.publicadoEn : contexto.ahora();
+  const vercel = clienteVercel({
+    token: env.PANEL_VERCEL_TOKEN,
+    // Sin `PANEL_VERCEL_PROYECTO`, el del repo (ver el docstring de la
+    // variable en `Entorno`, arriba): el nombre del proyecto en la
+    // plataforma no es un dato de negocio para inventar acá, es el mismo
+    // nombre que ya usan `GITHUB_DUENIO`/`GITHUB_REPO` para todo lo demás.
+    proyecto: env.PANEL_VERCEL_PROYECTO ?? env.GITHUB_REPO ?? "",
+    fetch: contexto.fetch
+  });
+  let despliegue;
+  try {
+    despliegue = await vercel.despliegueDe(cuerpo.sha);
+  } catch (e) {
+    console.error("estado: la plataforma no contest\xF3 por el despliegue \u2014", e);
+    return error51(502, PROBLEMA_NO_SE_PUDO_LEER);
+  }
+  const shaServido = despliegue.estado === "listo" ? await shaQueSirveElCdn(contexto) : null;
+  const veredicto = decide({
+    despliegue: despliegue.estado,
+    url: despliegue.url,
+    shaServido,
+    shaPublicado: cuerpo.sha,
+    desdeHaceMs: contexto.ahora() - publicadoEn
+  });
+  return ok({ ok: true, ...veredicto });
+}
+async function shaQueSirveElCdn(contexto) {
+  try {
+    const r = await contexto.fetch(`${SITIO}/version.json?t=${contexto.ahora()}`, { cache: "no-store" });
+    if (!r.ok) return null;
+    const v = await r.json();
+    return typeof v.sha === "string" ? v.sha : null;
+  } catch (e) {
+    console.error("estado: no se pudo leer version.json del sitio \u2014", e);
+    return null;
+  }
+}
 var PROBLEMA_ACCION_INEXISTENTE = "Esta acci\xF3n todav\xEDa no existe.";
 async function maneja(accion, pedido, contexto) {
   try {
@@ -18072,6 +18198,8 @@ async function maneja(accion, pedido, contexto) {
         return await publicarAccion(pedido, contexto);
       case "salud":
         return await salud(pedido, contexto);
+      case "estado":
+        return await estadoAccion(pedido, contexto);
       default:
         return error51(404, PROBLEMA_ACCION_INEXISTENTE);
     }
