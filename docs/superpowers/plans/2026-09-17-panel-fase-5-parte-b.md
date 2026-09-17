@@ -1478,31 +1478,35 @@ módulo se escribe contra lo que ELLA devuelva.
     `despliegueDe(sha: string): Promise<{ estado: EstadoDeDespliegue; url: string | null }>`
   - `Entorno` gana `PANEL_VERCEL_TOKEN?: string` y `PANEL_VERCEL_PROYECTO?: string`.
 
-- [ ] **Step 1: MEDÍ la API antes de escribir el módulo**
+- [ ] **Step 1: La medición se difiere — leé esto antes de escribir nada**
 
-Pedile a Marcos que corra esto **él**, con su token cargado en la shell (el
-token no entra al repo ni al chat):
+**[RULING T5-1]** Este paso pedía correr un `curl` contra la API real con el
+token de Marcos, y confirmar tres cosas antes de escribir el módulo: cómo se
+filtra por commit, en qué clave viene el estado y qué valores toma, y si el
+proyecto se nombra con `app=` o con `projectId=`.
 
-```bash
-SHA=$(git rev-parse origin/main)
-curl -sS -H "Authorization: Bearer $PANEL_VERCEL_TOKEN" \
-  "https://api.vercel.com/v6/deployments?app=maracacao&limit=5" \
-  | python3 -m json.tool | head -60
-```
+**No se puede hacer ahora.** El token no existe en el repo ni puede existir
+—ningún secreto entra acá— y pedírselo a Marcos para pegarlo en una terminal
+parada esta tarea hasta que él esté disponible. Así que la medición se difiere
+al lugar donde ya iba a ocurrir de todas formas: el **paso 7 del ensayo de humo
+(Tarea 15)**, que sondea el estado de una publicación real contra producción.
+Ese paso ES la medición, nada más que unos días después.
 
-Y que pegue la salida **sin el token** y sin `Authorization`. Lo que hay que
-confirmar, y anotar en el docstring del módulo con la fecha:
+Lo que hacés vos, entonces:
 
-1. Cómo se filtra por commit: si `?sha=<sha>` funciona, o hay que traer los
-   últimos y filtrar por `meta.githubCommitSha`.
-2. Qué valores toma el estado y en qué clave viene (`state`, `readyState`, o
-   las dos).
-3. Si el proyecto se nombra con `app=<slug>` o con `projectId=<id>`.
+1. Escribí el módulo contra la forma documentada que el Paso 4 te da.
+2. Dejá en el docstring un bloque **`PENDIENTE DE MEDICIÓN`** que nombre las
+   tres preguntas de arriba, para que quien corra el ensayo sepa exactamente
+   qué mirar y dónde corregir.
+3. **No adivines de más.** Todo lo que el módulo no entienda se lee como
+   `'enCurso'` — nunca como `'listo'` ni como `'falló'`. Esa asimetría es lo
+   que hace que diferir la medición sea barato: si le erramos, el panel dice
+   «seguí esperando» hasta que alguien lo corrija, en vez de mentirle a la
+   clienta o disparar una reversión que nadie pidió.
 
-**Si la medición contradice lo que dice el Paso 3, gana la medición**: corregí el
-código y dejá anotado en el docstring qué se midió, cuándo y qué decía este plan.
-Es exactamente lo que pasó con el tracing en la Parte A, y anotarlo es lo que
-hizo que no se volviera a discutir.
+*Costo si me equivoco:* el panel se queda diciendo «estamos subiendo tu cambio»
+para siempre, y el ensayo de la Tarea 15 lo encuentra antes de que la clienta
+lo vea nunca.
 
 - [ ] **Step 2: Escribí los tests que fallan**
 
