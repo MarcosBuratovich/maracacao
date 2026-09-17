@@ -18106,9 +18106,9 @@ function ipDelPedido(headers) {
 
 // src/servidor/correo.ts
 async function manda(c, carta) {
-  if (!c.clave || !c.remitente) return { ok: false, motivo: "sin-configurar" };
-  if (carta.a.length === 0) return { ok: false, motivo: "sin-destino" };
   try {
+    if (!c?.clave || !c?.remitente) return { ok: false, motivo: "sin-configurar" };
+    if (!carta?.a?.length) return { ok: false, motivo: "sin-destino" };
     const respuesta = await c.fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${c.clave}`, "Content-Type": "application/json" },

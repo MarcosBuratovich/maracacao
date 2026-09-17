@@ -39,10 +39,25 @@ export type ResultadoCorreo =
   | { ok: false; motivo: 'sin-configurar' | 'rechazado' | 'sin-destino' }
 
 export async function manda(c: CredencialesCorreo, carta: Carta): Promise<ResultadoCorreo> {
-  if (!c.clave || !c.remitente) return { ok: false, motivo: 'sin-configurar' }
-  if (carta.a.length === 0) return { ok: false, motivo: 'sin-destino' }
-
+  // [RULING T6-2] El `try` abarca la función ENTERA, chequeos incluidos, y los
+  // chequeos son a prueba de nulos. La primera versión dejaba
+  // `carta.a.length === 0` afuera del `try`, así que una `Carta` con `a` en
+  // `undefined` tiraba un `TypeError` y se llevaba puesto el flujo que llama
+  // —publicar, revertir—, que es exactamente lo que la promesa de este módulo
+  // («nunca tira») existe para impedir. Verificado ejecutando: tiraba con `a`
+  // ausente, con `a` en `null`, y con la carta entera ausente.
+  //
+  // Una promesa absoluta se sostiene con una estructura absoluta, no
+  // recordándose de envolver cada línea nueva. El costo de esto es real y va
+  // dicho: un bug adentro de esta función sale como `'rechazado'` en vez de
+  // explotar. Se acepta porque quien llama ya está en medio de algo más
+  // importante que el aviso, y porque el aviso que no sale se nota (no llega
+  // el correo), mientras que la publicación que se aborta por culpa del aviso
+  // no se nota hasta que la clienta pregunta por qué no se publicó.
   try {
+    if (!c?.clave || !c?.remitente) return { ok: false, motivo: 'sin-configurar' }
+    if (!carta?.a?.length) return { ok: false, motivo: 'sin-destino' }
+
     const respuesta = await c.fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${c.clave}`, 'Content-Type': 'application/json' },

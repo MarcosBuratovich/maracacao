@@ -1867,6 +1867,35 @@ describe('mandar un aviso', () => {
       await manda({ clave: 'k', remitente: 'r', fetch: f }, { a: ['x@y.mx'], asunto: 'x', texto: 'y' }),
     ).toEqual({ ok: false, motivo: 'rechazado' })
   })
+
+  it('T6-2: NINGUNA forma de carta rota lo hace tirar', async () => {
+    // La promesa de este módulo es absoluta, así que el test tiene que serlo
+    // también. Verificado en la revisión: con `a` ausente, `a` en `null` o la
+    // carta entera ausente, la versión anterior tiraba un `TypeError` — y se
+    // llevaba puesto el flujo de publicar o revertir, que es lo único que
+    // esta promesa existe para proteger.
+    const { f } = fetchFalso([])
+    const cred = { clave: 'k', remitente: 'r', fetch: f }
+    const rotas = [
+      undefined,
+      null,
+      {},
+      { asunto: 'x', texto: 'y' },
+      { a: undefined, asunto: 'x', texto: 'y' },
+      { a: null, asunto: 'x', texto: 'y' },
+      { a: [], asunto: 'x', texto: 'y' },
+    ]
+    for (const carta of rotas) {
+      await expect(manda(cred, carta as never)).resolves.toEqual({ ok: false, motivo: 'sin-destino' })
+    }
+  })
+
+  it('T6-2: y unas credenciales rotas tampoco', async () => {
+    const carta = { a: ['x@y.mx'], asunto: 'x', texto: 'y' }
+    for (const cred of [undefined, null, {}]) {
+      await expect(manda(cred as never, carta)).resolves.toEqual({ ok: false, motivo: 'sin-configurar' })
+    }
+  })
 })
 ```
 
@@ -1919,10 +1948,25 @@ export type ResultadoCorreo =
   | { ok: false; motivo: 'sin-configurar' | 'rechazado' | 'sin-destino' }
 
 export async function manda(c: CredencialesCorreo, carta: Carta): Promise<ResultadoCorreo> {
-  if (!c.clave || !c.remitente) return { ok: false, motivo: 'sin-configurar' }
-  if (carta.a.length === 0) return { ok: false, motivo: 'sin-destino' }
-
+  // [RULING T6-2] El `try` abarca la función ENTERA, chequeos incluidos, y los
+  // chequeos son a prueba de nulos. La primera versión dejaba
+  // `carta.a.length === 0` afuera del `try`, así que una `Carta` con `a` en
+  // `undefined` tiraba un `TypeError` y se llevaba puesto el flujo que llama
+  // —publicar, revertir—, que es exactamente lo que la promesa de este módulo
+  // («nunca tira») existe para impedir. Verificado ejecutando: tiraba con `a`
+  // ausente, con `a` en `null`, y con la carta entera ausente.
+  //
+  // Una promesa absoluta se sostiene con una estructura absoluta, no
+  // recordándose de envolver cada línea nueva. El costo de esto es real y va
+  // dicho: un bug adentro de esta función sale como `'rechazado'` en vez de
+  // explotar. Se acepta porque quien llama ya está en medio de algo más
+  // importante que el aviso, y porque el aviso que no sale se nota (no llega
+  // el correo), mientras que la publicación que se aborta por culpa del aviso
+  // no se nota hasta que la clienta pregunta por qué no se publicó.
   try {
+    if (!c?.clave || !c?.remitente) return { ok: false, motivo: 'sin-configurar' }
+    if (!carta?.a?.length) return { ok: false, motivo: 'sin-destino' }
+
     const respuesta = await c.fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${c.clave}`, 'Content-Type': 'application/json' },
@@ -1984,10 +2028,17 @@ con su import, y sumá las tres variables a `entorno()`.
 
 En `docs/panel-operacion.md`:
 
+**[CORREGIDO 2026-09-17, ruling T6-1]** La tabla real de `docs/panel-operacion.md`
+tiene las columnas **`Variable | Qué es | Si falta`**, no las `Variable | Sí/No |
+descripción` que este plan venía escribiendo. Pegar filas con la forma
+equivocada deja una tabla donde la segunda columna significa una cosa en unas
+filas y otra en otras — y esa tabla es lo que Marcos va a leer apurado el día
+que algo no ande. Van con la forma real:
+
 ```markdown
-| `RESEND_API_KEY` | No (pero sin ella no hay avisos) | La clave del proveedor de correo. Sin ella, el panel publica igual: lo que se pierde son los avisos, y el enlace mágico deja de estar disponible. |
-| `PANEL_REMITENTE` | No (ídem) | `Panel Maracacao <panel@maracacao.mx>`. Tiene que ser una dirección de un dominio verificado en el proveedor (SPF+DKIM en el DNS). Mientras `maracacao.mx` no esté verificado, los avisos solo llegan al correo del dueño de la cuenta del proveedor. |
-| `PANEL_AVISOS_A` | No | A quién avisarle cuando algo sale mal (deploy fallido, token por vencer). La dirección de Marcos. A la clienta se le avisa al correo con el que entró. |
+| `RESEND_API_KEY` | La clave del proveedor de correo. | No es una de las obligatorias: el panel publica igual. Lo que se pierde son los avisos, y el enlace mágico deja de estar disponible. |
+| `PANEL_REMITENTE` | La dirección desde la que salen los avisos: `Panel Maracacao <panel@maracacao.mx>`. Tiene que ser de un dominio verificado en el proveedor (SPF+DKIM en el DNS). | Igual que la anterior: sin avisos y sin enlace mágico. Y mientras `maracacao.mx` no esté verificado, los avisos solo llegan a la casilla del dueño de la cuenta del proveedor. |
+| `PANEL_AVISOS_A` | A quién avisarle cuando algo sale mal: un despliegue que falló, el token por vencer. Es la dirección de Marcos; a la clienta se le avisa al correo con el que entró. | Los avisos para Marcos no salen. Los de la clienta sí. |
 ```
 
 - [ ] **Step 7: Corré la suite entera, reempaquetá y commiteá**

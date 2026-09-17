@@ -62,4 +62,33 @@ describe('mandar un aviso', () => {
       await manda({ clave: 'k', remitente: 'r', fetch: f }, { a: ['x@y.mx'], asunto: 'x', texto: 'y' }),
     ).toEqual({ ok: false, motivo: 'rechazado' })
   })
+
+  it('T6-2: NINGUNA forma de carta rota lo hace tirar', async () => {
+    // La promesa de este módulo es absoluta, así que el test tiene que serlo
+    // también. Verificado en la revisión: con `a` ausente, `a` en `null` o la
+    // carta entera ausente, la versión anterior tiraba un `TypeError` — y se
+    // llevaba puesto el flujo de publicar o revertir, que es lo único que
+    // esta promesa existe para proteger.
+    const { f } = fetchFalso([])
+    const cred = { clave: 'k', remitente: 'r', fetch: f }
+    const rotas = [
+      undefined,
+      null,
+      {},
+      { asunto: 'x', texto: 'y' },
+      { a: undefined, asunto: 'x', texto: 'y' },
+      { a: null, asunto: 'x', texto: 'y' },
+      { a: [], asunto: 'x', texto: 'y' },
+    ]
+    for (const carta of rotas) {
+      await expect(manda(cred, carta as never)).resolves.toEqual({ ok: false, motivo: 'sin-destino' })
+    }
+  })
+
+  it('T6-2: y unas credenciales rotas tampoco', async () => {
+    const carta = { a: ['x@y.mx'], asunto: 'x', texto: 'y' }
+    for (const cred of [undefined, null, {}]) {
+      await expect(manda(cred as never, carta)).resolves.toEqual({ ok: false, motivo: 'sin-configurar' })
+    }
+  })
 })
