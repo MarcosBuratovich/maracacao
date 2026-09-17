@@ -89,6 +89,8 @@ function entorno(): Entorno {
     PANEL_GITHUB_TOKEN: process.env.PANEL_GITHUB_TOKEN,
     GITHUB_DUENIO: process.env.GITHUB_DUENIO ?? process.env.VERCEL_GIT_REPO_OWNER ?? 'MarcosBuratovich',
     GITHUB_REPO: process.env.GITHUB_REPO ?? process.env.VERCEL_GIT_REPO_SLUG ?? 'maracacao',
+    PANEL_VERCEL_TOKEN: process.env.PANEL_VERCEL_TOKEN,
+    PANEL_VERCEL_PROYECTO: process.env.PANEL_VERCEL_PROYECTO ?? process.env.VERCEL_GIT_REPO_SLUG ?? 'maracacao',
   }
 }
 

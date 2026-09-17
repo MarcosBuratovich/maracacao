@@ -65,6 +65,15 @@ export interface Entorno {
    * celular perdido de alguien que sigue teniendo acceso.
    */
   PANEL_DISPOSITIVOS_REVOCADOS?: string
+  /**
+   * Token de la API de la plataforma. Es OBLIGATORIO (spec §4.5): sin él no
+   * se puede saber si el deploy terminó ni revertir solo, y publicar a
+   * ciegas es peor que no publicar — ella cree que publicó, vende al precio
+   * nuevo, y el cliente le muestra el celular con el precio viejo.
+   */
+  PANEL_VERCEL_TOKEN?: string
+  /** El nombre del proyecto en la plataforma. Por defecto, el del repo. */
+  PANEL_VERCEL_PROYECTO?: string
 }
 
 /** Todo lo que `maneja()` necesita del mundo exterior, inyectado. */
@@ -661,10 +670,17 @@ async function publicarAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
  * ---------------------------------------------------------------------
  */
 
-// Las seis variables que el panel necesita para funcionar del todo. Por
+// Las siete variables que el panel necesita para funcionar del todo. Por
 // NOMBRE nunca por valor (E7): esta lista vive acá, no un valor leído de
 // `contexto.env`, así que no hay forma de que un `console.log` apurado se
 // escape y termine devolviendo un secreto.
+//
+// [RULING P-2 del preflight, Tarea 5] `PANEL_VERCEL_TOKEN` se suma acá desde
+// que existe `src/servidor/vercel.ts` (spec §4.5): publicar a ciegas, sin
+// poder saber si el deploy terminó ni revertir solo, es peor que no
+// publicar. Consecuencia real, no hipotética: desde que esta lista mergea a
+// producción, `salud` contesta 503 hasta que Marcos cargue esa variable —
+// avisado en el reporte de esa tarea, no es un bug.
 const VARIABLES_REQUERIDAS = [
   'PANEL_CLAVE_HASH',
   'PANEL_SECRETO',
@@ -672,6 +688,7 @@ const VARIABLES_REQUERIDAS = [
   'PANEL_GITHUB_TOKEN',
   'GITHUB_DUENIO',
   'GITHUB_REPO',
+  'PANEL_VERCEL_TOKEN',
 ] as const
 
 // [I-6] Lo que dice la clienta (bueno, acá nadie la llama por sesión, así
@@ -712,7 +729,7 @@ async function salud(_pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
     return { status: 503, cuerpo: { ok: false, faltan, github: null } }
   }
 
-  // Las seis están: falta ver si GitHub de verdad contesta con ellas — y
+  // Las siete están: falta ver si GitHub de verdad contesta con ellas — y
   // ESE paso es el que va detrás del freno, no el chequeo de variables de
   // arriba.
   if (!intentoPermitido(contexto.ip, contexto.ahora())) {

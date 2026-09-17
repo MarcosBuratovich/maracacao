@@ -121,6 +121,12 @@ const contextoBase = (fetch: typeof globalThis.fetch) => ({
     PANEL_CORREOS: 'clienta@ejemplo.mx,marcos@ejemplo.mx',
     PANEL_GITHUB_TOKEN: 'token',
     GITHUB_DUENIO: 'd', GITHUB_REPO: 'r',
+    // Tarea 5: séptima variable de VARIABLES_REQUERIDAS. Ningún test de
+    // este archivo ejercita `clienteVercel` (eso lo cubre
+    // test/vercel-servidor.test.ts, con `fetchFalso`) — está acá solo para
+    // que `salud` siga viendo las siete completas, como ya hacía con las
+    // seis antes de esta tarea.
+    PANEL_VERCEL_TOKEN: 'token-vercel-de-prueba',
   },
   fetch,
   ahora: () => Date.now(),

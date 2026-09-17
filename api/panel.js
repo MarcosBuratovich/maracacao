@@ -18036,7 +18036,8 @@ var VARIABLES_REQUERIDAS = [
   "PANEL_CORREOS",
   "PANEL_GITHUB_TOKEN",
   "GITHUB_DUENIO",
-  "GITHUB_REPO"
+  "GITHUB_REPO",
+  "PANEL_VERCEL_TOKEN"
 ];
 var PROBLEMA_SALUD_OMITIDA = "Las variables est\xE1n, pero no revisamos la conexi\xF3n con GitHub: hubo demasiados pedidos seguidos. Intenta de nuevo en unos minutos.";
 async function salud(_pedido, contexto) {
@@ -18132,7 +18133,9 @@ function entorno() {
     PANEL_CORREOS: process.env.PANEL_CORREOS,
     PANEL_GITHUB_TOKEN: process.env.PANEL_GITHUB_TOKEN,
     GITHUB_DUENIO: process.env.GITHUB_DUENIO ?? process.env.VERCEL_GIT_REPO_OWNER ?? "MarcosBuratovich",
-    GITHUB_REPO: process.env.GITHUB_REPO ?? process.env.VERCEL_GIT_REPO_SLUG ?? "maracacao"
+    GITHUB_REPO: process.env.GITHUB_REPO ?? process.env.VERCEL_GIT_REPO_SLUG ?? "maracacao",
+    PANEL_VERCEL_TOKEN: process.env.PANEL_VERCEL_TOKEN,
+    PANEL_VERCEL_PROYECTO: process.env.PANEL_VERCEL_PROYECTO ?? process.env.VERCEL_GIT_REPO_SLUG ?? "maracacao"
   };
 }
 async function handler(req, res) {
