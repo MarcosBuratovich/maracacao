@@ -26,8 +26,11 @@ const sitioCrudoDeDisco = () => JSON.parse(readFileSync('src/contenido/datos/sit
 // Lo mismo para `sabores`: la fuente de la que `sitio` saca sus cinco
 // derivados. `sabores` no tiene NINGÚN campo derivado propio (esquema
 // sabores.ts — ningún `derivado`/`derivadoTexto`), así que su versión
-// «vivo» es sencillamente el archivo del repo, serializado.
-const textoSaboresVivo = serializa(esquemaSabores, JSON.parse(readFileSync('src/contenido/datos/sabores.json', 'utf8')))
+// «vivo» es sencillamente el archivo del repo, serializado. Una función y
+// no una constante: los tests que arman un lote con `sabores` editado
+// necesitan su PROPIA copia para mutar, no la que ya usó otro test.
+const saboresCrudoDeDisco = () => JSON.parse(readFileSync('src/contenido/datos/sabores.json', 'utf8'))
+const textoSaboresVivo = serializa(esquemaSabores, saboresCrudoDeDisco())
 
 /**
  * Las dos respuestas que el router necesita para calcular los derivados de
@@ -360,6 +363,13 @@ describe('publicar', () => {
       const cuerpo = r.cuerpo as { ok: boolean; sha: string | null }
       expect(cuerpo.ok).toBe(true)
       expect(cuerpo.sha).toBe('commit-nuevo')
+      // Y esa lectura de `sabores` fue de VERDAD, no salteada: si la Fase
+      // 1b tuviera las dos ramas cambiadas —tratar «`sabores` no vino en
+      // el lote» como si hubiera venido— habría llamado
+      // `fuentesDeSabores(documentos.sabores)` con `undefined`, sin tocar
+      // GitHub, y `injerta()` hubiera reventado en `precioDesde([])` mucho
+      // antes de llegar a un 200.
+      expect(pedidos.filter((p) => p.metodo === 'GET' && p.url.includes('sabores'))).toHaveLength(1)
       // Y lo que se escribió tampoco lleva los derivados: siguen sin
       // pertenecer al archivo, injertados o no (serializa() los omite
       // siempre — ver el test de bytes idénticos más abajo).
@@ -413,6 +423,137 @@ describe('publicar', () => {
         return (blob?.cuerpo as { content: string }).content
       }
       expect(blobDe(a.pedidos)).toBe(blobDe(b.pedidos))
+    })
+  })
+
+  // El punto 2 de la tarea: de dónde salen las fuentes de los derivados de
+  // `sitio` cuando el lote también trae `sabores`. Ningún test de arriba
+  // manda los dos documentos juntos — todos mandan `sitio` solo — así que
+  // ninguno ejercita la rama `fuentesDeSabores(documentos.sabores)` de
+  // `acciones.ts`; solo la rama de lo vivo. Estos tests cubren esa rama y
+  // su espejo.
+  //
+  // Nota sobre el mecanismo: ninguno de los cinco campos derivados tiene
+  // un chequeo de VALOR exacto en el esquema —`derivado()` es
+  // `z.int().min(1).max(99_999)`, `derivadoTexto()` es
+  // `z.string().trim().max(maxCaracteres)` (campos.ts:490-509)— así que un
+  // texto que «dijera 16» en vez de «15» no lo rechaza ningún esquema: la
+  // única gravedad que compara un texto contra una cantidad es
+  // `avisosDeConteo()` (validacion.ts), que da `gravedad: 'avisa'` y que
+  // el router NUNCA calcula (usa `validarContra`, no `validar` — ver el
+  // docstring de `publicarAccion`). El punto donde `sitio` SÍ depende de
+  // el CONTENIDO real de `sabores`, no solo de su tipo, es
+  // `gotas.precioJengibre`: `precioDe(f.gotas, 'jengibreYNaranja')`
+  // (derivados.ts:62) tira si esa bolsa no está en la lista que se le
+  // pasó. Eso es lo que estos dos tests usan para demostrar, de forma
+  // determinística, CUÁL de las dos fuentes usó el router — con las
+  // dos posibles fuentes con un contenido que un bug de rama cambiada
+  // ("swapped branch") no podría producir por accidente.
+  describe('de dónde salen las fuentes de los derivados cuando el lote trae sabores (punto 2 de la tarea)', () => {
+    it('sitio y sabores en el mismo lote: sitio se valida y se escribe contra los sabores DEL LOTE — nunca se lee nada vivo de sabores', async () => {
+      const saboresConUnoNuevo = saboresCrudoDeDisco()
+      const nuevo = JSON.parse(JSON.stringify(saboresConUnoNuevo.sabores[0]))
+      nuevo.orden = 16
+      nuevo.slug = 'sabor-prueba-16'
+      nuevo.nombre = 'Sabor de prueba n.º 16'
+      saboresConUnoNuevo.sabores.push(nuevo)
+      const textoSaboresConNuevo = serializa(esquemaSabores, saboresConUnoNuevo)
+      expect(textoSaboresConNuevo).not.toBe(textoSaboresVivo) // guardia
+
+      const sitioConCambio = JSON.parse(JSON.stringify(marca))
+      sitioConCambio.footer.derechos = 'Ahora somos 16 sabores'
+      const textoSitioConCambio = serializa(esquemaSitio, sitioConCambio)
+      const textoSitioVivo = serializa(esquemaSitio, marca)
+      expect(textoSitioConCambio).not.toBe(textoSitioVivo) // guardia
+
+      // Ni una respuesta de más que las que hacen falta para ESCRIBIR los
+      // dos documentos: si el router leyera `sabores` vivo además de
+      // usar el del lote, pediría una respuesta de más que las 10
+      // programadas y `fetchFalso` lo denuncia (M-11).
+      const { f, pedidos } = fetchFalso([
+        { cuerpo: { object: { sha: 'main-1' } } }, // gh.ref (Fase 2 — la Fase 1b no tocó GitHub: sabores vino en el lote)
+        { cuerpo: { content: Buffer.from(textoSitioVivo).toString('base64'), encoding: 'base64' } }, // archivoEnRef(sitio)
+        { cuerpo: { content: Buffer.from(textoSaboresVivo).toString('base64'), encoding: 'base64' } }, // archivoEnRef(sabores): 15, distinto del lote
+        { cuerpo: { object: { sha: 'main-1' } } }, // gh.ref (dentro de publica())
+        { cuerpo: { sha: 'commit-viejo', tree: { sha: 'arbol-viejo' } } }, // gh.commit
+        { cuerpo: { sha: 'blob-a' } }, // creaBlob (uno de los dos archivos; el orden de llegada no importa)
+        { cuerpo: { sha: 'blob-b' } }, // creaBlob (el otro)
+        { cuerpo: { sha: 'arbol-nuevo' } }, // creaArbol
+        { cuerpo: { sha: 'commit-nuevo' } }, // creaCommit
+        { cuerpo: {} }, // mueveRef
+      ])
+
+      const r = await maneja(
+        'publicar',
+        { cuerpo: { documentos: { sitio: sitioConCambio, sabores: saboresConUnoNuevo } }, cookie: cookieValida() },
+        contextoBase(f),
+      )
+
+      expect(r.status).toBe(200)
+      expect((r.cuerpo as { ok: boolean; sha: string | null }).sha).toBe('commit-nuevo')
+
+      const blobsEscritos = pedidos.filter(
+        (p) => p.metodo === 'POST' && (p.cuerpo as { encoding?: string })?.encoding === 'base64',
+      )
+      expect(blobsEscritos).toHaveLength(2)
+      const textos = blobsEscritos.map((b) => Buffer.from((b.cuerpo as { content: string }).content, 'base64').toString('utf8'))
+      const escritoSabores = textos.find((t) => t.includes('Sabor de prueba n.º 16'))
+      expect(escritoSabores).toBeDefined()
+      expect(JSON.parse(escritoSabores as string).sabores).toHaveLength(16)
+    })
+
+    it('al sabores del lote le falta lo que sitio necesita: se valida contra ESO (422), no contra lo vivo, que sí lo tiene', async () => {
+      const saboresSinJengibre = saboresCrudoDeDisco()
+      saboresSinJengibre.gotas = saboresSinJengibre.gotas.filter((g: { clave: string }) => g.clave !== 'jengibreYNaranja')
+      const crudo = sitioCrudoDeDisco() // sin ningún derivado: si injerta() no corre, no hay «de dónde» sacarlos
+
+      // CERO respuestas programadas: si esto llegara a tocar GitHub —el
+      // «swapped branch» que este test existe para atrapar, usando lo
+      // vivo en vez del lote— `fetchFalso` tira por pedir una respuesta
+      // que no programó, y el 502 de «no pudimos leer» delata el bug
+      // (en vez del 422 que sigue).
+      const { f, pedidos } = fetchFalso([])
+
+      const r = await maneja(
+        'publicar',
+        { cuerpo: { documentos: { sitio: crudo, sabores: saboresSinJengibre } }, cookie: cookieValida() },
+        contextoBase(f),
+      )
+
+      expect(pedidos).toHaveLength(0)
+      expect(r.status).toBe(422)
+      // `anaquel.contadorDe` es el primer derivado que el esquema declara
+      // (cabecera.ts → producto.ts: `anaquel` antes que `gotas`) — el
+      // mismo campo que reportó el humo de producción.
+      expect((r.cuerpo as { campo?: string }).campo).toBe('sitio.anaquel.contadorDe')
+    })
+
+    // El espejo del test anterior: `sitio` SOLO (sin `sabores` en el lote)
+    // tiene que validarse contra lo VIVO de verdad —no saltarse la lectura
+    // ni usar un valor vacío/inventado—, así que si a lo vivo también le
+    // falta lo que `sitio` necesita, el resultado tiene que ser el MISMO
+    // 422, y la prueba de que de verdad leyó lo vivo (y no un lote que no
+    // existe) son los DOS pedidos de red.
+    it('sitio solo, sin sabores en el lote: se valida contra lo vivo — si a lo vivo también le falta lo que sitio necesita, 422 y no un 200 con datos inventados', async () => {
+      const saboresVivoSinJengibre = saboresCrudoDeDisco()
+      saboresVivoSinJengibre.gotas = saboresVivoSinJengibre.gotas.filter((g: { clave: string }) => g.clave !== 'jengibreYNaranja')
+      const textoSaboresVivoSinJengibre = serializa(esquemaSabores, saboresVivoSinJengibre)
+      const crudo = sitioCrudoDeDisco()
+
+      const { f, pedidos } = fetchFalso([
+        { cuerpo: { object: { sha: 'main-1' } } }, // gh.ref (Fase 1b)
+        { cuerpo: { content: Buffer.from(textoSaboresVivoSinJengibre).toString('base64'), encoding: 'base64' } }, // archivoEnRef(sabores): lo vivo, sin jengibreYNaranja
+      ])
+
+      const r = await maneja('publicar', { cuerpo: { documentos: { sitio: crudo } }, cookie: cookieValida() }, contextoBase(f))
+
+      // Dos pedidos, ni uno más ni uno menos: de verdad leyó lo vivo. Un
+      // «swapped branch» que tratara «sabores no vino» como si hubiera
+      // venido habría llamado `fuentesDeSabores(undefined)` SIN tocar
+      // GitHub — cero pedidos, no dos.
+      expect(pedidos).toHaveLength(2)
+      expect(r.status).toBe(422)
+      expect((r.cuerpo as { campo?: string }).campo).toBe('sitio.anaquel.contadorDe')
     })
   })
 })

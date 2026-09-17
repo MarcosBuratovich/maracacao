@@ -402,11 +402,15 @@ async function publicarAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
   // Fase 1a, sin tocar GitHub: el esquema COMPLETO de cada documento que
   // NO necesita nada inyectado —hoy, cualquiera menos `sitio`—, en el
   // orden en que llegó. `sabores` y `fichas` no declaran un solo campo
-  // `derivado` (ver el punto 6 del informe de esta tarea), así que su
-  // esquema completo es justo lo que la clienta mandó: nada que calcular
-  // antes de validar. `sitio` se deja para la Fase 1b, después de esta,
-  // para no gastar un pedido de red por sus derivados si el lote ya iba a
-  // rechazarse por CUALQUIER otro documento.
+  // `derivado` (`grep -rn derivado src/contenido/esquema/sabores.ts
+  // src/contenido/esquema/fichas.ts` no da nada — y `validarContra()`
+  // contra los dos archivos crudos del repo, sin injertar nada, da cero
+  // problemas: ver `test/contenido.test.ts`, «el documento de productos
+  // vuelve a salir idéntico» y el describe «el documento de fichas»), así
+  // que su esquema completo es justo lo que la clienta mandó: nada que
+  // calcular antes de validar. `sitio` se deja para la Fase 1b, después de
+  // esta, para no gastar un pedido de red por sus derivados si el lote ya
+  // iba a rechazarse por CUALQUIER otro documento.
   for (const id of idsConocidos) {
     if (id === 'sitio') continue
     const problemas: Problema[] = validarContra(DOCUMENTOS[id], documentos[id])
