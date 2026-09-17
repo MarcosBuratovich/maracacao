@@ -3507,6 +3507,89 @@ async function deshacerAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
 
 Y en el `switch`: `case 'deshacer': return await deshacerAccion(pedido, contexto)`.
 
+- [ ] **Step 3b: Lo que salió de la revisión**
+
+**1 (Important) · `nada-que-revertir` cae en la frase equivocada.** Hoy ese
+motivo y `falló` terminan los dos en «No pudimos publicar: hubo un problema para
+conectarnos con el sitio. Prueba de nuevo en unos minutos». Para `falló` está
+bien. Para el otro es **engañosa**: «no tocó ningún documento de contenido» es
+un hecho permanente de ese commit, no una falla de conexión — reintentar no lo
+va a arreglar nunca, y va a dar el mismo error para siempre.
+
+Escenario, cuando la fase 7 publique imágenes: ella publica una foto, aprieta
+«Deshacer» adentro de la ventana, recibe «hubo un problema para conectarnos»,
+reintenta tres veces con el mismo resultado, y termina escribiéndole a Marcos
+convencida de que el sitio está caído. El camino interno del revert automático
+ya trata este motivo como un tercer resultado con su propia frase; el botón
+tiene que hacer lo mismo:
+
+```ts
+const PROBLEMA_NADA_QUE_DESHACER =
+  'Esa publicación no cambió ningún dato del sitio, así que no hay nada que deshacer.'
+```
+
+con su propio caso en el `switch` (409, no 502: no es un error nuestro).
+
+**2 (Important) · La guardia contra una fecha ilegible no tiene test.**
+Verificado por mutación: sacando el `!Number.isFinite(publicadoEn) ||`, **los 65
+tests siguen verdes**. El código de hoy es correcto, pero nada impide que un
+refactor reintroduzca el bug clásico de JavaScript: `NaN > VENTANA` es `false`,
+así que sin esa guardia una fecha ilegible **pasa la ventana como si estuviera
+adentro** — o sea que se podría deshacer cualquier cosa, de cualquier fecha.
+
+```ts
+it('una fecha que no se puede leer NO cae del lado permisivo', async () => {
+  // `NaN > VENTANA_DESHACER_MS` es `false`: sin la guardia explícita, un commit
+  // con fecha ilegible se trata como «recién publicado» y se puede deshacer
+  // siempre. Es el bug de JavaScript que más veces se reintrodujo en la
+  // historia del lenguaje, y acá abre la ventana de media hora para siempre.
+  for (const fecha of ['no-es-una-fecha', '']) {
+    const r = await maneja('deshacer', { cuerpo: { sha: SHA }, cookie: cookieValida() }, …)
+    expect(r.status, `fecha «${fecha}»`).toBe(409)
+  }
+})
+```
+
+**3 (Minor) · El borde exacto de los 30:00.000 no tiene test.** Verificado por
+mutación: cambiando `>` por `>=`, los 65 tests siguen verdes. La elección actual
+(a los 30:00.000 todavía se puede) es defendible; lo que no puede es quedar sin
+que nadie la haya decidido. Un test la fija.
+
+**4 (Minor) · La frase de error está tipeada dos veces**, acá y en
+`publicar.ts`, y encima `revierte()` puede devolver ese mismo texto adentro de
+su `detalle`. Compartí la constante.
+
+**5 (Minor, arreglo de raíz) · El guardián de jerga tiene un falso positivo, y
+es en la palabra del botón de esta tarea.** `JERGA_PROHIBIDA` incluye `'sha'`, y
+`'deshacer'.includes('sha')` da **verdadero** (de-**sha**-cer). Los tres
+consumidores que hacen el `includes` a mano rechazan una palabra del castellano
+que el panel necesita. El revisor encontró además **«deshabilitar»**, que es
+copy de panel completamente plausible.
+
+Un guardián con falsos positivos se desactiva solo: el próximo que escriba
+«deshacer» va a aflojar el test en vez de entenderlo. Se arregla al lado de la
+constante, y los tres consumidores pasan a usarlo:
+
+```ts
+/**
+ * ¿Esta frase le habla a la clienta con jerga?
+ *
+ * Por límites de palabra y no por substring, porque `'sha'` —la única entrada
+ * de tres letras de la lista— vive adentro de «deshacer» y de «deshabilitar»,
+ * que son exactamente el vocabulario de un panel de publicación. Un guardián
+ * que rechaza la palabra del botón principal no se corrige: se afloja, y a la
+ * tercera vez que alguien lo pelea, deja de proteger.
+ *
+ * Se normalizan los acentos antes de comparar para que «commit» no se cuele
+ * escrito como «cómmit».
+ */
+export function jergaEn(frase: string): string | null
+```
+
+con sus propios casos: que «deshacer» y «deshabilitar» pasen, que «el sha del
+commit» NO pase, y que «hubo un problema con el Deploy» no pase por estar en
+mayúscula.
+
 - [ ] **Step 4: Corré, verificá que pasan, reempaquetá y commiteá**
 
 ```bash
