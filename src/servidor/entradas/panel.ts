@@ -27,6 +27,7 @@
 import { maneja, type Pedido, type Contexto, type Entorno } from '../acciones'
 import { origenPermitido } from '../origen'
 import { ipDelPedido } from '../ip'
+import { manda } from '../correo'
 
 interface PedidoHTTP {
   method?: string
@@ -91,6 +92,9 @@ function entorno(): Entorno {
     GITHUB_REPO: process.env.GITHUB_REPO ?? process.env.VERCEL_GIT_REPO_SLUG ?? 'maracacao',
     PANEL_VERCEL_TOKEN: process.env.PANEL_VERCEL_TOKEN,
     PANEL_VERCEL_PROYECTO: process.env.PANEL_VERCEL_PROYECTO ?? process.env.VERCEL_GIT_REPO_SLUG ?? 'maracacao',
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    PANEL_REMITENTE: process.env.PANEL_REMITENTE,
+    PANEL_AVISOS_A: process.env.PANEL_AVISOS_A,
   }
 }
 
@@ -117,6 +121,7 @@ export default async function handler(req: PedidoHTTP, res: RespuestaHTTP) {
     ahora: () => Date.now(),
     ip: ipDelPedido(req.headers),
     bytesDelCuerpo: bytesDeCuerpo(req.headers),
+    correo: (carta) => manda({ clave: process.env.RESEND_API_KEY, remitente: process.env.PANEL_REMITENTE, fetch: globalThis.fetch }, carta),
   }
 
   const r = await maneja(accion, pedido, contexto)

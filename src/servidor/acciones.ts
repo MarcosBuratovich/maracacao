@@ -31,6 +31,7 @@ import { validarContra, type Problema } from '../contenido/validacion'
 import { serializa } from '../contenido/carga'
 import { injerta, type FuentesDeDerivados } from '../contenido/derivados'
 import { DOCUMENTOS, type IdDocumento } from '../contenido/esquema'
+import type { Carta, ResultadoCorreo } from './correo'
 
 /** Lo que le llega al router, ya despojado de HTTP: el borde lo arma. */
 export interface Pedido {
@@ -74,6 +75,16 @@ export interface Entorno {
   PANEL_VERCEL_TOKEN?: string
   /** El nombre del proyecto en la plataforma. Por defecto, el del repo. */
   PANEL_VERCEL_PROYECTO?: string
+  /** La clave del proveedor de correo. Ausente = los avisos no se mandan (B3). */
+  RESEND_API_KEY?: string
+  /** `Panel Maracacao <panel@maracacao.mx>`, verificado en el proveedor. */
+  PANEL_REMITENTE?: string
+  /**
+   * A quién avisarle cuando algo sale MAL (el deploy falló, el token está por
+   * vencer). Es la dirección de Marcos, no la de la clienta: a ella se le
+   * avisa a su propio correo de sesión, que el panel ya conoce.
+   */
+  PANEL_AVISOS_A?: string
 }
 
 /** Todo lo que `maneja()` necesita del mundo exterior, inyectado. */
@@ -100,6 +111,13 @@ export interface Contexto {
    * llamador y dejan la trampa armada para el siguiente.
    */
   bytesDelCuerpo?: number
+  /**
+   * Mandar un aviso, ya atado a las credenciales por el borde. Las acciones
+   * no conocen la clave ni el remitente: piden «mandá esto» y listo. Así, un
+   * test le pasa una función que anota las cartas en una lista y verifica
+   * QUÉ se avisa sin tocar la red ni ninguna clave.
+   */
+  correo: (carta: Carta) => Promise<ResultadoCorreo>
 }
 
 /** Lo que devuelve el router. El borde lo traduce a una respuesta HTTP real. */

@@ -18104,6 +18104,22 @@ function ipDelPedido(headers) {
   return primera || "desconocida";
 }
 
+// src/servidor/correo.ts
+async function manda(c, carta) {
+  if (!c.clave || !c.remitente) return { ok: false, motivo: "sin-configurar" };
+  if (carta.a.length === 0) return { ok: false, motivo: "sin-destino" };
+  try {
+    const respuesta = await c.fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${c.clave}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: c.remitente, to: carta.a, subject: carta.asunto, text: carta.texto })
+    });
+    return respuesta.ok ? { ok: true } : { ok: false, motivo: "rechazado" };
+  } catch {
+    return { ok: false, motivo: "rechazado" };
+  }
+}
+
 // src/servidor/entradas/panel.ts
 var valorUnico2 = (v) => Array.isArray(v) ? v[0] ?? "" : v ?? "";
 function bytesDeCuerpo(headers) {
@@ -18135,7 +18151,10 @@ function entorno() {
     GITHUB_DUENIO: process.env.GITHUB_DUENIO ?? process.env.VERCEL_GIT_REPO_OWNER ?? "MarcosBuratovich",
     GITHUB_REPO: process.env.GITHUB_REPO ?? process.env.VERCEL_GIT_REPO_SLUG ?? "maracacao",
     PANEL_VERCEL_TOKEN: process.env.PANEL_VERCEL_TOKEN,
-    PANEL_VERCEL_PROYECTO: process.env.PANEL_VERCEL_PROYECTO ?? process.env.VERCEL_GIT_REPO_SLUG ?? "maracacao"
+    PANEL_VERCEL_PROYECTO: process.env.PANEL_VERCEL_PROYECTO ?? process.env.VERCEL_GIT_REPO_SLUG ?? "maracacao",
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    PANEL_REMITENTE: process.env.PANEL_REMITENTE,
+    PANEL_AVISOS_A: process.env.PANEL_AVISOS_A
   };
 }
 async function handler(req, res) {
@@ -18150,7 +18169,8 @@ async function handler(req, res) {
     fetch: globalThis.fetch,
     ahora: () => Date.now(),
     ip: ipDelPedido(req.headers),
-    bytesDelCuerpo: bytesDeCuerpo(req.headers)
+    bytesDelCuerpo: bytesDeCuerpo(req.headers),
+    correo: (carta) => manda({ clave: process.env.RESEND_API_KEY, remitente: process.env.PANEL_REMITENTE, fetch: globalThis.fetch }, carta)
   };
   const r = await maneja(accion, pedido, contexto);
   if (r.cookie) res.setHeader("Set-Cookie", r.cookie);

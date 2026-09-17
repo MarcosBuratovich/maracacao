@@ -81,6 +81,9 @@ curl -s https://www.maracacao.mx/api/panel?accion=salud
 | `PANEL_VERCEL_PROYECTO` | El nombre del proyecto. Por defecto sale del repo (`maracacao`). | No es una de las obligatorias: `salud` no la pide. Solo hace falta cargarla si algún día el proyecto se llama distinto del repo. |
 | `GITHUB_DUENIO` | El dueño del repo (`MarcosBuratovich`). Tiene default: si falta, se completa solo con `VERCEL_GIT_REPO_OWNER` (que Vercel ya inyecta en todo deploy conectado a Git) o, si ni eso está, con el literal `MarcosBuratovich` (`src/servidor/entradas/panel.ts`, función `entorno()`). | En la práctica, nunca falta — por eso no hace falta cargarla a mano en Vercel. |
 | `GITHUB_REPO` | El nombre del repo (`maracacao`). Mismo default en cascada que `GITHUB_DUENIO`. | Igual que arriba: nunca falta en la práctica. |
+| `RESEND_API_KEY` | No (pero sin ella no hay avisos) | La clave del proveedor de correo. Sin ella, el panel publica igual: lo que se pierde son los avisos, y el enlace mágico deja de estar disponible. |
+| `PANEL_REMITENTE` | No (ídem) | `Panel Maracacao <panel@maracacao.mx>`. Tiene que ser una dirección de un dominio verificado en el proveedor (SPF+DKIM en el DNS). Mientras `maracacao.mx` no esté verificado, los avisos solo llegan al correo del dueño de la cuenta del proveedor. |
+| `PANEL_AVISOS_A` | No | A quién avisarle cuando algo sale mal (deploy fallido, token por vencer). La dirección de Marcos. A la clienta se le avisa al correo con el que entró. |
 
 Las últimas dos están en la lista de `salud` porque el código las pide (E8:
 siete variables obligatorias, siempre las mismas siete), pero en un deploy

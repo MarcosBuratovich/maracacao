@@ -136,6 +136,12 @@ const contextoBase = (fetch: typeof globalThis.fetch) => ({
   // legible — nunca un `0`, que confundiría «no lo sé» con «midió cero» y
   // desactivaría el tope de cuerpo en `publica()` (ver el test M-9 más
   // abajo, que prueba exactamente ese camino).
+  //
+  // Tarea 6: ninguna acción de este router llama todavía a `correo()` — el
+  // aviso lo dispara una tarea posterior. Acá alcanza con un stub que nunca
+  // se ejercita; el comportamiento real de `manda()` (sin red, degradando
+  // sin tirar) lo prueba `test/correo.test.ts`.
+  correo: async () => ({ ok: true as const }),
 })
 
 const cookieValida = (correo = 'clienta@ejemplo.mx') =>
