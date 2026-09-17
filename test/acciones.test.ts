@@ -133,7 +133,15 @@ const contextoBase = (fetch: typeof globalThis.fetch) => ({
 })
 
 const cookieValida = (correo = 'clienta@ejemplo.mx') =>
-  firmaSesion({ correo, vence: Date.now() + 86_400_000, dispositivo: 'test' }, SECRETO)
+  firmaSesion({ correo, vence: Date.now() + 86_400_000, dispositivo: 'test', emitida: Date.now() }, SECRETO)
+
+/** Una cookie válida cuya `emitida` es la fecha (ISO 8601) que se le pase, para ejercitar `PANEL_SESIONES_DESDE`. */
+const cookieEmitidaEn = (fecha: string, correo = 'clienta@ejemplo.mx') =>
+  firmaSesion({ correo, vence: Date.now() + 86_400_000, dispositivo: 'test', emitida: Date.parse(fecha) }, SECRETO)
+
+/** Una cookie válida firmada desde el `dispositivo` que se le pase, para ejercitar `PANEL_DISPOSITIVOS_REVOCADOS`. */
+const cookieDeDispositivo = (dispositivo: string, correo = 'clienta@ejemplo.mx') =>
+  firmaSesion({ correo, vence: Date.now() + 86_400_000, dispositivo, emitida: Date.now() }, SECRETO)
 
 describe('entrar', () => {
   it('con la contraseña correcta devuelve una cookie firmada', async () => {
@@ -753,6 +761,61 @@ describe('publicar', () => {
 
       expect((porElRouter.cuerpo as { problema: string }).problema).toBe((porElRef as { problema: string }).problema)
     })
+  })
+})
+
+// Tarea 3 de la Parte B: cortar UNA sesión sin rotar `PANEL_SECRETO` — el
+// celular perdido de alguien que sigue teniendo acceso. `sesionVigente()`
+// centraliza esto para todas las acciones autenticadas; acá se ejercita a
+// través de `publicar`, que hoy es la única que existe.
+describe('revocar una sesión sin rotar la llave', () => {
+  it('una sesión emitida antes de PANEL_SESIONES_DESDE deja de valer', async () => {
+    const ctx = contextoBase(fetchQueNoSeUsa())
+    ;(ctx.env as Record<string, string>).PANEL_SESIONES_DESDE = '2026-09-10T00:00:00Z'
+    const r = await maneja(
+      'publicar',
+      { cuerpo: { base: 'x', documentos: {} }, cookie: cookieEmitidaEn('2026-09-01T00:00:00Z') },
+      ctx,
+    )
+    expect(r.status).toBe(401)
+    expect((r.cuerpo as { problema: string }).problema).toBe('Tu sesión no es válida: vuelve a entrar.')
+  })
+
+  it('una sesión emitida DESPUÉS de esa fecha sigue valiendo', async () => {
+    const ctx = contextoBase(fetchQueNoSeUsa())
+    ;(ctx.env as Record<string, string>).PANEL_SESIONES_DESDE = '2026-09-10T00:00:00Z'
+    const r = await maneja(
+      'publicar',
+      { cuerpo: { base: 'x', documentos: {} }, cookie: cookieEmitidaEn('2026-09-11T00:00:00Z') },
+      ctx,
+    )
+    // 400 (sin documentos), no 401: la sesión pasó.
+    expect(r.status).toBe(400)
+  })
+
+  it('un dispositivo revocado no publica, aunque su correo siga en la lista', async () => {
+    const ctx = contextoBase(fetchQueNoSeUsa())
+    ;(ctx.env as Record<string, string>).PANEL_DISPOSITIVOS_REVOCADOS = 'otro, celu-perdido ,tercero'
+    const r = await maneja(
+      'publicar',
+      { cuerpo: { base: 'x', documentos: {} }, cookie: cookieDeDispositivo('celu-perdido') },
+      ctx,
+    )
+    expect(r.status).toBe(401)
+  })
+
+  it('una fecha ilegible en PANEL_SESIONES_DESDE no abre la puerta: la cierra', async () => {
+    // Si el candado no se puede leer, la única respuesta segura es no dejar
+    // pasar. Un typo en una variable de entorno no puede ser la forma de
+    // desactivar una revocación.
+    const ctx = contextoBase(fetchQueNoSeUsa())
+    ;(ctx.env as Record<string, string>).PANEL_SESIONES_DESDE = 'el martes'
+    const r = await maneja(
+      'publicar',
+      { cuerpo: { base: 'x', documentos: {} }, cookie: cookieEmitidaEn('2026-09-11T00:00:00Z') },
+      ctx,
+    )
+    expect(r.status).toBe(401)
   })
 })
 

@@ -12,11 +12,20 @@
  */
 import { scryptSync, randomBytes, timingSafeEqual, createHmac } from 'node:crypto'
 
-/** El cuerpo de la cookie: quién es, hasta cuándo vale, desde qué aparato. */
+/** El cuerpo de la cookie: quién es, hasta cuándo vale, desde qué aparato, desde cuándo. */
 export interface Sesion {
   correo: string
   vence: number
   dispositivo: string
+  /**
+   * Cuándo se firmó, en epoch ms. No es lo mismo que `vence` y no se puede
+   * derivar de él: `vence` depende de si el aparato se marcó como propio (un
+   * año) o no (treinta días), así que dos sesiones que vencen el mismo día
+   * pueden haberse emitido con once meses de diferencia. Esto es lo que hace
+   * posible «cerrar sesión en todos lados» sin rotar el secreto: se corre una
+   * fecha (`PANEL_SESIONES_DESDE`) y todo lo firmado antes deja de valer.
+   */
+  emitida: number
 }
 
 // Parámetros de scrypt: N=16384 (2^14), r=8, p=5. Es la fila N=2^14 de la
@@ -132,6 +141,24 @@ export function claveCorrecta(clave: string, guardado: string): boolean {
 }
 
 /**
+ * El propósito de un token firmado con `PANEL_SECRETO`, metido ADENTRO de lo
+ * que se firma. El mismo secreto va a firmar dos cosas distintas —la cookie
+ * de sesión y el enlace mágico de recuperación (spec §4.1)— y sin esto, un
+ * token de uno sirve de token del otro: quien tenga un enlace mágico
+ * interceptado en su bandeja de entrada lo pega como cookie y ya está
+ * adentro, sin que el enlace se «consuma» nunca.
+ *
+ * Va como prefijo del mensaje y no como campo del JSON a propósito: un campo
+ * del JSON también funcionaría, pero solo si TODOS los verificadores se
+ * acuerdan de mirarlo. Como prefijo, olvidarse no es una opción — la firma
+ * directamente no da.
+ */
+export const DOMINIO_SESION = 'sesion'
+
+/** Lo que se le pasa al HMAC: el propósito, una barra, y el cuerpo. */
+export const mensajeFirmado = (dominio: string, cuerpo: string): string => `${dominio}|${cuerpo}`
+
+/**
  * Firma una sesión: `<JSON en base64url>.<HMAC-SHA256 en base64url>`.
  *
  * [C-1] Tira si `secreto` mide menos de `LARGO_MIN_SECRETO`: una firma hecha
@@ -148,7 +175,7 @@ export function firmaSesion(sesion: Sesion, secreto: string): string {
     )
   }
   const cuerpo = Buffer.from(JSON.stringify(sesion)).toString('base64url')
-  const firma = createHmac('sha256', secreto).update(cuerpo).digest('base64url')
+  const firma = createHmac('sha256', secreto).update(mensajeFirmado(DOMINIO_SESION, cuerpo)).digest('base64url')
   return `${cuerpo}.${firma}`
 }
 
@@ -179,13 +206,18 @@ export function verificaSesion(cookie: string, secreto: string, ahora: number = 
     const firma = cookie.slice(punto + 1)
     if (cookie.indexOf('.', punto + 1) !== -1) return null
 
-    const firmaEsperada = createHmac('sha256', secreto).update(cuerpo).digest()
+    const firmaEsperada = createHmac('sha256', secreto).update(mensajeFirmado(DOMINIO_SESION, cuerpo)).digest()
     const firmaRecibida = Buffer.from(firma, 'base64url')
     if (firmaRecibida.length !== firmaEsperada.length) return null
     if (!timingSafeEqual(firmaRecibida, firmaEsperada)) return null
 
     const sesion = JSON.parse(Buffer.from(cuerpo, 'base64url').toString('utf8')) as Sesion
-    if (typeof sesion.correo !== 'string' || typeof sesion.vence !== 'number' || typeof sesion.dispositivo !== 'string') {
+    if (
+      typeof sesion.correo !== 'string' ||
+      typeof sesion.vence !== 'number' ||
+      typeof sesion.dispositivo !== 'string' ||
+      typeof sesion.emitida !== 'number'
+    ) {
       return null
     }
     if (sesion.vence <= ahora) return null

@@ -55,14 +55,15 @@ banner de la primera línea del artefacto (`GENERADO por scripts/bundle-api.ts
 — no editar a mano`) está para recordarlo en el peor momento, con el archivo
 ya abierto.
 
-## Las seis variables: qué es cada una y dónde vive
+## Las variables: qué es cada una y dónde vive
 
 Todas viven en el mismo lugar: vercel.com → proyecto `maracacao` →
 **Settings** → **Environment Variables**, marcadas para el entorno
 **Production** nada más (nunca Preview ni Development — los previews de
 cada rama y `pnpm dev` local no necesitan, y no deberían tener, ningún
 secreto real). `salud` (`GET /api/panel?accion=salud`) es la forma de
-confirmar desde afuera que las seis están cargadas, sin necesitar sesión:
+confirmar desde afuera que las seis obligatorias están cargadas, sin
+necesitar sesión:
 
 ```bash
 curl -s https://www.maracacao.mx/api/panel?accion=salud
@@ -73,17 +74,34 @@ curl -s https://www.maracacao.mx/api/panel?accion=salud
 | `PANEL_CLAVE_HASH` | El hash de la contraseña de la clienta (formato `scrypt$…`, ver la sección de abajo). Sin esto, nadie entra. | `entrar` compara contra el hash señuelo igual, así que siempre da 401 — parece «contraseña incorrecta» aunque el problema sea otro. `salud` es la forma de distinguir los dos casos. |
 | `PANEL_SECRETO` | La clave con la que se firma y se verifica la cookie de sesión (HMAC-SHA256). Tiene que medir 32 caracteres o más — con menos, `entrar` y `publicar` responden 503 a propósito, antes de intentar nada (ver C-1 en `src/servidor/acciones.ts`). | Nadie puede entrar ni publicar: 503, nunca un 401 que confunda. |
 | `PANEL_CORREOS` | La lista de correos con acceso, separados por comas. Se vuelve a leer en CADA `entrar` y en CADA `publicar` (I-4) — nunca queda una cookie vieja publicando en nombre de alguien que ya no está en la lista. | Nadie entra: ningún correo matchea una lista vacía. |
+| `PANEL_SESIONES_DESDE` | Opcional, ISO 8601. Toda sesión firmada ANTES de esta fecha deja de valer — el botón de pánico para cerrar sesión en todos lados sin rotar `PANEL_SECRETO`. Ver «Cómo cortar una sesión», abajo. | No es una de las seis obligatorias: `salud` no la pide. Ausente, no hay revocación por fecha (el estado normal). Si trae un valor que no se puede leer como fecha, el efecto es el contrario del de las otras filas: en vez de «no hay revocación», se rechaza TODA sesión hasta que se corrija — a propósito, ver la sección de abajo. |
+| `PANEL_DISPOSITIVOS_REVOCADOS` | Opcional, ids de dispositivo separados por comas. La revocación quirúrgica de un aparato puntual — el celular perdido de alguien que sigue teniendo acceso. Ver «Cómo cortar una sesión», abajo. | No es una de las seis obligatorias: `salud` no la pide. Ausente, ningún dispositivo está revocado (el estado normal). |
 | `PANEL_GITHUB_TOKEN` | El fine-grained PAT de GitHub, acotado al repo `maracacao`, con un solo permiso (`Contents: Read and write`, sin `Workflows`). Es lo que le permite al panel escribir commits. | `publicar` no puede leer ni escribir nada: 502. `salud` contesta `"github":false`. |
 | `GITHUB_DUENIO` | El dueño del repo (`MarcosBuratovich`). Tiene default: si falta, se completa solo con `VERCEL_GIT_REPO_OWNER` (que Vercel ya inyecta en todo deploy conectado a Git) o, si ni eso está, con el literal `MarcosBuratovich` (`src/servidor/entradas/panel.ts`, función `entorno()`). | En la práctica, nunca falta — por eso no hace falta cargarla a mano en Vercel. |
 | `GITHUB_REPO` | El nombre del repo (`maracacao`). Mismo default en cascada que `GITHUB_DUENIO`. | Igual que arriba: nunca falta en la práctica. |
 
 Las últimas dos están en la lista de `salud` porque el código las pide (E8:
-seis variables, siempre las mismas seis), pero en un deploy conectado a
-GitHub —que es como está este proyecto— nunca vas a ver a `GITHUB_DUENIO` ni
-a `GITHUB_REPO` en el `"faltan"` de una respuesta real: el default las
-completa antes de que `salud` las mire. Si alguna vez hace falta apuntar el
-panel a OTRO repo (un fork, una migración), ahí sí hay que cargarlas a mano
-— mientras tanto, no.
+seis variables obligatorias, siempre las mismas seis), pero en un deploy
+conectado a GitHub —que es como está este proyecto— nunca vas a ver a
+`GITHUB_DUENIO` ni a `GITHUB_REPO` en el `"faltan"` de una respuesta real: el
+default las completa antes de que `salud` las mire. Si alguna vez hace falta
+apuntar el panel a OTRO repo (un fork, una migración), ahí sí hay que
+cargarlas a mano — mientras tanto, no.
+
+### Cómo cortar una sesión (celular perdido, alguien que se va)
+
+Tres botones, del más chico al más grande. **Ninguno de los tres pide rotar
+`PANEL_SECRETO`** — rotarlo desloguea a todo el mundo y además mata los enlaces
+mágicos que estén en vuelo.
+
+1. **Un aparato:** agregá su id a `PANEL_DISPOSITIVOS_REVOCADOS` (lista separada
+   por comas). El id sale del historial de la persona o del log de `entrar`.
+2. **Todas las sesiones de todo el mundo:** poné en `PANEL_SESIONES_DESDE` la
+   fecha y hora de ahora, en ISO 8601 (`2026-09-17T15:30:00Z`). Todos vuelven a
+   entrar con su contraseña. **Ojo:** si la fecha no se puede leer, NADIE entra
+   —está hecho así a propósito— así que revisá que quede bien escrita.
+3. **Sacar a una persona para siempre:** quitá su dirección de `PANEL_CORREOS`.
+   Se relee en cada pedido, así que corta enseguida.
 
 ## Cómo se cambia la contraseña del panel
 

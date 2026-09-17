@@ -37,6 +37,8 @@ function claveCorrecta(clave, guardado) {
     return false;
   }
 }
+var DOMINIO_SESION = "sesion";
+var mensajeFirmado = (dominio, cuerpo) => `${dominio}|${cuerpo}`;
 function firmaSesion(sesion, secreto) {
   if (secreto.length < LARGO_MIN_SECRETO) {
     throw new Error(
@@ -44,7 +46,7 @@ function firmaSesion(sesion, secreto) {
     );
   }
   const cuerpo = Buffer.from(JSON.stringify(sesion)).toString("base64url");
-  const firma = createHmac("sha256", secreto).update(cuerpo).digest("base64url");
+  const firma = createHmac("sha256", secreto).update(mensajeFirmado(DOMINIO_SESION, cuerpo)).digest("base64url");
   return `${cuerpo}.${firma}`;
 }
 function verificaSesion(cookie, secreto, ahora = Date.now()) {
@@ -55,12 +57,12 @@ function verificaSesion(cookie, secreto, ahora = Date.now()) {
     const cuerpo = cookie.slice(0, punto);
     const firma = cookie.slice(punto + 1);
     if (cookie.indexOf(".", punto + 1) !== -1) return null;
-    const firmaEsperada = createHmac("sha256", secreto).update(cuerpo).digest();
+    const firmaEsperada = createHmac("sha256", secreto).update(mensajeFirmado(DOMINIO_SESION, cuerpo)).digest();
     const firmaRecibida = Buffer.from(firma, "base64url");
     if (firmaRecibida.length !== firmaEsperada.length) return null;
     if (!timingSafeEqual(firmaRecibida, firmaEsperada)) return null;
     const sesion = JSON.parse(Buffer.from(cuerpo, "base64url").toString("utf8"));
-    if (typeof sesion.correo !== "string" || typeof sesion.vence !== "number" || typeof sesion.dispositivo !== "string") {
+    if (typeof sesion.correo !== "string" || typeof sesion.vence !== "number" || typeof sesion.dispositivo !== "string" || typeof sesion.emitida !== "number") {
       return null;
     }
     if (sesion.vence <= ahora) return null;
@@ -17872,7 +17874,7 @@ function entrar(pedido, contexto) {
   const dias = cuerpo.recuerdame === true ? DIAS_SESION_LARGA : DIAS_SESION_CORTA;
   const dispositivo = typeof cuerpo.dispositivo === "string" ? cuerpo.dispositivo : "sin identificar";
   const vence = contexto.ahora() + dias * 864e5;
-  const token = firmaSesion({ correo: correo2, vence, dispositivo }, env.PANEL_SECRETO);
+  const token = firmaSesion({ correo: correo2, vence, dispositivo, emitida: contexto.ahora() }, env.PANEL_SECRETO);
   return ok({ ok: true }, cookieDeSesion(token, dias));
 }
 var PROBLEMA_SESION = "Tu sesi\xF3n no es v\xE1lida: vuelve a entrar.";
@@ -17894,15 +17896,35 @@ function fuentesDeSabores(v) {
     gotas: Array.isArray(doc.gotas) ? doc.gotas : []
   };
 }
+function sesionVigente(cookie, env, ahora) {
+  const sesion = verificaSesion(cookie, env.PANEL_SECRETO, ahora);
+  if (!sesion) return null;
+  if (!correoEnLista(sesion.correo, env.PANEL_CORREOS)) return null;
+  if (env.PANEL_SESIONES_DESDE) {
+    const desde = Date.parse(env.PANEL_SESIONES_DESDE);
+    if (!Number.isFinite(desde)) {
+      console.error(
+        `sesi\xF3n: PANEL_SESIONES_DESDE no es una fecha que se pueda leer (\xAB${env.PANEL_SESIONES_DESDE}\xBB) \u2014 se rechaza toda sesi\xF3n hasta que se corrija.`
+      );
+      return null;
+    }
+    if (sesion.emitida < desde) return null;
+  }
+  if (listaTiene(env.PANEL_DISPOSITIVOS_REVOCADOS, sesion.dispositivo)) return null;
+  return sesion;
+}
+function listaTiene(lista2, valor) {
+  if (!lista2) return false;
+  return lista2.split(",").some((x) => x.trim() === valor);
+}
 async function publicarAccion(pedido, contexto) {
   const env = contexto.env;
   if (!secretoUtilizable(env)) {
     console.error("publicar: PANEL_SECRETO falta o mide menos de 32 caracteres \u2014 no se puede verificar ninguna sesi\xF3n.");
     return error51(503, PROBLEMA_INESPERADO);
   }
-  const sesion = verificaSesion(pedido.cookie, env.PANEL_SECRETO, contexto.ahora());
+  const sesion = sesionVigente(pedido.cookie, env, contexto.ahora());
   if (!sesion) return error51(401, PROBLEMA_SESION);
-  if (!correoEnLista(sesion.correo, env.PANEL_CORREOS)) return error51(401, PROBLEMA_SESION);
   const cuerpo = pedido.cuerpo ?? {};
   if (typeof cuerpo.base !== "string" || cuerpo.base === "") {
     console.error("publicar: el cuerpo lleg\xF3 sin `base` \u2014 el panel que lo mand\xF3 es de antes del sha base.");

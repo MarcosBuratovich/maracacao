@@ -19,7 +19,10 @@
  * a agregar— contesta 404, nunca 500: así el panel puede preguntar por una
  * acción que todavía no existe sin que se le caiga la página.
  */
-import { claveCorrecta, hashDeClave, firmaSesion, verificaSesion, cookieDeSesion, intentoPermitido, LARGO_MIN_SECRETO } from './sesion'
+import {
+  claveCorrecta, hashDeClave, firmaSesion, verificaSesion, cookieDeSesion, intentoPermitido, LARGO_MIN_SECRETO,
+  type Sesion,
+} from './sesion'
 import { cliente } from './github'
 import { publica, type Archivo } from './publicar'
 import type { Cambio } from '../contenido/diff'
@@ -50,6 +53,18 @@ export interface Entorno {
   PANEL_GITHUB_TOKEN?: string
   GITHUB_DUENIO?: string
   GITHUB_REPO?: string
+  /**
+   * ISO 8601. Toda sesión emitida ANTES de esta fecha deja de valer: es el
+   * «cerrar sesión en todos lados» sin rotar `PANEL_SECRETO` —que además de
+   * desloguear a todo el mundo invalidaría los enlaces mágicos en vuelo—.
+   * Ausente = no hay revocación por fecha.
+   */
+  PANEL_SESIONES_DESDE?: string
+  /**
+   * Ids de dispositivo separados por comas. La revocación quirúrgica: el
+   * celular perdido de alguien que sigue teniendo acceso.
+   */
+  PANEL_DISPOSITIVOS_REVOCADOS?: string
 }
 
 /** Todo lo que `maneja()` necesita del mundo exterior, inyectado. */
@@ -245,7 +260,7 @@ function entrar(pedido: Pedido, contexto: Contexto): Respuesta {
   const dispositivo = typeof cuerpo.dispositivo === 'string' ? cuerpo.dispositivo : 'sin identificar'
   const vence = contexto.ahora() + dias * 86_400_000
 
-  const token = firmaSesion({ correo, vence, dispositivo }, env.PANEL_SECRETO)
+  const token = firmaSesion({ correo, vence, dispositivo, emitida: contexto.ahora() }, env.PANEL_SECRETO)
   return ok({ ok: true }, cookieDeSesion(token, dias))
 }
 
@@ -301,6 +316,53 @@ function fuentesDeSabores(v: unknown): FuentesDeDerivados {
     sabores: (Array.isArray(doc.sabores) ? doc.sabores : []) as FuentesDeDerivados['sabores'],
     gotas: (Array.isArray(doc.gotas) ? doc.gotas : []) as FuentesDeDerivados['gotas'],
   }
+}
+
+/**
+ * La única puerta de las acciones autenticadas. Cuatro candados, en este
+ * orden y por esta razón:
+ *
+ *   1. La FIRMA y el vencimiento (`verificaSesion`): sin eso, todo lo demás
+ *      estaría decidiendo sobre datos que escribió quien sea.
+ *   2. `PANEL_CORREOS` de HOY: revoca a una PERSONA. Ya estaba en la Parte A
+ *      —una cookie firmada hace un año no puede seguir publicando solo
+ *      porque la firma es válida—; acá se centraliza para que no haya que
+ *      acordarse de copiarlo en cada acción nueva.
+ *   3. `PANEL_SESIONES_DESDE`: revoca TODAS las sesiones anteriores a una
+ *      fecha. Es el botón de pánico.
+ *   4. `PANEL_DISPOSITIVOS_REVOCADOS`: revoca UN aparato.
+ *
+ * Una fecha que no parsea se trata como «revocá todo», no como «no hay
+ * revocación»: un typo en una variable de entorno no puede ser la forma
+ * accidental de desactivar el botón de pánico. Marcos lo ve enseguida
+ * —nadie puede entrar— y lo arregla; al revés no lo vería nunca.
+ */
+function sesionVigente(cookie: string, env: Entorno & { PANEL_SECRETO: string }, ahora: number): Sesion | null {
+  const sesion = verificaSesion(cookie, env.PANEL_SECRETO, ahora)
+  if (!sesion) return null
+  if (!correoEnLista(sesion.correo, env.PANEL_CORREOS)) return null
+
+  if (env.PANEL_SESIONES_DESDE) {
+    const desde = Date.parse(env.PANEL_SESIONES_DESDE)
+    if (!Number.isFinite(desde)) {
+      console.error(
+        `sesión: PANEL_SESIONES_DESDE no es una fecha que se pueda leer («${env.PANEL_SESIONES_DESDE}») — ` +
+          'se rechaza toda sesión hasta que se corrija.',
+      )
+      return null
+    }
+    if (sesion.emitida < desde) return null
+  }
+
+  if (listaTiene(env.PANEL_DISPOSITIVOS_REVOCADOS, sesion.dispositivo)) return null
+
+  return sesion
+}
+
+/** ¿Está `valor` en una lista separada por comas, ignorando espacios alrededor? */
+function listaTiene(lista: string | undefined, valor: string): boolean {
+  if (!lista) return false
+  return lista.split(',').some((x) => x.trim() === valor)
 }
 
 /**
@@ -384,12 +446,13 @@ function fuentesDeSabores(v: unknown): FuentesDeDerivados {
  *
  * [I-4] La cookie firmada solo prueba que ALGUNA VEZ el correo estuvo en
  * `PANEL_CORREOS` —dura hasta un año (E3)—, no que sigue estando HOY:
- * `PANEL_CORREOS` se vuelve a leer acá, después de que `verificaSesion`
- * confirma la firma, y si esa dirección ya no está en la lista de hoy, el
- * mismo 401 de sesión inválida. Sin este chequeo, sacarle el acceso a
- * alguien —la hermana, alguien que dejó de trabajar con la marca— no
- * revocaba nada hasta que su cookie venciera sola, o hasta rotar
- * `PANEL_SECRETO`, que de paso desloguea a todo el mundo.
+ * `PANEL_CORREOS` se vuelve a leer en `sesionVigente()` (más arriba en este
+ * archivo), después de que `verificaSesion` confirma la firma, y si esa
+ * dirección ya no está en la lista de hoy, el mismo 401 de sesión inválida.
+ * Sin este chequeo, sacarle el acceso a alguien —la hermana, alguien que
+ * dejó de trabajar con la marca— no revocaba nada hasta que su cookie
+ * venciera sola, o hasta rotar `PANEL_SECRETO`, que de paso desloguea a todo
+ * el mundo.
  */
 async function publicarAccion(pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
   const env = contexto.env
@@ -398,13 +461,8 @@ async function publicarAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
     return error(503, PROBLEMA_INESPERADO)
   }
 
-  const sesion = verificaSesion(pedido.cookie, env.PANEL_SECRETO, contexto.ahora())
+  const sesion = sesionVigente(pedido.cookie, env, contexto.ahora())
   if (!sesion) return error(401, PROBLEMA_SESION)
-
-  // [I-4] Re-lee PANEL_CORREOS en cada publicación: una cookie firmada
-  // hace un año, con un correo que YA NO está en la lista de hoy, no
-  // puede seguir publicando solo porque la firma es válida.
-  if (!correoEnLista(sesion.correo, env.PANEL_CORREOS)) return error(401, PROBLEMA_SESION)
 
   const cuerpo = (pedido.cuerpo ?? {}) as { documentos?: unknown; base?: unknown }
   if (typeof cuerpo.base !== 'string' || cuerpo.base === '') {

@@ -34,7 +34,7 @@ describe('la contraseña', () => {
 })
 
 describe('la cookie de sesión', () => {
-  const sesion = { correo: 'clienta@ejemplo.mx', vence: Date.now() + 86_400_000, dispositivo: 'celu' }
+  const sesion = { correo: 'clienta@ejemplo.mx', vence: Date.now() + 86_400_000, dispositivo: 'celu', emitida: Date.now() }
 
   it('vuelve a leer lo que firmó', () => {
     expect(verificaSesion(firmaSesion(sesion, SECRETO), SECRETO)).toEqual(sesion)
@@ -98,7 +98,7 @@ describe('la cookie de sesión', () => {
 })
 
 describe('C-1: un PANEL_SECRETO corto o ausente no puede tratarse como el secreto real', () => {
-  const sesion = { correo: 'clienta@ejemplo.mx', vence: Date.now() + 86_400_000, dispositivo: 'celu' }
+  const sesion = { correo: 'clienta@ejemplo.mx', vence: Date.now() + 86_400_000, dispositivo: 'celu', emitida: Date.now() }
 
   it('firmaSesion() tira con la cadena vacía y con cualquier secreto corto', () => {
     // La cadena vacía es justo lo que `contexto.env.PANEL_SECRETO ?? ''`
@@ -139,6 +139,36 @@ describe('C-1: un PANEL_SECRETO corto o ausente no puede tratarse como el secret
     // supiera nada. Ahora, con el secreto vacío pasado explícitamente
     // (el estado exacto de «la variable falta»), rechaza.
     expect(verificaSesion(cookieForjada, '')).toBeNull()
+  })
+})
+
+describe('emitida y el propósito adentro de la firma', () => {
+  it('la sesión firmada dice cuándo se emitió', () => {
+    const secreto = 'x'.repeat(40)
+    const cookie = firmaSesion(
+      { correo: 'a@b.mx', vence: 2_000_000, dispositivo: 'celu', emitida: 1_000_000 },
+      secreto,
+    )
+    expect(verificaSesion(cookie, secreto, 1_500_000)?.emitida).toBe(1_000_000)
+  })
+
+  it('una cookie sin `emitida` no vale, aunque la firma sea buena', () => {
+    // No es paranoia: es lo que hace que el candado de `PANEL_SESIONES_DESDE`
+    // no se pueda saltear mandando una cookie vieja a la que le falta el campo.
+    const secreto = 'x'.repeat(40)
+    const cuerpo = Buffer.from(JSON.stringify({ correo: 'a@b.mx', vence: 2_000_000, dispositivo: 'celu' })).toString('base64url')
+    const firma = createHmac('sha256', secreto).update(`sesion|${cuerpo}`).digest('base64url')
+    expect(verificaSesion(`${cuerpo}.${firma}`, secreto, 1_500_000)).toBeNull()
+  })
+
+  it('C-2: la firma lleva el propósito adentro, así que un token de otro propósito no sirve de cookie', () => {
+    // Sin esto, cualquier cosa que este mismo secreto firme —el enlace mágico
+    // de la Tarea 12— serviría como cookie de sesión y al revés. El propósito
+    // va ADENTRO de lo que se firma (spec §4.1), no al lado.
+    const secreto = 'x'.repeat(40)
+    const cuerpo = Buffer.from(JSON.stringify({ correo: 'a@b.mx', vence: 2_000_000, dispositivo: 'celu', emitida: 1 })).toString('base64url')
+    const firmaDeOtroProposito = createHmac('sha256', secreto).update(`entrar|${cuerpo}`).digest('base64url')
+    expect(verificaSesion(`${cuerpo}.${firmaDeOtroProposito}`, secreto, 1_500_000)).toBeNull()
   })
 })
 
