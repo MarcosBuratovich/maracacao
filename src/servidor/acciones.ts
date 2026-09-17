@@ -811,6 +811,21 @@ async function estadoAccion(pedido: Pedido, contexto: Contexto): Promise<Respues
     return error(503, PROBLEMA_INESPERADO)
   }
 
+  // Mismo candado que el token, justo al lado: sin `PANEL_VERCEL_PROYECTO`,
+  // el del repo (ver el docstring de la variable en `Entorno`, arriba) — un
+  // dato de negocio que no hay que inventar acá, es el mismo nombre que ya
+  // usan `GITHUB_DUENIO`/`GITHUB_REPO` para todo lo demás. Pero si NINGUNA de
+  // las dos está cargada, el código no puede seguir en silencio con
+  // `proyecto: ''`: eso le pregunta a la plataforma por un proyecto sin
+  // nombre y termina en un 502 mudo —Marcos ve «no pudimos conectarnos»
+  // cuando lo que pasa es que falta una variable, un diagnóstico
+  // completamente distinto—.
+  const proyecto = env.PANEL_VERCEL_PROYECTO ?? env.GITHUB_REPO ?? ''
+  if (proyecto === '') {
+    console.error('estado: ni PANEL_VERCEL_PROYECTO ni GITHUB_REPO están cargadas — no sé por qué proyecto preguntar.')
+    return error(503, PROBLEMA_INESPERADO)
+  }
+
   const cuerpo = (pedido.cuerpo ?? {}) as { sha?: unknown; publicadoEn?: unknown }
   if (typeof cuerpo.sha !== 'string' || !/^[0-9a-f]{40}$/.test(cuerpo.sha)) {
     return error(400, PROBLEMA_INESPERADO)
@@ -819,11 +834,7 @@ async function estadoAccion(pedido: Pedido, contexto: Contexto): Promise<Respues
 
   const vercel = clienteVercel({
     token: env.PANEL_VERCEL_TOKEN,
-    // Sin `PANEL_VERCEL_PROYECTO`, el del repo (ver el docstring de la
-    // variable en `Entorno`, arriba): el nombre del proyecto en la
-    // plataforma no es un dato de negocio para inventar acá, es el mismo
-    // nombre que ya usan `GITHUB_DUENIO`/`GITHUB_REPO` para todo lo demás.
-    proyecto: env.PANEL_VERCEL_PROYECTO ?? env.GITHUB_REPO ?? '',
+    proyecto,
     fetch: contexto.fetch,
   })
 

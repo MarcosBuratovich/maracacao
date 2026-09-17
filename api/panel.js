@@ -18146,6 +18146,11 @@ async function estadoAccion(pedido, contexto) {
     console.error("estado: PANEL_VERCEL_TOKEN no est\xE1 cargada \u2014 no hay forma de saber si el despliegue termin\xF3.");
     return error51(503, PROBLEMA_INESPERADO);
   }
+  const proyecto = env.PANEL_VERCEL_PROYECTO ?? env.GITHUB_REPO ?? "";
+  if (proyecto === "") {
+    console.error("estado: ni PANEL_VERCEL_PROYECTO ni GITHUB_REPO est\xE1n cargadas \u2014 no s\xE9 por qu\xE9 proyecto preguntar.");
+    return error51(503, PROBLEMA_INESPERADO);
+  }
   const cuerpo = pedido.cuerpo ?? {};
   if (typeof cuerpo.sha !== "string" || !/^[0-9a-f]{40}$/.test(cuerpo.sha)) {
     return error51(400, PROBLEMA_INESPERADO);
@@ -18153,11 +18158,7 @@ async function estadoAccion(pedido, contexto) {
   const publicadoEn = typeof cuerpo.publicadoEn === "number" ? cuerpo.publicadoEn : contexto.ahora();
   const vercel = clienteVercel({
     token: env.PANEL_VERCEL_TOKEN,
-    // Sin `PANEL_VERCEL_PROYECTO`, el del repo (ver el docstring de la
-    // variable en `Entorno`, arriba): el nombre del proyecto en la
-    // plataforma no es un dato de negocio para inventar acá, es el mismo
-    // nombre que ya usan `GITHUB_DUENIO`/`GITHUB_REPO` para todo lo demás.
-    proyecto: env.PANEL_VERCEL_PROYECTO ?? env.GITHUB_REPO ?? "",
+    proyecto,
     fetch: contexto.fetch
   });
   let despliegue;

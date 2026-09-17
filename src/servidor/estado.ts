@@ -27,15 +27,33 @@ const CAMBIA_DE_CADENCIA_MS = 60_000
 const DEJA_DE_PREGUNTAR_MS = 300_000
 
 /**
- * [B10] Las tres frases. Viven acá, juntas, para que se lean una al lado de
+ * [B10] Las cuatro frases. Viven acá, juntas, para que se lean una al lado de
  * la otra: son lo único de este módulo que la clienta ve, y un test exige que
  * ninguna nombre una tecnología.
  */
 const FRASE_LISTO = 'Tu cambio ya está en el sitio.'
 const FRASE_EN_CURSO = 'Estamos subiendo tu cambio al sitio.'
+// Esta frase promete DOS cosas que este módulo no hace: que algo se dejó como
+// estaba, y que se le avisó a Marcos. Las dos las cumple `revierteYAvisa()` en
+// `acciones.ts` (Tarea 8), en la MISMA invocación que devuelve este veredicto
+// —la que ve el fracaso revierte y manda los dos correos antes de contestar—.
+// Si algún día esa reversión deja de correr ahí, esta frase pasa a ser mentira
+// y hay que cambiarla: es una promesa que este archivo hace y otro paga.
 const FRASE_FALLO = 'No salió; lo dejé como estaba y ya le avisé a Marcos.'
 const FRASE_TARDA =
   'Tu cambio está tardando más de lo normal. Vuelve a abrir el panel en un rato para ver cómo quedó.'
+
+/**
+ * Las palabras que NUNCA pueden aparecer en algo que lea la clienta.
+ *
+ * Vive exportada y no suelta adentro de un test porque el guardián tiene que
+ * poder correr sobre TODAS las frases que una acción puede devolver, no solo
+ * sobre las que produce este archivo: `estadoAccion` también contesta con las
+ * frases compartidas del router (sesión inválida, «algo salió mal», «no
+ * pudimos revisar el contenido»), y esas las puede editar mañana alguien que
+ * está tocando otra acción y no se acuerda de que esta también las usa.
+ */
+export const JERGA_PROHIBIDA = ['Vercel', 'deploy', 'commit', 'build', 'GitHub', 'CDN', 'sha'] as const
 
 export interface Veredicto {
   estado: 'enCurso' | 'listo' | 'falló'

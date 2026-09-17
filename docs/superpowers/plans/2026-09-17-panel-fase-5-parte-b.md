@@ -2093,7 +2093,7 @@ Crear `test/estado.test.ts`:
  * Por eso las once combinaciones se prueban acá, en milisegundos.
  */
 import { describe, it, expect } from 'vitest'
-import { decide } from '../src/servidor/estado'
+import { decide, JERGA_PROHIBIDA } from '../src/servidor/estado'
 
 const SHA = 'a'.repeat(40)
 const base = { despliegue: 'enCurso' as const, url: null, shaServido: null, shaPublicado: SHA, desdeHaceMs: 5_000 }
@@ -2146,7 +2146,7 @@ describe('el veredicto', () => {
     expect(v.estado).toBe('enCurso')
   })
 
-  it('B10: ninguna de las tres frases nombra una tecnología', () => {
+  it('B10: ninguna de las cuatro frases nombra una tecnología', () => {
     const frases = [
       decide({ ...base, despliegue: 'listo', shaServido: SHA }).frase,
       decide({ ...base }).frase,
@@ -2154,7 +2154,7 @@ describe('el veredicto', () => {
       decide({ ...base, desdeHaceMs: 300_001 }).frase,
     ]
     for (const f of frases) {
-      for (const jerga of ['Vercel', 'deploy', 'commit', 'build', 'GitHub', 'CDN', 'sha']) {
+      for (const jerga of JERGA_PROHIBIDA) {
         expect(f.toLowerCase(), f).not.toContain(jerga.toLowerCase())
       }
     }
@@ -2199,15 +2199,33 @@ const CAMBIA_DE_CADENCIA_MS = 60_000
 const DEJA_DE_PREGUNTAR_MS = 300_000
 
 /**
- * [B10] Las tres frases. Viven acá, juntas, para que se lean una al lado de
+ * [B10] Las cuatro frases. Viven acá, juntas, para que se lean una al lado de
  * la otra: son lo único de este módulo que la clienta ve, y un test exige que
  * ninguna nombre una tecnología.
  */
 const FRASE_LISTO = 'Tu cambio ya está en el sitio.'
 const FRASE_EN_CURSO = 'Estamos subiendo tu cambio al sitio.'
+// Esta frase promete DOS cosas que este módulo no hace: que algo se dejó como
+// estaba, y que se le avisó a Marcos. Las dos las cumple `revierteYAvisa()` en
+// `acciones.ts` (Tarea 8), en la MISMA invocación que devuelve este veredicto
+// —la que ve el fracaso revierte y manda los dos correos antes de contestar—.
+// Si algún día esa reversión deja de correr ahí, esta frase pasa a ser mentira
+// y hay que cambiarla: es una promesa que este archivo hace y otro paga.
 const FRASE_FALLO = 'No salió; lo dejé como estaba y ya le avisé a Marcos.'
 const FRASE_TARDA =
   'Tu cambio está tardando más de lo normal. Vuelve a abrir el panel en un rato para ver cómo quedó.'
+
+/**
+ * Las palabras que NUNCA pueden aparecer en algo que lea la clienta.
+ *
+ * Vive exportada y no suelta adentro de un test porque el guardián tiene que
+ * poder correr sobre TODAS las frases que una acción puede devolver, no solo
+ * sobre las que produce este archivo: `estadoAccion` también contesta con las
+ * frases compartidas del router (sesión inválida, «algo salió mal», «no
+ * pudimos revisar el contenido»), y esas las puede editar mañana alguien que
+ * está tocando otra acción y no se acuerda de que esta también las usa.
+ */
+export const JERGA_PROHIBIDA = ['Vercel', 'deploy', 'commit', 'build', 'GitHub', 'CDN', 'sha'] as const
 
 export interface Veredicto {
   estado: 'enCurso' | 'listo' | 'falló'
@@ -2434,6 +2452,70 @@ Y en el `switch` de `maneja()`:
 
 Sumá los imports: `clienteVercel`, `type EstadoDeDespliegue` de `./vercel`, y
 `decide`, `SITIO` de `./estado`.
+
+- [ ] **Step 7b: El guardián de jerga tiene que cubrir TODO lo que la acción puede decir**
+
+El test de arriba cubre las cuatro frases de `decide()`. Pero `estadoAccion`
+también contesta, sin pasar por `decide()`, con las frases COMPARTIDAS del
+router: la de sesión inválida, la genérica de «algo salió mal» (503 y 400) y la
+de «no pudimos revisar el contenido» (502). Hoy las tres están limpias
+—verificado— pero nada las ata a la lista: el día que alguien las retoque
+ajustando otra acción, `accion=estado` empieza a hablarle a la clienta con
+jerga y ningún test lo caza.
+
+En `test/acciones.test.ts`:
+
+```ts
+it('B10: NINGUNA respuesta de `estado` le habla a la clienta con jerga, ni las frases compartidas', async () => {
+  // Las frases del router las comparten varias acciones, así que se pueden
+  // editar desde cualquier lado. Este test recorre TODAS las salidas posibles
+  // de `estado` —no solo las que produce `decide()`— y las pasa por la misma
+  // lista. Es el único lugar donde esas tres cadenas quedan atadas a la regla.
+  const salidas: string[] = []
+  for (const armar of [
+    () => maneja('estado', { cuerpo: {}, cookie: '' }, contextoBase()),                        // 401
+    () => maneja('estado', { cuerpo: { sha: 'no-es-un-sha' }, cookie: cookieValida() }, contextoBase()), // 400
+    () => maneja('estado', { cuerpo: { sha: SHA }, cookie: cookieValida() }, sinTokenDePlataforma()),    // 503
+    () => maneja('estado', { cuerpo: { sha: SHA }, cookie: cookieValida() }, conPlataformaCaida()),      // 502
+  ]) {
+    const r = await armar()
+    const c = r.cuerpo as { problema?: string; frase?: string }
+    salidas.push(c.problema ?? c.frase ?? '')
+  }
+
+  expect(salidas.filter((s) => s !== '')).toHaveLength(4)
+  for (const frase of salidas) {
+    for (const jerga of JERGA_PROHIBIDA) {
+      expect(frase.toLowerCase(), frase).not.toContain(jerga.toLowerCase())
+    }
+  }
+})
+```
+
+Adaptá los cuatro armadores a los ayudantes que el archivo tenga. El assert de
+`toHaveLength(4)` no es decorativo: sin él, un cambio que haga que alguna de
+esas ramas devuelva un cuerpo sin frase dejaría el test verde sobre una lista
+vacía.
+
+- [ ] **Step 7c: Y el nombre del proyecto no puede resolver a la cadena vacía en silencio**
+
+`PANEL_VERCEL_TOKEN` corta con 503 si falta, y nombra la variable en el log.
+El nombre del proyecto no tiene esa guardia: si tanto `PANEL_VERCEL_PROYECTO`
+como `GITHUB_REPO` faltaran, el código sigue con `proyecto: ''` y le pregunta a
+la plataforma por un proyecto sin nombre. Lo más probable es que la API rechace
+el pedido y termine en un 502 —seguro, pero mudo—: Marcos ve «no pudimos
+conectarnos» cuando lo que pasa es que falta una variable, que es un
+diagnóstico completamente distinto.
+
+Misma guardia que el token, justo al lado:
+
+```ts
+  const proyecto = env.PANEL_VERCEL_PROYECTO ?? env.GITHUB_REPO ?? ''
+  if (proyecto === '') {
+    console.error('estado: ni PANEL_VERCEL_PROYECTO ni GITHUB_REPO están cargadas — no sé por qué proyecto preguntar.')
+    return error(503, PROBLEMA_INESPERADO)
+  }
+```
 
 - [ ] **Step 8: Corré y verificá que pasan**
 

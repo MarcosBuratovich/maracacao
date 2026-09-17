@@ -16,6 +16,7 @@ import { esquemaSabores } from '../src/contenido/esquema/sabores'
 import { TOPE_CUERPO } from '../src/servidor/rutas-permitidas'
 import { fetchFalso } from './lib/github-falso'
 import { marca } from '@/copy/sitio-marca'
+import { JERGA_PROHIBIDA } from '../src/servidor/estado'
 
 // El JSON tal cual vive en el repo, SIN pasar por la fachada: es
 // exactamente lo que `scripts/humo-panel.sh` publica de verdad (lee el
@@ -1048,5 +1049,66 @@ describe('accion=estado', () => {
       ctx,
     )
     expect(r.status).toBe(503)
+  })
+
+  it('B10: NINGUNA respuesta de `estado` le habla a la clienta con jerga, ni las frases compartidas', async () => {
+    // Las frases del router (sesión inválida, «algo salió mal», «no pudimos
+    // revisar el contenido») las comparten varias acciones, así que se
+    // pueden editar desde cualquier lado. Este test recorre TODAS las
+    // salidas posibles de `estado` —no solo las que produce `decide()`— y
+    // las pasa por la misma lista. Es el único lugar donde esas frases
+    // compartidas quedan atadas a la regla.
+    const sha = 'a'.repeat(40)
+    const salidas: string[] = []
+
+    // 401: sin sesión.
+    {
+      const { f } = fetchFalso([])
+      const r = await maneja('estado', { cuerpo: {}, cookie: '' }, contextoBase(f))
+      const c = r.cuerpo as { problema?: string; frase?: string }
+      salidas.push(c.problema ?? c.frase ?? '')
+    }
+
+    // 400: un sha que no matchea la forma de 40 hex.
+    {
+      const r = await maneja(
+        'estado',
+        { cuerpo: { sha: 'no-es-un-sha' }, cookie: cookieValida() },
+        contextoBase(fetchQueNoSeUsa()),
+      )
+      const c = r.cuerpo as { problema?: string; frase?: string }
+      salidas.push(c.problema ?? c.frase ?? '')
+    }
+
+    // 503: sin PANEL_VERCEL_TOKEN, no hay forma de preguntarle a la plataforma.
+    {
+      const ctx = contextoBase(fetchQueNoSeUsa())
+      delete (ctx.env as Record<string, string | undefined>).PANEL_VERCEL_TOKEN
+      const r = await maneja('estado', { cuerpo: { sha, publicadoEn: 1_000 }, cookie: cookieValida() }, ctx)
+      const c = r.cuerpo as { problema?: string; frase?: string }
+      salidas.push(c.problema ?? c.frase ?? '')
+    }
+
+    // 502: la plataforma no contesta al pedirle el despliegue.
+    {
+      const { f } = fetchFalso([{ status: 500, cuerpo: {} }])
+      const r = await maneja(
+        'estado',
+        { cuerpo: { sha, publicadoEn: 1_000 }, cookie: cookieValida() },
+        contextoBase(f),
+      )
+      const c = r.cuerpo as { problema?: string; frase?: string }
+      salidas.push(c.problema ?? c.frase ?? '')
+    }
+
+    // El assert de longitud no es decorativo: sin él, una rama que empiece a
+    // devolver un cuerpo sin frase dejaría este test verde sobre una lista
+    // vacía.
+    expect(salidas.filter((s) => s !== '')).toHaveLength(4)
+    for (const frase of salidas) {
+      for (const jerga of JERGA_PROHIBIDA) {
+        expect(frase.toLowerCase(), frase).not.toContain(jerga.toLowerCase())
+      }
+    }
   })
 })

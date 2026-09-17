@@ -8,7 +8,7 @@
  * Por eso las once combinaciones se prueban acá, en milisegundos.
  */
 import { describe, it, expect } from 'vitest'
-import { decide } from '../src/servidor/estado'
+import { decide, JERGA_PROHIBIDA } from '../src/servidor/estado'
 
 const SHA = 'a'.repeat(40)
 const base = { despliegue: 'enCurso' as const, url: null, shaServido: null, shaPublicado: SHA, desdeHaceMs: 5_000 }
@@ -61,7 +61,7 @@ describe('el veredicto', () => {
     expect(v.estado).toBe('enCurso')
   })
 
-  it('B10: ninguna de las tres frases nombra una tecnología', () => {
+  it('B10: ninguna de las cuatro frases nombra una tecnología', () => {
     const frases = [
       decide({ ...base, despliegue: 'listo', shaServido: SHA }).frase,
       decide({ ...base }).frase,
@@ -69,7 +69,7 @@ describe('el veredicto', () => {
       decide({ ...base, desdeHaceMs: 300_001 }).frase,
     ]
     for (const f of frases) {
-      for (const jerga of ['Vercel', 'deploy', 'commit', 'build', 'GitHub', 'CDN', 'sha']) {
+      for (const jerga of JERGA_PROHIBIDA) {
         expect(f.toLowerCase(), f).not.toContain(jerga.toLowerCase())
       }
     }
