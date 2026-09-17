@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest'
 import { createHmac } from 'node:crypto'
 import { readFileSync } from 'node:fs'
-import { maneja, idDeDispositivo, type Entorno } from '../src/servidor/acciones'
+import { maneja, idDeDispositivo, VENTANA_DESHACER_MS, type Entorno } from '../src/servidor/acciones'
 import type { Carta, ResultadoCorreo } from '../src/servidor/correo'
 import { hashDeClave, firmaSesion } from '../src/servidor/sesion'
 import { cliente } from '../src/servidor/github'
@@ -15,7 +15,7 @@ import { serializa } from '../src/contenido/carga'
 import { esquemaSitio } from '../src/contenido/esquema/sitio'
 import { esquemaSabores } from '../src/contenido/esquema/sabores'
 import { TOPE_CUERPO } from '../src/servidor/rutas-permitidas'
-import { fetchFalso, respuestasDeUnaPublicacionCompleta } from './lib/github-falso'
+import { fetchFalso, respuestasDeUnaPublicacionCompleta, respuestasDeUnaPublicacionDirecta } from './lib/github-falso'
 import { marca } from '@/copy/sitio-marca'
 import { JERGA_PROHIBIDA } from '../src/servidor/estado'
 
@@ -754,12 +754,18 @@ describe('publicar', () => {
       saboresSinJengibre.gotas = saboresSinJengibre.gotas.filter((g: { clave: string }) => g.clave !== 'jengibreYNaranja')
       const crudo = sitioCrudoDeDisco() // sin ningún derivado: si injerta() no corre, no hay «de dónde» sacarlos
 
-      // CERO respuestas programadas: si esto llegara a tocar GitHub —el
-      // «swapped branch» que este test existe para atrapar, usando lo
-      // vivo en vez del lote— `fetchFalso` tira por pedir una respuesta
-      // que no programó, y el 502 de «no pudimos leer» delata el bug
-      // (en vez del 422 que sigue).
-      const { f, pedidos } = fetchFalso([])
+      // [RULING T7-5] Solo las DOS respuestas del costo fijo de
+      // `revisaLaCabeza()` (corre antes que la Fase 1b, siempre — ver su
+      // docstring en acciones.ts) — nunca una tercera: si la Fase 1b
+      // llegara a tocar GitHub —el «swapped branch» que este test existe
+      // para atrapar, usando lo vivo en vez del lote— `fetchFalso` tira por
+      // pedir una respuesta que no programó, y el 502 de «no pudimos leer»
+      // delata el bug (en vez del 422 que sigue). Antes decía «CERO
+      // respuestas programadas»: eso medía mal — el intento de
+      // `revisaLaCabeza()` existía igual, solo que `fetchFalso([])` tiraba
+      // su error ANTES de anotarlo en `pedidos`, así que la lista quedaba en
+      // cero por casualidad, no porque no se hubiera tocado la red.
+      const { f, pedidos } = fetchFalso([...respuestasDeNingunaReversionPendiente()])
 
       const r = await maneja(
         'publicar',
@@ -767,7 +773,7 @@ describe('publicar', () => {
         contextoBase(f),
       )
 
-      expect(pedidos).toHaveLength(0)
+      expect(pedidos).toHaveLength(2)
       expect(r.status).toBe(422)
       // `anaquel.contadorDe` es el primer derivado que el esquema declara
       // (cabecera.ts → producto.ts: `anaquel` antes que `gotas`) — el
@@ -1506,5 +1512,370 @@ describe('accion=estado', () => {
     expect(cartas[0].a).toEqual(['marcos@ejemplo.mx'])
     expect(cartas[0].texto).toContain(cabezaRota)
     expect(cartas[0].texto).toContain('clienta@ejemplo.mx') // el autor real, del trailer — no de quien pidió esta publicación
+  })
+})
+
+// Tarea 9 (spec §4.6): el botón «Deshacer esta publicación», con su ventana
+// de treinta minutos. La mecánica de revertir en sí (Tarea 8) ya está
+// probada en `test/revertir.test.ts`; lo que cubren estos tests es la
+// VENTANA, las frases para ella, y que `deshacerAccion` paga el mismo costo
+// fijo de `revisaLaCabeza()` que `publicarAccion`/`estadoAccion`, en el
+// mismo lugar del flujo (después de las validaciones baratas y
+// sincrónicas, antes de cualquier otra cosa).
+describe('accion=deshacer', () => {
+  // La misma fecha fija que usa el resto de este archivo para los commits
+  // de prueba (`respuestasDeUnaReversionCompleta`,
+  // `respuestasDeNingunaReversionPendiente`).
+  const PUBLICADO_EN = Date.parse('2026-09-17T12:00:00Z')
+
+  /**
+   * Un commit DEL PANEL cualquiera («Panel: sí», con padre): lo mínimo para
+   * pasar el chequeo de trailer de `revisaLaCabeza()`/`revierte()` y el de
+   * la ventana. `padre` por defecto es literal `'padre'` — el mismo valor
+   * que después se usa como `base` en `gh.archivoEnRef(ruta, padre)`.
+   */
+  const commitDelPanel = (sha: string, padre = 'padre') => ({
+    cuerpo: {
+      sha,
+      tree: { sha: 't' },
+      message: 'cambia sabores\n\nPanel: sí',
+      author: { date: '2026-09-17T12:00:00Z' },
+      parents: [{ sha: padre }],
+    },
+  })
+
+  /**
+   * Un commit hecho A MANO, sin «Panel: sí»: lo que hace que
+   * `revisaLaCabeza()` se vaya sin tocar la plataforma (no es del panel,
+   * nada que autorrevertir) y que `revierte()` lo rechace con
+   * `no-es-del-panel`.
+   */
+  const commitDeMarcos = (sha: string, padre = 'padre') => ({
+    cuerpo: {
+      sha,
+      tree: { sha: 't' },
+      message: 'fix: un ajuste a mano',
+      author: { date: '2026-09-17T12:00:00Z' },
+      parents: [{ sha: padre }],
+    },
+  })
+
+  /**
+   * Un commit de REVERSIÓN de `sha` — la forma exacta que deja `publica()`
+   * cuando `revierte()` lo escribe (Tarea 8): «Panel: sí» + `Panel-Revierte:`.
+   */
+  const commitDeReversion = (reversionSha: string, sha: string) => ({
+    cuerpo: {
+      sha: reversionSha,
+      tree: { sha: 't' },
+      message: `Deshace un cambio\n\nPanel: sí\nPanel-Autor: alguien\nPanel-Revierte: ${sha}`,
+      author: { date: '2026-09-17T12:00:00Z' },
+      parents: [{ sha }],
+    },
+  })
+
+  it('deshace la última publicación y devuelve el resumen', async () => {
+    const sha = 'a'.repeat(40)
+    const c = commitDelPanel(sha)
+    const { f } = fetchFalso([
+      { cuerpo: { object: { sha } } }, // gh.ref (revisaLaCabeza)
+      c, // gh.commit (revisaLaCabeza)
+      { cuerpo: { deployments: [{ state: 'READY', url: 'maracacao-x.vercel.app' }] } }, // vercel.despliegueDe (revisaLaCabeza): el despliegue de ESTE commit salió bien, nada que autorrevertir
+      c, // gh.commit (deshacerAccion: lee la fecha del commit, para la ventana)
+      { cuerpo: { object: { sha } } }, // gh.ref (dentro de revierte())
+      c, // gh.commit (dentro de revierte())
+      { cuerpo: { files: [{ filename: 'src/contenido/datos/sabores.json' }] } }, // gh.comparaRefs(padre, sha)
+      { cuerpo: { content: Buffer.from(textoSaboresVivo).toString('base64'), encoding: 'base64' } }, // gh.archivoEnRef(sabores, padre): el contenido VIEJO
+      ...respuestasDeUnaPublicacionDirecta(),
+    ])
+    const r = await maneja(
+      'deshacer',
+      { cuerpo: { sha }, cookie: cookieValida() },
+      contextoDePrueba({ fetch: f, ahora: () => PUBLICADO_EN + 60_000 }), // un minuto después: adentro de la ventana
+    )
+    expect(r.status).toBe(200)
+    expect((r.cuerpo as { ok: boolean; resumen: string }).ok).toBe(true)
+    expect((r.cuerpo as { resumen: string }).resumen).toBe('Listo, lo dejé como estaba antes.')
+  })
+
+  it('pasados los 30 minutos, ya no se puede: manda al historial', async () => {
+    // No es una limitación técnica —el commit sigue ahí— sino la línea entre
+    // «me equivoqué recién» y «quiero volver a una versión vieja», que son
+    // dos gestos distintos con dos pantallas distintas (spec §4.6).
+    const sha = 'b'.repeat(40)
+    const { f } = fetchFalso([
+      ...respuestasDeNingunaReversionPendiente(), // revisaLaCabeza(): costo fijo, primero que nada — la cabeza de main no es este commit
+      commitDelPanel(sha), // gh.commit (deshacerAccion: lee la fecha del commit, para la ventana)
+    ])
+    const r = await maneja(
+      'deshacer',
+      { cuerpo: { sha }, cookie: cookieValida() },
+      contextoDePrueba({ fetch: f, ahora: () => PUBLICADO_EN + 31 * 60_000 }), // 31 minutos después: fuera de la ventana
+    )
+    expect(r.status).toBe(409)
+    expect((r.cuerpo as { problema: string }).problema).toBe(
+      'Ya pasó mucho tiempo para deshacer esto desde aquí. Búscalo en el historial de cambios.',
+    )
+  })
+
+  it('B8: si ya publicó otra cosa encima, tampoco: manda al historial', async () => {
+    // Dentro de la ventana, pero la cabeza de main ya no es este commit:
+    // deshacerlo desde acá pisaría lo que sea que se publicó después.
+    const sha = 'c'.repeat(40)
+    const otraCabeza = commitDeMarcos('otraCabeza')
+    const { f } = fetchFalso([
+      { cuerpo: { object: { sha: 'otraCabeza' } } }, // gh.ref (revisaLaCabeza): Marcos publicó algo después
+      otraCabeza, // gh.commit (revisaLaCabeza): sin «Panel: sí», se va sin tocar la plataforma
+      commitDelPanel(sha), // gh.commit (deshacerAccion: lee la fecha de SU commit, para la ventana — pasa)
+      { cuerpo: { object: { sha: 'otraCabeza' } } }, // gh.ref (dentro de revierte()): la cabeza sigue siendo la de Marcos
+      otraCabeza, // gh.commit (dentro de revierte()): ¿la cabeza revierte `sha`? no — es no-es-la-cabeza
+    ])
+    const r = await maneja(
+      'deshacer',
+      { cuerpo: { sha }, cookie: cookieValida() },
+      contextoDePrueba({ fetch: f, ahora: () => PUBLICADO_EN + 60_000 }),
+    )
+    expect(r.status).toBe(409)
+    expect((r.cuerpo as { problema: string }).problema).toBe(
+      'Ya pasó mucho tiempo para deshacer esto desde aquí. Búscalo en el historial de cambios.',
+    )
+  })
+
+  it('si el contenido viejo ya no pasa las reglas de hoy, lo dice y ofrece el borrador', async () => {
+    // El esquema pudo haber cambiado entre medio. Publicar a la fuerza
+    // rompería el sitio; callarse dejaría a la clienta apretando un botón
+    // que no hace nada.
+    const sha = 'd'.repeat(40)
+    const c = commitDelPanel(sha)
+    const saboresRotos = saboresCrudoDeDisco()
+    delete saboresRotos.sabores[0].precio // le falta un campo que el esquema exige: no valida
+    const { f } = fetchFalso([
+      { cuerpo: { object: { sha } } },
+      c,
+      { cuerpo: { deployments: [{ state: 'READY', url: 'x.vercel.app' }] } },
+      c,
+      { cuerpo: { object: { sha } } },
+      c,
+      { cuerpo: { files: [{ filename: 'src/contenido/datos/sabores.json' }] } },
+      { cuerpo: { content: Buffer.from(JSON.stringify(saboresRotos)).toString('base64'), encoding: 'base64' } },
+    ])
+    const r = await maneja(
+      'deshacer',
+      { cuerpo: { sha }, cookie: cookieValida() },
+      contextoDePrueba({ fetch: f, ahora: () => PUBLICADO_EN + 60_000 }),
+    )
+    expect(r.status).toBe(422)
+    expect((r.cuerpo as { problema: string }).problema).toBe(
+      'Ese contenido ya no cumple con las reglas de hoy. Puedo abrírtelo como borrador para que lo ajustes.',
+    )
+  })
+
+  it('sin sesión, 401', async () => {
+    const { f, pedidos } = fetchFalso([])
+    const r = await maneja('deshacer', { cuerpo: { sha: 'a'.repeat(40) }, cookie: '' }, contextoDePrueba({ fetch: f }))
+    expect(r.status).toBe(401)
+    expect(pedidos).toHaveLength(0)
+  })
+
+  it('un `sha` mal formado no toca GitHub', async () => {
+    // Mismo criterio que `estadoAccion` (Ronda 3, Grupo 1): las
+    // validaciones baratas y sincrónicas —acá, la forma del `sha`— corren
+    // ANTES de `revisaLaCabeza()`, que es la primera en tocar la red.
+    // `contando()` y no `fetchFalso`: mide cada llamada de verdad, la deje
+    // pasar quien la deje pasar (ver el Paso 0 de esta tarea).
+    const usos = { n: 0 }
+    const r = await maneja(
+      'deshacer',
+      { cuerpo: { sha: 'no-es-un-sha' }, cookie: cookieValida() },
+      contextoDePrueba({ fetch: contando(usos) }),
+    )
+    expect(r.status).toBe(400)
+    expect(usos.n, 'la guardia corta antes de gastar un pedido').toBe(0)
+  })
+
+  it('si ya está deshecho, la respuesta es éxito, no error: mentirle sobre el estado del sitio sería peor', async () => {
+    // Puede pasar sola —la reversión automática ya lo arregló porque el
+    // despliegue de ESTE commit falló, y `revisaLaCabeza()` corrió primero,
+    // antes que el resto de `deshacerAccion` (ver su docstring)— o porque
+    // alguien ya apretó el botón antes que ella. Desde donde ella lo mira,
+    // el sitio está como quería: eso es un éxito, no un fracaso.
+    const sha = 'e'.repeat(40)
+    const reversionSha = 'f'.repeat(40)
+    const reversion = commitDeReversion(reversionSha, sha)
+    const { f } = fetchFalso([
+      { cuerpo: { object: { sha: reversionSha } } }, // gh.ref (revisaLaCabeza): la cabeza YA es la reversión
+      reversion, // gh.commit (revisaLaCabeza): es del panel Y ya es una reversión — se va sin tocar la plataforma
+      commitDelPanel(sha), // gh.commit (deshacerAccion: lee la fecha del commit que ella quiere deshacer, para la ventana)
+      { cuerpo: { object: { sha: reversionSha } } }, // gh.ref (dentro de revierte())
+      reversion, // gh.commit (dentro de revierte()): ¿la cabeza revierte `sha`? sí
+    ])
+    const r = await maneja(
+      'deshacer',
+      { cuerpo: { sha }, cookie: cookieValida() },
+      contextoDePrueba({ fetch: f, ahora: () => PUBLICADO_EN + 60_000 }),
+    )
+    expect(r.status).toBe(200)
+    expect((r.cuerpo as { ok: boolean; sha: string | null; resumen: string }).ok).toBe(true)
+    expect((r.cuerpo as { resumen: string }).resumen).toBe('Listo, lo dejé como estaba antes.')
+  })
+
+  it('un commit que no es del panel no se puede deshacer desde acá', async () => {
+    const sha = '1'.repeat(40)
+    const c = commitDeMarcos(sha)
+    const { f } = fetchFalso([
+      { cuerpo: { object: { sha } } }, // gh.ref (revisaLaCabeza)
+      c, // gh.commit (revisaLaCabeza): sin «Panel: sí», se va
+      c, // gh.commit (deshacerAccion: lee la fecha, para la ventana — pasa igual; no es eso lo que lo frena)
+      { cuerpo: { object: { sha } } }, // gh.ref (dentro de revierte())
+      c, // gh.commit (dentro de revierte()): confirma que no es del panel
+    ])
+    const r = await maneja(
+      'deshacer',
+      { cuerpo: { sha }, cookie: cookieValida() },
+      contextoDePrueba({ fetch: f, ahora: () => PUBLICADO_EN + 60_000 }),
+    )
+    expect(r.status).toBe(403)
+    expect((r.cuerpo as { problema: string }).problema).toBe('Ese cambio no se publicó desde aquí, así que no lo puedo deshacer.')
+  })
+
+  it('un commit que no tocó contenido no tiene nada que revertir: no es un éxito', async () => {
+    const sha = '2'.repeat(40)
+    const c = commitDelPanel(sha)
+    const { f } = fetchFalso([
+      { cuerpo: { object: { sha } } },
+      c,
+      { cuerpo: { deployments: [{ state: 'READY', url: 'x' }] } },
+      c,
+      { cuerpo: { object: { sha } } },
+      c,
+      { cuerpo: { files: [] } }, // no tocó ningún documento de contenido
+    ])
+    const r = await maneja(
+      'deshacer',
+      { cuerpo: { sha }, cookie: cookieValida() },
+      contextoDePrueba({ fetch: f, ahora: () => PUBLICADO_EN + 60_000 }),
+    )
+    expect(r.status).toBe(502)
+    expect((r.cuerpo as { problema: string }).problema).toBe(
+      'No pudimos publicar: hubo un problema para conectarnos con el sitio. Prueba de nuevo en unos minutos.',
+    )
+  })
+
+  it('VENTANA_DESHACER_MS son treinta minutos — la fase 6 apaga el botón con este mismo número', () => {
+    expect(VENTANA_DESHACER_MS).toBe(30 * 60_000)
+  })
+
+  it('ninguna frase nueva de deshacer usa jerga técnica', async () => {
+    const salidas: string[] = []
+
+    // 409: la ventana venció.
+    {
+      const sha = 'b'.repeat(40)
+      const { f } = fetchFalso([...respuestasDeNingunaReversionPendiente(), commitDelPanel(sha)])
+      const r = await maneja(
+        'deshacer',
+        { cuerpo: { sha }, cookie: cookieValida() },
+        contextoDePrueba({ fetch: f, ahora: () => PUBLICADO_EN + 31 * 60_000 }),
+      )
+      salidas.push((r.cuerpo as { problema: string }).problema)
+    }
+
+    // 422: el contenido viejo no valida.
+    {
+      const sha = 'd'.repeat(40)
+      const c = commitDelPanel(sha)
+      const saboresRotos = saboresCrudoDeDisco()
+      delete saboresRotos.sabores[0].precio
+      const { f } = fetchFalso([
+        { cuerpo: { object: { sha } } },
+        c,
+        { cuerpo: { deployments: [{ state: 'READY', url: 'x' }] } },
+        c,
+        { cuerpo: { object: { sha } } },
+        c,
+        { cuerpo: { files: [{ filename: 'src/contenido/datos/sabores.json' }] } },
+        { cuerpo: { content: Buffer.from(JSON.stringify(saboresRotos)).toString('base64'), encoding: 'base64' } },
+      ])
+      const r = await maneja(
+        'deshacer',
+        { cuerpo: { sha }, cookie: cookieValida() },
+        contextoDePrueba({ fetch: f, ahora: () => PUBLICADO_EN + 60_000 }),
+      )
+      salidas.push((r.cuerpo as { problema: string }).problema)
+    }
+
+    // 403: no es del panel.
+    {
+      const sha = '1'.repeat(40)
+      const c = commitDeMarcos(sha)
+      const { f } = fetchFalso([{ cuerpo: { object: { sha } } }, c, c, { cuerpo: { object: { sha } } }, c])
+      const r = await maneja(
+        'deshacer',
+        { cuerpo: { sha }, cookie: cookieValida() },
+        contextoDePrueba({ fetch: f, ahora: () => PUBLICADO_EN + 60_000 }),
+      )
+      salidas.push((r.cuerpo as { problema: string }).problema)
+    }
+
+    // 502: nada que revertir.
+    {
+      const sha = '2'.repeat(40)
+      const c = commitDelPanel(sha)
+      const { f } = fetchFalso([
+        { cuerpo: { object: { sha } } },
+        c,
+        { cuerpo: { deployments: [{ state: 'READY', url: 'x' }] } },
+        c,
+        { cuerpo: { object: { sha } } },
+        c,
+        { cuerpo: { files: [] } },
+      ])
+      const r = await maneja(
+        'deshacer',
+        { cuerpo: { sha }, cookie: cookieValida() },
+        contextoDePrueba({ fetch: f, ahora: () => PUBLICADO_EN + 60_000 }),
+      )
+      salidas.push((r.cuerpo as { problema: string }).problema)
+    }
+
+    // 200: éxito (comparte la misma frase con `ya-revertido`).
+    {
+      const sha = 'e'.repeat(40)
+      const reversionSha = 'f'.repeat(40)
+      const reversion = commitDeReversion(reversionSha, sha)
+      const { f } = fetchFalso([
+        { cuerpo: { object: { sha: reversionSha } } },
+        reversion,
+        commitDelPanel(sha),
+        { cuerpo: { object: { sha: reversionSha } } },
+        reversion,
+      ])
+      const r = await maneja(
+        'deshacer',
+        { cuerpo: { sha }, cookie: cookieValida() },
+        contextoDePrueba({ fetch: f, ahora: () => PUBLICADO_EN + 60_000 }),
+      )
+      salidas.push((r.cuerpo as { resumen: string }).resumen)
+    }
+
+    expect(salidas.filter((s) => s !== '')).toHaveLength(5)
+
+    // [Hallazgo, Tarea 9] `JERGA_PROHIBIDA` incluye «sha» —el hash corto de
+    // un commit— pero el resto de la suite lo busca con `.toContain()`, un
+    // substring CRUDO. Esta acción se llama «deshacer», y «deshacer»
+    // CONTIENE «sha» como fragmento (de-s-h-a-cer) sin ser jerga de
+    // ninguna forma: es el verbo que le da nombre al botón. Con
+    // `.toContain()` a secas, DOS de las frases de esta tarea
+    // (`PROBLEMA_TARDE`, `PROBLEMA_NO_ES_TUYO`) fallarían por un falso
+    // positivo, no por jerga de verdad. Acá se busca cada palabra de
+    // `JERGA_PROHIBIDA` con LÍMITES de palabra (`\b`), que es lo que la
+    // lista siempre quiso decir — «sha» como palabra suelta, no como
+    // fragmento de cualquier palabra que la contenga.
+    for (const frase of salidas) {
+      for (const jerga of JERGA_PROHIBIDA) {
+        const patron = new RegExp(`\\b${jerga.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i')
+        expect(frase, `«${frase}» no debería contener la palabra «${jerga}»`).not.toMatch(patron)
+      }
+    }
   })
 })

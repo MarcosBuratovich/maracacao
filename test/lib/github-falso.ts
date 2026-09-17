@@ -24,6 +24,18 @@ export function fetchFalso(respuestas: Array<{ status?: number; cuerpo: unknown 
   const pedidos: Array<{ url: string; metodo: string; cuerpo: unknown; cabeceras: Record<string, string> }> = []
   let i = 0
   const f = async (url: string | URL, init?: RequestInit) => {
+    // El intento se registra ANTES de mirar si hay respuesta programada: si se
+    // registrara después, un pedido que cae en el error de «scripteó de menos»
+    // quedaría sin rastro, y todos los `expect(pedidos).toHaveLength(0)` de la
+    // suite darían cero tanto si el código frenó antes de la red como si la
+    // intentó. Parecerían candados y serían decoración. [RULING T7-5]
+    pedidos.push({
+      url: String(url),
+      metodo: init?.method ?? 'GET',
+      cuerpo: init?.body ? JSON.parse(String(init.body)) : undefined,
+      cabeceras: (init?.headers ?? {}) as Record<string, string>,
+    })
+
     if (i >= respuestas.length) {
       throw new Error(
         `fetchFalso(): se pidió una respuesta más de las ${respuestas.length} programadas ` +
@@ -31,12 +43,6 @@ export function fetchFalso(respuestas: Array<{ status?: number; cuerpo: unknown 
       )
     }
     const r = respuestas[i++]
-    pedidos.push({
-      url: String(url),
-      metodo: init?.method ?? 'GET',
-      cuerpo: init?.body ? JSON.parse(String(init.body)) : undefined,
-      cabeceras: (init?.headers ?? {}) as Record<string, string>,
-    })
     return new Response(JSON.stringify(r.cuerpo), { status: r.status ?? 200 })
   }
   return { f: f as unknown as typeof globalThis.fetch, pedidos }

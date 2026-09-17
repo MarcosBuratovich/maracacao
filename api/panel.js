@@ -18443,6 +18443,69 @@ async function shaQueSirveElCdn(contexto) {
     return null;
   }
 }
+var VENTANA_DESHACER_MS = 30 * 6e4;
+var RESUMEN_DESHECHO = "Listo, lo dej\xE9 como estaba antes.";
+var PROBLEMA_TARDE = "Ya pas\xF3 mucho tiempo para deshacer esto desde aqu\xED. B\xFAscalo en el historial de cambios.";
+var PROBLEMA_NO_VALIDA = "Ese contenido ya no cumple con las reglas de hoy. Puedo abr\xEDrtelo como borrador para que lo ajustes.";
+var PROBLEMA_NO_ES_TUYO = "Ese cambio no se public\xF3 desde aqu\xED, as\xED que no lo puedo deshacer.";
+var PROBLEMA_NO_SE_PUDO_DESHACER = "No pudimos publicar: hubo un problema para conectarnos con el sitio. Prueba de nuevo en unos minutos.";
+async function deshacerAccion(pedido, contexto) {
+  const env = contexto.env;
+  if (!secretoUtilizable(env)) {
+    console.error("deshacer: PANEL_SECRETO falta o mide menos de 32 caracteres.");
+    return error51(503, PROBLEMA_INESPERADO);
+  }
+  const sesion = sesionVigente(pedido.cookie, env, contexto.ahora());
+  if (!sesion) return error51(401, PROBLEMA_SESION);
+  const cuerpo = pedido.cuerpo ?? {};
+  if (typeof cuerpo.sha !== "string" || !/^[0-9a-f]{40}$/.test(cuerpo.sha)) {
+    return error51(400, PROBLEMA_INESPERADO);
+  }
+  await revisaLaCabeza(contexto);
+  const gh = cliente({
+    token: env.PANEL_GITHUB_TOKEN ?? "",
+    duenio: env.GITHUB_DUENIO ?? "",
+    repo: env.GITHUB_REPO ?? "",
+    fetch: contexto.fetch
+  });
+  let publicadoEn;
+  try {
+    const commit = await gh.commit(cuerpo.sha);
+    publicadoEn = Date.parse(commit.author.date);
+  } catch (e) {
+    console.error(`deshacer: no se pudo leer el commit ${cuerpo.sha} \u2014`, e);
+    return error51(502, PROBLEMA_NO_SE_PUDO_LEER);
+  }
+  if (!Number.isFinite(publicadoEn) || contexto.ahora() - publicadoEn > VENTANA_DESHACER_MS) {
+    return error51(409, PROBLEMA_TARDE);
+  }
+  const r = await revierte(gh, {
+    sha: cuerpo.sha,
+    autor: sesion.correo,
+    bytesDelCuerpo: contexto.bytesDelCuerpo
+  });
+  if (r.ok) return ok({ ok: true, sha: r.sha, resumen: RESUMEN_DESHECHO });
+  switch (r.motivo) {
+    case "no-es-la-cabeza":
+      return error51(409, PROBLEMA_TARDE);
+    // Ya está deshecho. Decirle que falló sería mentirle sobre el estado del
+    // sitio, que es lo único que ella quería saber.
+    case "ya-revertido":
+      return ok({ ok: true, sha: null, resumen: RESUMEN_DESHECHO });
+    case "no-es-del-panel":
+      return error51(403, PROBLEMA_NO_ES_TUYO);
+    case "no-valida":
+      console.error(`deshacer: el contenido viejo de ${cuerpo.sha} no pasa las reglas de hoy \u2014 ${r.detalle}`);
+      return error51(422, PROBLEMA_NO_VALIDA);
+    // `nada-que-revertir` y `falló` caen las dos acá: son la misma frase
+    // genérica de «no se pudo» que ya usa el resto del router para un error
+    // fuerte del lado de GitHub — ninguna de las dos tiene una frase propia
+    // que a ella le sirva más que esta.
+    default:
+      console.error(`deshacer: no se pudo deshacer ${cuerpo.sha} \u2014 ${r.motivo}: ${r.detalle}`);
+      return error51(502, PROBLEMA_NO_SE_PUDO_DESHACER);
+  }
+}
 var PROBLEMA_ACCION_INEXISTENTE = "Esta acci\xF3n todav\xEDa no existe.";
 async function maneja(accion, pedido, contexto) {
   try {
@@ -18455,6 +18518,8 @@ async function maneja(accion, pedido, contexto) {
         return await salud(pedido, contexto);
       case "estado":
         return await estadoAccion(pedido, contexto);
+      case "deshacer":
+        return await deshacerAccion(pedido, contexto);
       default:
         return error51(404, PROBLEMA_ACCION_INEXISTENTE);
     }

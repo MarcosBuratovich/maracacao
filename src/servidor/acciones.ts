@@ -1177,6 +1177,139 @@ async function shaQueSirveElCdn(contexto: Contexto): Promise<string | null> {
 
 /*
  * ---------------------------------------------------------------------
+ * deshacer (Tarea 9, spec §4.6)
+ * ---------------------------------------------------------------------
+ */
+
+/**
+ * Cuánto dura el botón «Deshacer esta publicación» (spec §4.6).
+ *
+ * No es una limitación técnica: el commit sigue ahí para siempre y el
+ * historial lo puede revertir cuando sea (Tarea 10). Es la línea entre dos
+ * gestos distintos —«me equivoqué recién, sacalo» y «quiero volver a una
+ * versión vieja»— que merecen dos pantallas distintas, porque el primero se
+ * hace con una mano, parada en un mercado, y el segundo se hace sentada y
+ * mirando.
+ *
+ * Exportada porque la fase 6 la necesita para saber cuándo dejar de dibujar
+ * el botón: el servidor y la pantalla tienen que estar de acuerdo en cuándo
+ * se apaga, o ella lo va a apretar y va a recibir un error.
+ */
+export const VENTANA_DESHACER_MS = 30 * 60_000
+
+// Éxito: ya está como estaba. La misma frase la use `deshacerAccion` para
+// terminar de deshacer o para contarle que YA estaba deshecho (motivo
+// `ya-revertido`, más abajo) — desde donde ella lo mira, el sitio quedó
+// igual en los dos casos, y no hay ninguna razón para que sean dos frases.
+const RESUMEN_DESHECHO = 'Listo, lo dejé como estaba antes.'
+
+// [B8] Desde donde ella lo mira, «ya publicaste otra cosa encima» (motivo
+// `no-es-la-cabeza` de `revierte()`) y «pasó mucho tiempo» (la ventana, acá
+// abajo) son el mismo hecho: no se puede deshacer desde ACÁ, hay que ir al
+// historial. Dos frases para eso serían dos formas de decir lo mismo con
+// más palabras — y el historial (Tarea 10) es justo la pantalla que sabe
+// resolver las dos.
+const PROBLEMA_TARDE = 'Ya pasó mucho tiempo para deshacer esto desde aquí. Búscalo en el historial de cambios.'
+
+const PROBLEMA_NO_VALIDA = 'Ese contenido ya no cumple con las reglas de hoy. Puedo abrírtelo como borrador para que lo ajustes.'
+const PROBLEMA_NO_ES_TUYO = 'Ese cambio no se publicó desde aquí, así que no lo puedo deshacer.'
+const PROBLEMA_NO_SE_PUDO_DESHACER =
+  'No pudimos publicar: hubo un problema para conectarnos con el sitio. Prueba de nuevo en unos minutos.'
+
+/**
+ * `deshacer`: volver atrás la última publicación, durante media hora (spec
+ * §4.6, Tarea 9).
+ *
+ * Toda la mecánica —qué commit es válido revertir, cómo se arma el commit
+ * nuevo con los blobs viejos, la idempotencia— vive en `revertir.ts` (Tarea
+ * 8). Lo que agrega ESTA función es la VENTANA de tiempo y las frases para
+ * ella. La ventana se chequea ACÁ y no en `revertir.ts` a propósito: media
+ * hora es una regla de PRODUCTO —dónde termina «me equivoqué recién» y
+ * empieza «quiero volver a una versión vieja»— y `revertir.ts` también sirve
+ * a la reversión AUTOMÁTICA (más arriba en este archivo), que no tiene
+ * ninguna ventana: un despliegue puede tardar más de media hora en fallar.
+ *
+ * [B1] Mismo orden que `publicarAccion`/`estadoAccion`: `revisaLaCabeza()`
+ * corre DESPUÉS de las validaciones baratas y sincrónicas (secreto, sesión,
+ * forma del `sha`) — así una sesión vencida o un `sha` mal formado no gastan
+ * ni un pedido de red. Y antes de leer nada más: si la cabeza estaba rota
+ * por un despliegue fallido y se autorrevierte acá mismo, lo que sigue ya ve
+ * el sitio arreglado — y si el sha que ella quería deshacer era justo ESE,
+ * `revierte()` lo va a encontrar como `ya-revertido` (éxito) en vez de
+ * `no-es-la-cabeza` (que también sería correcto, pero más confuso: ella no
+ * hizo nada raro, el sitio ya está como quería).
+ */
+async function deshacerAccion(pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
+  const env = contexto.env
+  if (!secretoUtilizable(env)) {
+    console.error('deshacer: PANEL_SECRETO falta o mide menos de 32 caracteres.')
+    return error(503, PROBLEMA_INESPERADO)
+  }
+
+  const sesion = sesionVigente(pedido.cookie, env, contexto.ahora())
+  if (!sesion) return error(401, PROBLEMA_SESION)
+
+  const cuerpo = (pedido.cuerpo ?? {}) as { sha?: unknown }
+  if (typeof cuerpo.sha !== 'string' || !/^[0-9a-f]{40}$/.test(cuerpo.sha)) {
+    return error(400, PROBLEMA_INESPERADO)
+  }
+
+  await revisaLaCabeza(contexto)
+
+  const gh = cliente({
+    token: env.PANEL_GITHUB_TOKEN ?? '',
+    duenio: env.GITHUB_DUENIO ?? '',
+    repo: env.GITHUB_REPO ?? '',
+    fetch: contexto.fetch,
+  })
+
+  // La ventana, antes de tocar nada más: si ya pasó, no hay razón para leer
+  // el contenido viejo del padre ni para armar nada — un 409 franco y listo.
+  let publicadoEn: number
+  try {
+    const commit = await gh.commit(cuerpo.sha)
+    publicadoEn = Date.parse(commit.author.date)
+  } catch (e) {
+    console.error(`deshacer: no se pudo leer el commit ${cuerpo.sha} —`, e)
+    return error(502, PROBLEMA_NO_SE_PUDO_LEER)
+  }
+
+  if (!Number.isFinite(publicadoEn) || contexto.ahora() - publicadoEn > VENTANA_DESHACER_MS) {
+    return error(409, PROBLEMA_TARDE)
+  }
+
+  const r = await revierte(gh, {
+    sha: cuerpo.sha,
+    autor: sesion.correo,
+    bytesDelCuerpo: contexto.bytesDelCuerpo,
+  })
+
+  if (r.ok) return ok({ ok: true, sha: r.sha, resumen: RESUMEN_DESHECHO })
+
+  switch (r.motivo) {
+    case 'no-es-la-cabeza':
+      return error(409, PROBLEMA_TARDE)
+    // Ya está deshecho. Decirle que falló sería mentirle sobre el estado del
+    // sitio, que es lo único que ella quería saber.
+    case 'ya-revertido':
+      return ok({ ok: true, sha: null, resumen: RESUMEN_DESHECHO })
+    case 'no-es-del-panel':
+      return error(403, PROBLEMA_NO_ES_TUYO)
+    case 'no-valida':
+      console.error(`deshacer: el contenido viejo de ${cuerpo.sha} no pasa las reglas de hoy — ${r.detalle}`)
+      return error(422, PROBLEMA_NO_VALIDA)
+    // `nada-que-revertir` y `falló` caen las dos acá: son la misma frase
+    // genérica de «no se pudo» que ya usa el resto del router para un error
+    // fuerte del lado de GitHub — ninguna de las dos tiene una frase propia
+    // que a ella le sirva más que esta.
+    default:
+      console.error(`deshacer: no se pudo deshacer ${cuerpo.sha} — ${r.motivo}: ${r.detalle}`)
+      return error(502, PROBLEMA_NO_SE_PUDO_DESHACER)
+  }
+}
+
+/*
+ * ---------------------------------------------------------------------
  * El router
  * ---------------------------------------------------------------------
  */
@@ -1202,6 +1335,8 @@ export async function maneja(accion: string, pedido: Pedido, contexto: Contexto)
         return await salud(pedido, contexto)
       case 'estado':
         return await estadoAccion(pedido, contexto)
+      case 'deshacer':
+        return await deshacerAccion(pedido, contexto)
       default:
         return error(404, PROBLEMA_ACCION_INEXISTENTE)
     }
