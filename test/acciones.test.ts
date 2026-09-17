@@ -223,6 +223,24 @@ const respuestasDeUnaReversionCompleta = (sha: string) => [
   { cuerpo: { files: [] } }, // gh.comparaRefs: no tocó contenido
 ]
 
+/**
+ * [Ronda 3, Grupo 3] La respuesta de `gh.commit(sha)` que `revierteYAvisa()`
+ * lee ANTES de llamar a `revierte()` —igual que `revisaLaCabeza()` ya hacía
+ * en el camino de al lado—, para sacar el autor real del trailer
+ * `Panel-Autor:` en vez de usar el correo de quien está sondeando `estado`.
+ * Un pedido de más que paga cualquier test que ejercite `revierteYAvisa()`
+ * (no `revierteYAvisaAMarcos()`, que ya recibe el autor listo).
+ */
+const respuestaDelCommitParaElAutor = (sha: string, autor = 'clienta@ejemplo.mx') => ({
+  cuerpo: {
+    sha,
+    tree: { sha: 't' },
+    message: `cambia algo\n\nPanel: sí\nPanel-Autor: ${autor}`,
+    author: { date: '2026-09-17T12:00:00Z' },
+    parents: [{ sha: 'padre' }],
+  },
+})
+
 const cookieValida = (correo = 'clienta@ejemplo.mx') =>
   firmaSesion({ correo, vence: Date.now() + 86_400_000, dispositivo: 'test', emitida: Date.now() }, SECRETO)
 
@@ -1162,14 +1180,36 @@ describe('accion=estado', () => {
     // MUDO, que le dice a Marcos «no pudimos conectarnos» cuando lo que pasa
     // es que falta una variable. Son dos diagnósticos distintos y él
     // necesita el segundo. Una guardia sin test es una intención, no un
-    // candado —ya pasó una vez en este panel con `PANEL_SECRETO` ausente— así
-    // que el `toHaveLength(0)` de abajo prueba que la guardia corta ANTES de
-    // gastar el pedido, no solo que el status final da 503.
+    // candado —ya pasó una vez en este panel con `PANEL_SECRETO` ausente—.
+    //
+    // [Ronda 3, Grupo 1] Antes, esta misma guardia «pasaba» por la razón
+    // podrida: `fetchFalso([])` tira apenas se lo llama, `revisaLaCabeza()`
+    // se traga esa excepción en su propio `try`, y el pedido nunca se
+    // registra — el test no podía distinguir «nunca se llamó a `fetch`» de
+    // «se llamó y falló en silencio». `contando()` (no `fetchFalso`) cierra
+    // ese hueco: cuenta cada llamada de verdad, la deje pasar quien la deje
+    // pasar.
     const sha = 'a'.repeat(40)
-    const { f, pedidos } = fetchFalso([])
-    const r = await maneja('estado', { cuerpo: { sha, publicadoEn: 1_000 }, cookie: cookieValida() }, sinNombreDeProyecto(f))
+    const usos = { n: 0 }
+    const r = await maneja('estado', { cuerpo: { sha, publicadoEn: 1_000 }, cookie: cookieValida() }, sinNombreDeProyecto(contando(usos)))
     expect(r.status).toBe(503)
-    expect(pedidos, 'la guardia corta antes de gastar un pedido').toHaveLength(0)
+    expect(usos.n, 'la guardia corta antes de gastar un pedido').toBe(0)
+  })
+
+  // Ronda 3, Grupo 1: `revisaLaCabeza()` corre en `estadoAccion` DESPUÉS de
+  // sus tres validaciones baratas y sincrónicas (token ausente, proyecto sin
+  // nombre, `sha` mal formado) — el mismo criterio que `publicarAccion`
+  // (Grupo C, ronda 2). Medido en la re-revisión: antes de este arreglo, un
+  // `sha` mal formado gastaba un pedido REAL a GitHub antes de contestar 400.
+  it('Ronda 3, Grupo 1: un `sha` mal formado no toca GitHub', async () => {
+    const usos = { n: 0 }
+    const r = await maneja(
+      'estado',
+      { cuerpo: { sha: 'no-es-un-sha', publicadoEn: 1_000 }, cookie: cookieValida() },
+      contextoBase(contando(usos)),
+    )
+    expect(r.status).toBe(400)
+    expect(usos.n, 'la guardia corta antes de gastar un pedido').toBe(0)
   })
 
   it('B10: NINGUNA respuesta de `estado` le habla a la clienta con jerga, ni las frases compartidas', async () => {
@@ -1243,6 +1283,7 @@ describe('accion=estado', () => {
     const { f } = fetchFalso([
       ...respuestasDeNingunaReversionPendiente(), // revisaLaCabeza(), primero que nada
       { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } },
+      respuestaDelCommitParaElAutor(sha), // revierteYAvisa() lee el autor real ANTES de revierte()
       ...respuestasDeUnaReversionCompleta(sha),
     ])
     const r = await maneja(
@@ -1269,6 +1310,7 @@ describe('accion=estado', () => {
     const { f } = fetchFalso([
       ...respuestasDeNingunaReversionPendiente(),
       { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } },
+      respuestaDelCommitParaElAutor(sha),
       ...respuestasDeUnaReversionCompleta(sha),
     ])
     const r = await maneja(
@@ -1334,6 +1376,7 @@ describe('accion=estado', () => {
     const { f } = fetchFalso([
       ...respuestasDeNingunaReversionPendiente(),
       { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } },
+      respuestaDelCommitParaElAutor(sha),
       ...respuestasDeUnaReversionCompleta(sha),
     ])
     await maneja(
@@ -1360,6 +1403,7 @@ describe('accion=estado', () => {
     const { f } = fetchFalso([
       ...respuestasDeNingunaReversionPendiente(),
       { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } },
+      respuestaDelCommitParaElAutor(sha),
       ...respuestasDeUnaReversionCompleta(sha),
     ])
     const r = await maneja(

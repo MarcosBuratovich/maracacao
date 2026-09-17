@@ -32,8 +32,13 @@ import { DOCUMENTOS, type IdDocumento } from '../contenido/esquema'
  */
 export const TRAILER_REVIERTE = 'Panel-Revierte'
 
-/** La marca que el panel le pone a todo lo que publica (`publicar.ts`). */
-const TRAILER_PANEL = 'Panel: sí'
+/**
+ * La marca que el panel le pone a todo lo que publica (`publicar.ts`).
+ * Exportada: es la MISMA línea que decide si un commit puede escribir en
+ * `main` desde `revisaLaCabeza()` (acciones.ts) — escribirla dos veces sería
+ * la clase de duplicado que se desincroniza sola.
+ */
+export const TRAILER_PANEL = 'Panel: sí'
 
 /** El trailer que lleva el correo de quien publicó de verdad (`publicar.ts`). */
 const TRAILER_AUTOR = 'Panel-Autor'

@@ -18132,7 +18132,10 @@ var ASUNTO_PARA_ELLA = "Tu cambio no se pudo publicar";
 var TEXTO_PARA_ELLA = "No sali\xF3; lo dej\xE9 como estaba y ya le avis\xE9 a Marcos.\n\nPuedes volver a intentarlo cuando quieras.";
 async function mandaProtegido(contexto, carta) {
   try {
-    await contexto.correo(carta);
+    const r = await contexto.correo(carta);
+    if (!r.ok) {
+      console.error(`aviso: no se pudo mandar \xAB${carta.asunto}\xBB a ${carta.a.join(", ")} \u2014 ${r.motivo}`);
+    }
   } catch (e) {
     console.error("revertir: el env\xEDo de un correo de aviso revent\xF3 \u2014", e);
   }
@@ -18162,7 +18165,13 @@ async function revierteYAvisa(sha, correoDeElla, contexto) {
     repo: contexto.env.GITHUB_REPO ?? "",
     fetch: contexto.fetch
   });
-  const resumen = await intentaRevertir(gh, sha, correoDeElla);
+  let autorReal = correoDeElla;
+  try {
+    const commit = await gh.commit(sha);
+    autorReal = autorDelCommit(commit.message) ?? correoDeElla;
+  } catch {
+  }
+  const resumen = await intentaRevertir(gh, sha, autorReal);
   await avisaAElla(correoDeElla, contexto);
   const paraMarcos = contexto.env.PANEL_AVISOS_A;
   if (paraMarcos) {
@@ -18170,7 +18179,7 @@ async function revierteYAvisa(sha, correoDeElla, contexto) {
       a: [paraMarcos],
       asunto: `[panel] El deploy de ${sha.slice(0, 7)} fall\xF3`,
       texto: [
-        `El commit ${sha} publicado por ${correoDeElla} no construy\xF3.`,
+        `El commit ${sha} publicado por ${autorReal} no construy\xF3.`,
         `Reversi\xF3n autom\xE1tica: ${resumen}.`,
         "",
         "El sitio sigue sirviendo el \xFAltimo deploy bueno."
@@ -18211,7 +18220,7 @@ async function revisaLaCabeza(contexto) {
     });
     const cabeza = await gh.ref("heads/main");
     const commit = await gh.commit(cabeza.sha);
-    if (!tieneTrailer(commit.message, "Panel: s\xED")) return null;
+    if (!tieneTrailer(commit.message, TRAILER_PANEL)) return null;
     if (valorDeTrailer(commit.message, TRAILER_REVIERTE) !== void 0) return null;
     const proyecto = contexto.env.PANEL_VERCEL_PROYECTO ?? contexto.env.GITHUB_REPO ?? "";
     if (proyecto === "") {
@@ -18379,7 +18388,6 @@ async function estadoAccion(pedido, contexto) {
   }
   const sesion = sesionVigente(pedido.cookie, env, contexto.ahora());
   if (!sesion) return error51(401, PROBLEMA_SESION);
-  const shaYaAtendido = await revisaLaCabeza(contexto);
   if (!env.PANEL_VERCEL_TOKEN) {
     console.error("estado: PANEL_VERCEL_TOKEN no est\xE1 cargada \u2014 no hay forma de saber si el despliegue termin\xF3.");
     return error51(503, PROBLEMA_INESPERADO);
@@ -18394,6 +18402,7 @@ async function estadoAccion(pedido, contexto) {
     return error51(400, PROBLEMA_INESPERADO);
   }
   const publicadoEn = typeof cuerpo.publicadoEn === "number" ? cuerpo.publicadoEn : contexto.ahora();
+  const shaYaAtendido = await revisaLaCabeza(contexto);
   const vercel = clienteVercel({
     token: env.PANEL_VERCEL_TOKEN,
     proyecto,

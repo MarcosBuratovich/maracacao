@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs'
 import { describe, it, expect } from 'vitest'
 import { fetchFalso, respuestasDeUnaPublicacionDirecta } from './lib/github-falso'
 import { cliente } from '../src/servidor/github'
-import { revierte, TRAILER_REVIERTE } from '../src/servidor/revertir'
+import { revierte, TRAILER_REVIERTE, autorDelCommit } from '../src/servidor/revertir'
 
 const gh = (f: typeof globalThis.fetch) => cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
 const SHA = 'a'.repeat(40)
@@ -182,5 +182,14 @@ describe('revertir un commit del panel', () => {
     ])
     const r = await revierte(gh(f), { sha: SHA, autor: 'ella@ejemplo.mx' })
     expect(r).toEqual({ ok: false, motivo: 'no-es-del-panel', detalle: expect.any(String) })
+  })
+
+  // Ronda 3, Grupo 5: el caso NO es «hoy inalcanzable» — desde que los
+  // trailers se anclan por línea (F-4), un commit escrito a mano cuyo cuerpo
+  // contenga la línea «Panel: sí» (copiar el mensaje de un commit del panel,
+  // un cherry-pick) pasa la guardia de `revisaLaCabeza()` sin traer
+  // `Panel-Autor:`. `autorDelCommit` es pura y exportada: el test sale gratis.
+  it('autorDelCommit(): un mensaje con «Panel: sí» pero sin `Panel-Autor:` no tiene autor', () => {
+    expect(autorDelCommit('cambia algo\n\nPanel: sí')).toBeUndefined()
   })
 })

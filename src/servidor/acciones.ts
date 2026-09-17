@@ -25,7 +25,7 @@ import {
 } from './sesion'
 import { cliente } from './github'
 import { publica, type Archivo } from './publicar'
-import { revierte, TRAILER_REVIERTE, tieneTrailer, valorDeTrailer, autorDelCommit } from './revertir'
+import { revierte, TRAILER_REVIERTE, TRAILER_PANEL, tieneTrailer, valorDeTrailer, autorDelCommit } from './revertir'
 import type { Cambio } from '../contenido/diff'
 import { resume } from '../contenido/diff'
 import { validarContra, type Problema } from '../contenido/validacion'
@@ -442,10 +442,22 @@ const TEXTO_PARA_ELLA = 'No salió; lo dejé como estaba y ya le avisé a Marcos
  * quien pidió la acción, y depender en silencio de que otro módulo cumpla su
  * contrato es exactamente la clase de acoplamiento que un `try` de una línea
  * evita gratis.
+ *
+ * [Ronda 3] El `try` atrapa lo IMPOSIBLE (que `manda()` tire, cosa que el
+ * ruling T6-2 de `correo.ts` ya descarta); lo de verdad probable —que
+ * `manda()` devuelva `{ ok: false }` porque no está configurado o el
+ * proveedor lo rechazó— pasaba en silencio, sin loguear nada. `correo.ts`
+ * documenta que el detalle es responsabilidad de QUIEN LLAMA, «que sí sabe en
+ * qué contexto lo llamaron»: esto es ese log. Cuando el despliegue falla con
+ * nadie mirando el panel, este correo es la ÚNICA señal que tiene Marcos —
+ * que se pierda en silencio es peor que un log de más.
  */
 async function mandaProtegido(contexto: Contexto, carta: Carta): Promise<void> {
   try {
-    await contexto.correo(carta)
+    const r = await contexto.correo(carta)
+    if (!r.ok) {
+      console.error(`aviso: no se pudo mandar «${carta.asunto}» a ${carta.a.join(', ')} — ${r.motivo}`)
+    }
   } catch (e) {
     console.error('revertir: el envío de un correo de aviso reventó —', e)
   }
@@ -496,6 +508,13 @@ async function avisaAElla(correoDeElla: string, contexto: Contexto): Promise<voi
  *
  * [B3] El correo degrada: que no esté configurado no puede impedir que el
  * repo vuelva a estar sano.
+ *
+ * [Ronda 3, Grupo 3] `correoDeElla` es SOLO el destinatario de SU correo —
+ * quien está sondeando `estado`, que es a quien hay que avisarle—. Nunca el
+ * autor que se le atribuye al commit: el trailer `Panel-Autor:` del commit
+ * que se está por revertir, y el «publicado por X» del correo de Marcos,
+ * salen de leer ESE commit, igual que hace `revisaLaCabeza()` en el camino de
+ * al lado. Sondear `estado` no prueba que quien sondea sea quien publicó.
  */
 async function revierteYAvisa(sha: string, correoDeElla: string, contexto: Contexto): Promise<void> {
   const gh = cliente({
@@ -505,7 +524,20 @@ async function revierteYAvisa(sha: string, correoDeElla: string, contexto: Conte
     fetch: contexto.fetch,
   })
 
-  const resumen = await intentaRevertir(gh, sha, correoDeElla)
+  // El autor real, del trailer — nunca de quien está sondeando. Si esto
+  // falla (GitHub no contesta, el commit no existe más), se cae a
+  // `correoDeElla`: `intentaRevertir()` va a fallar de la misma manera un
+  // instante después y loguear el motivo de verdad; acá no hace falta
+  // duplicar ese log, alcanza con no dejar `autorReal` vacío.
+  let autorReal = correoDeElla
+  try {
+    const commit = await gh.commit(sha)
+    autorReal = autorDelCommit(commit.message) ?? correoDeElla
+  } catch {
+    // se sigue con `correoDeElla` — ver el comentario de arriba.
+  }
+
+  const resumen = await intentaRevertir(gh, sha, autorReal)
 
   await avisaAElla(correoDeElla, contexto)
 
@@ -516,7 +548,7 @@ async function revierteYAvisa(sha: string, correoDeElla: string, contexto: Conte
       a: [paraMarcos],
       asunto: `[panel] El deploy de ${sha.slice(0, 7)} falló`,
       texto: [
-        `El commit ${sha} publicado por ${correoDeElla} no construyó.`,
+        `El commit ${sha} publicado por ${autorReal} no construyó.`,
         `Reversión automática: ${resumen}.`,
         '',
         'El sitio sigue sirviendo el último deploy bueno.',
@@ -609,7 +641,7 @@ async function revisaLaCabeza(contexto: Contexto): Promise<string | null> {
     // [F-4] Anclado por línea (`tieneTrailer`/`valorDeTrailer`, revertir.ts):
     // un commit a mano que solo MENCIONE «Panel: sí» en su cuerpo no puede
     // colarse como si fuera del panel.
-    if (!tieneTrailer(commit.message, 'Panel: sí')) return null
+    if (!tieneTrailer(commit.message, TRAILER_PANEL)) return null
     // Solo los commits del panel, y solo los que no son ya una reversión: sin
     // el segundo chequeo, un revert cuyo propio deploy falla se revertiría a
     // sí mismo, y así para siempre.
@@ -1036,13 +1068,6 @@ async function estadoAccion(pedido: Pedido, contexto: Contexto): Promise<Respues
   const sesion = sesionVigente(pedido.cookie, env, contexto.ahora())
   if (!sesion) return error(401, PROBLEMA_SESION)
 
-  // [B1] Misma red de seguridad que `publicarAccion`: si la cabeza de main
-  // quedó rota por un despliegue que falló con el panel cerrado, arreglarla
-  // antes de seguir. `estadoAccion` no tiene un chequeo sincrónico barato
-  // ANTES de esto —a diferencia de `publicarAccion` (Grupo C)—, así que acá
-  // corre apenas pasa la sesión, como siempre.
-  const shaYaAtendido = await revisaLaCabeza(contexto)
-
   if (!env.PANEL_VERCEL_TOKEN) {
     console.error('estado: PANEL_VERCEL_TOKEN no está cargada — no hay forma de saber si el despliegue terminó.')
     return error(503, PROBLEMA_INESPERADO)
@@ -1068,6 +1093,15 @@ async function estadoAccion(pedido: Pedido, contexto: Contexto): Promise<Respues
     return error(400, PROBLEMA_INESPERADO)
   }
   const publicadoEn = typeof cuerpo.publicadoEn === 'number' ? cuerpo.publicadoEn : contexto.ahora()
+
+  // [B1, Grupo C — ronda 3] Recién ACÁ, después de las tres validaciones
+  // baratas y sincrónicas de arriba (token ausente, proyecto sin nombre,
+  // `sha` mal formado): antes tocaba GitHub —un pedido real, medido— incluso
+  // cuando cualquiera de esas tres iba a rechazar el pedido igual. Mismo
+  // criterio que `publicarAccion` (Grupo C, ronda 2); el comentario viejo acá
+  // decía que esta acción «no tiene ningún chequeo sincrónico previo», y eso
+  // era falso: tenía tres.
+  const shaYaAtendido = await revisaLaCabeza(contexto)
 
   const vercel = clienteVercel({
     token: env.PANEL_VERCEL_TOKEN,
