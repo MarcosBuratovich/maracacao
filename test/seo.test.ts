@@ -220,10 +220,11 @@ describe('rastreo: robots.txt, sitemap y vercel.json', () => {
   })
 
   it('vercel.json: X-Robots-Tag de refuerzo solo sobre lo privado — ya no sobre /sitio (tapaba las imágenes)', () => {
-    const cabecera = vercel.headers[0]
-    expect(cabecera.source).toContain('presentacion|manual')
-    expect(cabecera.source).not.toContain('sitio')
-    expect(cabecera.headers).toContainEqual({ key: 'X-Robots-Tag', value: 'noindex, nofollow' })
+    const cabecera = vercel.headers.find((h) => h.source.includes('presentacion|manual'))
+    expect(cabecera).toBeDefined()
+    expect(cabecera!.source).toContain('presentacion|manual')
+    expect(cabecera!.source).not.toContain('sitio')
+    expect(cabecera!.headers).toContainEqual({ key: 'X-Robots-Tag', value: 'noindex, nofollow' })
   })
 
   it('vercel.json: caché larga para fuentes (inmutables) y corta con revalidación para imágenes de public/', () => {
