@@ -354,14 +354,25 @@ código: `publicar` empieza a contestar 502 y `salud` dice `"github":false` —
 el modo de falla que esta tarea existe para que Marcos nunca vea de
 sorpresa (spec §4.1).
 
-**Por eso `salud` avisa solo, con anticipación.** Cada vez que alguien la
-llama —vos a mano, o `scripts/humo-panel.sh`— lee la fecha de vencimiento de
-la MISMA respuesta que ya le pedía a GitHub para el chequeo de `"github"`
-(no hace un pedido aparte: no le cuesta cuota al PAT). Si faltan **treinta
-días o menos**, te manda un correo a `PANEL_AVISOS_A` con la fecha exacta y
-cuántos días quedan. Ese correo es la señal de que hay que hacer lo de
-abajo — no hace falta esperar a que el token venza solo ni a acordarse de
-mirar el calendario.
+**Por eso el panel avisa solo, con anticipación.** Cada respuesta de GitHub
+trae la fecha de vencimiento del token en una cabecera, así que CUALQUIER
+acción del panel que hable con GitHub estando autenticada —ella publicando,
+vos entrando, el panel leyendo el historial o el borrador— la lee sin un
+pedido aparte: no le cuesta cuota al PAT. Si faltan **treinta días o menos**,
+te llega un correo a `PANEL_AVISOS_A` con la fecha exacta y cuántos días
+quedan. Ese correo es la señal de que hay que hacer lo de abajo — no hace
+falta esperar a que el token venza solo ni acordarse de mirar el calendario.
+
+**[Actualizado, ola de arreglos de la revisión final]** Hasta esa ola, el
+aviso colgaba SOLO de `salud`, que es la única acción que ningún flujo
+automático llama: si vos no corrías el `curl` de abajo, el aviso no salía
+nunca y el día D ella recibía un 502 incomprensible — o sea, exactamente el
+modo de falla que esta sección existe para evitar. Ahora `salud` **informa**
+`tokenVence`/`diasParaVencer` en su respuesta (es lo que lee el `curl` de más
+abajo) pero **no manda el correo**: es la única puerta sin sesión, y su freno
+de una-vez-cada-24-h vive en la memoria de una sola instancia serverless, así
+que cualquiera con un bucle de `curl` en paralelo podía llenarte la bandeja y
+gastar la cuota del PAT que `publicar` necesita.
 
 Dos cosas a tener presentes sobre ese aviso, por si alguna vez hace falta
 depurarlo:
@@ -375,7 +386,7 @@ depurarlo:
   más, no un agujero de seguridad — pero si alguna vez ves dos avisos el
   mismo día, es por eso, no por un bug.
 - **Si la respuesta de GitHub no trae la cabecera de vencimiento —un token
-  CLÁSICO en vez de fine-grained, por ejemplo—, `salud` nunca inventa una
+  CLÁSICO en vez de fine-grained, por ejemplo—, el panel nunca inventa una
   fecha.** `tokenVence` y `diasParaVencer` quedan en `null` y no sale ningún
   correo. Poner «vence en un año» a ojo sería peor que no saber: apagaría la
   vigilancia justo el día que más hace falta que esté prendida.

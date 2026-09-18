@@ -1728,14 +1728,22 @@ describe('salud', () => {
       'github-authentication-token-expiration': new Date(ahora + dias * 86_400_000).toISOString(),
     })
 
-    it('a treinta días o menos, avisa a PANEL_AVISOS_A con la fecha y los días que faltan', async () => {
-      const cartas: Carta[] = []
-      // Lejos (en la escala de `ahora()`, no de reloj real) de cualquier
-      // otro test de este describe: el freno del aviso es una sola clave
-      // GLOBAL (Tarea 13, `AVISOS_VENCIMIENTO_TOKEN`), así que dos tests que
-      // manden un correo con un `ahora()` a menos de 24 h uno del otro se
-      // pisarían sin importar el orden en que corran.
+    it('a treinta días o menos, INFORMA la fecha y los días que faltan', async () => {
+      // [Revisión final de la rama, I6] Informa, y ya no manda el correo:
+      // `salud` es la única puerta sin sesión, y su freno de una-vez-cada-24-h
+      // vive en la memoria de UNA instancia. Durante los últimos treinta días
+      // del token, cualquiera con un bucle de `curl` en paralelo provoca
+      // instancias frías y cada una manda su propio correo a Marcos y gasta
+      // su propio pedido del PAT. El correo pasó a `clienteDeGitHub()`, o sea
+      // a toda acción AUTENTICADA (ver el describe I5, más abajo): más
+      // cobertura y sin amplificador anónimo. Lo que `salud` sigue
+      // contestando es lo que lee el `curl` del runbook.
       const ahora = 5_000_000_000_000
+      // Se ANOTAN las cartas en vez de tirar desde el `correo` de prueba:
+      // `mandaProtegido()` se traga cualquier excepción por diseño, así que
+      // un correo que revienta pasaría inadvertido y este test no podría
+      // fallar nunca. Lo que se afirma es la lista vacía.
+      const cartas: Carta[] = []
       const { f } = fetchFalso([{ cuerpo: { object: { sha: 'x' } }, cabeceras: cabeceraVence(30, ahora) }])
       const ctx = {
         ...contextoDePrueba({
@@ -1753,9 +1761,47 @@ describe('salud', () => {
       const cuerpo = r.cuerpo as { tokenVence: string | null; diasParaVencer: number | null }
       expect(cuerpo.diasParaVencer).toBe(30)
       expect(cuerpo.tokenVence).toBeTruthy()
-      expect(cartas).toHaveLength(1)
-      expect(cartas[0].a).toEqual(['marcos@ejemplo.mx'])
-      expect(cartas[0].asunto).toContain('30')
+      expect(cartas).toEqual([]) // ni una carta desde la puerta sin sesión
+    })
+
+    it('I6: ni con el token vencido HOY `salud` le escribe a Marcos — es la puerta sin sesión', async () => {
+      // El día del vencimiento es justo cuando el aviso más hace falta, así
+      // que si alguna vez vuelve a mandarse desde acá, va a ser por este
+      // camino: el test tiene que verlo.
+      const ahora = 5_100_000_000_000
+      const cartas: Carta[] = []
+      const { f } = fetchFalso([{ cuerpo: { object: { sha: 'x' } }, cabeceras: cabeceraVence(0, ahora) }])
+      const r = await maneja(
+        'salud',
+        { cuerpo: {}, cookie: '' },
+        {
+          ...contextoDePrueba({
+            fetch: f,
+            ahora: () => ahora,
+            correo: correoQueAnota(cartas),
+            env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
+          }),
+          ip: `t13-vencido-hoy-${Math.random()}`,
+        },
+      )
+      expect((r.cuerpo as { diasParaVencer: number | null }).diasParaVencer).toBe(0)
+      expect(cartas).toEqual([])
+    })
+
+    it('I6: con el freno por IP gastado, `salud` no gasta ni un pedido del PAT', async () => {
+      // El otro brazo del mismo hallazgo: el pedido a GitHub —lo que le cuesta
+      // cuota al PAT, la misma que `publicar` necesita— tiene que quedar
+      // detrás del freno por IP, no solo el correo. `fetchQueNoSeUsa()` es la
+      // afirmación: si `salud` llegara a tocar la red, revienta.
+      const ip = `i6-freno-pat-${Math.random()}`
+      for (let i = 0; i < 5; i++) {
+        const { f } = fetchFalso([{ cuerpo: { object: { sha: 'x' } } }])
+        await maneja('salud', { cuerpo: {}, cookie: '' }, { ...contextoBase(f), ip })
+      }
+      const r = await maneja('salud', { cuerpo: {}, cookie: '' }, { ...contextoBase(fetchQueNoSeUsa()), ip })
+      expect(r.status).toBe(200)
+      expect((r.cuerpo as { github: boolean | null }).github).toBeNull()
+      expect((r.cuerpo as { problema?: string }).problema).toBeTruthy()
     })
 
     it('a treinta y un días, NO avisa', async () => {
@@ -1779,43 +1825,53 @@ describe('salud', () => {
     })
 
     it('no avisa dos veces seguidas: una vez cada 24 h por instancia', async () => {
+      // [I5/I6] El freno de 24 h sigue existiendo y sigue importando —más que
+      // antes: ahora la vigilancia cuelga de CADA respuesta de GitHub, y una
+      // sola publicación hace media docena de pedidos—, así que se mide donde
+      // ahora vive: en una acción autenticada.
       const cartas: Carta[] = []
-      const ahora = 9_000_000_000_000 // más de 24 h de los dos tests anteriores
-      const ip = `t13-no-doble-${Math.random()}`
-
-      const { f: f1 } = fetchFalso([{ cuerpo: { object: { sha: 'x' } }, cabeceras: cabeceraVence(10, ahora) }])
-      await maneja(
-        'salud',
-        { cuerpo: {}, cookie: '' },
-        {
-          ...contextoDePrueba({
-            fetch: f1,
-            ahora: () => ahora,
-            correo: correoQueAnota(cartas),
-            env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
-          }),
-          ip,
-        },
+      const ahora = 9_000_000_000_000 // más de 24 h de los tests de arriba
+      const cookieViva = firmaSesion(
+        { correo: 'clienta@ejemplo.mx', vence: ahora + 86_400_000, dispositivo: 'test', emitida: ahora },
+        SECRETO,
       )
-      expect(cartas).toHaveLength(1)
 
-      // Un minuto después, mismo `ip` (bien lejos de gastar el freno de I-6,
-      // que es de cinco): el pedido a GitHub SÍ vuelve a salir —esto prueba
-      // el freno del AVISO, no el de I-6— pero el correo no se repite.
-      const masTarde = ahora + 60_000
-      const { f: f2 } = fetchFalso([{ cuerpo: { object: { sha: 'x' } }, cabeceras: cabeceraVence(10, masTarde) }])
-      await maneja(
-        'salud',
-        { cuerpo: {}, cookie: '' },
+      // Un `borrador.leer` que hace DOS pedidos a GitHub, los dos con la
+      // cabecera: sin el freno serían dos correos por una sola acción.
+      const { f } = fetchFalso([
+        { cuerpo: { object: { sha: 'refBorrador' } }, cabeceras: cabeceraVence(10, ahora) },
         {
-          ...contextoDePrueba({
-            fetch: f2,
-            ahora: () => masTarde,
-            correo: correoQueAnota(cartas),
-            env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
-          }),
-          ip,
+          cuerpo: { content: Buffer.from('{}').toString('base64'), encoding: 'base64' },
+          cabeceras: cabeceraVence(10, ahora),
         },
+      ])
+      await maneja(
+        'borrador.leer',
+        { cuerpo: {}, cookie: cookieViva },
+        contextoDePrueba({
+          fetch: f,
+          ahora: () => ahora,
+          correo: correoQueAnota(cartas),
+          env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
+        }),
+      )
+      expect(cartas).toHaveLength(1) // uno solo, no uno por pedido
+
+      // Un minuto después, otra acción entera: el correo no se repite.
+      const masTarde = ahora + 60_000
+      const { f: f2 } = fetchFalso([
+        { cuerpo: { object: { sha: 'refBorrador' } }, cabeceras: cabeceraVence(10, masTarde) },
+        { cuerpo: { content: Buffer.from('{}').toString('base64'), encoding: 'base64' } },
+      ])
+      await maneja(
+        'borrador.leer',
+        { cuerpo: {}, cookie: cookieViva },
+        contextoDePrueba({
+          fetch: f2,
+          ahora: () => masTarde,
+          correo: correoQueAnota(cartas),
+          env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
+        }),
       )
       expect(cartas).toHaveLength(1) // sigue en uno: el freno de 24 h lo bloqueó
     })
@@ -1942,6 +1998,7 @@ describe('salud', () => {
       // así que lo que mide es que NO salga un correo por pedido.
       const ahora = 14_000_000_100_000 // dentro de las 24 h del test anterior
       const { f } = fetchFalso([{ cuerpo: { object: { sha: 'x' } }, cabeceras: cabeceraVence(5, ahora) }])
+      const cartas: Carta[] = []
       const r = await maneja(
         'salud',
         { cuerpo: {}, cookie: '' },
@@ -1949,7 +2006,7 @@ describe('salud', () => {
           ...contextoDePrueba({
             fetch: f,
             ahora: () => ahora,
-            correo: correoQueNoSeUsa(),
+            correo: correoQueAnota(cartas),
             env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
           }),
           ip: `i5-salud-${Math.random()}`,
@@ -1957,6 +2014,7 @@ describe('salud', () => {
       )
       expect(r.status).toBe(200)
       expect((r.cuerpo as { diasParaVencer: number | null }).diasParaVencer).toBe(5)
+      expect(cartas).toEqual([])
     })
   })
 })
@@ -2227,10 +2285,14 @@ describe('accion=estado', () => {
       }),
     )
     expect((r.cuerpo as { estado: string }).estado).toBe('falló')
-    // Uno a ella, con su frase; uno a Marcos, con el detalle.
+    // Uno a Marcos, con el detalle; uno a ella, con su frase.
+    //
+    // [Revisión final de la rama, I4] En ESE orden, que se invirtió a
+    // propósito: la frase que ella lee promete «ya le avisé a Marcos», y eso
+    // no se puede prometer antes de haberlo intentado.
     expect(cartas).toHaveLength(2)
-    expect(cartas[0].a).toEqual(['clienta@ejemplo.mx']) // el correo de la sesión de prueba (cookieValida())
-    expect(cartas[1].a).toEqual(['marcos@ejemplo.mx'])
+    expect(cartas[0].a).toEqual(['marcos@ejemplo.mx'])
+    expect(cartas[1].a).toEqual(['clienta@ejemplo.mx']) // el correo de la sesión de prueba (cookieValida())
   })
 
   it('si el correo no está configurado, la reversión igual pasa', async () => {
@@ -2294,6 +2356,142 @@ describe('accion=estado', () => {
     expect(cartas[0].a).toEqual(['marcos@ejemplo.mx'])
     expect(cartas[0].texto).toContain('clienta@ejemplo.mx')
     expect(cartas[1].a).toEqual(['clienta@ejemplo.mx'])
+  })
+
+  /*
+   * [Revisión final de la rama, I3] `ya-revertido` significaba cosas OPUESTAS
+   * en los dos consumidores de `revierte()`: `deshacerAccion` lo trataba como
+   * éxito, `intentaRevertir()` lo mandaba al `default` y reportaba «NO se
+   * pudo revertir».
+   *
+   * Escenario medido: deploy fallido. Primer sondeo, la reversión corre bien
+   * y a Marcos le llega «revertido (commit X)». Ella refresca la pestaña.
+   * Segundo sondeo: la cabeza ya es la reversión, así que `revisaLaCabeza()`
+   * se va sin hacer nada, pero `despliegueDe(shaViejo)` sigue diciendo
+   * `falló` y sale un segundo correo diciéndole a Marcos que la reversión
+   * FALLÓ — cuando funcionó. Marcos sale a arreglar a mano un repo sano.
+   *
+   * Esto estaba parqueado como «un recargue vuelve a disparar el par de
+   * correos». Es peor que eso: es una falsa alarma que contradice al correo
+   * anterior.
+   */
+  describe('I3: el segundo sondeo, después de que ella refresca la pestaña', () => {
+    const sha = 'a'.repeat(40)
+    const shaRevert = 'b'.repeat(40)
+    const commitRevert = {
+      sha: shaRevert,
+      tree: { sha: 't' },
+      message: `deshace un cambio\n\nPanel: sí\nPanel-Autor: clienta@ejemplo.mx\nPanel-Revierte: ${sha}`,
+      author: { date: '2026-09-17T12:00:00Z' },
+      parents: [{ sha }],
+    }
+    const commitRoto = {
+      sha,
+      tree: { sha: 't' },
+      message: 'cambia algo\n\nPanel: sí\nPanel-Autor: clienta@ejemplo.mx',
+      author: { date: '2026-09-17T12:00:00Z' },
+      parents: [{ sha: 'padre' }],
+    }
+    const elSegundoSondeo = () => [
+      { cuerpo: { object: { sha: shaRevert } } }, // revisaLaCabeza: gh.ref — la cabeza YA es la reversión
+      { cuerpo: commitRevert }, // revisaLaCabeza: gh.commit → es una reversión, se va sin tocar nada
+      { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // el deploy VIEJO sigue marcado como fallido
+      { cuerpo: commitRoto }, // revierteYAvisa: el autor real
+      { cuerpo: { object: { sha: shaRevert } } }, // revierte(): gh.ref
+      { cuerpo: commitRevert }, // revierte(): la cabeza ya revierte este sha → `ya-revertido`
+    ]
+
+    it('el correo a Marcos NO dice que la reversión falló: ya estaba hecha', async () => {
+      const cartas: Carta[] = []
+      const { f } = fetchFalso([...elSegundoSondeo()])
+      await maneja(
+        'estado',
+        { cuerpo: { sha, publicadoEn: 1_000 }, cookie: cookieValida() },
+        contextoDePrueba({
+          fetch: f,
+          ahora: () => 6_000,
+          correo: correoQueAnota(cartas),
+          env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
+        }),
+      )
+      const aMarcos = cartas.find((c) => c.a.includes('marcos@ejemplo.mx'))!
+      expect(aMarcos).toBeDefined()
+      expect(aMarcos.texto).not.toContain('NO se pudo revertir')
+      expect(aMarcos.texto).toContain('ya estaba revertido')
+    })
+
+    it('y a ella se le sigue diciendo que lo dejó como estaba, porque es verdad', async () => {
+      const cartas: Carta[] = []
+      const { f } = fetchFalso([...elSegundoSondeo()])
+      const r = await maneja(
+        'estado',
+        { cuerpo: { sha, publicadoEn: 1_000 }, cookie: cookieValida() },
+        contextoDePrueba({
+          fetch: f,
+          ahora: () => 6_000,
+          correo: correoQueAnota(cartas),
+          env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
+        }),
+      )
+      expect((r.cuerpo as { frase: string }).frase).toBe('No salió; lo dejé como estaba y ya le avisé a Marcos.')
+      const aElla = cartas.find((c) => c.a.includes('clienta@ejemplo.mx'))!
+      expect(aElla.texto).toContain('lo dejé como estaba')
+    })
+  })
+
+  /*
+   * [Revisión final de la rama, I4] La otra mitad: la frase promete un correo
+   * que puede no existir. El correo degrada por diseño —sin las variables,
+   * `mandaProtegido()` loguea y sigue— y el escenario medido es que todavía
+   * son un trámite de DNS: ella lee que Marcos ya sabe, Marcos no sabe nada,
+   * y los dos esperan al otro.
+   */
+  describe('I4: la frase no promete un correo que no salió', () => {
+    const sha = 'a'.repeat(40)
+    const respuestas = () => [
+      ...respuestasDeNingunaReversionPendiente(),
+      { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } },
+      respuestaDelCommitParaElAutor(sha),
+      ...respuestasDeUnaReversionCompleta(sha),
+    ]
+
+    it('sin PANEL_AVISOS_A, la frase deja de decir «ya le avisé a Marcos»', async () => {
+      const { f } = fetchFalso([...respuestas()])
+      const r = await maneja(
+        'estado',
+        { cuerpo: { sha, publicadoEn: 1_000 }, cookie: cookieValida() },
+        contextoDePrueba({ fetch: f, ahora: () => 6_000, correo: async () => ({ ok: true as const }) }),
+      )
+      const frase = (r.cuerpo as { frase: string }).frase
+      expect(frase).not.toContain('ya le avisé a Marcos')
+      expect(frase).toContain('Avísale a Marcos')
+      expect(jergaEn(frase), frase).toBeNull()
+    })
+
+    it('con el correo sin configurar (degrada), tampoco lo promete — y el correo a ella dice lo mismo', async () => {
+      const cartas: Carta[] = []
+      const { f } = fetchFalso([...respuestas()])
+      const r = await maneja(
+        'estado',
+        { cuerpo: { sha, publicadoEn: 1_000 }, cookie: cookieValida() },
+        contextoDePrueba({
+          fetch: f,
+          ahora: () => 6_000,
+          correo: async (c) => {
+            cartas.push(c)
+            return { ok: false, motivo: 'sin-configurar' as const }
+          },
+          env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
+        }),
+      )
+      const frase = (r.cuerpo as { frase: string }).frase
+      expect(frase).not.toContain('ya le avisé a Marcos')
+      // El correo a ella no sale tampoco (está sin configurar), pero si
+      // saliera, diría exactamente lo mismo que la pantalla: es la misma
+      // frase, no dos textos que se puedan desincronizar.
+      const aElla = cartas.find((c) => c.a.includes('clienta@ejemplo.mx'))!
+      expect(aElla.texto.startsWith(frase)).toBe(true)
+    })
   })
 
   // Ronda 2, F-5: la copia nueva para ELLA —a diferencia de las frases de

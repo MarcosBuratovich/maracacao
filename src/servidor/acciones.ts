@@ -38,7 +38,7 @@ import { injerta, type FuentesDeDerivados } from '../contenido/derivados'
 import { DOCUMENTOS, type IdDocumento } from '../contenido/esquema'
 import type { Carta, ResultadoCorreo } from './correo'
 import { clienteVercel, type EstadoDeDespliegue } from './vercel'
-import { decide, SITIO } from './estado'
+import { decide, fraseDeFracaso, SITIO, type Fracaso } from './estado'
 
 /** Lo que le llega al router, ya despojado de HTTP: el borde lo arma. */
 export interface Pedido {
@@ -844,7 +844,10 @@ function clienteDeGitHub(contexto: Contexto): ReturnType<typeof cliente> {
 // ve en pantalla no cuenten dos historias distintas. Nada técnico (B10) —
 // [F-5] `test/acciones.test.ts` lo pasa por `JERGA_PROHIBIDA`.
 const ASUNTO_PARA_ELLA = 'Tu cambio no se pudo publicar'
-const TEXTO_PARA_ELLA = 'No salió; lo dejé como estaba y ya le avisé a Marcos.\n\nPuedes volver a intentarlo cuando quieras.'
+// [Revisión final de la rama, I4] El CUERPO ya no vive acá: sale de
+// `fraseDeFracaso()` (estado.ts), que es la misma frase que ella ve en
+// pantalla — la razón de siempre— pero ahora condicionada a lo que de verdad
+// pasó con la reversión y con el aviso a Marcos. Ver `avisaAElla()`.
 
 /**
  * [F-2] Manda una carta protegida por su propio `try`. `manda()` (correo.ts)
@@ -863,14 +866,21 @@ const TEXTO_PARA_ELLA = 'No salió; lo dejé como estaba y ya le avisé a Marcos
  * nadie mirando el panel, este correo es la ÚNICA señal que tiene Marcos —
  * que se pierda en silencio es peor que un log de más.
  */
-async function mandaProtegido(contexto: Contexto, carta: Carta): Promise<void> {
+async function mandaProtegido(contexto: Contexto, carta: Carta): Promise<boolean> {
   try {
     const r = await contexto.correo(carta)
     if (!r.ok) {
       console.error(`aviso: no se pudo mandar «${carta.asunto}» a ${carta.a.join(', ')} — ${r.motivo}`)
     }
+    // [Revisión final de la rama, I4] Devuelve SI SE PUDO, y no `void`.
+    // Quien avisa a Marcos necesita saberlo porque la frase que ella lee
+    // —«...y ya le avisé a Marcos»— lo promete, y el correo degrada por
+    // diseño: sin las variables de correo, esto loguea y sigue. Con `void`,
+    // esa promesa se hacía a ciegas.
+    return r.ok
   } catch (e) {
     console.error('revertir: el envío de un correo de aviso reventó —', e)
+    return false
   }
 }
 
@@ -885,25 +895,68 @@ async function mandaProtegido(contexto: Contexto, carta: Carta): Promise<void> {
  * «NO se pudo revertir», que suena a que algo salió mal cuando lo que pasó
  * es que no había NADA de contenido que revertir.
  */
-async function intentaRevertir(gh: ReturnType<typeof cliente>, sha: string, autor: string): Promise<string> {
+async function intentaRevertir(
+  gh: ReturnType<typeof cliente>,
+  sha: string,
+  autor: string,
+): Promise<{ revertido: boolean; resumen: string }> {
   try {
     const r = await revierte(gh, { sha, autor })
-    if (r.ok) return `revertido (commit ${r.sha ?? 'sin cambios'})`
+    if (r.ok) return { revertido: true, resumen: `revertido (commit ${r.sha ?? 'sin cambios'})` }
+    // [Revisión final de la rama, I3] `ya-revertido` es ÉXITO, igual que en
+    // `deshacerAccion` —el otro consumidor de `revierte()`, que siempre lo
+    // trató así—. Acá caía en el `default` y salía como «NO se pudo
+    // revertir», y eso no era un correo de más: era una FALSA ALARMA QUE
+    // CONTRADICE AL ANTERIOR.
+    //
+    // Escenario medido: deploy fallido. Primer sondeo, la reversión corre
+    // bien y a Marcos le llega «revertido (commit X)». Ella refresca la
+    // pestaña. Segundo sondeo: la cabeza ya es la reversión —así que
+    // `revisaLaCabeza()` se va sin hacer nada— pero `despliegueDe(shaViejo)`
+    // sigue diciendo `falló`, se reintenta el revert, `revierte()` contesta
+    // `ya-revertido`, y sale un segundo correo diciéndole a Marcos que la
+    // reversión FALLÓ — cuando funcionó. Marcos sale a arreglar a mano un
+    // repo sano, a las dos de la mañana.
+    if (r.motivo === 'ya-revertido') {
+      return { revertido: true, resumen: `ya estaba revertido (${r.detalle})` }
+    }
+    // [D] `nada-que-revertir` se cuenta con sus propias palabras: no es un
+    // `revertido` (el commit roto se queda en `main`) ni entra en el
+    // genérico «NO se pudo revertir», que suena a que algo salió mal cuando
+    // lo que pasó es que no había NADA de contenido que revertir.
     if (r.motivo === 'nada-que-revertir') {
       console.error(`revertir: ${sha} no tenía nada que revertir — main sigue con el commit roto (${r.detalle}).`)
-      return 'no había nada que revertir: el commit no tocó ningún documento de contenido'
+      return {
+        // El commit roto se queda en la cabeza: el sitio NO quedó como
+        // estaba, aunque no hubiera contenido que deshacer.
+        revertido: false,
+        resumen: 'no había nada que revertir: el commit no tocó ningún documento de contenido',
+      }
     }
     console.error(`revertir: la reversión automática de ${sha} no se pudo hacer — ${r.motivo}: ${r.detalle}`)
-    return `NO se pudo revertir: ${r.motivo} — ${r.detalle}`
+    return { revertido: false, resumen: `NO se pudo revertir: ${r.motivo} — ${r.detalle}` }
   } catch (e) {
     console.error(`revertir: la reversión automática de ${sha} reventó —`, e)
-    return `NO se pudo revertir: ${e instanceof Error ? e.message : String(e)}`
+    return { revertido: false, resumen: `NO se pudo revertir: ${e instanceof Error ? e.message : String(e)}` }
   }
 }
 
-/** Solo el correo a ella — sin intentar (de nuevo) el revert. Ver el uso en `estadoAccion`, más abajo. */
-async function avisaAElla(correoDeElla: string, contexto: Contexto): Promise<void> {
-  await mandaProtegido(contexto, { a: [correoDeElla], asunto: ASUNTO_PARA_ELLA, texto: TEXTO_PARA_ELLA })
+/**
+ * Solo el correo a ella — sin intentar (de nuevo) el revert. Ver el uso en
+ * `estadoAccion`, más abajo.
+ *
+ * [Revisión final de la rama, I4] El texto ya no es una constante: sale de
+ * `fraseDeFracaso()` (estado.ts), la MISMA que va por HTTP, para que el
+ * correo y la pantalla no cuenten dos historias distintas — que era la razón
+ * de que fuera una constante en primer lugar—. Lo que cambió es que ahora
+ * las dos dicen lo que de verdad pasó.
+ */
+async function avisaAElla(correoDeElla: string, contexto: Contexto, fracaso: Fracaso): Promise<void> {
+  await mandaProtegido(contexto, {
+    a: [correoDeElla],
+    asunto: ASUNTO_PARA_ELLA,
+    texto: `${fraseDeFracaso(fracaso)}\n\nPuedes volver a intentarlo cuando quieras.`,
+  })
 }
 
 /**
@@ -927,7 +980,7 @@ async function avisaAElla(correoDeElla: string, contexto: Contexto): Promise<voi
  * salen de leer ESE commit, igual que hace `revisaLaCabeza()` en el camino de
  * al lado. Sondear `estado` no prueba que quien sondea sea quien publicó.
  */
-async function revierteYAvisa(sha: string, correoDeElla: string, contexto: Contexto): Promise<void> {
+async function revierteYAvisa(sha: string, correoDeElla: string, contexto: Contexto): Promise<Fracaso> {
   const gh = clienteDeGitHub(contexto)
 
   // El autor real, del trailer — nunca de quien está sondeando. Si esto
@@ -943,24 +996,30 @@ async function revierteYAvisa(sha: string, correoDeElla: string, contexto: Conte
     // se sigue con `correoDeElla` — ver el comentario de arriba.
   }
 
-  const resumen = await intentaRevertir(gh, sha, autorReal)
+  const { revertido, resumen } = await intentaRevertir(gh, sha, autorReal)
 
-  await avisaAElla(correoDeElla, contexto)
-
+  // [Revisión final de la rama, I4] Marcos PRIMERO, ella después — al revés
+  // que antes. No es capricho de orden: la frase que ella lee promete «ya le
+  // avisé a Marcos», y eso no se puede prometer antes de haberlo intentado.
   // A Marcos: todo. El sha, qué pasó con la reversión, y a dónde mirar.
   const paraMarcos = contexto.env.PANEL_AVISOS_A
-  if (paraMarcos) {
-    await mandaProtegido(contexto, {
-      a: [paraMarcos],
-      asunto: `[panel] El deploy de ${sha.slice(0, 7)} falló`,
-      texto: [
-        `El commit ${sha} publicado por ${autorReal} no construyó.`,
-        `Reversión automática: ${resumen}.`,
-        '',
-        'El sitio sigue sirviendo el último deploy bueno.',
-      ].join('\n'),
-    })
-  }
+  const avisadoAMarcos =
+    paraMarcos === undefined
+      ? false
+      : await mandaProtegido(contexto, {
+          a: [paraMarcos],
+          asunto: `[panel] El deploy de ${sha.slice(0, 7)} falló`,
+          texto: [
+            `El commit ${sha} publicado por ${autorReal} no construyó.`,
+            `Reversión automática: ${resumen}.`,
+            '',
+            'El sitio sigue sirviendo el último deploy bueno.',
+          ].join('\n'),
+        })
+
+  const fracaso: Fracaso = { revertido, avisadoAMarcos }
+  await avisaAElla(correoDeElla, contexto, fracaso)
+  return fracaso
 }
 
 /**
@@ -974,24 +1033,30 @@ async function revierteYAvisa(sha: string, correoDeElla: string, contexto: Conte
  * (Marcos entrando al panel, por ejemplo): `autorReal` sale del trailer
  * `Panel-Autor:` del propio commit, que es quien de verdad lo publicó.
  */
-async function revierteYAvisaAMarcos(sha: string, autorReal: string, contexto: Contexto): Promise<void> {
+async function revierteYAvisaAMarcos(sha: string, autorReal: string, contexto: Contexto): Promise<Fracaso> {
   const gh = clienteDeGitHub(contexto)
 
-  const resumen = await intentaRevertir(gh, sha, autorReal)
+  const { revertido, resumen } = await intentaRevertir(gh, sha, autorReal)
 
   const paraMarcos = contexto.env.PANEL_AVISOS_A
-  if (paraMarcos) {
-    await mandaProtegido(contexto, {
-      a: [paraMarcos],
-      asunto: `[panel] El deploy de ${sha.slice(0, 7)} falló`,
-      texto: [
-        `El commit ${sha} publicado por ${autorReal} no construyó (nadie tenía el panel abierto).`,
-        `Reversión automática: ${resumen}.`,
-        '',
-        'El sitio sigue sirviendo el último deploy bueno.',
-      ].join('\n'),
-    })
-  }
+  const avisadoAMarcos =
+    paraMarcos === undefined
+      ? false
+      : await mandaProtegido(contexto, {
+          a: [paraMarcos],
+          asunto: `[panel] El deploy de ${sha.slice(0, 7)} falló`,
+          texto: [
+            `El commit ${sha} publicado por ${autorReal} no construyó (nadie tenía el panel abierto).`,
+            `Reversión automática: ${resumen}.`,
+            '',
+            'El sitio sigue sirviendo el último deploy bueno.',
+          ].join('\n'),
+        })
+
+  // [I4] Se devuelve para que `estadoAccion` —que puede estar corriendo en
+  // la MISMA invocación, un instante después— pueda decirle a ella la verdad
+  // sobre lo que pasó acá, en vez de repetir el intento para averiguarlo.
+  return { revertido, avisadoAMarcos }
 }
 
 /**
@@ -1021,8 +1086,13 @@ async function revierteYAvisaAMarcos(sha: string, autorReal: string, contexto: C
  * reversión nueva— o `null` si no había nada que hacer. `estadoAccion` lo usa
  * para no revertir NI avisar dos veces por el mismo sha: si esto ya lo
  * atendió (y ya le avisó a Marcos), lo único que falta es avisarle a ELLA.
+ *
+ * [Revisión final de la rama, I4] Y devuelve también QUÉ PASÓ —si revirtió,
+ * si pudo avisarle a Marcos—, porque la frase que ella lee lo promete. Sin
+ * esto, `estadoAccion` tenía que elegir entre repetir el intento para
+ * averiguarlo o prometer a ciegas.
  */
-async function revisaLaCabeza(contexto: Contexto): Promise<string | null> {
+async function revisaLaCabeza(contexto: Contexto): Promise<({ sha: string } & Fracaso) | null> {
   // Todo lo de acá adentro es "mejor esfuerzo": si algo falla, se loguea y se
   // sigue. Esta función NUNCA puede hacer fallar la acción que la llamó — sería
   // impedirle publicar por culpa de una limpieza que ni pidió.
@@ -1063,8 +1133,8 @@ async function revisaLaCabeza(contexto: Contexto): Promise<string | null> {
     const autorReal = autorDelCommit(commit.message) ?? 'alguien del panel'
 
     console.error(`revisaLaCabeza: ${cabeza.sha} es un commit del panel cuyo despliegue falló — revirtiendo.`)
-    await revierteYAvisaAMarcos(cabeza.sha, autorReal, contexto)
-    return cabeza.sha
+    const fracaso = await revierteYAvisaAMarcos(cabeza.sha, autorReal, contexto)
+    return { sha: cabeza.sha, ...fracaso }
   } catch (e) {
     console.error('revisaLaCabeza: no se pudo revisar la cabeza de main —', e)
     return null
@@ -1542,8 +1612,9 @@ const ASUNTO_AVISO_VENCIMIENTO = (dias: number): string =>
 
 // [E7 — para Marcos, no para la clienta] Este correo SÍ puede ser técnico:
 // nombra la variable de entorno y el archivo del runbook, porque quien lo
-// lee es Marcos, no ella. Contraste a propósito con `TEXTO_PARA_ELLA`, más
-// arriba en este archivo, que nunca nombra una variable ni un archivo.
+// lee es Marcos, no ella. Contraste a propósito con `fraseDeFracaso()`
+// (estado.ts), que es lo que lee ella y nunca nombra una variable ni un
+// archivo.
 function textoAvisoVencimiento(tokenVence: string, dias: number): string {
   const cuandoFalta = dias > 0 ? `faltan ${dias} día${dias === 1 ? '' : 's'}` : 'ya venció, o vence hoy'
   return [
@@ -1586,12 +1657,25 @@ function textoAvisoVencimiento(tokenVence: string, dias: number): string {
  *
  * [Tarea 13] El cuerpo también suma `tokenVence`/`diasParaVencer`, leídos
  * de la MISMA respuesta de `gh.ref('heads/main')` que ya se pedía para
- * `github` —nunca un pedido aparte— y si faltan treinta días o menos, se le
- * manda un correo a `PANEL_AVISOS_A` (con su propio freno de una vez cada
- * 24 h por instancia, `avisoDeVencimientoPermitido()` arriba). Se calculan
- * incluso si GitHub contestó mal: `vencimientoDelToken()` guarda la cabecera
- * de CUALQUIER respuesta, y el día que el token YA venció es, con
- * diferencia, el día en que más hace falta que este aviso salga.
+ * `github` —nunca un pedido aparte—. Se calculan incluso si GitHub contestó
+ * mal: `vencimientoDelToken()` guarda la cabecera de CUALQUIER respuesta.
+ * Eso es lo que lee el `curl` del runbook, y se queda.
+ *
+ * [Revisión final de la rama, I6] Lo que NO hace más es MANDAR el correo del
+ * vencimiento. Mandarlo desde acá convertía a la única puerta sin sesión en
+ * un amplificador: el freno de una-vez-cada-24-h vive en la memoria de UNA
+ * instancia, y las funciones de la plataforma son efímeras y concurrentes,
+ * así que durante los últimos treinta días del token cualquiera con un bucle
+ * de `curl` en paralelo provoca instancias frías y cada una manda su propio
+ * correo a Marcos y gasta su propio pedido del PAT — la misma cuota que
+ * `publicar` necesita. Poner el correo detrás del freno POR IP no lo
+ * arreglaba: ese `Map` es igual de por-instancia (sesion.ts lo declara con
+ * todas las letras), así que no frena nada entre instancias frías.
+ *
+ * No se pierde la vigilancia, se gana: desde el arreglo I5 cuelga de
+ * `clienteDeGitHub()`, o sea de CUALQUIER acción autenticada que hable con
+ * GitHub — cobertura estrictamente mayor que la de `salud`, a la que ningún
+ * flujo automático llamaba. El amplificador anónimo, en cambio, desaparece.
  */
 async function salud(_pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
   const faltan = VARIABLES_REQUERIDAS.filter((v) => !contexto.env[v])
@@ -1629,21 +1713,10 @@ async function salud(_pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
   }
 
   // [Tarea 13] `vencimientoDelToken()` no pide nada: lee lo que la respuesta
-  // de ARRIBA ya trajo, le haya ido bien o mal a `gh.ref`.
-  const ahora = contexto.ahora()
+  // de ARRIBA ya trajo, le haya ido bien o mal a `gh.ref`. [I6] Se INFORMA,
+  // no se avisa por correo — ver el docstring de esta función.
   const tokenVence = gh.vencimientoDelToken()
-  const diasParaVencer = diasHastaVencimiento(tokenVence, ahora)
-
-  if (tokenVence !== null && diasParaVencer !== null && diasParaVencer <= DIAS_AVISO_VENCIMIENTO_TOKEN) {
-    const paraMarcos = contexto.env.PANEL_AVISOS_A
-    if (paraMarcos && avisoDeVencimientoPermitido(ahora)) {
-      await mandaProtegido(contexto, {
-        a: [paraMarcos],
-        asunto: ASUNTO_AVISO_VENCIMIENTO(diasParaVencer),
-        texto: textoAvisoVencimiento(tokenVence, diasParaVencer),
-      })
-    }
-  }
+  const diasParaVencer = diasHastaVencimiento(tokenVence, contexto.ahora())
 
   return githubOk
     ? { status: 200, cuerpo: { ok: true, faltan: [], github: true, tokenVence, diasParaVencer } }
@@ -1735,14 +1808,6 @@ async function estadoAccion(pedido: Pedido, contexto: Contexto): Promise<Respues
 
   const shaServido = despliegue.estado === 'listo' ? await shaQueSirveElCdn(contexto) : null
 
-  const veredicto = decide({
-    despliegue: despliegue.estado,
-    url: despliegue.url,
-    shaServido,
-    shaPublicado: cuerpo.sha,
-    desdeHaceMs: contexto.ahora() - publicadoEn,
-  })
-
   // [B1] La reversión automática la hace la invocación que VE el fracaso. No
   // hay ningún proceso sondeando: una función de la plataforma muere a los
   // 60 s y un despliegue tarda más. Si ella cerró el panel antes de que
@@ -1756,13 +1821,30 @@ async function estadoAccion(pedido: Pedido, contexto: Contexto): Promise<Respues
   // nuevo (ya le avisó `revisaLaCabeza()`, un instante antes, en esta misma
   // invocación). Lo único que falta es avisarle a ELLA, que es la única
   // persona a la que `revisaLaCabeza()` nunca le habla.
-  if (veredicto.estado === 'falló') {
-    if (shaYaAtendido === cuerpo.sha) {
-      await avisaAElla(sesion.correo, contexto)
+  //
+  // [Revisión final de la rama, I4] Esto corre ANTES de `decide()`, no
+  // después: la frase que sale por HTTP promete que el sitio quedó como
+  // estaba y que Marcos ya sabe, y esas dos cosas no se saben hasta
+  // haberlas intentado. Con el orden viejo, `decide()` las prometía y el
+  // código que las pagaba corría después.
+  let fracaso: Fracaso | undefined
+  if (despliegue.estado === 'falló') {
+    if (shaYaAtendido?.sha === cuerpo.sha) {
+      fracaso = { revertido: shaYaAtendido.revertido, avisadoAMarcos: shaYaAtendido.avisadoAMarcos }
+      await avisaAElla(sesion.correo, contexto, fracaso)
     } else {
-      await revierteYAvisa(cuerpo.sha, sesion.correo, contexto)
+      fracaso = await revierteYAvisa(cuerpo.sha, sesion.correo, contexto)
     }
   }
+
+  const veredicto = decide({
+    despliegue: despliegue.estado,
+    url: despliegue.url,
+    shaServido,
+    shaPublicado: cuerpo.sha,
+    desdeHaceMs: contexto.ahora() - publicadoEn,
+    ...(fracaso ? { fracaso } : {}),
+  })
 
   return ok({ ok: true, ...veredicto })
 }

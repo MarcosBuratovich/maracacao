@@ -18395,11 +18395,17 @@ var CAMBIA_DE_CADENCIA_MS = 6e4;
 var DEJA_DE_PREGUNTAR_MS = 3e5;
 var FRASE_LISTO = "Tu cambio ya est\xE1 en el sitio.";
 var FRASE_EN_CURSO = "Estamos subiendo tu cambio al sitio.";
-var FRASE_FALLO = "No sali\xF3; lo dej\xE9 como estaba y ya le avis\xE9 a Marcos.";
 var FRASE_TARDA = "Tu cambio est\xE1 tardando m\xE1s de lo normal. Vuelve a abrir el panel en un rato para ver c\xF3mo qued\xF3.";
+function fraseDeFracaso(f) {
+  if (f === void 0) return "No sali\xF3. Av\xEDsale a Marcos para que lo revise.";
+  if (f.revertido && f.avisadoAMarcos) return "No sali\xF3; lo dej\xE9 como estaba y ya le avis\xE9 a Marcos.";
+  if (f.revertido) return "No sali\xF3; lo dej\xE9 como estaba. Av\xEDsale a Marcos para que lo revise.";
+  if (f.avisadoAMarcos) return "No sali\xF3 y no pude dejarlo como estaba. Ya le avis\xE9 a Marcos.";
+  return "No sali\xF3 y no pude dejarlo como estaba. Av\xEDsale a Marcos para que lo revise.";
+}
 function decide(e) {
   if (e.despliegue === "fall\xF3") {
-    return { estado: "fall\xF3", frase: FRASE_FALLO, reintentarEn: null, url: e.url };
+    return { estado: "fall\xF3", frase: fraseDeFracaso(e.fracaso), reintentarEn: null, url: e.url };
   }
   if (e.despliegue === "listo" && e.shaServido === e.shaPublicado) {
     return { estado: "listo", frase: FRASE_LISTO, reintentarEn: null, url: e.url };
@@ -18606,34 +18612,49 @@ function clienteDeGitHub(contexto) {
   });
 }
 var ASUNTO_PARA_ELLA = "Tu cambio no se pudo publicar";
-var TEXTO_PARA_ELLA = "No sali\xF3; lo dej\xE9 como estaba y ya le avis\xE9 a Marcos.\n\nPuedes volver a intentarlo cuando quieras.";
 async function mandaProtegido(contexto, carta) {
   try {
     const r = await contexto.correo(carta);
     if (!r.ok) {
       console.error(`aviso: no se pudo mandar \xAB${carta.asunto}\xBB a ${carta.a.join(", ")} \u2014 ${r.motivo}`);
     }
+    return r.ok;
   } catch (e) {
     console.error("revertir: el env\xEDo de un correo de aviso revent\xF3 \u2014", e);
+    return false;
   }
 }
 async function intentaRevertir(gh, sha, autor) {
   try {
     const r = await revierte(gh, { sha, autor });
-    if (r.ok) return `revertido (commit ${r.sha ?? "sin cambios"})`;
+    if (r.ok) return { revertido: true, resumen: `revertido (commit ${r.sha ?? "sin cambios"})` };
+    if (r.motivo === "ya-revertido") {
+      return { revertido: true, resumen: `ya estaba revertido (${r.detalle})` };
+    }
     if (r.motivo === "nada-que-revertir") {
       console.error(`revertir: ${sha} no ten\xEDa nada que revertir \u2014 main sigue con el commit roto (${r.detalle}).`);
-      return "no hab\xEDa nada que revertir: el commit no toc\xF3 ning\xFAn documento de contenido";
+      return {
+        // El commit roto se queda en la cabeza: el sitio NO quedó como
+        // estaba, aunque no hubiera contenido que deshacer.
+        revertido: false,
+        resumen: "no hab\xEDa nada que revertir: el commit no toc\xF3 ning\xFAn documento de contenido"
+      };
     }
     console.error(`revertir: la reversi\xF3n autom\xE1tica de ${sha} no se pudo hacer \u2014 ${r.motivo}: ${r.detalle}`);
-    return `NO se pudo revertir: ${r.motivo} \u2014 ${r.detalle}`;
+    return { revertido: false, resumen: `NO se pudo revertir: ${r.motivo} \u2014 ${r.detalle}` };
   } catch (e) {
     console.error(`revertir: la reversi\xF3n autom\xE1tica de ${sha} revent\xF3 \u2014`, e);
-    return `NO se pudo revertir: ${e instanceof Error ? e.message : String(e)}`;
+    return { revertido: false, resumen: `NO se pudo revertir: ${e instanceof Error ? e.message : String(e)}` };
   }
 }
-async function avisaAElla(correoDeElla, contexto) {
-  await mandaProtegido(contexto, { a: [correoDeElla], asunto: ASUNTO_PARA_ELLA, texto: TEXTO_PARA_ELLA });
+async function avisaAElla(correoDeElla, contexto, fracaso) {
+  await mandaProtegido(contexto, {
+    a: [correoDeElla],
+    asunto: ASUNTO_PARA_ELLA,
+    texto: `${fraseDeFracaso(fracaso)}
+
+Puedes volver a intentarlo cuando quieras.`
+  });
 }
 async function revierteYAvisa(sha, correoDeElla, contexto) {
   const gh = clienteDeGitHub(contexto);
@@ -18643,38 +18664,37 @@ async function revierteYAvisa(sha, correoDeElla, contexto) {
     autorReal = autorDelCommit(commit.message) ?? correoDeElla;
   } catch {
   }
-  const resumen = await intentaRevertir(gh, sha, autorReal);
-  await avisaAElla(correoDeElla, contexto);
+  const { revertido, resumen } = await intentaRevertir(gh, sha, autorReal);
   const paraMarcos = contexto.env.PANEL_AVISOS_A;
-  if (paraMarcos) {
-    await mandaProtegido(contexto, {
-      a: [paraMarcos],
-      asunto: `[panel] El deploy de ${sha.slice(0, 7)} fall\xF3`,
-      texto: [
-        `El commit ${sha} publicado por ${autorReal} no construy\xF3.`,
-        `Reversi\xF3n autom\xE1tica: ${resumen}.`,
-        "",
-        "El sitio sigue sirviendo el \xFAltimo deploy bueno."
-      ].join("\n")
-    });
-  }
+  const avisadoAMarcos = paraMarcos === void 0 ? false : await mandaProtegido(contexto, {
+    a: [paraMarcos],
+    asunto: `[panel] El deploy de ${sha.slice(0, 7)} fall\xF3`,
+    texto: [
+      `El commit ${sha} publicado por ${autorReal} no construy\xF3.`,
+      `Reversi\xF3n autom\xE1tica: ${resumen}.`,
+      "",
+      "El sitio sigue sirviendo el \xFAltimo deploy bueno."
+    ].join("\n")
+  });
+  const fracaso = { revertido, avisadoAMarcos };
+  await avisaAElla(correoDeElla, contexto, fracaso);
+  return fracaso;
 }
 async function revierteYAvisaAMarcos(sha, autorReal, contexto) {
   const gh = clienteDeGitHub(contexto);
-  const resumen = await intentaRevertir(gh, sha, autorReal);
+  const { revertido, resumen } = await intentaRevertir(gh, sha, autorReal);
   const paraMarcos = contexto.env.PANEL_AVISOS_A;
-  if (paraMarcos) {
-    await mandaProtegido(contexto, {
-      a: [paraMarcos],
-      asunto: `[panel] El deploy de ${sha.slice(0, 7)} fall\xF3`,
-      texto: [
-        `El commit ${sha} publicado por ${autorReal} no construy\xF3 (nadie ten\xEDa el panel abierto).`,
-        `Reversi\xF3n autom\xE1tica: ${resumen}.`,
-        "",
-        "El sitio sigue sirviendo el \xFAltimo deploy bueno."
-      ].join("\n")
-    });
-  }
+  const avisadoAMarcos = paraMarcos === void 0 ? false : await mandaProtegido(contexto, {
+    a: [paraMarcos],
+    asunto: `[panel] El deploy de ${sha.slice(0, 7)} fall\xF3`,
+    texto: [
+      `El commit ${sha} publicado por ${autorReal} no construy\xF3 (nadie ten\xEDa el panel abierto).`,
+      `Reversi\xF3n autom\xE1tica: ${resumen}.`,
+      "",
+      "El sitio sigue sirviendo el \xFAltimo deploy bueno."
+    ].join("\n")
+  });
+  return { revertido, avisadoAMarcos };
 }
 async function revisaLaCabeza(contexto) {
   try {
@@ -18694,8 +18714,8 @@ async function revisaLaCabeza(contexto) {
     if (estado !== "fall\xF3") return null;
     const autorReal = autorDelCommit(commit.message) ?? "alguien del panel";
     console.error(`revisaLaCabeza: ${cabeza.sha} es un commit del panel cuyo despliegue fall\xF3 \u2014 revirtiendo.`);
-    await revierteYAvisaAMarcos(cabeza.sha, autorReal, contexto);
-    return cabeza.sha;
+    const fracaso = await revierteYAvisaAMarcos(cabeza.sha, autorReal, contexto);
+    return { sha: cabeza.sha, ...fracaso };
   } catch (e) {
     console.error("revisaLaCabeza: no se pudo revisar la cabeza de main \u2014", e);
     return null;
@@ -18903,19 +18923,8 @@ async function salud(_pedido, contexto) {
     console.error("salud: GitHub no contest\xF3", e);
     githubOk = false;
   }
-  const ahora = contexto.ahora();
   const tokenVence = gh.vencimientoDelToken();
-  const diasParaVencer = diasHastaVencimiento(tokenVence, ahora);
-  if (tokenVence !== null && diasParaVencer !== null && diasParaVencer <= DIAS_AVISO_VENCIMIENTO_TOKEN) {
-    const paraMarcos = contexto.env.PANEL_AVISOS_A;
-    if (paraMarcos && avisoDeVencimientoPermitido(ahora)) {
-      await mandaProtegido(contexto, {
-        a: [paraMarcos],
-        asunto: ASUNTO_AVISO_VENCIMIENTO(diasParaVencer),
-        texto: textoAvisoVencimiento(tokenVence, diasParaVencer)
-      });
-    }
-  }
+  const diasParaVencer = diasHastaVencimiento(tokenVence, contexto.ahora());
   return githubOk ? { status: 200, cuerpo: { ok: true, faltan: [], github: true, tokenVence, diasParaVencer } } : { status: 503, cuerpo: { ok: false, faltan: [], github: false, tokenVence, diasParaVencer } };
 }
 async function estadoAccion(pedido, contexto) {
@@ -18954,20 +18963,23 @@ async function estadoAccion(pedido, contexto) {
     return error51(502, PROBLEMA_NO_SE_PUDO_LEER);
   }
   const shaServido = despliegue.estado === "listo" ? await shaQueSirveElCdn(contexto) : null;
+  let fracaso;
+  if (despliegue.estado === "fall\xF3") {
+    if (shaYaAtendido?.sha === cuerpo.sha) {
+      fracaso = { revertido: shaYaAtendido.revertido, avisadoAMarcos: shaYaAtendido.avisadoAMarcos };
+      await avisaAElla(sesion.correo, contexto, fracaso);
+    } else {
+      fracaso = await revierteYAvisa(cuerpo.sha, sesion.correo, contexto);
+    }
+  }
   const veredicto = decide({
     despliegue: despliegue.estado,
     url: despliegue.url,
     shaServido,
     shaPublicado: cuerpo.sha,
-    desdeHaceMs: contexto.ahora() - publicadoEn
+    desdeHaceMs: contexto.ahora() - publicadoEn,
+    ...fracaso ? { fracaso } : {}
   });
-  if (veredicto.estado === "fall\xF3") {
-    if (shaYaAtendido === cuerpo.sha) {
-      await avisaAElla(sesion.correo, contexto);
-    } else {
-      await revierteYAvisa(cuerpo.sha, sesion.correo, contexto);
-    }
-  }
   return ok({ ok: true, ...veredicto });
 }
 async function shaQueSirveElCdn(contexto) {

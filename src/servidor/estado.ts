@@ -27,19 +27,14 @@ const CAMBIA_DE_CADENCIA_MS = 60_000
 const DEJA_DE_PREGUNTAR_MS = 300_000
 
 /**
- * [B10] Las cuatro frases. Viven acá, juntas, para que se lean una al lado de
- * la otra: son lo único de este módulo que la clienta ve, y un test exige que
- * ninguna nombre una tecnología.
+ * [B10] Las frases. Viven acá, juntas, para que se lean una al lado de la
+ * otra: son lo único de este módulo que la clienta ve, y un test exige que
+ * ninguna nombre una tecnología. Las del FRACASO son cuatro y salen de
+ * `fraseDeFracaso()`, más abajo — dejaron de ser una sola el día que se midió
+ * que prometía dos cosas que otro archivo puede no haber cumplido.
  */
 const FRASE_LISTO = 'Tu cambio ya está en el sitio.'
 const FRASE_EN_CURSO = 'Estamos subiendo tu cambio al sitio.'
-// Esta frase promete DOS cosas que este módulo no hace: que algo se dejó como
-// estaba, y que se le avisó a Marcos. Las dos las cumple `revierteYAvisa()` en
-// `acciones.ts` (Tarea 8), en la MISMA invocación que devuelve este veredicto
-// —la que ve el fracaso revierte y manda los dos correos antes de contestar—.
-// Si algún día esa reversión deja de correr ahí, esta frase pasa a ser mentira
-// y hay que cambiarla: es una promesa que este archivo hace y otro paga.
-const FRASE_FALLO = 'No salió; lo dejé como estaba y ya le avisé a Marcos.'
 const FRASE_TARDA =
   'Tu cambio está tardando más de lo normal. Vuelve a abrir el panel en un rato para ver cómo quedó.'
 
@@ -80,6 +75,46 @@ export function jergaEn(frase: string): string | null {
   return null
 }
 
+/**
+ * Qué pasó de verdad cuando el despliegue falló: si el sitio quedó como
+ * estaba, y si Marcos se enteró.
+ *
+ * [Revisión final de la rama, I4] Existe porque la frase del fracaso decía
+ * «lo dejé como estaba **y ya le avisé a Marcos**» SIEMPRE, y las dos mitades
+ * pueden ser falsas. El comentario que había acá mismo ya lo anticipaba —«es
+ * una promesa que este archivo hace y otro paga»—: el pago está
+ * CONDICIONADO, así que la promesa también tiene que estarlo.
+ *
+ * El escenario medido de la mitad del correo: las variables de correo
+ * todavía no están cargadas (es un trámite de DNS), `mandaProtegido()`
+ * degrada por diseño —loguea y sigue—, ella lee que Marcos ya sabe, Marcos
+ * no sabe nada, y los dos esperan al otro.
+ */
+export interface Fracaso {
+  /** ¿La reversión automática dejó el sitio como estaba? */
+  revertido: boolean
+  /** ¿Se le pudo mandar el aviso a Marcos? */
+  avisadoAMarcos: boolean
+}
+
+/**
+ * [B10 · I4] Las cuatro frases del fracaso, juntas, para que se lean una al
+ * lado de la otra: son las únicas de este módulo que prometen algo sobre
+ * lo que hizo OTRO archivo, y ninguna puede prometer más de lo que pasó.
+ *
+ * `undefined` —nadie intentó revertir ni avisar todavía— cae en la más
+ * conservadora: no afirma que el sitio quedó como estaba ni que Marcos sabe.
+ * Hoy `estadoAccion` siempre pasa el resultado; la rama existe para que el
+ * día que alguien llame a `decide()` sin él, lo que salga sea verdad igual.
+ */
+export function fraseDeFracaso(f?: Fracaso): string {
+  if (f === undefined) return 'No salió. Avísale a Marcos para que lo revise.'
+  if (f.revertido && f.avisadoAMarcos) return 'No salió; lo dejé como estaba y ya le avisé a Marcos.'
+  if (f.revertido) return 'No salió; lo dejé como estaba. Avísale a Marcos para que lo revise.'
+  if (f.avisadoAMarcos) return 'No salió y no pude dejarlo como estaba. Ya le avisé a Marcos.'
+  return 'No salió y no pude dejarlo como estaba. Avísale a Marcos para que lo revise.'
+}
+
 export interface Veredicto {
   estado: 'enCurso' | 'listo' | 'falló'
   frase: string
@@ -98,9 +133,16 @@ export function decide(e: {
   shaPublicado: string
   /** Cuánto hace que se publicó. */
   desdeHaceMs: number
+  /**
+   * [I4] Qué pasó con la reversión y el aviso, cuando el despliegue falló.
+   * Quien llama tiene que haberlos INTENTADO antes de pedir el veredicto —
+   * si no, la frase no puede decir la verdad sobre ellos (ver
+   * `fraseDeFracaso`).
+   */
+  fracaso?: Fracaso
 }): Veredicto {
   if (e.despliegue === 'falló') {
-    return { estado: 'falló', frase: FRASE_FALLO, reintentarEn: null, url: e.url }
+    return { estado: 'falló', frase: fraseDeFracaso(e.fracaso), reintentarEn: null, url: e.url }
   }
 
   // [B2] Las dos fuentes. `shaServido` puede ser `null` construyendo fuera de

@@ -8,7 +8,7 @@
  * Por eso las once combinaciones se prueban acá, en milisegundos.
  */
 import { describe, it, expect } from 'vitest'
-import { decide, jergaEn } from '../src/servidor/estado'
+import { decide, fraseDeFracaso, jergaEn } from '../src/servidor/estado'
 
 const SHA = 'a'.repeat(40)
 const base = { despliegue: 'enCurso' as const, url: null, shaServido: null, shaPublicado: SHA, desdeHaceMs: 5_000 }
@@ -31,10 +31,64 @@ describe('el veredicto', () => {
   })
 
   it('falló es definitivo: no se vuelve a preguntar', () => {
-    const v = decide({ ...base, despliegue: 'falló' })
+    const v = decide({ ...base, despliegue: 'falló', fracaso: { revertido: true, avisadoAMarcos: true } })
     expect(v.estado).toBe('falló')
     expect(v.reintentarEn).toBeNull()
     expect(v.frase).toBe('No salió; lo dejé como estaba y ya le avisé a Marcos.')
+  })
+
+  /*
+   * [Revisión final de la rama, I4] La frase del fracaso prometía DOS cosas
+   * que este módulo no hace —que algo se dejó como estaba, y que se le avisó
+   * a Marcos— y las dos pueden ser falsas. El comentario del propio archivo
+   * ya lo anticipaba («es una promesa que este archivo hace y otro paga»): el
+   * pago está condicionado, así que la promesa también.
+   *
+   * El escenario medido: las variables de correo todavía no están cargadas
+   * (es un trámite de DNS), `mandaProtegido()` degrada por diseño, ella lee
+   * que Marcos ya sabe, Marcos no sabe nada, y los dos esperan al otro.
+   */
+  describe('I4: la frase del fracaso dice lo que de verdad pasó', () => {
+    const conFracaso = (revertido: boolean, avisadoAMarcos: boolean) =>
+      decide({ ...base, despliegue: 'falló', fracaso: { revertido, avisadoAMarcos } }).frase
+
+    it('sin correo a Marcos, no promete que Marcos sabe', () => {
+      const frase = conFracaso(true, false)
+      expect(frase).not.toContain('ya le avisé a Marcos')
+      expect(frase).toContain('lo dejé como estaba') // esto sí pasó
+      expect(frase).toContain('Avísale a Marcos') // y le dice qué hacer
+    })
+
+    it('sin reversión, no promete que lo dejó como estaba', () => {
+      const frase = conFracaso(false, true)
+      expect(frase).toContain('no pude dejarlo como estaba')
+      expect(frase).toContain('Ya le avisé a Marcos')
+    })
+
+    it('sin nada de las dos, no promete ninguna', () => {
+      const frase = conFracaso(false, false)
+      expect(frase).toContain('no pude dejarlo como estaba')
+      expect(frase).not.toContain('ya le avisé a Marcos')
+    })
+
+    it('sin `fracaso` —nadie intentó nada todavía— la frase no promete ninguna de las dos', () => {
+      const frase = decide({ ...base, despliegue: 'falló' }).frase
+      expect(frase).not.toContain('lo dejé como estaba')
+      expect(frase).not.toContain('ya le avisé a Marcos')
+    })
+
+    it('las cuatro frases, y la de «nadie intentó», siguen sin jerga técnica', () => {
+      const todas = [
+        fraseDeFracaso(),
+        fraseDeFracaso({ revertido: true, avisadoAMarcos: true }),
+        fraseDeFracaso({ revertido: true, avisadoAMarcos: false }),
+        fraseDeFracaso({ revertido: false, avisadoAMarcos: true }),
+        fraseDeFracaso({ revertido: false, avisadoAMarcos: false }),
+      ]
+      // Cinco distintas: si dos colapsaran, una de las dos estaría mintiendo.
+      expect(new Set(todas).size).toBe(5)
+      for (const f of todas) expect(jergaEn(f), f).toBeNull()
+    })
   })
 
   it('la cadencia la dicta el servidor: 3 s el primer minuto, 6 s después', () => {
