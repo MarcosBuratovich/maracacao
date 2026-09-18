@@ -786,6 +786,23 @@ const comoAviso = (p: Problema): AvisoPublicado => ({
   ...(p.detalle !== undefined ? { detalle: p.detalle } : {}),
 })
 
+/**
+ * ¿Esto tiene forma de sha de commit? Cuarenta hexadecimales en minúscula,
+ * que es lo que devuelve GitHub y lo único que el panel puede haber leído.
+ *
+ * [Revisión final de la rama] Existe porque el MISMO dato se validaba de tres
+ * formas distintas: `estado` y `deshacer` exigían los cuarenta hexadecimales
+ * para su `sha`, y `publicar` y `borrador.guardar` se conformaban con
+ * «cadena no vacía» para su `base`. La consecuencia no era teórica: un `base`
+ * basura en `publicar` pasaba el chequeo, llegaba hasta `gh.comparaRefs()`,
+ * GitHub lo rechazaba, y la clienta recibía un 502 con «no pudimos revisar el
+ * contenido actual del sitio: prueba de nuevo en unos minutos» — un
+ * diagnóstico equivocado que la manda a reintentar algo que nunca va a
+ * funcionar. Con la forma chequeada antes, es un 400 franco que le dice lo
+ * único que de verdad lo arregla: volver a abrir el panel.
+ */
+const esShaDeCommit = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{40}$/.test(v)
+
 const RUTA_DEL_DOCUMENTO = (id: IdDocumento): string => `src/contenido/datos/${id}.json`
 
 const esIdDocumento = (v: string): v is IdDocumento => Object.prototype.hasOwnProperty.call(DOCUMENTOS, v)
@@ -1313,8 +1330,11 @@ async function publicarAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
   if (!sesion) return error(401, PROBLEMA_SESION)
 
   const cuerpo = (pedido.cuerpo ?? {}) as { documentos?: unknown; base?: unknown }
-  if (typeof cuerpo.base !== 'string' || cuerpo.base === '') {
-    console.error('publicar: el cuerpo llegó sin `base` — el panel que lo mandó es de antes del sha base.')
+  if (!esShaDeCommit(cuerpo.base)) {
+    console.error(
+      `publicar: el cuerpo llegó sin un \`base\` con forma de sha (${JSON.stringify(cuerpo.base)}) — ` +
+        'el panel que lo mandó es de antes del sha base, o lo armó mal.',
+    )
     return error(400, PROBLEMA_SIN_BASE)
   }
 
@@ -1848,7 +1868,7 @@ async function estadoAccion(pedido: Pedido, contexto: Contexto): Promise<Respues
   }
 
   const cuerpo = (pedido.cuerpo ?? {}) as { sha?: unknown; publicadoEn?: unknown }
-  if (typeof cuerpo.sha !== 'string' || !/^[0-9a-f]{40}$/.test(cuerpo.sha)) {
+  if (!esShaDeCommit(cuerpo.sha)) {
     return error(400, PROBLEMA_INESPERADO)
   }
   const publicadoEn = typeof cuerpo.publicadoEn === 'number' ? cuerpo.publicadoEn : contexto.ahora()
@@ -2028,7 +2048,7 @@ async function deshacerAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
   if (!sesion) return error(401, PROBLEMA_SESION)
 
   const cuerpo = (pedido.cuerpo ?? {}) as { sha?: unknown }
-  if (typeof cuerpo.sha !== 'string' || !/^[0-9a-f]{40}$/.test(cuerpo.sha)) {
+  if (!esShaDeCommit(cuerpo.sha)) {
     return error(400, PROBLEMA_INESPERADO)
   }
 
@@ -2060,11 +2080,11 @@ async function deshacerAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
     return error(409, PROBLEMA_TARDE)
   }
 
-  const r = await revierte(gh, {
-    sha: cuerpo.sha,
-    autor: sesion.correo,
-    bytesDelCuerpo: contexto.bytesDelCuerpo,
-  })
+  // [Revisión final de la rama] Sin `bytesDelCuerpo`: el cuerpo de un
+  // deshacer son unos cincuenta bytes, y lo que `revierte()` escribe son los
+  // archivos viejos que restaura. Pasárselo desactivaba el tope de 3,5 MB
+  // justo en ese camino — ver el comentario en `revierte()`.
+  const r = await revierte(gh, { sha: cuerpo.sha, autor: sesion.correo })
 
   if (r.ok) return ok({ ok: true, sha: r.sha, resumen: RESUMEN_DESHECHO })
 
@@ -2257,7 +2277,10 @@ async function borradorGuardarAccion(pedido: Pedido, contexto: Contexto): Promis
   if (!sesion) return error(401, PROBLEMA_SESION)
 
   const cuerpo = (pedido.cuerpo ?? {}) as CuerpoBorradorGuardar
-  if (typeof cuerpo.base !== 'string' || cuerpo.base === '') {
+  // La MISMA forma que exige `publicar` (ver `esShaDeCommit`): es el mismo
+  // dato, y un borrador guardado contra un `base` que no es un sha no le
+  // sirve a la publicación que viene después.
+  if (!esShaDeCommit(cuerpo.base)) {
     return error(400, PROBLEMA_BORRADOR_INCOMPLETO)
   }
   const documentos = comoDocumentos(cuerpo.documentos)

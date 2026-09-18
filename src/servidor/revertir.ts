@@ -100,7 +100,7 @@ function fuentesDeSabores(v: unknown): FuentesDeDerivados {
 
 export async function revierte(
   gh: ReturnType<typeof cliente>,
-  p: { sha: string; autor: string; bytesDelCuerpo?: number },
+  p: { sha: string; autor: string },
 ): Promise<ResultadoReversion> {
   const cabeza = await gh.ref('heads/main')
 
@@ -245,7 +245,15 @@ export async function revierte(
     // abajo en `no-es-la-cabeza`: la próxima invocación relee todo desde
     // cero, que es lo correcto para algo idempotente.
     reintentar: false,
-    ...(p.bytesDelCuerpo !== undefined ? { bytesDelCuerpo: p.bytesDelCuerpo } : {}),
+    // [Revisión final de la rama] SIN `bytesDelCuerpo`. Lo tenía, y el único
+    // llamador que se lo pasaba (`deshacerAccion`) le daba el peso del cuerpo
+    // HTTP del pedido de deshacer — unos cincuenta bytes—, así que el tope de
+    // 3,5 MB se comparaba contra eso y quedaba desactivado justo en el camino
+    // que más lo necesita: lo que se escribe acá no es el cuerpo del pedido,
+    // son los archivos VIEJOS que se están restaurando, y pueden pesar
+    // cualquier cosa. `publica()` los mide solo, que es la cuenta correcta.
+    // El parámetro se fue entero: dejarlo era dejar armada la misma trampa
+    // para el próximo llamador.
   })
 
   if (!resultado.ok) {

@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest'
 import { createHmac } from 'node:crypto'
 import {
   hashDeClave, claveCorrecta, firmaSesion, verificaSesion, cookieDeSesion, intentoPermitido,
-  LARGO_MIN_SECRETO,
+  clavesDeFreno, LARGO_MIN_SECRETO,
 } from '../src/servidor/sesion'
 
 const SECRETO = 'secreto-de-prueba-no-es-el-de-produccion'
@@ -216,5 +216,48 @@ describe('el freno a la fuerza bruta', () => {
     expect(intentoPermitido(clave, Date.now(), 2)).toBe(true)
     expect(intentoPermitido(clave, Date.now(), 2)).toBe(true)
     expect(intentoPermitido(clave, Date.now(), 2)).toBe(false)
+  })
+})
+
+/*
+ * [Revisión final de la rama] El `Map` del freno filtraba las marcas viejas
+ * de la clave que se consultaba, pero NUNCA borraba una clave.
+ *
+ * Cada dirección distinta que alguien mande a `enlace` deja la suya
+ * (`enlace-destino:<correo>`, acciones.ts), y eso es entrada controlada por
+ * quien ataca: un bucle con direcciones inventadas hacía crecer este `Map`
+ * sin techo mientras la instancia viviera. Con el barrido, lo que queda vivo
+ * está acotado por las claves vistas EN LA VENTANA, no por todas las vistas
+ * desde que arrancó el proceso.
+ */
+describe('el freno de intentos no acumula claves para siempre', () => {
+  it('las claves que nadie volvió a usar en la ventana se sueltan', () => {
+    const ahora = 4_000_000_000_000
+    const antes = clavesDeFreno()
+
+    // Bien por encima del umbral de barrido (mil): es lo que simula el bucle
+    // con direcciones inventadas.
+    for (let i = 0; i < 1_500; i++) {
+      intentoPermitido(`basura-${ahora}-${i}`, ahora)
+    }
+    expect(clavesDeFreno()).toBeGreaterThan(antes + 1_000)
+
+    // Pasada la ventana de quince minutos, el primer pedido que llegue barre
+    // lo vencido: ninguna de esas mil quinientas claves sigue viva.
+    const despues = ahora + 16 * 60_000
+    intentoPermitido('alguien-de-verdad', despues)
+    expect(clavesDeFreno()).toBeLessThan(100)
+  })
+
+  it('barrer no le saca el presupuesto a quien SÍ está dentro de la ventana', () => {
+    // Lo que no puede pasar: que la limpieza le regale intentos a quien está
+    // siendo frenado ahora mismo. Es el freno de la puerta principal.
+    const ahora = 5_000_000_000_000
+    const clave = `vigente-${Math.random()}`
+    for (let i = 0; i < 5; i++) expect(intentoPermitido(clave, ahora)).toBe(true)
+    expect(intentoPermitido(clave, ahora)).toBe(false)
+
+    for (let i = 0; i < 1_500; i++) intentoPermitido(`ruido-${ahora}-${i}`, ahora)
+    expect(intentoPermitido(clave, ahora + 1_000)).toBe(false) // sigue frenado
   })
 })

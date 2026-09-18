@@ -47,7 +47,7 @@ const textoSaboresVivo = serializa(esquemaSabores, saboresCrudoDeDisco())
  * de `publicar` que mande `sitio` sin `sabores` las necesita — repetirlas
  * a mano en cada test es la clase de copia que se desincroniza sola.
  */
-const respuestasFuentesDeSitio = (sha = 'main-1') => [
+const respuestasFuentesDeSitio = (sha = SHA_MAIN) => [
   { cuerpo: { object: { sha } } }, // gh.ref (router: sha base del lote, y fuente de los derivados de sitio)
   { cuerpo: { content: Buffer.from(textoSaboresVivo).toString('base64'), encoding: 'base64' } }, // gh.archivoEnRef: lo vivo de sabores
 ]
@@ -181,6 +181,19 @@ function relojDeMentira() {
     marca: () => t,
   }
 }
+
+/*
+ * [Revisión final de la rama] Los shas de prueba tienen la FORMA de un sha:
+ * cuarenta hexadecimales. Antes eran etiquetas («main-1», «viejo»,
+ * «loQueEllaLeyo») y por eso ningún test veía que `publicar` y
+ * `borrador.guardar` aceptaban cualquier cadena como `base` mientras `estado`
+ * y `deshacer` exigían los cuarenta hexadecimales para el mismo dato. Se
+ * eligieron palabras escritas en hexadecimal para que sigan siendo legibles
+ * en un mensaje de error.
+ */
+const SHA_MAIN = 'facade01'.repeat(5)
+const SHA_VIEJO = 'de1e7ed0'.repeat(5)
+const SHA_QUE_ELLA_LEYO = '0cea0bad'.repeat(5)
 
 const contextoBase = (fetch: typeof globalThis.fetch) => ({
   env: {
@@ -925,7 +938,7 @@ describe('publicar', () => {
     const roto = JSON.parse(JSON.stringify(marca))
     roto.anaquel.titulo = ''      // texto vacío: el esquema lo rechaza
     const { f, pedidos } = fetchFalso([...respuestasDeNingunaReversionPendiente(), ...respuestasFuentesDeSitio()])
-    const r = await maneja('publicar', { cuerpo: { base: 'main-1', documentos: { sitio: roto } }, cookie: cookieValida() }, contextoBase(f))
+    const r = await maneja('publicar', { cuerpo: { base: SHA_MAIN, documentos: { sitio: roto } }, cookie: cookieValida() }, contextoBase(f))
     expect(r.status).toBe(422)
     expect((r.cuerpo as { campo?: string }).campo).toContain('anaquel.titulo')
     expect(pedidos.filter((p) => p.metodo === 'POST' || p.metodo === 'PATCH')).toHaveLength(0)
@@ -935,7 +948,7 @@ describe('publicar', () => {
     const roto = JSON.parse(JSON.stringify(marca))
     roto.anaquel.titulo = ''
     const { f } = fetchFalso([...respuestasDeNingunaReversionPendiente(), ...respuestasFuentesDeSitio()])
-    const r = await maneja('publicar', { cuerpo: { base: 'main-1', documentos: { sitio: roto } }, cookie: cookieValida() }, contextoBase(f))
+    const r = await maneja('publicar', { cuerpo: { base: SHA_MAIN, documentos: { sitio: roto } }, cookie: cookieValida() }, contextoBase(f))
     const texto = String((r.cuerpo as { problema: string }).problema)
     expect(texto).not.toMatch(/zod|schema|422|undefined|parse/i)
   })
@@ -943,7 +956,7 @@ describe('publicar', () => {
   it('un documento que no existe se rechaza antes de mirar su contenido', async () => {
     const r = await maneja(
       'publicar',
-      { cuerpo: { base: 'main-1', documentos: { inventado: {} } }, cookie: cookieValida() },
+      { cuerpo: { base: SHA_MAIN, documentos: { inventado: {} } }, cookie: cookieValida() },
       contextoBase(fetchQueNoSeUsa()),
     )
     expect(r.status).toBe(422)
@@ -957,7 +970,7 @@ describe('publicar', () => {
     const sinGotas = JSON.parse(JSON.stringify(marca))
     delete sinGotas.gotas
     const { f, pedidos } = fetchFalso([...respuestasDeNingunaReversionPendiente(), ...respuestasFuentesDeSitio()])
-    const r = await maneja('publicar', { cuerpo: { base: 'main-1', documentos: { sitio: sinGotas } }, cookie: cookieValida() }, contextoBase(f))
+    const r = await maneja('publicar', { cuerpo: { base: SHA_MAIN, documentos: { sitio: sinGotas } }, cookie: cookieValida() }, contextoBase(f))
     expect(r.status).toBe(422)
     expect((r.cuerpo as { campo?: string }).campo).toContain('gotas')
     expect(pedidos.filter((p) => p.metodo === 'POST' || p.metodo === 'PATCH')).toHaveLength(0)
@@ -975,7 +988,7 @@ describe('publicar', () => {
     const usos = { n: 0 }
     const r = await maneja(
       'publicar',
-      { cuerpo: { base: 'main-1', documentos: {} }, cookie: cookieValida() },
+      { cuerpo: { base: SHA_MAIN, documentos: {} }, cookie: cookieValida() },
       contextoBase(contando(usos)),
     )
     expect(r.status).toBe(400)
@@ -1014,13 +1027,13 @@ describe('publicar', () => {
 
     const { f, pedidos } = fetchFalso([
       ...respuestasDeNingunaReversionPendiente(),
-      { cuerpo: { object: { sha: 'main-1' } } }, // gh.ref (Fase 2: el sha base del lote)
+      { cuerpo: { object: { sha: SHA_MAIN } } }, // gh.ref (Fase 2: el sha base del lote)
       { cuerpo: { content: Buffer.from(textoSaboresVivo).toString('base64'), encoding: 'base64' } }, // archivoEnRef(sabores): lo vivo, para el diff
     ])
 
     const r = await maneja(
       'publicar',
-      { cuerpo: { base: 'main-1', documentos: { sabores: saboresEnorme } }, cookie: cookieValida() },
+      { cuerpo: { base: SHA_MAIN, documentos: { sabores: saboresEnorme } }, cookie: cookieValida() },
       contextoBase(f),
     )
 
@@ -1054,7 +1067,7 @@ describe('publicar', () => {
         ...respuestasDeNingunaReversionPendiente(),
         ...respuestasFuentesDeSitio(), // gh.ref (router, base del lote — también sirve de fuente de derivados) + gh.archivoEnRef(sabores)
         { cuerpo: { content: Buffer.from(textoVivo).toString('base64'), encoding: 'base64' } }, // gh.archivoEnRef (router, lo vivo de sitio)
-        { cuerpo: { object: { sha: 'main-1' } } }, // gh.ref (dentro de publica())
+        { cuerpo: { object: { sha: SHA_MAIN } } }, // gh.ref (dentro de publica())
         { cuerpo: { sha: 'commit-viejo', tree: { sha: 'arbol-viejo' } } }, // gh.commit
         { cuerpo: { sha: 'blob-nuevo' } }, // creaBlob
         { cuerpo: { sha: 'arbol-nuevo' } }, // creaArbol
@@ -1062,7 +1075,7 @@ describe('publicar', () => {
         { cuerpo: {} }, // mueveRef
       ])
 
-      const r = await maneja('publicar', { cuerpo: { base: 'main-1', documentos: { sitio: enviado } }, cookie: cookieValida() }, contextoBase(f))
+      const r = await maneja('publicar', { cuerpo: { base: SHA_MAIN, documentos: { sitio: enviado } }, cookie: cookieValida() }, contextoBase(f))
 
       expect(r.status).toBe(200)
       expect((r.cuerpo as { ok: boolean; sha: string | null }).ok).toBe(true)
@@ -1082,7 +1095,7 @@ describe('publicar', () => {
         { cuerpo: { content: Buffer.from(textoEnviado).toString('base64'), encoding: 'base64' } }, // gh.archivoEnRef(sitio): igual a lo enviado
       ])
 
-      const r = await maneja('publicar', { cuerpo: { base: 'main-1', documentos: { sitio: enviado } }, cookie: cookieValida() }, contextoBase(f))
+      const r = await maneja('publicar', { cuerpo: { base: SHA_MAIN, documentos: { sitio: enviado } }, cookie: cookieValida() }, contextoBase(f))
 
       expect(r.status).toBe(200)
       const cuerpo = r.cuerpo as { ok: boolean; sha: string | null; resumen: string }
@@ -1100,7 +1113,7 @@ describe('publicar', () => {
         { status: 500, cuerpo: { message: 'ups, caído' } }, // gh.ref falla
       ])
 
-      const r = await maneja('publicar', { cuerpo: { base: 'main-1', documentos: { sitio: enviado } }, cookie: cookieValida() }, contextoBase(f))
+      const r = await maneja('publicar', { cuerpo: { base: SHA_MAIN, documentos: { sitio: enviado } }, cookie: cookieValida() }, contextoBase(f))
 
       expect(r.status).toBe(502)
       const cuerpo = r.cuerpo as { ok: boolean; problema: string }
@@ -1132,7 +1145,7 @@ describe('publicar', () => {
         ...respuestasDeNingunaReversionPendiente(),
         ...respuestasFuentesDeSitio(), // fuentes de los derivados: sabores no viene en el lote
         { cuerpo: { content: Buffer.from(serializa(esquemaSitio, marca)).toString('base64'), encoding: 'base64' } }, // lo vivo de sitio
-        { cuerpo: { object: { sha: 'main-1' } } }, // gh.ref (dentro de publica())
+        { cuerpo: { object: { sha: SHA_MAIN } } }, // gh.ref (dentro de publica())
         { cuerpo: { sha: 'commit-viejo', tree: { sha: 'arbol-viejo' } } }, // gh.commit
         { cuerpo: { sha: 'blob-nuevo' } }, // creaBlob
         { cuerpo: { sha: 'arbol-nuevo' } }, // creaArbol
@@ -1140,7 +1153,7 @@ describe('publicar', () => {
         { cuerpo: {} }, // mueveRef
       ])
 
-      const r = await maneja('publicar', { cuerpo: { base: 'main-1', documentos: { sitio: crudo } }, cookie: cookieValida() }, contextoBase(f))
+      const r = await maneja('publicar', { cuerpo: { base: SHA_MAIN, documentos: { sitio: crudo } }, cookie: cookieValida() }, contextoBase(f))
 
       expect(r.status).toBe(200)
       const cuerpo = r.cuerpo as { ok: boolean; sha: string | null }
@@ -1183,7 +1196,7 @@ describe('publicar', () => {
           ...respuestasDeNingunaReversionPendiente(),
           ...respuestasFuentesDeSitio(),
           { cuerpo: { content: Buffer.from(serializa(esquemaSitio, marca)).toString('base64'), encoding: 'base64' } },
-          { cuerpo: { object: { sha: 'main-1' } } },
+          { cuerpo: { object: { sha: SHA_MAIN } } },
           { cuerpo: { sha: 'commit-viejo', tree: { sha: 'arbol-viejo' } } },
           { cuerpo: { sha: 'blob-nuevo' } },
           { cuerpo: { sha: 'arbol-nuevo' } },
@@ -1194,10 +1207,10 @@ describe('publicar', () => {
       }
 
       const a = contextoParaOtroLote()
-      const rCrudo = await maneja('publicar', { cuerpo: { base: 'main-1', documentos: { sitio: crudo } }, cookie: cookieValida() }, a.ctx)
+      const rCrudo = await maneja('publicar', { cuerpo: { base: SHA_MAIN, documentos: { sitio: crudo } }, cookie: cookieValida() }, a.ctx)
 
       const b = contextoParaOtroLote()
-      const rInjertado = await maneja('publicar', { cuerpo: { base: 'main-1', documentos: { sitio: yaInjertado } }, cookie: cookieValida() }, b.ctx)
+      const rInjertado = await maneja('publicar', { cuerpo: { base: SHA_MAIN, documentos: { sitio: yaInjertado } }, cookie: cookieValida() }, b.ctx)
 
       expect(rCrudo.status).toBe(200)
       expect(rInjertado.status).toBe(200)
@@ -1258,10 +1271,10 @@ describe('publicar', () => {
       // cualquier otra cosa.
       const { f, pedidos } = fetchFalso([
         ...respuestasDeNingunaReversionPendiente(),
-        { cuerpo: { object: { sha: 'main-1' } } }, // gh.ref (Fase 2 — la Fase 1b no tocó GitHub: sabores vino en el lote)
+        { cuerpo: { object: { sha: SHA_MAIN } } }, // gh.ref (Fase 2 — la Fase 1b no tocó GitHub: sabores vino en el lote)
         { cuerpo: { content: Buffer.from(textoSitioVivo).toString('base64'), encoding: 'base64' } }, // archivoEnRef(sitio)
         { cuerpo: { content: Buffer.from(textoSaboresVivo).toString('base64'), encoding: 'base64' } }, // archivoEnRef(sabores): 15, distinto del lote
-        { cuerpo: { object: { sha: 'main-1' } } }, // gh.ref (dentro de publica())
+        { cuerpo: { object: { sha: SHA_MAIN } } }, // gh.ref (dentro de publica())
         { cuerpo: { sha: 'commit-viejo', tree: { sha: 'arbol-viejo' } } }, // gh.commit
         { cuerpo: { sha: 'blob-a' } }, // creaBlob (uno de los dos archivos; el orden de llegada no importa)
         { cuerpo: { sha: 'blob-b' } }, // creaBlob (el otro)
@@ -1272,7 +1285,7 @@ describe('publicar', () => {
 
       const r = await maneja(
         'publicar',
-        { cuerpo: { base: 'main-1', documentos: { sitio: sitioConCambio, sabores: saboresConUnoNuevo } }, cookie: cookieValida() },
+        { cuerpo: { base: SHA_MAIN, documentos: { sitio: sitioConCambio, sabores: saboresConUnoNuevo } }, cookie: cookieValida() },
         contextoBase(f),
       )
 
@@ -1309,7 +1322,7 @@ describe('publicar', () => {
 
       const r = await maneja(
         'publicar',
-        { cuerpo: { base: 'main-1', documentos: { sitio: crudo, sabores: saboresSinJengibre } }, cookie: cookieValida() },
+        { cuerpo: { base: SHA_MAIN, documentos: { sitio: crudo, sabores: saboresSinJengibre } }, cookie: cookieValida() },
         contextoBase(f),
       )
 
@@ -1335,11 +1348,11 @@ describe('publicar', () => {
 
       const { f, pedidos } = fetchFalso([
         ...respuestasDeNingunaReversionPendiente(), // costo fijo de revisaLaCabeza() (Tarea 8, paso 9)
-        { cuerpo: { object: { sha: 'main-1' } } }, // gh.ref (Fase 1b)
+        { cuerpo: { object: { sha: SHA_MAIN } } }, // gh.ref (Fase 1b)
         { cuerpo: { content: Buffer.from(textoSaboresVivoSinJengibre).toString('base64'), encoding: 'base64' } }, // archivoEnRef(sabores): lo vivo, sin jengibreYNaranja
       ])
 
-      const r = await maneja('publicar', { cuerpo: { base: 'main-1', documentos: { sitio: crudo } }, cookie: cookieValida() }, contextoBase(f))
+      const r = await maneja('publicar', { cuerpo: { base: SHA_MAIN, documentos: { sitio: crudo } }, cookie: cookieValida() }, contextoBase(f))
 
       // Cuatro pedidos, ni uno más ni uno menos: los dos primeros son
       // `revisaLaCabeza()`, los otros dos son la Fase 1b leyendo lo vivo de
@@ -1383,7 +1396,7 @@ describe('publicar', () => {
       ])
       const r = await maneja(
         'publicar',
-        { cuerpo: { base: 'loQueEllaLeyo', documentos: { sabores: saboresCrudoDeDisco() } }, cookie: cookieValida() },
+        { cuerpo: { base: SHA_QUE_ELLA_LEYO, documentos: { sabores: saboresCrudoDeDisco() } }, cookie: cookieValida() },
         contextoBase(f),
       )
       expect(r.status).toBe(409)
@@ -1406,7 +1419,7 @@ describe('publicar', () => {
       ])
       const r = await maneja(
         'publicar',
-        { cuerpo: { base: 'loQueEllaLeyo', documentos: { sabores: saboresConUnPrecioDistinto() } }, cookie: cookieValida() },
+        { cuerpo: { base: SHA_QUE_ELLA_LEYO, documentos: { sabores: saboresConUnPrecioDistinto() } }, cookie: cookieValida() },
         contextoBase(f),
       )
       expect(r.status).toBe(200)
@@ -1427,7 +1440,7 @@ describe('publicar', () => {
       ])
       const porElRouter = await maneja(
         'publicar',
-        { cuerpo: { base: 'viejo', documentos: { sabores: saboresCrudoDeDisco() } }, cookie: cookieValida() },
+        { cuerpo: { base: SHA_VIEJO, documentos: { sabores: saboresCrudoDeDisco() } }, cookie: cookieValida() },
         contextoBase(f),
       )
 
@@ -1453,7 +1466,7 @@ describe('publicar', () => {
     // La cabeza de `main` en estos tests: coincide con `cuerpo.base`, así
     // que la Fase 2 nunca entra a la rama de «pisada» (`gh.comparaRefs`) —
     // un pedido menos que programar en cada caso.
-    const SHA_BASE = 'main-1'
+    const SHA_BASE = SHA_MAIN
 
     // El documento real de `sabores.json`, leído del disco, con un sabor
     // más — nunca a mano (un fixture a mano se desincroniza del esquema y
@@ -1631,7 +1644,7 @@ describe('revocar una sesión sin rotar la llave', () => {
     ;(ctx.env as Record<string, string>).PANEL_SESIONES_DESDE = '2026-09-10T00:00:00Z'
     const r = await maneja(
       'publicar',
-      { cuerpo: { base: 'x', documentos: {} }, cookie: cookieEmitidaEn('2026-09-01T00:00:00Z') },
+      { cuerpo: { base: SHA_MAIN, documentos: {} }, cookie: cookieEmitidaEn('2026-09-01T00:00:00Z') },
       ctx,
     )
     expect(r.status).toBe(401)
@@ -1643,7 +1656,7 @@ describe('revocar una sesión sin rotar la llave', () => {
     ;(ctx.env as Record<string, string>).PANEL_SESIONES_DESDE = '2026-09-10T00:00:00Z'
     const r = await maneja(
       'publicar',
-      { cuerpo: { base: 'x', documentos: {} }, cookie: cookieEmitidaEn('2026-09-11T00:00:00Z') },
+      { cuerpo: { base: SHA_MAIN, documentos: {} }, cookie: cookieEmitidaEn('2026-09-11T00:00:00Z') },
       ctx,
     )
     // 400 (sin documentos), no 401: la sesión pasó.
@@ -1655,7 +1668,7 @@ describe('revocar una sesión sin rotar la llave', () => {
     ;(ctx.env as Record<string, string>).PANEL_DISPOSITIVOS_REVOCADOS = 'otro, celu-perdido ,tercero'
     const r = await maneja(
       'publicar',
-      { cuerpo: { base: 'x', documentos: {} }, cookie: cookieDeDispositivo('celu-perdido') },
+      { cuerpo: { base: SHA_MAIN, documentos: {} }, cookie: cookieDeDispositivo('celu-perdido') },
       ctx,
     )
     expect(r.status).toBe(401)
@@ -1669,7 +1682,7 @@ describe('revocar una sesión sin rotar la llave', () => {
     ;(ctx.env as Record<string, string>).PANEL_SESIONES_DESDE = 'el martes'
     const r = await maneja(
       'publicar',
-      { cuerpo: { base: 'x', documentos: {} }, cookie: cookieEmitidaEn('2026-09-11T00:00:00Z') },
+      { cuerpo: { base: SHA_MAIN, documentos: {} }, cookie: cookieEmitidaEn('2026-09-11T00:00:00Z') },
       ctx,
     )
     expect(r.status).toBe(401)
@@ -1741,7 +1754,7 @@ describe('revocar una sesión sin rotar la llave', () => {
     ;(ctx.env as Record<string, string>).PANEL_DISPOSITIVOS_REVOCADOS = 'otro, iPhone-15-de-Marcos'
     const r = await maneja(
       'publicar',
-      { cuerpo: { base: 'x', documentos: {} }, cookie: cookieDeDispositivo('iPhone-15-de-Marcos') },
+      { cuerpo: { base: SHA_MAIN, documentos: {} }, cookie: cookieDeDispositivo('iPhone-15-de-Marcos') },
       ctx,
     )
     expect(r.status).toBe(401)
@@ -2656,7 +2669,7 @@ describe('accion=estado', () => {
     const ctx = contextoDePrueba({ fetch: f })
     delete (ctx.env as Record<string, string | undefined>).PANEL_VERCEL_PROYECTO
     delete (ctx.env as Record<string, string | undefined>).GITHUB_REPO
-    const r = await maneja('publicar', { cuerpo: { base: 'x', documentos: { fichas: {} } }, cookie: cookieValida() }, ctx)
+    const r = await maneja('publicar', { cuerpo: { base: SHA_MAIN, documentos: { fichas: {} } }, cookie: cookieValida() }, ctx)
     expect(r.status).toBe(422) // fichas: {} sigue su curso normal después
     // Solo el ref y el commit: nunca llegó a preguntarle nada a la plataforma.
     expect(pedidos).toHaveLength(2)
@@ -2699,7 +2712,7 @@ describe('accion=estado', () => {
     ])
     const r = await maneja(
       'publicar',
-      { cuerpo: { base: 'cualquiera', documentos: { fichas: {} } }, cookie: cookieValida() },
+      { cuerpo: { base: SHA_MAIN, documentos: { fichas: {} } }, cookie: cookieValida() },
       contextoDePrueba({
         fetch: f,
         correo: async (c) => { cartas.push(c); return { ok: true } },
@@ -2815,6 +2828,27 @@ describe('accion=deshacer', () => {
     expect(r.status).toBe(200)
     expect((r.cuerpo as { ok: boolean; resumen: string }).ok).toBe(true)
     expect((r.cuerpo as { resumen: string }).resumen).toBe('Listo, lo dejé como estaba antes.')
+  })
+
+  it('[Revisión final] el tope de cuerpo NO se compara contra el pedido de deshacer', async () => {
+    // El cuerpo de un deshacer son unos cincuenta bytes (`{ sha }`), así que
+    // pasárselo a `revierte()` como cota de lo que se escribe comparaba el
+    // tope de 3,5 MB contra el número equivocado: quedaba desactivado en ese
+    // camino (inocuo hoy) y, al revés, un `Content-Length` inflado —que lo
+    // elige quien manda el pedido— frenaba un deshacer perfectamente
+    // legítimo. Lo que se escribe son los ARCHIVOS VIEJOS que se restauran, y
+    // ésos los mide `publica()` sola.
+    const sha = 'd'.repeat(40)
+    const { f } = fetchFalso(respuestasDeUnDeshacerExitoso(sha))
+    const r = await maneja(
+      'deshacer',
+      { cuerpo: { sha }, cookie: cookieValida() },
+      {
+        ...contextoDePrueba({ fetch: f, ahora: () => PUBLICADO_EN + 60_000 }),
+        bytesDelCuerpo: TOPE_CUERPO + 1,
+      },
+    )
+    expect(r.status).toBe(200)
   })
 
   it('pasados los 30 minutos, ya no se puede: manda al historial', async () => {
@@ -3221,6 +3255,49 @@ describe('accion=deshacer', () => {
 // acá solo se prueba el cableado del router: sesión obligatoria,
 // `revisaLaCabeza()` como red de seguridad, y que lo que devuelve `lee()`
 // llegue intacto (filtrado y en el orden en que vino).
+/*
+ * [Revisión final de la rama] El MISMO dato se validaba de tres formas:
+ * `estado` y `deshacer` pedían los cuarenta hexadecimales para su `sha`, y
+ * `publicar` y `borrador.guardar` se conformaban con «cadena no vacía»
+ * para su `base`. La consecuencia no era teórica: un `base` basura pasaba
+ * el chequeo, llegaba hasta `gh.comparaRefs()`, GitHub lo rechazaba, y ella
+ * recibía un 502 con «no pudimos revisar el contenido actual del sitio:
+ * prueba de nuevo en unos minutos» — un diagnóstico equivocado que la manda
+ * a reintentar algo que nunca va a funcionar.
+ */
+describe('la forma del `base` se valida igual en todas las acciones', () => {
+  const BASURA = ['', 'main', 'loQueSea', 'FACADE01'.repeat(5), `${SHA_MAIN}a`, SHA_MAIN.slice(0, 39), 42, null]
+
+  it('publicar: un `base` sin forma de sha da 400 franco, no un 502 con el diagnóstico equivocado', async () => {
+    for (const base of BASURA) {
+      const { f, pedidos } = fetchFalso([])
+      const r = await maneja(
+        'publicar',
+        { cuerpo: { base, documentos: { sabores: saboresCrudoDeDisco() } }, cookie: cookieValida() },
+        contextoBase(f),
+      )
+      expect(r.status, JSON.stringify(base)).toBe(400)
+      expect((r.cuerpo as { problema: string }).problema).toBe(
+        'No pudimos publicar: vuelve a abrir el panel y hazlo de nuevo.',
+      )
+      expect(pedidos, JSON.stringify(base)).toHaveLength(0) // ni un pedido a GitHub
+    }
+  })
+
+  it('borrador.guardar: el mismo dato, la misma forma, el mismo 400', async () => {
+    for (const base of BASURA) {
+      const { f, pedidos } = fetchFalso([])
+      const r = await maneja(
+        'borrador.guardar',
+        { cuerpo: { base, documentos: {} }, cookie: cookieValida() },
+        contextoBase(f),
+      )
+      expect(r.status, JSON.stringify(base)).toBe(400)
+      expect(pedidos, JSON.stringify(base)).toHaveLength(0)
+    }
+  })
+})
+
 describe('accion=historial', () => {
   /**
    * Un commit, en la forma que da la API de Commits que usa
@@ -3331,7 +3408,7 @@ describe('accion=borrador.guardar', () => {
     const { f, pedidos } = fetchFalso([])
     const r = await maneja(
       'borrador.guardar',
-      { cuerpo: { base: 'main-1', documentos: {} }, cookie: '' },
+      { cuerpo: { base: SHA_MAIN, documentos: {} }, cookie: '' },
       contextoBase(f),
     )
     expect(r.status).toBe(401)
@@ -3362,7 +3439,7 @@ describe('accion=borrador.guardar', () => {
     const r = await maneja(
       'borrador.guardar',
       {
-        cuerpo: { base: 'main-1', documentos: { sitio: { footer: { derechos: 'x' } } }, dispositivo: 'celu' },
+        cuerpo: { base: SHA_MAIN, documentos: { sitio: { footer: { derechos: 'x' } } }, dispositivo: 'celu' },
         cookie: cookieValida(),
       },
       contextoBase(f),
@@ -3381,7 +3458,7 @@ describe('accion=borrador.guardar', () => {
     await maneja(
       'borrador.guardar',
       {
-        cuerpo: { base: 'main-1', documentos: {}, dispositivo: 'celu', autor: 'quien-sea@otro.mx' },
+        cuerpo: { base: SHA_MAIN, documentos: {}, dispositivo: 'celu', autor: 'quien-sea@otro.mx' },
         cookie: cookieValida('clienta@ejemplo.mx'),
       },
       contextoBase(f),
@@ -3394,7 +3471,7 @@ describe('accion=borrador.guardar', () => {
   it('si hay un borrador más nuevo de OTRO aparato, 409 con el hecho crudo — no lo resuelve acá', async () => {
     const yaGuardado = JSON.stringify({
       documentos: {},
-      base: 'main-1',
+      base: SHA_MAIN,
       dispositivo: 'la-compu',
       autor: 'clienta@ejemplo.mx',
       hora: 2_000,
@@ -3405,7 +3482,7 @@ describe('accion=borrador.guardar', () => {
     ])
     const r = await maneja(
       'borrador.guardar',
-      { cuerpo: { base: 'main-1', documentos: {}, dispositivo: 'celu' }, cookie: cookieValida() },
+      { cuerpo: { base: SHA_MAIN, documentos: {}, dispositivo: 'celu' }, cookie: cookieValida() },
       { ...contextoBase(f), ahora: () => 1_000 },
     )
     expect(r.status).toBe(409)
@@ -3423,7 +3500,7 @@ describe('accion=borrador.guardar', () => {
     const ONCE = Date.parse('2026-09-18T11:00:00Z')
     const ONCE_CINCO = Date.parse('2026-09-18T11:05:00Z')
     const deLaHermana = JSON.stringify({
-      documentos: {}, base: 'main-1', dispositivo: 'la-compu', autor: 'clienta@ejemplo.mx', hora: ONCE,
+      documentos: {}, base: SHA_MAIN, dispositivo: 'la-compu', autor: 'clienta@ejemplo.mx', hora: ONCE,
     })
     const elRefYElBorrador = () => [
       { cuerpo: { object: { sha: 'refViejo' } } },
@@ -3437,7 +3514,7 @@ describe('accion=borrador.guardar', () => {
       const { f, pedidos } = fetchFalso([...elRefYElBorrador()])
       const r = await maneja(
         'borrador.guardar',
-        { cuerpo: { base: 'main-1', documentos: {} }, cookie: cookieDeDispositivo('celu') },
+        { cuerpo: { base: SHA_MAIN, documentos: {} }, cookie: cookieDeDispositivo('celu') },
         { ...contextoBase(f), ahora: () => ONCE_CINCO },
       )
       expect(r.status).toBe(409)
@@ -3449,7 +3526,7 @@ describe('accion=borrador.guardar', () => {
       const { f } = fetchFalso([...elRefYElBorrador(), ...respuestasDeUnaPublicacionDirecta()])
       const r = await maneja(
         'borrador.guardar',
-        { cuerpo: { base: 'main-1', documentos: {}, horaLeida: ONCE }, cookie: cookieDeDispositivo('celu') },
+        { cuerpo: { base: SHA_MAIN, documentos: {}, horaLeida: ONCE }, cookie: cookieDeDispositivo('celu') },
         { ...contextoBase(f), ahora: () => ONCE_CINCO },
       )
       expect(r.status).toBe(200)
@@ -3462,7 +3539,7 @@ describe('accion=borrador.guardar', () => {
         const { f } = fetchFalso([...elRefYElBorrador()])
         const r = await maneja(
           'borrador.guardar',
-          { cuerpo: { base: 'main-1', documentos: {}, horaLeida: basura }, cookie: cookieDeDispositivo('celu') },
+          { cuerpo: { base: SHA_MAIN, documentos: {}, horaLeida: basura }, cookie: cookieDeDispositivo('celu') },
           { ...contextoBase(f), ahora: () => ONCE_CINCO },
         )
         expect(r.status, JSON.stringify(basura)).toBe(409)
@@ -3485,7 +3562,7 @@ describe('accion=borrador.guardar', () => {
       await maneja(
         'borrador.guardar',
         {
-          cuerpo: { base: 'main-1', documentos: {}, dispositivo: 'lo-que-diga-el-cuerpo-no-cuenta' },
+          cuerpo: { base: SHA_MAIN, documentos: {}, dispositivo: 'lo-que-diga-el-cuerpo-no-cuenta' },
           cookie: cookieDeDispositivo('celu'),
         },
         contextoBase(f),
@@ -3502,7 +3579,7 @@ describe('accion=borrador.guardar', () => {
       // 409 nunca pasaría. Con la sesión como fuente, el cuerpo ni siquiera
       // tiene la opción de mandarlo mal.
       const yaGuardado = JSON.stringify({
-        documentos: {}, base: 'main-1', dispositivo: 'celu', autor: 'clienta@ejemplo.mx', hora: 5_000,
+        documentos: {}, base: SHA_MAIN, dispositivo: 'celu', autor: 'clienta@ejemplo.mx', hora: 5_000,
       })
       const { f } = fetchFalso([
         { cuerpo: { object: { sha: 'refViejo' } } },
@@ -3510,7 +3587,7 @@ describe('accion=borrador.guardar', () => {
       ])
       const r = await maneja(
         'borrador.guardar',
-        { cuerpo: { base: 'main-1', documentos: {} }, cookie: cookieDeDispositivo('la-hermana') },
+        { cuerpo: { base: SHA_MAIN, documentos: {} }, cookie: cookieDeDispositivo('la-hermana') },
         { ...contextoBase(f), ahora: () => 1_000 },
       )
       expect(r.status).toBe(409)
@@ -3530,7 +3607,7 @@ describe('accion=borrador.guardar', () => {
     ])
     const r = await maneja(
       'borrador.guardar',
-      { cuerpo: { base: 'main-1', documentos: {} }, cookie: cookieValida() },
+      { cuerpo: { base: SHA_MAIN, documentos: {} }, cookie: cookieValida() },
       contextoBase(f),
     )
     expect(r.status).toBe(200)
@@ -3544,7 +3621,7 @@ describe('accion=borrador.guardar', () => {
     const { f, pedidos } = fetchFalso([{ status: 404, cuerpo: { message: 'Not Found' } }])
     const r = await maneja(
       'borrador.guardar',
-      { cuerpo: { base: 'main-1', documentos: {} }, cookie: cookieValida() },
+      { cuerpo: { base: SHA_MAIN, documentos: {} }, cookie: cookieValida() },
       { ...contextoBase(f), bytesDelCuerpo: TOPE_CUERPO + 1 },
     )
     expect(r.status).toBe(502)
@@ -3573,7 +3650,7 @@ describe('accion=borrador.leer', () => {
   it('con un borrador guardado, lo devuelve tal cual — sin comparar ni decidir nada', async () => {
     const guardado = {
       documentos: { sitio: { footer: { derechos: 'x' } } },
-      base: 'main-1',
+      base: SHA_MAIN,
       dispositivo: 'celu',
       autor: 'clienta@ejemplo.mx',
       hora: 5_000,

@@ -266,6 +266,35 @@ const VENTANA_MS = 15 * 60_000
 const TOPE_INTENTOS = 5
 
 /**
+ * [Revisión final de la rama] A partir de cuántas claves vivas se barren las
+ * vencidas.
+ *
+ * El `Map` filtraba las marcas viejas de la clave que se estaba consultando,
+ * pero NUNCA borraba una clave: cada dirección distinta que alguien mande a
+ * `enlace` deja una (`enlace-destino:<correo>`), y eso es entrada controlada
+ * por quien ataca — un bucle con direcciones inventadas hace crecer este
+ * `Map` sin techo mientras la instancia viva. Con el barrido, lo que queda
+ * vivo está acotado por las claves VISTAS EN LA VENTANA, no por todas las
+ * vistas desde que arrancó el proceso.
+ *
+ * El umbral existe para que el camino normal siga siendo O(1): con menos
+ * claves que esto, barrer no vale la pena (el `Map` cabe de sobra en
+ * memoria); recién cuando alguien lo está inflando a propósito se paga el
+ * recorrido, y se paga una vez cada tanto, no en cada pedido.
+ */
+const CLAVES_ANTES_DE_BARRER = 1_000
+
+/** Saca del `Map` las claves cuyas marcas están todas fuera de la ventana. */
+function barreVencidas(ahora: number): void {
+  for (const [clave, marcas] of INTENTOS) {
+    if (marcas.every((t) => ahora - t >= VENTANA_MS)) INTENTOS.delete(clave)
+  }
+}
+
+/** Cuántas claves tiene vivas el freno ahora mismo. Solo para tests: no la usa ninguna acción. */
+export const clavesDeFreno = (): number => INTENTOS.size
+
+/**
  * ¿Esta clave puede intentar de nuevo? Cuenta los intentos de los últimos
  * quince minutos y, si ya hubo `tope` (cinco por defecto), frena — este
  * llamado en sí también cuenta como intento cuando se permite, así que
@@ -274,6 +303,8 @@ const TOPE_INTENTOS = 5
  * otra cosa (su bandeja, no nuestra cuota de intentos) con otro número.
  */
 export function intentoPermitido(clave: string, ahora: number = Date.now(), tope: number = TOPE_INTENTOS): boolean {
+  if (INTENTOS.size > CLAVES_ANTES_DE_BARRER) barreVencidas(ahora)
+
   const marcas = (INTENTOS.get(clave) ?? []).filter((t) => ahora - t < VENTANA_MS)
 
   if (marcas.length >= tope) {

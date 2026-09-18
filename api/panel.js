@@ -78,7 +78,14 @@ function cookieDeSesion(valor, dias) {
 var INTENTOS = /* @__PURE__ */ new Map();
 var VENTANA_MS = 15 * 6e4;
 var TOPE_INTENTOS = 5;
+var CLAVES_ANTES_DE_BARRER = 1e3;
+function barreVencidas(ahora) {
+  for (const [clave, marcas] of INTENTOS) {
+    if (marcas.every((t) => ahora - t >= VENTANA_MS)) INTENTOS.delete(clave);
+  }
+}
 function intentoPermitido(clave, ahora = Date.now(), tope = TOPE_INTENTOS) {
+  if (INTENTOS.size > CLAVES_ANTES_DE_BARRER) barreVencidas(ahora);
   const marcas = (INTENTOS.get(clave) ?? []).filter((t) => ahora - t < VENTANA_MS);
   if (marcas.length >= tope) {
     INTENTOS.set(clave, marcas);
@@ -309,7 +316,7 @@ function cliente(c) {
      * nunca `force: true` salvo que quien llama lo pida explícitamente.
      */
     async mueveRef(nombre, sha, forzar = false) {
-      await pedir(`/git/refs/${nombre}`, {
+      await pedir(`/git/refs/${codificaRuta(nombre)}`, {
         method: "PATCH",
         body: { sha, force: forzar }
       });
@@ -18313,8 +18320,16 @@ async function revierte(gh, p) {
     // desaparecería sin 409 y sin log. Perder la carrera acá se traduce
     // abajo en `no-es-la-cabeza`: la próxima invocación relee todo desde
     // cero, que es lo correcto para algo idempotente.
-    reintentar: false,
-    ...p.bytesDelCuerpo !== void 0 ? { bytesDelCuerpo: p.bytesDelCuerpo } : {}
+    reintentar: false
+    // [Revisión final de la rama] SIN `bytesDelCuerpo`. Lo tenía, y el único
+    // llamador que se lo pasaba (`deshacerAccion`) le daba el peso del cuerpo
+    // HTTP del pedido de deshacer — unos cincuenta bytes—, así que el tope de
+    // 3,5 MB se comparaba contra eso y quedaba desactivado justo en el camino
+    // que más lo necesita: lo que se escribe acá no es el cuerpo del pedido,
+    // son los archivos VIEJOS que se están restaurando, y pueden pesar
+    // cualquier cosa. `publica()` los mide solo, que es la cuenta correcta.
+    // El parámetro se fue entero: dejarlo era dejar armada la misma trampa
+    // para el próximo llamador.
   });
   if (!resultado.ok) {
     return {
@@ -18569,6 +18584,7 @@ var comoAviso = (p) => ({
   titulo: p.titulo,
   ...p.detalle !== void 0 ? { detalle: p.detalle } : {}
 });
+var esShaDeCommit = (v) => typeof v === "string" && /^[0-9a-f]{40}$/.test(v);
 var RUTA_DEL_DOCUMENTO2 = (id) => `src/contenido/datos/${id}.json`;
 var esIdDocumento = (v) => Object.prototype.hasOwnProperty.call(DOCUMENTOS, v);
 function comoDocumentos(v) {
@@ -18735,8 +18751,10 @@ async function publicarAccion(pedido, contexto) {
   const sesion = sesionVigente(pedido.cookie, env, contexto.ahora());
   if (!sesion) return error51(401, PROBLEMA_SESION);
   const cuerpo = pedido.cuerpo ?? {};
-  if (typeof cuerpo.base !== "string" || cuerpo.base === "") {
-    console.error("publicar: el cuerpo lleg\xF3 sin `base` \u2014 el panel que lo mand\xF3 es de antes del sha base.");
+  if (!esShaDeCommit(cuerpo.base)) {
+    console.error(
+      `publicar: el cuerpo lleg\xF3 sin un \`base\` con forma de sha (${JSON.stringify(cuerpo.base)}) \u2014 el panel que lo mand\xF3 es de antes del sha base, o lo arm\xF3 mal.`
+    );
     return error51(400, PROBLEMA_SIN_BASE);
   }
   const documentos = comoDocumentos(cuerpo.documentos);
@@ -18950,7 +18968,7 @@ async function estadoAccion(pedido, contexto) {
     return error51(503, PROBLEMA_INESPERADO);
   }
   const cuerpo = pedido.cuerpo ?? {};
-  if (typeof cuerpo.sha !== "string" || !/^[0-9a-f]{40}$/.test(cuerpo.sha)) {
+  if (!esShaDeCommit(cuerpo.sha)) {
     return error51(400, PROBLEMA_INESPERADO);
   }
   const publicadoEn = typeof cuerpo.publicadoEn === "number" ? cuerpo.publicadoEn : contexto.ahora();
@@ -19013,7 +19031,7 @@ async function deshacerAccion(pedido, contexto) {
   const sesion = sesionVigente(pedido.cookie, env, contexto.ahora());
   if (!sesion) return error51(401, PROBLEMA_SESION);
   const cuerpo = pedido.cuerpo ?? {};
-  if (typeof cuerpo.sha !== "string" || !/^[0-9a-f]{40}$/.test(cuerpo.sha)) {
+  if (!esShaDeCommit(cuerpo.sha)) {
     return error51(400, PROBLEMA_INESPERADO);
   }
   await revisaLaCabeza(contexto);
@@ -19029,11 +19047,7 @@ async function deshacerAccion(pedido, contexto) {
   if (!Number.isFinite(publicadoEn) || contexto.ahora() - publicadoEn > VENTANA_DESHACER_MS) {
     return error51(409, PROBLEMA_TARDE);
   }
-  const r = await revierte(gh, {
-    sha: cuerpo.sha,
-    autor: sesion.correo,
-    bytesDelCuerpo: contexto.bytesDelCuerpo
-  });
+  const r = await revierte(gh, { sha: cuerpo.sha, autor: sesion.correo });
   if (r.ok) return ok({ ok: true, sha: r.sha, resumen: RESUMEN_DESHECHO });
   switch (r.motivo) {
     case "no-es-la-cabeza":
@@ -19100,7 +19114,7 @@ async function borradorGuardarAccion(pedido, contexto) {
   const sesion = sesionVigente(pedido.cookie, env, contexto.ahora());
   if (!sesion) return error51(401, PROBLEMA_SESION);
   const cuerpo = pedido.cuerpo ?? {};
-  if (typeof cuerpo.base !== "string" || cuerpo.base === "") {
+  if (!esShaDeCommit(cuerpo.base)) {
     return error51(400, PROBLEMA_BORRADOR_INCOMPLETO);
   }
   const documentos = comoDocumentos(cuerpo.documentos);

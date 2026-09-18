@@ -337,7 +337,12 @@ export function cliente(c: Credenciales) {
      * nunca `force: true` salvo que quien llama lo pida explícitamente.
      */
     async mueveRef(nombre: string, sha: string, forzar = false): Promise<void> {
-      await pedir(`/git/refs/${nombre}`, {
+      // [Revisión final de la rama] `codificaRuta`, igual que sus vecinas
+      // (`ref`, `archivoEnRef`). Hoy todo lo que llega acá es una constante,
+      // así que no cambia un byte de lo que se manda; la inconsistencia era
+      // el problema, porque es lo que hace que la próxima ruta variable se
+      // cuele por el lado equivocado.
+      await pedir(`/git/refs/${codificaRuta(nombre)}`, {
         method: 'PATCH',
         body: { sha, force: forzar },
       })

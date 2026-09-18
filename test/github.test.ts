@@ -81,6 +81,18 @@ describe('el cliente de GitHub', () => {
     expect(pedidos[0].url).toContain('/git/ref/heads/' + encodeURIComponent('una rama#rara'))
   })
 
+  it('[Revisión final] mueveRef() codifica igual que sus vecinas, no al revés', async () => {
+    // Hoy el nombre que llega acá es siempre una constante, así que esto no
+    // cambia un byte de lo que se manda en producción. La inconsistencia era
+    // el problema: `ref()` y `archivoEnRef()` codificaban y `mueveRef()` no,
+    // y eso es lo que hace que la próxima ruta variable se cuele por el lado
+    // equivocado — el `#` de un nombre corta la URL entera.
+    const { f, pedidos } = fetchFalso([{ cuerpo: {} }])
+    await cliente(creds(f)).mueveRef('heads/una rama#rara', 'nuevo')
+    expect(pedidos[0].url).toContain('/git/refs/heads/' + encodeURIComponent('una rama#rara'))
+    expect(pedidos[0].url).not.toContain('una rama#rara')
+  })
+
   it('crea un blob con el contenido en base64', async () => {
     const { f, pedidos } = fetchFalso([{ cuerpo: { sha: 'blob1' } }])
     const sha = await cliente(creds(f)).creaBlob('hola')
