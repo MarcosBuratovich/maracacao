@@ -18978,20 +18978,36 @@ async function estadoAccion(pedido, contexto) {
     proyecto,
     fetch: contexto.fetch
   });
-  let despliegue;
+  let despliegue = null;
+  let porQueNoContestoLaPlataforma;
   try {
     despliegue = await vercel.despliegueDe(cuerpo.sha);
   } catch (e) {
-    console.error("estado: la plataforma no contest\xF3 por el despliegue \u2014", e);
-    return error51(502, PROBLEMA_NO_SE_PUDO_LEER);
+    porQueNoContestoLaPlataforma = e;
   }
   const shaServido = await shaQueSirveElCdn(contexto);
+  if (despliegue === null) {
+    if (shaServido === cuerpo.sha) {
+      return ok({
+        ok: true,
+        ...decide({
+          despliegue: "desconocido",
+          url: null,
+          shaServido,
+          shaPublicado: cuerpo.sha,
+          desdeHaceMs: contexto.ahora() - publicadoEn
+        })
+      });
+    }
+    console.error("estado: la plataforma no contest\xF3 por el despliegue \u2014", porQueNoContestoLaPlataforma);
+    return error51(502, PROBLEMA_NO_SE_PUDO_LEER);
+  }
   let fracaso;
   if (despliegue.estado === "fall\xF3") {
     if (shaYaAtendido?.sha === cuerpo.sha) {
       fracaso = { revertido: shaYaAtendido.revertido, avisadoAMarcos: shaYaAtendido.avisadoAMarcos };
       await avisaAElla(sesion.correo, contexto, fracaso);
-    } else {
+    } else if (shaServido !== cuerpo.sha) {
       fracaso = await revierteYAvisa(cuerpo.sha, sesion.correo, contexto);
     }
   }

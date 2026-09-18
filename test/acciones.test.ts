@@ -2666,6 +2666,93 @@ describe('accion=estado', () => {
     expect((r.cuerpo as { estado: string }).estado).toBe('falló')
   })
 
+  /*
+   * Ronda 2 del arreglo de precedencia: el CDN manda sobre el reporte de la
+   * plataforma incluso cuando lo que ese reporte dispara es un EFECTO
+   * SECUNDARIO — revertir un commit. Si el CDN ya sirve el sha publicado,
+   * `estadoAccion` no puede disparar `revierteYAvisa()`: estaría destruyendo
+   * un cambio que está funcionando, servido de verdad, por un reporte de la
+   * plataforma equivocado.
+   *
+   * OJO al verificar esto: desde la Ronda 1, `decide()` ya devuelve 'listo'
+   * en cuanto `shaServido === shaPublicado`, sin mirar `despliegue` — así
+   * que el veredicto por sí solo NO alcanza para probar que el revert no se
+   * disparó (daría 'listo' de cualquier manera, revierta o no). Lo que
+   * prueba que no se disparó es que no salió ningún pedido de más —ni el
+   * del autor real, ni los de `revierte()`— y ninguna carta.
+   */
+  it('Ronda 2: si el CDN ya sirve el sha publicado, NO se revierte aunque la plataforma diga que falló', async () => {
+    const cartas: Array<{ a: string[]; asunto: string }> = []
+    const sha = 'a'.repeat(40)
+    const { f, pedidos } = fetchFalso([
+      ...respuestasDeNingunaReversionPendiente(), // revisaLaCabeza(), primero que nada
+      { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // la plataforma dice que falló
+      { cuerpo: { sha, construido: '2026-09-17T12:00:00.000Z' } }, // pero el CDN YA sirve el sha publicado
+    ])
+    const r = await maneja(
+      'estado',
+      { cuerpo: { sha, publicadoEn: 1_000 }, cookie: cookieValida() },
+      contextoDePrueba({
+        fetch: f,
+        ahora: () => 6_000,
+        correo: async (c) => { cartas.push(c); return { ok: true } },
+        env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
+      }),
+    )
+    expect((r.cuerpo as { estado: string }).estado).toBe('listo')
+    expect((r.cuerpo as { frase: string }).frase).toBe('Tu cambio ya está en el sitio.')
+    // Los cuatro pedidos programados y ni uno más: si `revierteYAvisa()` se
+    // hubiera disparado, habría pedido el autor real (un quinto pedido) que
+    // nadie programó, y `fetchFalso` lo hubiera registrado igual (se anota
+    // ANTES de tirar por quedarse sin respuestas).
+    expect(pedidos).toHaveLength(4)
+    expect(cartas).toHaveLength(0)
+  })
+
+  /*
+   * Ronda 2, degradación: que la plataforma no conteste no puede tapar al
+   * CDN. Antes, un error de red al preguntarle a la plataforma cortaba acá
+   * mismo con 502 — sin mirar nunca `version.json`, que podía estar
+   * confirmando el sha publicado en ese mismo instante.
+   */
+  it('Ronda 2: si la plataforma no contesta pero el CDN ya sirve el sha publicado, igual da "listo"', async () => {
+    const sha = 'a'.repeat(40)
+    const { f, pedidos } = fetchFalso([
+      ...respuestasDeNingunaReversionPendiente(),
+      { status: 500, cuerpo: {} }, // la plataforma no contesta
+      { cuerpo: { sha, construido: '2026-09-17T12:00:00.000Z' } }, // el CDN sí
+    ])
+    const r = await maneja(
+      'estado',
+      { cuerpo: { sha, publicadoEn: 1_000 }, cookie: cookieValida() },
+      contextoDePrueba({ fetch: f, ahora: () => 6_000, correo: correoQueNoSeUsa() }),
+    )
+    expect(r.status).toBe(200)
+    expect((r.cuerpo as { estado: string }).estado).toBe('listo')
+    expect((r.cuerpo as { frase: string }).frase).toBe('Tu cambio ya está en el sitio.')
+    expect(pedidos).toHaveLength(4)
+  })
+
+  // El otro lado de la degradación de arriba: si el CDN TAMPOCO confirma
+  // (o tampoco contesta), de verdad no sabemos nada — ahí sigue
+  // correspondiendo el 502 de siempre, porque falta la única fuente que
+  // distingue «falló» de «todavía va». Que una fuente caída no se
+  // convierta en un «sí» por omisión sigue valiendo para las dos.
+  it('Ronda 2: si ni la plataforma ni el CDN contestan, sigue siendo 502', async () => {
+    const sha = 'a'.repeat(40)
+    const { f } = fetchFalso([
+      ...respuestasDeNingunaReversionPendiente(),
+      { status: 500, cuerpo: {} }, // la plataforma no contesta
+      { status: 500, cuerpo: {} }, // el CDN tampoco
+    ])
+    const r = await maneja(
+      'estado',
+      { cuerpo: { sha, publicadoEn: 1_000 }, cookie: cookieValida() },
+      contextoDePrueba({ fetch: f, ahora: () => 6_000, correo: correoQueNoSeUsa() }),
+    )
+    expect(r.status).toBe(502)
+  })
+
   // Ronda 2, F-1: mismo candado que la acción vecina (`estadoAccion`, arriba
   // en este archivo): sin `PANEL_VERCEL_PROYECTO` ni `GITHUB_REPO`,
   // `revisaLaCabeza()` no puede seguir en silencio preguntándole a la

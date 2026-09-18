@@ -1843,6 +1843,16 @@ async function salud(_pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
  * `shaServido: null`, que nunca coincide, así que el veredicto depende de lo
  * que diga la plataforma. Una de las dos fuentes caída no puede volverse un
  * «sí» por omisión.
+ *
+ * [Ronda 2] La misma idea, llevada a las dos puntas que le faltaban:
+ *   - Si la PLATAFORMA no contesta (se cae, tira, lo que sea) pero el CDN
+ *     YA confirma el sha publicado, no se corta con 502 — el CDN alcanza
+ *     solo, la plataforma ahí no hacía falta. Recién si el CDN TAMPOCO lo
+ *     confirma es que de verdad no sabemos nada, y ahí sí el 502 de siempre.
+ *   - Si el CDN YA confirma el sha publicado, tampoco se dispara la
+ *     reversión automática aunque la plataforma diga `'falló'`: sería
+ *     destruir un cambio que está funcionando, servido de verdad, por un
+ *     reporte equivocado.
  */
 async function estadoAccion(pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
   const env = contexto.env
@@ -1895,21 +1905,56 @@ async function estadoAccion(pedido: Pedido, contexto: Contexto): Promise<Respues
     fetch: contexto.fetch,
   })
 
-  let despliegue: { estado: EstadoDeDespliegue; url: string | null }
+  // [Ronda 2] Ya no corta con 502 apenas la plataforma falla: `despliegue`
+  // queda en `null` y el error se guarda para el log, pero seguimos —ver el
+  // comentario grande de más abajo sobre por qué.
+  let despliegue: { estado: EstadoDeDespliegue; url: string | null } | null = null
+  let porQueNoContestoLaPlataforma: unknown
   try {
     despliegue = await vercel.despliegueDe(cuerpo.sha)
   } catch (e) {
-    console.error('estado: la plataforma no contestó por el despliegue —', e)
-    return error(502, PROBLEMA_NO_SE_PUDO_LEER)
+    porQueNoContestoLaPlataforma = e
   }
 
   // [Inversión de precedencia] SIEMPRE, ya no solo cuando `despliegue.estado
-  // === 'listo'`. Medido en producción: el despliegue había terminado bien,
-  // el CDN ya servía el sha nuevo, y esta lectura ni se hacía porque la de
-  // arriba decía otra cosa — 31 sondeos seguidos de «en curso» con el
+  // === 'listo'` — ni siquiera condicionado a que la plataforma haya
+  // contestado algo. Medido en producción: el despliegue había terminado
+  // bien, el CDN ya servía el sha nuevo, y esta lectura ni se hacía porque
+  // la de arriba decía otra cosa — 31 sondeos seguidos de «en curso» con el
   // cambio YA publicado. `decide()` (estado.ts) es quien ahora sabe que el
   // CDN alcanza solo; acá no hay que adivinarlo, solo preguntarle siempre.
   const shaServido = await shaQueSirveElCdn(contexto)
+
+  // [Ronda 2, degradación] Antes, que la plataforma no contestara cortaba
+  // ACÁ MISMO con 502, antes de mirar nada más. Con la inversión de
+  // precedencia de arriba, eso deja muda a la fuente que manda —el CDN—
+  // por culpa de la que puede fallar: el mismo defecto que motivó todo este
+  // arreglo, ahora del lado del error de red y no del lado del estado. Si
+  // el CDN YA confirma el sha publicado, la plataforma no hace falta para
+  // saber que está listo. Recién si el CDN TAMPOCO lo confirma es que de
+  // verdad no sabemos nada —ahí falta la única fuente que distingue
+  // «falló» de «todavía va»— y corresponde el 502 de siempre.
+  if (despliegue === null) {
+    if (shaServido === cuerpo.sha) {
+      // El valor de `despliegue` que sigue no importa: la primera rama de
+      // `decide()` corta en cuanto `shaServido === shaPublicado`, antes de
+      // mirarlo. `'desconocido'` es el más honesto de los cuatro posibles
+      // acá — es exactamente lo que sabemos del despliegue en este
+      // instante: nada, porque la plataforma no contestó.
+      return ok({
+        ok: true,
+        ...decide({
+          despliegue: 'desconocido',
+          url: null,
+          shaServido,
+          shaPublicado: cuerpo.sha,
+          desdeHaceMs: contexto.ahora() - publicadoEn,
+        }),
+      })
+    }
+    console.error('estado: la plataforma no contestó por el despliegue —', porQueNoContestoLaPlataforma)
+    return error(502, PROBLEMA_NO_SE_PUDO_LEER)
+  }
 
   // [B1] La reversión automática la hace la invocación que VE el fracaso. No
   // hay ningún proceso sondeando: una función de la plataforma muere a los
@@ -1930,12 +1975,21 @@ async function estadoAccion(pedido: Pedido, contexto: Contexto): Promise<Respues
   // estaba y que Marcos ya sabe, y esas dos cosas no se saben hasta
   // haberlas intentado. Con el orden viejo, `decide()` las prometía y el
   // código que las pagaba corría después.
+  //
+  // [Ronda 2] Y el segundo `if` de acá abajo —el que de verdad dispara
+  // `revierteYAvisa()`— no revierte cuando el CDN YA sirve el sha
+  // publicado. Es la misma razón que reordenó `decide()`: el CDN es el
+  // hecho observable, `despliegue.estado === 'falló'` es un reporte SOBRE
+  // ese hecho, y acá el reporte puede estar mal. Revertir en ese caso no es
+  // un error inocuo — es destruir un cambio que está funcionando, servido
+  // de verdad, por un reporte equivocado. Si el sitio ya sirve lo que ella
+  // publicó, no hay nada que revertir.
   let fracaso: Fracaso | undefined
   if (despliegue.estado === 'falló') {
     if (shaYaAtendido?.sha === cuerpo.sha) {
       fracaso = { revertido: shaYaAtendido.revertido, avisadoAMarcos: shaYaAtendido.avisadoAMarcos }
       await avisaAElla(sesion.correo, contexto, fracaso)
-    } else {
+    } else if (shaServido !== cuerpo.sha) {
       fracaso = await revierteYAvisa(cuerpo.sha, sesion.correo, contexto)
     }
   }
