@@ -1540,6 +1540,26 @@ describe('publicar', () => {
       expect(pedidos.some((p) => p.url.endsWith('/git/commits') && p.metodo === 'POST')).toBe(true)
     })
 
+    it('cada aviso trae SOLO lo que la pantalla necesita: campo, título y detalle', async () => {
+      // [Revisión final de la rama] La respuesta devolvía el `Problema`
+      // completo de `validacion.ts`. `gravedad` es siempre `'avisa'` acá (los
+      // de `'impide'` bloquearon la publicación mucho antes) y `arreglo`
+      // nunca se produce: dos campos que la fase 6 iba a cablear sin que
+      // signifiquen nada, y achicar un contrato después de eso es un cambio
+      // incompatible. `detalle` se queda: es la segunda oración que ella LEE.
+      const { f } = fetchFalso([...respuestasDeUnaPublicacionDeSabores(SITIO_QUE_DICE_QUINCE)])
+      const r = await maneja(
+        'publicar',
+        { cuerpo: { base: SHA_BASE, documentos: { sabores: conDieciseisSabores() } }, cookie: cookieValida() },
+        contextoBase(f),
+      )
+      const avisos = (r.cuerpo as { avisos: Array<Record<string, unknown>> }).avisos
+      expect(avisos.length).toBeGreaterThan(0)
+      for (const a of avisos) {
+        expect(Object.keys(a).sort()).toEqual(['campo', 'detalle', 'titulo'])
+      }
+    })
+
     it('sin nada que avisar, la lista viene VACÍA, nunca ausente', async () => {
       // Que el campo exista siempre es lo que le permite a la fase 6
       // escribir `avisos.length` sin un `?.` que esconda un bug de la
@@ -1648,6 +1668,54 @@ describe('revocar una sesión sin rotar la llave', () => {
     expect(idDeDispositivo(undefined)).toBe('sin-nombre')
     expect(idDeDispositivo(',,,')).toBe('sin-nombre')
     expect(idDeDispositivo('x'.repeat(200))).toHaveLength(64)
+  })
+
+  /*
+   * [Revisión final de la rama] El normalizador tiene que ser IDEMPOTENTE:
+   * `f(f(x)) === f(x)`. No lo era, y el borde estaba en el corte de los 64
+   * caracteres, que puede caer justo después de un guion y dejarlo colgando —
+   * algo que una segunda pasada sí sacaría.
+   *
+   * No es un detalle estético: el id viaja FIRMADO en la cookie, y Marcos lo
+   * copia de un log a `PANEL_DISPOSITIVOS_REVOCADOS` a mano. Dos formas del
+   * mismo id es exactamente cómo una revocación falla en silencio — el bug
+   * que este normalizador existe para cerrar.
+   */
+  describe('idDeDispositivo es idempotente: normalizar dos veces da lo mismo que una', () => {
+    // El caso del borde: 63 caracteres buenos, y el carácter 64 es el guion
+    // que salió de normalizar un espacio. Sin el arreglo, la primera pasada
+    // devuelve «aaa…a-» y la segunda «aaa…a»: dos ids distintos para el
+    // mismo aparato.
+    const JUSTO_EN_EL_CORTE = `${'a'.repeat(63)} b`
+
+    it('el id que corta justo después de un guion no se lo queda colgando', () => {
+      expect(idDeDispositivo(JUSTO_EN_EL_CORTE)).toBe('a'.repeat(63))
+      expect(idDeDispositivo(JUSTO_EN_EL_CORTE).endsWith('-')).toBe(false)
+    })
+
+    it('una segunda pasada no cambia nada, para cualquier entrada rara', () => {
+      const entradas = [
+        JUSTO_EN_EL_CORTE,
+        'iPhone 15, de Marcos',
+        `${'a'.repeat(60)}    ${'b'.repeat(10)}`,
+        'x'.repeat(200),
+        `${'-'.repeat(70)}abc`,
+        '   ',
+        ',,,',
+        '',
+      ]
+      for (const entrada of entradas) {
+        const una = idDeDispositivo(entrada)
+        expect(idDeDispositivo(una), JSON.stringify(entrada)).toBe(una)
+      }
+    })
+
+    it('un nombre que empieza con muchos guiones NO colapsa a `sin-nombre`', () => {
+      // `sin-nombre` es el id COMPARTIDO: cualquier aparato que caiga ahí
+      // deja de poder revocarse por separado. Recortar los extremos solo
+      // después del corte habría mandado este caso justo ahí.
+      expect(idDeDispositivo(`${'-'.repeat(70)}abc`)).toBe('abc')
+    })
   })
 
   it('C-2: y revocarlo funciona de punta a punta', async () => {

@@ -4998,19 +4998,27 @@ escribió, y el servidor compara contra eso.
 
 `publicar` exitoso siempre trae `avisos` — un array, **nunca ausente,
 vacío si no hay nada que avisar** (`acciones.ts`: «para que la pantalla
-pueda leer `avisos.length` sin preguntarse primero si el campo vino») — de
-`Problema[]`, `src/contenido/validacion.ts`, ya filtrado a
-`gravedad: 'avisa'` (los de `gravedad: 'impide'` nunca llegan acá: esos
-bloquearon la publicación antes de escribir):
+pueda leer `avisos.length` sin preguntarse primero si el campo vino»).
+
+**[Achicado en la ola de arreglos de la revisión final, grupo 7]** Viajaba
+el `Problema` completo de `src/contenido/validacion.ts`; ahora viaja
+`AvisoPublicado` (`acciones.ts`), que es lo que la pantalla necesita y nada
+más:
 ```ts
-interface Problema {
-  campo: string
-  gravedad: 'impide' | 'avisa'  // acá siempre 'avisa'
-  titulo: string        // sin jerga — para pintar directo, pero NUNCA como HTML (ver más abajo)
-  detalle?: string
-  arreglo?: { etiqueta: string; valor: unknown }
+interface AvisoPublicado {
+  campo: string         // la ruta del campo, para resaltarlo
+  titulo: string        // lo que ella lee. Sin jerga — pintar directo, pero NUNCA como HTML (ver más abajo)
+  detalle?: string      // por qué importa, cuando hace falta decirlo. Sin jerga.
 }
 ```
+Qué se fue y por qué: **`gravedad`**, porque este array ya viene filtrado a
+`'avisa'` (los de `'impide'` bloquearon la publicación mucho antes de llegar
+acá), así que era siempre el mismo valor y una pantalla que filtrara por él
+se rompería en silencio; y **`arreglo`**, porque `avisosDeConteo()` no lo
+produce nunca y su `valor: unknown` es contenido de la clienta viajando sin
+forma — si algún día hay un «arreglalo por mí», es una decisión de producto
+con la pantalla delante, no algo que se hereda por descuido. **`detalle` se
+quedó**: no es metadato, es la segunda oración que ella lee.
 
 **Un gotcha de forma que no está en ningún lado más que acá:** `salud`
 tiene TRES formas de cuerpo distintas según la rama, y la del error más

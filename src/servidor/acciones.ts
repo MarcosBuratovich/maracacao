@@ -299,10 +299,29 @@ interface CuerpoEntrar {
  * estás editando?», va a querer separar las dos cosas —un id opaco que
  * genera el servidor para revocar, y una etiqueta legible para mostrar— y
  * ese es el momento de hacerlo, con la pantalla delante.
+ *
+ * [Revisión final de la rama] Es IDEMPOTENTE: `f(f(x)) === f(x)` para
+ * cualquier `x`. No lo era, y el borde estaba en el corte de los 64
+ * caracteres — que puede caer justo después de un guion y dejarlo colgando,
+ * cosa que una segunda pasada sí sacaría. Importa porque el id viaja FIRMADO
+ * en la cookie y Marcos lo copia de un log a `PANEL_DISPOSITIVOS_REVOCADOS`
+ * a mano: dos formas del mismo id es exactamente cómo una revocación falla
+ * en silencio, que es el bug que este normalizador existe para cerrar. Por
+ * eso el recorte de guiones va DESPUÉS del corte, no antes, y hay un test
+ * que lo corre dos veces.
  */
 export const idDeDispositivo = (crudo: unknown): string => {
   const texto = typeof crudo === 'string' ? crudo : ''
-  const limpio = texto.replace(/[^A-Za-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64)
+  const limpio = texto
+    .replace(/[^A-Za-z0-9_-]+/g, '-')
+    // Los guiones de los extremos se sacan ANTES de cortar —si no, un nombre
+    // que empieza con setenta guiones se quedaría sin nada que lo
+    // identifique y colapsaría a `'sin-nombre'`, que es el id compartido que
+    // hay que evitar— y los del final, otra vez DESPUÉS, porque el corte
+    // puede caer justo detrás de uno.
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64)
+    .replace(/-+$/, '')
   return limpio === '' ? 'sin-nombre' : limpio
 }
 
@@ -715,6 +734,48 @@ const PROBLEMA_SIN_BASE = 'No pudimos publicar: vuelve a abrir el panel y hazlo 
 // sitio mientras editabas»— y tiene que sonar igual, se detecte antes (acá,
 // comparando shas) o después (allá, al chocar el ref).
 const PROBLEMA_PISARIA = 'Marcos cambió algo del sitio mientras editabas: vuelve a intentar la publicación.'
+
+/**
+ * Un aviso de conteo, tal cual sale por HTTP.
+ *
+ * [Revisión final de la rama] La respuesta de `publicar` devolvía el
+ * `Problema` COMPLETO de `validacion.ts`, y eso es el contrato que la fase 6
+ * va a cablear: achicarlo después es un cambio incompatible sobre código ya
+ * escrito. Se achica ahora, y la decisión es explícita:
+ *
+ * - **`gravedad` se va.** Este array ya viene filtrado a `'avisa'` (los de
+ *   `'impide'` bloquearon la publicación mucho antes de llegar acá), así que
+ *   el campo es siempre el mismo valor. Una pantalla que lo lea estaría
+ *   codificando un hecho redundante, y el día que alguien filtre por él y se
+ *   equivoque, el bug es «los avisos dejaron de mostrarse» — silencioso.
+ * - **`arreglo` se va.** Hoy `avisosDeConteo()` no lo produce nunca, y su
+ *   `valor: unknown` es contenido de la clienta viajando sin forma. Si algún
+ *   día hay un «arreglalo por mí», esa es una decisión de producto con la
+ *   pantalla delante, no algo que se hereda por descuido.
+ * - **`detalle` SE QUEDA**, en contra de lo que pedía el informe de la
+ *   revisión (que decía «el par `{campo, titulo}`»). No es metadato: es la
+ *   segunda oración que ella LEE —«Si agregaste o quitaste algo de la lista,
+ *   este texto quedó viejo»— y el servidor es el único que la puede escribir,
+ *   porque es quien sabe por qué cruzó el conteo. Sacarla no achica el
+ *   contrato, le borra información a la pantalla y la obliga a inventar una
+ *   explicación propia. Ya hay un test que le corre `jergaEn()` encima: está
+ *   tratada como texto para ella desde el día uno.
+ */
+export interface AvisoPublicado {
+  /** La ruta del campo, para que la pantalla lo pueda resaltar. */
+  campo: string
+  /** Lo que ella lee. Sin jerga. */
+  titulo: string
+  /** Por qué importa, cuando hace falta decirlo. Sin jerga. */
+  detalle?: string
+}
+
+/** Del `Problema` de adentro al par mínimo que sale por HTTP — ver `AvisoPublicado`. */
+const comoAviso = (p: Problema): AvisoPublicado => ({
+  campo: p.campo,
+  titulo: p.titulo,
+  ...(p.detalle !== undefined ? { detalle: p.detalle } : {}),
+})
 
 const RUTA_DEL_DOCUMENTO = (id: IdDocumento): string => `src/contenido/datos/${id}.json`
 
@@ -1469,7 +1530,7 @@ async function publicarAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
     )
   }
 
-  return ok({ ok: true, sha: resultado.sha, resumen: resultado.resumen, avisos })
+  return ok({ ok: true, sha: resultado.sha, resumen: resultado.resumen, avisos: avisos.map(comoAviso) })
 }
 
 /*

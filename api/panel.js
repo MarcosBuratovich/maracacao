@@ -18443,7 +18443,7 @@ function correoEnLista(correo2, lista2) {
 var HASH_SENUELO = hashDeClave("se\xF1uelo \u2014 nunca es la contrase\xF1a de nadie, existe solo para parejar el reloj");
 var idDeDispositivo = (crudo) => {
   const texto2 = typeof crudo === "string" ? crudo : "";
-  const limpio = texto2.replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 64);
+  const limpio = texto2.replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 64).replace(/-+$/, "");
   return limpio === "" ? "sin-nombre" : limpio;
 };
 function entrar(pedido, contexto) {
@@ -18564,6 +18564,11 @@ var PROBLEMA_NO_SE_PUDO_LEER = "No pudimos revisar el contenido actual del sitio
 var SIN_CAMBIOS = "No hab\xEDa nada que publicar: no cambiaste ning\xFAn dato del sitio.";
 var PROBLEMA_SIN_BASE = "No pudimos publicar: vuelve a abrir el panel y hazlo de nuevo.";
 var PROBLEMA_PISARIA = "Marcos cambi\xF3 algo del sitio mientras editabas: vuelve a intentar la publicaci\xF3n.";
+var comoAviso = (p) => ({
+  campo: p.campo,
+  titulo: p.titulo,
+  ...p.detalle !== void 0 ? { detalle: p.detalle } : {}
+});
 var RUTA_DEL_DOCUMENTO2 = (id) => `src/contenido/datos/${id}.json`;
 var esIdDocumento = (v) => Object.prototype.hasOwnProperty.call(DOCUMENTOS, v);
 function comoDocumentos(v) {
@@ -18842,7 +18847,7 @@ async function publicarAccion(pedido, contexto) {
       e
     );
   }
-  return ok({ ok: true, sha: resultado.sha, resumen: resultado.resumen, avisos });
+  return ok({ ok: true, sha: resultado.sha, resumen: resultado.resumen, avisos: avisos.map(comoAviso) });
 }
 var VARIABLES_REQUERIDAS = [
   "PANEL_CLAVE_HASH",
