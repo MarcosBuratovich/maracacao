@@ -4220,130 +4220,195 @@ que impide que el token se filtre en la primera navegación que salga de la
 página; `no-store` es lo que impide que una página con token quede en un caché
 compartido.
 
-- [ ] **Step 4b: Los once arreglos de la revisión**
+- [ ] **Step 4b: Los nueve hallazgos de la revisión**
 
-La revisión **confirmó la divergencia**: apartarse de lo que este brief
-ilustraba era obligatorio. Con el diseño original, el primer guardado andaba,
-la primera LECTURA devolvía 404 → `null` —o sea, **el borrador desaparecía en
-silencio**— y desde ahí cada guardado reintentaba el arranque y moría con
-`Reference already exists`, para siempre. Y encontró el argumento decisivo por
-el commit huérfano, que vale la pena dejar escrito en el código: **un commit
-raíz no tiene ancestro común con `main`, así que git se niega a mergearlo**
-(«refusing to merge unrelated histories»). Las dos listas blancas son un candado
-de software; el huérfano es un candado de matemática.
+La revisión atacó la puerta con ocho forjas distintas y **las ocho rebotaron**:
+la criptografía de este enlace está bien hecha —el dominio adentro del mensaje
+firmado, el largo comparado antes del `timingSafeEqual`, la frontera del
+vencimiento exacta— y no hay un segundo bypass de clave vacía acá. Lo que
+encontró está alrededor.
 
-**A (Important) · El candado anti-pisada se apoya en un dato del cliente.**
-`dispositivo` sale del cuerpo del pedido, teniendo `sesion.dispositivo`
-—firmado— a mano. Y `idDeDispositivo(undefined)` devuelve `'sin-nombre'`, nunca
-falla: si la fase 6 arma el pedido sin ese campo, los dos aparatos son
-`'sin-nombre'`, el candado no dispara nunca, y la hermana pisa el borrador de la
-clienta en silencio — literalmente el bug que esta tarea vino a arreglar.
-Ningún test lo pesca porque todos pasan el campo explícito. **Sale de la
-sesión**, como ya salen `autor` y el reloj. Y va el test del pedido sin campo.
+**A (Critical) · La puerta no funciona nunca.** `history.replaceState` corre
+**antes** de leer `location.search`, y reescribe el URL de forma síncrona: para
+cuando el código lee el token, ya no está. `token` es siempre `''`, el botón no
+aparece nunca, y la página siempre dice «Este enlace no funciona. Pide uno
+nuevo.» Verificado en un Chromium de verdad.
 
-**B (Important) · Un borrador corrupto deja el panel en estado terminal.**
-Un `JSON.parse` que falla sube intacto y las DOS acciones dan 502 — y no hay
-salida, porque para escribir un borrador nuevo hay que leer el corrupto primero.
-Sólo se arregla a mano en git. El diseño ya decidió que «no puedo leer el
-borrador» no le rompe la pantalla (el 404 da `null`); un JSON corrupto es el
-mismo estado desde el lado de ella. Se trata igual, con `console.error` para
-Marcos. **Lo mismo con el ref que existe sin su archivo**, que hoy cae en el
-mismo bucle de 422.
+Invertir las dos líneas lo arregla, y **no** reintroduce el token en la barra:
+medido, el URL queda igual de limpio.
 
-**C (Important) · La guardia del `force` mira el valor equivocado.**
-Tanto la guardia como la elección de lista blanca son «todo lo que no sea
-exactamente `heads/main`». Medido: un ref tercero con `forzar: true` pasa. Si
-ese ref cayera adentro de `refs/heads/` —un typo como `'heads/borrador'`— el
-borrador a medio escribir aterriza en una **rama**, que la plataforma sí mira, y
-se despliega: justo la pregunta que el ref fuera de `refs/heads/` vino a cerrar.
+Y el motivo por el que 1179 tests verdes no lo vieron es lo que hay que arreglar
+de fondo: **los seis tests de esa página miran el TEXTO del archivo**, no su
+comportamiento. Uno exige que la cadena `history.replaceState` aparezca en el
+HTML — y aparece, en el orden equivocado. `linkedom` ya es dependencia del
+repo: un test que ejecute el script y verifique que el botón queda visible con
+un token en la URL habría cazado esto solo.
 
-Pasa a ser un **mapa explícito** de refs conocidos a su lista blanca, con
-`throw` para el desconocido, y el `force` permitido **solo** en la entrada del
-borrador. Una regla positiva («este ref permite forzar») en vez de una
-prohibición sobre un único valor.
+**B (Critical) · Pedir un enlace filtra qué direcciones tienen acceso, por el
+reloj.** El cuerpo y el código son idénticos en las dos ramas —eso está
+perfecto— pero la rama de la dirección listada hace una llamada HTTP al
+proveedor de correo y la otra no hace nada. Medido:
 
-**D (Important) · El arranque no pasa por ningún tope.**
-`borradorGuardarAccion` nunca pasa `contexto.bytesDelCuerpo` —a diferencia de
-las otras dos acciones que escriben— y el camino de arranque va directo a
-`creaBlob()` sin pasar por `revisaLote()`: ni lista blanca ni tope de cuerpo.
-Los dos caminos tienen que pasar por las mismas barreras.
+```
+listado    = 150.46 ms
+no listado =   0.03 ms      ← ~5000×
+```
 
-**E (Minor) · Y siete cosas chicas:**
+Un endpoint público, sin sesión, y un solo pedido alcanza para saber si una
+dirección tiene acceso al panel. Es exactamente el oráculo que este brief
+declara no negociable, abierto por el otro lado.
 
-1. **`ARBOL_VACIO` es el único paso que ningún test puede cubrir.** En vez de
-   dejarlo y mandar a alguien a verificarlo con un `curl` que se va a olvidar,
-   `creaArbol()` pasa a **omitir** `base_tree` cuando no hay base — que es la
-   forma documentada de «un árbol de cero». Elimina el riesgo en vez de
-   diferirlo.
-2. **El centinela `padre: ''`** pasa a `string | null`. `''` es justo el valor
-   que una variable `string` toma por accidente (`padre: sha ?? ''`), así que
-   hoy «no tengo padre» y «perdí el padre» son el mismo valor y el modo de falla
-   es silencioso por construcción.
-3. **Cualquier 404 se lee como «no hay borrador»** — incluido un token sin
-   permiso o un repo mal escrito. Ella ve «no hay borrador» y su trabajo parece
-   perdido cuando el panel está mal configurado. Va un `console.error` que lo
-   distinga.
-4. **El conflicto usa `>` y no `>=`**: dos guardados del mismo milisegundo desde
-   aparatos distintos y el segundo pisa sin avisar.
-5. **Un borrador sin `hora` se pisa sin avisar** (`undefined > 1000` es `false`).
-   El trato es el correcto —mejor escribir que bloquear— pero tiene que estar
-   declarado y con test, no ser un accidente del operador.
-6. **Los commits del ref del borrador no se parecen entre sí:** el raíz dice
-   «Borrador» y los siguientes usan el asunto genérico de publicar, con los
-   trailers del panel. Nada los lee, pero si Marcos mira ese ref ve commits que
-   parecen publicaciones del sitio.
-7. **Cada arreglo va con su test.** Los de A, B, C y D sobre todo.
+**Y este proyecto ya resolvió esta misma clase de bug en la puerta de al lado:**
+`entrar` tiene un hash señuelo (I-3) para que las dos ramas tarden lo mismo, con
+su test de piso. Medido: `entrar` da 105.7 ms en las dos ramas; `enlace` da
+150.5 contra 0.03. La acción nueva no heredó el criterio. Igualá el reloj —un
+envío señuelo, o un piso fijo antes de contestar— y poné el test con el mismo
+patrón del que ya existe.
 
-- [ ] **Step 4c: Los tres que quedaron abiertos**
+**C (Important) · El enlace se puede reusar sin límite.** Los quince minutos son
+el único techo. Medido: el mismo token se cambió por sesión **ocho veces en
+paralelo desde ocho IPs distintas**, ocho sesiones de treinta días. Un token de
+quince minutos se convierte en un pie adentro de un mes, replicable, y **ella no
+se entera**: consumirlo no invalida nada ni deja rastro.
 
-**1 · El hallazgo B quedó a medias, y la raíz es una sola.** El estado terminal
-se eliminó en todos los casos menos uno: un archivo cuyo contenido es
-exactamente `null`. Ahí `JSON.parse` **no falla** —`null` es JSON válido— así
-que la lectura se declara «ok» con un borrador nulo, y el guardado revienta al
-mirarle el `dispositivo`: 502. Y como leer traduce eso a «no hay borrador», el
-panel nunca va a mandar `pisar: true`: **sin salida por la interfaz**, que es
-exactamente lo que B vino a matar.
+No hace falta un almacén compartido para acotarlo, y hay dos cosas que no
+cuestan infraestructura:
 
-La misma raíz cubre cuatro casos más que hoy pasan silenciosamente: `[]`, `42`,
-`"hola"`, `true`. En todos ellos `borrador.leer` le entrega a la fase 6 un valor
-que **no es un `Borrador`** pero está tipado como si lo fuera, porque
-`JSON.parse(texto) as Borrador` no valida nada. Un `as` no es una validación: es
-una promesa que el archivo del repo no tiene por qué cumplir.
+1. **La sesión que emite esta vía dura 24 horas, no treinta días.** Es una
+   puerta de recuperación: sirve para volver a entrar, no para quedarse. La
+   fase 6 va a poder ofrecer «recordar este aparato» desde adentro.
+2. **Cada vez que se consume un enlace, le llega un correo a ella.** Es la única
+   señal que puede tener de que alguien más entró con su enlace.
+
+**D (Important) · No hay freno en el consumo, y el argumento que lo justifica se
+contradice.** Medido: veinte tokens basura seguidos desde la misma IP, veinte
+401, ni un 429. La premisa del razonamiento —que un HMAC no se adivina— es
+cierta y quedó verificada. Pero el freno acá no protege contra adivinar la
+firma: protege contra **reusar un token válido**, que es el hallazgo C y hoy no
+tiene ningún techo. Y la razón que se dio para no ponerlo («alguien podría
+gastarle los intentos a otro») **ya pasa** en la acción de al lado, por la
+puerta que sí se eligió compartir.
+
+**E (Minor) · El contador compartido se vuelve en contra el día que más
+importa.** Medido: cinco pedidos de enlace desde una IP y después `entrar` con
+la contraseña **correcta** devuelve 429. O sea: la clienta que perdió el
+teléfono pide el enlace cinco veces porque no le llega, y se queda además sin
+poder usar su contraseña por quince minutos — justo el día de la recuperación.
+Contadores separados por acción lo arreglan, y de paso desarman la
+contradicción del hallazgo D.
+
+**F (Minor) · Sin tope por destinatario.** El freno es por IP. Medido: veinte
+IPs distintas, **cien correos** a la bandeja de ella, todos desde el remitente
+del proyecto. Un tope por dirección (tres enlaces cada quince minutos) protege
+su bandeja y la reputación del remitente.
+
+**G (Minor) · La página no tiene su propio `<meta name="robots">`.** Las otras
+dos páginas privadas del proyecto tienen **las dos** señales: el meta en el HTML
+y la cabecera. Acá el `noindex` cuelga de un solo hilo. Cuatro palabras.
+
+**H (Minor) · El correo se firma con las mayúsculas que tipeó quien lo pidió**, y
+esa forma cruda termina como autor de los commits. Normalizalo contra la entrada
+de la lista al firmar.
+
+- [ ] **Step 4c: Las dos consecuencias de los arreglos**
+
+Los nueve quedaron cerrados y cada arreglo probado por mutación. Pero dos de
+ellos trajeron cola, y las dos hay que ajustarlas antes de que esto corra con
+una clave de correo real.
+
+**1 · El señuelo manda correo de verdad, sin techo, a una casilla que no
+existe.** Medido: veinte pedidos desde veinte IPs con veinte direcciones
+inventadas → **veinte correos**, todos a `senuelo@descarte.maracacao.mx`, y cada
+uno con **un token de enlace válido adentro**. El tope por destinatario no lo
+frena, porque su clave es la dirección que mandó quien pide, no el señuelo. Y
+`maracacao.mx` **no tiene registros MX**: cada uno de esos envíos es un rebote
+duro contra la reputación del remitente.
+
+O sea: el arreglo del oráculo abrió un generador ilimitado de rebotes — justo lo
+que el tope por destinatario fue a proteger. Y no está documentado en ningún
+lado, así que Marcos vería rebotes en Resend sin ninguna explicación.
+
+**Se reemplaza por un piso de tiempo fijo.** Cierra el oráculo igual —las dos
+ramas tardan lo mismo— y no manda nada:
 
 ```ts
-  // `JSON.parse` no falla con `null`, `[]`, `42` ni `"hola"`: todos son JSON
-  // válido. El `as Borrador` de acá abajo es una promesa que este archivo no
-  // tiene por qué cumplir —lo escribe el panel, pero también lo puede tocar
-  // una mano—, así que la forma se mira de verdad. Sin esto, un archivo con
-  // `null` adentro deja el panel sin salida: leer dice «no hay borrador»,
-  // guardar revienta, y como la pantalla cree que no hay nada, nunca manda el
-  // `pisar` que lo destrabaría.
-  const crudo: unknown = JSON.parse(texto)
-  if (typeof crudo !== 'object' || crudo === null || Array.isArray(crudo)) {
-    return { estado: 'ilegible', sha }
+/**
+ * El piso de tiempo de `enlace`.
+ *
+ * Las dos ramas —dirección listada y no listada— tienen que tardar lo mismo, o
+ * el endpoint se vuelve una forma de averiguar quién tiene acceso al panel
+ * probando direcciones una por una. La primera versión de este arreglo igualaba
+ * el reloj MANDANDO un correo señuelo, y eso cerraba el oráculo pero abría algo
+ * peor: veinte pedidos desde veinte IPs eran veinte rebotes duros contra la
+ * reputación del remitente, cada uno con un token válido adentro.
+ *
+ * Esperar es más barato y no le escribe a nadie. El número tiene que ser
+ * cómodamente mayor que lo que tarda el proveedor de correo —si queda corto, la
+ * rama que manda de verdad se pasa del piso y el oráculo vuelve—, y el test de
+ * abajo lo vigila con el mismo criterio que el de la puerta de contraseña.
+ */
+const PISO_ENLACE_MS = 400
+```
+
+con su test de piso, el mismo patrón del que ya existe para la contraseña: las
+dos ramas medidas, y la diferencia por debajo de un umbral chico.
+
+**2 · El tope por destinatario es una negación de servicio contra la puerta de
+recuperación.** Medido: un extraño desde **tres IPs cualesquiera** pide el
+enlace de ella tres veces; cuando **ella** lo pide desde su propia IP, recibe
+429. Tres pedidos alcanzan para dejarla afuera de su única puerta de emergencia
+—el día que perdió el teléfono— y no hace falta saber nada, porque el chequeo
+corre antes de saber si la dirección está en la lista.
+
+El tope era real y se queda, pero **tres es un número muy bajo para la puerta
+que tiene que funcionar el peor día**. Sube a **diez cada quince minutos**, con
+un `console.error` fuerte cuando se dispara. Diez es bajo para proteger su
+bandeja (frente a los cien que había) y alto para que dejarla afuera exija
+hostigarla a propósito — y si eso pasa, el log se lo dice a Marcos, que puede
+hacer algo. Dejalo escrito en el runbook, con el residuo declarado: **este tope
+no se puede subir hasta desaparecer sin devolverle el problema a su bandeja**.
+
+**3 · Y una imprecisión de redacción:** el runbook dice «las tres puertas de
+esta sección» y el paréntesis enumera dos.
+
+- [ ] **Step 4d: La alarma del piso**
+
+Medido en la re-revisión: con el proveedor a 800 ms contra un piso de 400, las
+dos ramas vuelven a diferir 400 ms. **El oráculo se reabre cada vez que el
+proveedor tenga un mal día.**
+
+El revisor propone un timeout duro sobre el envío para que el total no dependa
+nunca del proveedor. **No se hace, y la razón es de producto:** abandonar el
+envío en una función serverless puede matarlo —la plataforma congela el proceso
+después de responder— y ésta es la puerta de RECUPERACIÓN. Que el correo no
+salga el día que ella perdió el teléfono es peor que una señal de tiempo
+intermitente, que además solo aparece mientras el proveedor está lento y no es
+reproducible a voluntad por quien ataca. Lo que se gana con el timeout no paga
+lo que se arriesga.
+
+Lo que sí falta es que **no pase en silencio**. Hoy el código solo actúa cuando
+FALTA tiempo para llegar al piso, y nunca cuando sobra:
+
+```ts
+  const transcurrido = Date.now() - arranque
+  if (transcurrido > PISO_ENLACE_MS) {
+    // El proveedor tardó más que el piso, así que esta rama —la que SÍ manda—
+    // acaba de tardar más que la que no manda nada: por esta ventana, el
+    // tiempo de respuesta vuelve a decir si la dirección tiene acceso. No se
+    // corta el envío para evitarlo (ver el ruling T12-K: abandonar el pedido
+    // en una función serverless puede matar el correo, y ésta es la puerta que
+    // tiene que funcionar el peor día). Lo que sí se hace es avisar, para que
+    // esto no sea invisible: si aparece seguido, hay que subir el piso.
+    console.error(
+      `enlace: el envío tardó ${transcurrido} ms, más que el piso de ${PISO_ENLACE_MS} ms — ` +
+        'mientras eso pase, el tiempo de respuesta distingue una dirección con acceso de una sin acceso.',
+    )
   }
 ```
 
-**2 · Rotura nueva (Minor, latente): el mapa de refs acepta claves heredadas.**
-`REFS_CONOCIDOS` es un objeto literal y la búsqueda es `REFS_CONOCIDOS[ref]`, así
-que `__proto__`, `constructor`, `toString` y `valueOf` **no tiran** con
-`forzar: false`: la búsqueda devuelve algo heredado y truthy, `permiteRuta` sale
-`undefined`, y al caer en el default del parámetro **se aplica la lista blanca de
-`main`** — y publica de verdad.
-
-No es alcanzable hoy desde un pedido HTTP (el ref nunca sale de datos del
-cliente) y el `force` sigue siendo imposible fuera del borrador, así que no es
-grave. Pero contradice por escrito la invariante que el arreglo C fijó: `throw`
-para el desconocido. `Object.hasOwn(REFS_CONOCIDOS, ref)` —o un `Map`, o
-`Object.create(null)`— lo cierra, y `permiteRuta` pasa a pasarse siempre
-explícito en vez de depender de un default.
-
-**3 · El log nuevo grita en el caso más común.** Quedó en nivel `error` y
-dispara en el camino **normal**: cada lectura y cada guardado de un panel que
-todavía no tiene borrador. Con el mismo texto que tendría el 404 de un token
-vencido, así que no distingue los dos casos —que era lo que ese log venía a
-hacer— y de paso llena de «error» el estado más común de un panel recién
-estrenado. Bajalo de nivel y que el texto diga las dos posibilidades.
+con su test, y el residuo escrito en el runbook junto al del tope: **el piso
+protege mientras el proveedor sea más rápido que él, y la alarma es cómo se
+sabe que dejó de serlo.**
 
 - [ ] **Step 5: Corré, reempaquetá y commiteá**
 
