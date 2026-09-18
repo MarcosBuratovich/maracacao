@@ -522,10 +522,21 @@ limpieza:**
 
 - Si es ELLA quien está sondeando `estado` para ESE sha (el caso normal:
   publicó, y todavía tiene el panel abierto esperando el veredicto), le
-  llega un correo a ELLA («No salió; lo dejé como estaba y ya le avisé a
-  Marcos.», sin jerga) Y a vos (`PANEL_AVISOS_A`, con el sha, el autor real
-  —leído del trailer `Panel-Autor:` del commit, nunca de quien dispara la
-  limpieza— y el resultado técnico de la reversión).
+  llega un correo a ELLA (sin jerga) Y a vos (`PANEL_AVISOS_A`, con el sha,
+  el autor real —leído del trailer `Panel-Autor:` del commit, nunca de quien
+  dispara la limpieza— y el resultado técnico de la reversión).
+
+  **[Actualizado, ola de arreglos de la revisión final]** La frase que ella
+  lee —la misma en pantalla y en su correo— ya no es una sola. Decía «No
+  salió; lo dejé como estaba **y ya le avisé a Marcos**» siempre, y las dos
+  mitades pueden ser mentira: el correo degrada por diseño (sin
+  `PANEL_AVISOS_A`, o con `RESEND_API_KEY` todavía en trámite, se loguea y se
+  sigue) y la reversión puede no poder. Ahora hay cuatro, una por
+  combinación, y **te importan a vos cuando ella te muestre la pantalla**: si
+  lo que leyó dice «Avísale a Marcos para que lo revise», el correo NO te
+  llegó y no tiene sentido que lo busques en la bandeja; si dice «no pude
+  dejarlo como estaba», `main` quedó con el commit roto y hay que mirar la
+  sección «Si `main` queda roto», más abajo.
 - Si NADIE está mirando ese sha en particular en este instante —cerró el
   panel, o sos vos entrando a mirar `historial`, o ella publicando OTRA
   cosa y `revisaLaCabeza()` de paso encuentra la cabeza rota de una
