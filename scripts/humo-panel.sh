@@ -10,13 +10,21 @@
 # es el script al que hay que volver — por eso cada paso explica el PORQUÉ,
 # no el QUÉ (el comando ya dice el qué).
 #
-# El freno de intentos (paso 6) va AL FINAL, después de publicar y
-# restaurar, no antes: el freno no depende de nada de lo que hace
-# `publicar`, así que el orden es libre, y probarlo primero significaba
-# dispararlo y quedarte mirando una terminal quince minutos antes de que
-# pasara algo interesante. Un ensayo de veinticinco minutos con una espera
-# muerta en el medio es un ensayo que nadie repite — y un ensayo que nadie
-# repite deja de ser un ensayo (RULING T7-b).
+# [Fase 5B, Tarea 15] Crece con los pasos nuevos de esta fase: `publicar`
+# exige `base` (400 si falta, 409 si está vieja), `salud` exige
+# `PANEL_VERCEL_TOKEN`, y hay acciones nuevas (`estado`, `historial`,
+# `deshacer`) que este ensayo es la PRIMERA vez que tocan la API de la
+# plataforma desde la función, en producción — antes de este script, ese
+# camino nunca se había medido contra algo real (ver el docstring de
+# `src/servidor/vercel.ts`, RULING T5-1).
+#
+# El freno de intentos de `entrar` (el último paso) va AL FINAL, después de
+# publicar, sondear, deshacer y restaurar — no antes: el freno no depende de
+# nada de lo que hace `publicar`/`estado`/`deshacer`/`historial`, así que el
+# orden es libre, y probarlo primero significaba dispararlo y quedarte
+# mirando una terminal quince minutos antes de que pasara algo interesante.
+# Un ensayo largo con una espera muerta en el medio es un ensayo que nadie
+# repite — y un ensayo que nadie repite deja de ser un ensayo (RULING T7-b).
 #
 # Lo corrés vos, a mano, desde tu máquina:
 #   scripts/humo-panel.sh tu-correo@ejemplo.com
@@ -37,14 +45,18 @@
 #
 # Nada de esto queda commiteado en el repo, y este archivo no tiene ninguna
 # contraseña, cookie ni token adentro — ni de prueba: los junta en caliente,
-# los usa, y los tira.
+# los usa, y los tira. Y si venís de una corrida vieja: las sesiones de
+# antes de la Tarea 3 de esta fase (el cuerpo firmado de la cookie cambió)
+# ya no valen — este script arranca una cookie nueva en cada corrida, así
+# que no hay nada que migrar a mano.
 
 set -uo pipefail
 # Sin `-e` a propósito: cada paso de este script tiene su propio chequeo de
 # «¿esto salió como esperaba?» y decide por su cuenta si corta con `exit 1`.
-# `curl` no falla (código de salida 0) ante un 401 o un 403 — esas son
-# respuestas HTTP válidas, no errores de red — así que un `set -e` no nos
-# protegería de nada acá; lo que nos protege es comparar el status a mano.
+# `curl` no falla (código de salida 0) ante un 401, un 409 o un 422 — esas
+# son respuestas HTTP válidas, no errores de red — así que un `set -e` no
+# nos protegería de nada acá; lo que nos protege es comparar el status a
+# mano.
 
 BASE='https://www.maracacao.mx'
 ORIGEN='https://www.maracacao.mx'
@@ -52,9 +64,9 @@ ORIGEN='https://www.maracacao.mx'
 # (src/servidor/origen.ts) — es la misma defensa que ya prueban
 # `test/origen-servidor.test.ts` y `test/panel-entrada.test.ts`, y un curl
 # pelado (sin `-H Origin`) la dispara. Por eso el Origin va en TODOS los
-# POST de este script.
+# POST de este script, sea cual sea la acción.
 
-# Estas dos se inicializan ACÁ, antes de que pueda pasar cualquier cosa que
+# Estas se inicializan ACÁ, antes de que pueda pasar cualquier cosa que
 # corte el script (falta una herramienta, falta el correo, lo que sea): la
 # trampa de salida (`limpieza`, más abajo) las lee siempre, y con `set -u`
 # leer una variable que todavía no existe corta el script con un error feo
@@ -106,10 +118,17 @@ cuerpo_publicar() {
   # entero contra lo que se manda) — mandar solo
   # `{"footer":{"derechos":"…"}}` rebota con «el campo quedó vacío» en
   # todos los demás campos.
-  # $2 = el sha contra el que se "editó" (la Tarea 2 de la Parte B): sin
-  # esto el servidor rebota con 400 antes de mirar el documento siquiera —
-  # es la declaración de contra qué versión del sitio se escribió.
+  # $2 = el sha contra el que se "editó" (Tarea 2 de esta fase): sin esto
+  # el servidor rebota con 400 antes de mirar el documento siquiera — es
+  # la declaración de contra qué versión del sitio se escribió.
   jq -n --argjson sitio "$(cat "$1")" --arg base "$2" '{base: $base, documentos: {sitio: $sitio}}'
+}
+
+# El mismo cuerpo que `cuerpo_publicar`, pero SIN "base" — a propósito: el
+# paso 4a prueba justo que el servidor rebota con 400 antes de mirar un
+# solo byte del documento cuando esa declaración falta (Tarea 2).
+cuerpo_publicar_sin_base() {
+  jq -n --argjson sitio "$(cat "$1")" '{documentos: {sitio: $sitio}}'
 }
 
 # Login con la contraseña REAL (la de `$CLAVE`), usado tanto en el paso 3
@@ -150,9 +169,9 @@ hacer_login_real() {
 # `sitio.json` VIVO de GitHub —nunca el archivo local, que podría estar
 # desactualizado si alguien publicó algo después del último `git pull`— y
 # cambiándole ese único campo. Deja `SHA_PUBLICADO` seteado si salió bien.
-# La usan el paso 4 (publicar la prueba), el paso 5 (restaurar) y el modo
-# `--restaurar`: un solo lugar que arma el pedido es un solo lugar donde
-# puede haber un bug, no tres.
+# La usan el paso 4b (publicar la prueba) y el modo `--restaurar`: un solo
+# lugar que arma el pedido es un solo lugar donde puede haber un bug, no
+# dos.
 publica_derechos() {
   local valor="$1"
   git fetch origin main --quiet
@@ -220,6 +239,58 @@ espera_en_vivo() {
   return 1
 }
 
+# Sondea `accion=estado` para un sha publicado, respetando el `reintentarEn`
+# que cada respuesta manda — spec §4.5: el sondeo NO vive en la función, la
+# función solo dice "cada cuánto volver a preguntar" (una función de Vercel
+# muere a los 60 s y un despliegue tarda más). Nunca dormimos un tiempo fijo
+# elegido por este script: dormimos exactamente lo que el servidor pidió.
+#
+# $1 = sha publicado. $2 = epoch ms de cuando se publicó. Este segundo
+# argumento importa de verdad: sin él, el servidor trataría cada pedido
+# como "recién publicado" (`desdeHaceMs` ≈ 0 siempre), y ni la cadencia
+# lenta (después de un minuto) ni el corte de los 5 minutos ("nunca gira
+# infinito", spec §4.5) se ejercitarían — este ensayo probaría una versión
+# más simple de `estado` que la que corre en producción.
+sondea_estado() {
+  local sha="$1" publicado_en="$2" intento=0 tope=120 status estado reintentar_en
+  while [ "$intento" -lt "$tope" ]; do
+    intento=$((intento + 1))
+    status="$(curl -s -b "$COOKIES" -o "$TMPDIR_HUMO/resp-estado.json" -w '%{http_code}' \
+      -X POST "$BASE/api/panel?accion=estado" \
+      -H 'Content-Type: application/json' -H "Origin: $ORIGEN" \
+      -d "$(jq -n --arg sha "$sha" --argjson publicadoEn "$publicado_en" '{sha: $sha, publicadoEn: $publicadoEn}')")"
+    echo "  intento $intento: status $status — $(cat "$TMPDIR_HUMO/resp-estado.json")"
+    if [ "$status" != '200' ]; then
+      echo '  estado no contestó 200 — no puedo seguir sondeando.' >&2
+      return 1
+    fi
+    estado="$(jq -r '.estado // empty' "$TMPDIR_HUMO/resp-estado.json")"
+    if [ "$estado" = 'listo' ]; then
+      return 0
+    fi
+    if [ "$estado" = 'falló' ]; then
+      echo '  el despliegue FALLÓ. Con `PANEL_VERCEL_TOKEN` cargado, la reversión' \
+        'automática (revisaLaCabeza(), acciones.ts) ya debería haber corrido DENTRO' \
+        'de esta misma respuesta — revisá el correo de Marcos y los logs de Vercel' \
+        'antes de asumir que este script puede arreglarlo solo (ver' \
+        '«Se cayó el sitio después de una publicación» en' \
+        'docs/panel-operacion.md).' >&2
+      return 1
+    fi
+    reintentar_en="$(jq -r '.reintentarEn // empty' "$TMPDIR_HUMO/resp-estado.json")"
+    if [ -z "$reintentar_en" ]; then
+      echo '  "enCurso" pero reintentarEn vino null — el servidor dice "dejá de' \
+        'preguntar" (spec §4.5: nunca gira infinito) sin haber llegado a "listo".' \
+        'Volvé a abrir el panel más tarde y mirá Deployments en Vercel a mano.' >&2
+      return 1
+    fi
+    sleep "$(awk -v ms="$reintentar_en" 'BEGIN { printf "%.3f", ms / 1000 }')"
+  done
+  echo "  pasaron $tope sondeos sin llegar a \"listo\" ni a \"falló\" — corto por las dudas" \
+    '(esto no debería pasar nunca: revisá src/servidor/estado.ts a mano).' >&2
+  return 1
+}
+
 # ---------------------------------------------------------------------
 # Argumentos y credenciales.
 # ---------------------------------------------------------------------
@@ -251,7 +322,7 @@ if [ -z "$CLAVE" ]; then
   exit 1
 fi
 
-for cmd in curl jq git; do
+for cmd in curl jq git awk; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
     echo "Falta «$cmd» en esta máquina — sin eso el script no puede seguir." >&2
     exit 1
@@ -269,13 +340,14 @@ limpieza() {
   local salida=$?
   unset CLAVE
   # El caso peligroso no es que el script falle — es que falle DESPUÉS de
-  # publicar el cambio de prueba y ANTES de restaurar el original: ahí el
-  # sitio queda modificado de verdad y quien lo lea se encuentra con un
+  # publicar el cambio de prueba y ANTES de dejar el sitio como estaba: ahí
+  # el sitio queda modificado de verdad y quien lo lea se encuentra con un
   # stack trace en vez de con el comando que lo arregla. `SITIO_MODIFICADO`
   # marca exactamente esa ventana (se prende después de publicar el
-  # cambio, se apaga después de publicar la vuelta) — así que si seguía
-  # prendida al salir, esto lo dice fuerte, con el comando exacto para
-  # arreglarlo, en vez de dejarlo para que alguien lo adivine.
+  # cambio, se apaga en cuanto el commit que lo deshace —por `deshacer` o
+  # por `--restaurar`— ya existe en GitHub) — así que si seguía prendida al
+  # salir, esto lo dice fuerte, con el comando exacto para arreglarlo, en
+  # vez de dejarlo para que alguien lo adivine.
   if [ "$MODO_RESTAURAR" -eq 0 ] && [ "$SITIO_MODIFICADO" -eq 1 ]; then
     printf '\n'
     printf '#####################################################################\n'
@@ -327,32 +399,37 @@ if [ "$MODO_RESTAURAR" -eq 1 ]; then
 fi
 
 # ---------------------------------------------------------------------
-# Flujo normal (RULING T7-b: salud → login malo → login bueno → publicar
-# y restaurar → freno AL FINAL, sin espera de 16 minutos en el medio).
+# Flujo normal (RULING T7-b: salud → login malo → login bueno → publicar,
+# sondear, historial, deshacer y restaurar → freno de `entrar` AL FINAL,
+# sin espera de 16 minutos en el medio).
 # ---------------------------------------------------------------------
 
-# 1) Salud — ¿están las seis variables, y responde GitHub?
+# 1) Salud — ¿están las siete variables, y responde GitHub?
 # Sin sesión (E8: `salud` es la única acción que no la pide). Desde la
-# Ronda 1 de la Tarea 12, cada acción tiene su PROPIO freno de intentos
-# (src/servidor/sesion.ts, `intentoPermitido`, con clave `<acción>:<ip>`) —
-# antes `salud` y `entrar` compartían un único contador por IP, y este
-# pedido gastaba un lugar del presupuesto que el paso 6 iba a necesitar.
-# Ya no: este pedido a `salud` no le toca nada al de `entrar`. El paso 6
-# sigue sin asumir un número fijo de todos modos (prueba hasta ocho veces),
-# por si una corrida anterior dejó algo pendiente en la misma ventana.
+# Tarea 5 de esta fase, `PANEL_VERCEL_TOKEN` es una de las siete
+# OBLIGATORIAS (antes eran seis): si falta, `salud` contesta 503 aunque
+# GitHub esté perfecto — no es un bug de este script, es el candado a
+# propósito de «publicar a ciegas es peor que no publicar» (spec §4.5).
+# Cada acción tiene su PROPIO freno de intentos (src/servidor/sesion.ts,
+# `intentoPermitido`, con clave `<acción>:<ip>`) desde la Ronda 1 de la
+# Tarea 12 de esta fase — este pedido a `salud` no le toca nada al de
+# `entrar`, así que el paso final (el freno de `entrar`) sigue sin asumir
+# un número fijo de todos modos (prueba hasta ocho veces), por si una
+# corrida anterior dejó algo pendiente en la misma ventana.
 
 paso '1) Salud'
 salud_cuerpo="$(curl -s "$BASE/api/panel?accion=salud")"
 echo "  respuesta: $salud_cuerpo"
 if ! echo "$salud_cuerpo" | grep -q '"ok":true'; then
   echo 'salud no contestó ok:true — revisá qué variable falta en Vercel antes de seguir' \
-    '(el nombre viene en "faltan"). No tiene sentido gastar los intentos del freno' \
-    'en un login que va a fallar por otra razón.' >&2
+    '(el nombre viene en "faltan"; desde esta fase, PANEL_VERCEL_TOKEN también es' \
+    'obligatoria). No tiene sentido gastar los intentos del freno en un login que va a' \
+    'fallar por otra razón.' >&2
   exit 1
 fi
 if ! echo "$salud_cuerpo" | grep -q '"github":true'; then
-  echo 'Las variables están pero GitHub no contestó (o el freno ya estaba gastado). Mirá' \
-    'la respuesta de arriba antes de seguir.' >&2
+  echo 'Las variables están pero GitHub no contestó (o el freno de `salud` ya estaba' \
+    'gastado). Mirá la respuesta de arriba antes de seguir.' >&2
   exit 1
 fi
 echo '  variables completas, GitHub responde — sigo.'
@@ -372,7 +449,10 @@ espera_status 401 "$status2" 'clave mal a propósito, una sola vez'
 
 # 3) Entrar con la contraseña de verdad — 200 y un Set-Cookie con las
 # banderas correctas. Nunca se imprime el valor de la cookie: eso ES la
-# sesión (E3).
+# sesión (E3). Si esta cookie viene de una corrida vieja guardada a mano en
+# vez de recién emitida acá: no importa, `hacer_login_real` siempre pide
+# una nueva — las sesiones firmadas antes de la Tarea 3 de esta fase (el
+# cuerpo firmado cambió) de cualquier forma ya no valdrían.
 
 paso '3) Entrar con la contraseña real — esperado: 200 y Set-Cookie'
 if ! hacer_login_real 'humo-panel.sh'; then
@@ -380,21 +460,15 @@ if ! hacer_login_real 'humo-panel.sh'; then
   exit 1
 fi
 
-# 4) Publicar UN cambio chico, visible y fácil de revertir; mostrar el
-# commit; esperar el deploy; confirmar que se ve en vivo.
-#
-# El campo es `footer.derechos`: texto libre, sin banda de espacio duro que
-# cuidar, tope de 90 caracteres (src/contenido/esquema/sitio/paginas.ts), y
-# se ve en la última línea del pie de página de TODO el sitio — visible,
+# 4) Publicar: sin `base` (400), con la base correcta (200), y de nuevo con
+# esa MISMA base ahora vieja (409) — más el commit y su autor. El campo es
+# `footer.derechos`: texto libre, sin banda de espacio duro que cuidar,
+# tope de 90 caracteres (src/contenido/esquema/sitio/paginas.ts), y se ve
+# en la última línea del pie de página de TODO el sitio — visible,
 # cosmético, y a nadie se le rompe nada si por un rato dice una palabra de
 # más.
-#
-# Acá arranca la ventana peligrosa: desde que este `publicar` sale bien
-# hasta que el del paso 5 también sale bien, el sitio en vivo (o a punto de
-# estarlo) tiene el texto de prueba puesto. `SITIO_MODIFICADO=1` marca esa
-# ventana para la trampa de salida de arriba.
 
-paso '4a) Publicar el cambio de prueba en footer.derechos'
+paso '4) Preparar el cambio de prueba en footer.derechos'
 git fetch origin main --quiet
 git show origin/main:src/contenido/datos/sitio.json > "$TMPDIR_HUMO/vivo.json"
 
@@ -417,31 +491,51 @@ if [ "$LARGO_NUEVO" -gt 90 ]; then
     'permite hasta 90. Achicá MARCA_DE_HUMO en este script y volvé a correrlo.' >&2
   exit 1
 fi
+jq --arg v "$DERECHOS_NUEVO" '.footer.derechos = $v' "$TMPDIR_HUMO/vivo.json" > "$TMPDIR_HUMO/doc-pub.json"
+
+# La cabeza de ANTES de publicar nada — la vamos a reusar en el paso 4c,
+# cuando ya esté VIEJA de verdad (porque el 4b de abajo la movió). Un sha
+# inventado (`000…0`) NO sirve para ese chequeo: GitHub no puede comparar
+# contra un commit que no existe, así que el `catch` de la Fase 2 de
+# `publicarAccion` lo convierte en 502 antes de llegar al chequeo de la
+# base, y el ensayo afirmaría un 409 que el código no produce (Ruling T2-1
+# del plan de esta fase). El paso correcto usa un sha que SÍ existe y
+# contra el que SÍ hubo un cambio de contenido en el medio — la pisada de
+# verdad, no una simulada.
+SHA_ANTES_DEL_CAMBIO="$(git rev-parse origin/main)"
 
 echo "  antes:  $DERECHOS_ORIGINAL"
 echo "  nuevo:  $DERECHOS_NUEVO"
+echo "  cabeza actual de main: $SHA_ANTES_DEL_CAMBIO"
 
+paso '4a) Publicar SIN "base" — esperado: 400 (Tarea 2)'
+status4a="$(curl -s -o "$TMPDIR_HUMO/resp-sin-base.json" -w '%{http_code}' -b "$COOKIES" \
+  -X POST "$BASE/api/panel?accion=publicar" \
+  -H 'Content-Type: application/json' -H "Origin: $ORIGEN" \
+  -d "$(cuerpo_publicar_sin_base "$TMPDIR_HUMO/doc-pub.json")")"
+echo "  respuesta: $(cat "$TMPDIR_HUMO/resp-sin-base.json")"
+espera_status 400 "$status4a" 'sin `base` el servidor tiene que rebotar antes de mirar el documento'
+
+paso '4b) Publicar el cambio de prueba en footer.derechos — esperado: 200 con sha'
 if ! publica_derechos "$DERECHOS_NUEVO"; then
   echo "Corto en «$PASO_ACTUAL»: no se pudo publicar el cambio de prueba." >&2
   exit 1
 fi
+# `date -u +%s` en segundos, no milisegundos: no hay forma portable de
+# pedirle milisegundos a `date` (la extensión `%N` es de GNU date, no
+# existe en el `date` de macOS/BSD) — un margen de hasta 999 ms en
+# `publicadoEn` no cambia en nada la cadencia que `sondea_estado` va a
+# ejercitar.
+PUBLICADO_EN_MS=$(( $(date -u +%s) * 1000 ))
 SITIO_MODIFICADO=1  # a partir de acá, si algo corta, la trampa de salida avisa fuerte.
 
-# 4c) El freno de mano de esta tarea (Tarea 2 de la Parte B — el sha base):
-# si el sha contra el que se declara haber editado no es la cabeza de main
-# de verdad —acá, a propósito, uno que nunca existió—, el servidor tiene
-# que negarse a publicar, no pisar en silencio lo que haya cambiado en el
-# medio. Reusa el mismo documento que acaba de publicarse en 4a: lo que se
-# prueba acá es el chequeo de la base, no el contenido. Probado contra
-# producción: si algún día alguien saca este chequeo, este paso lo delata.
-
-paso '4c) Publicar con una base vieja tiene que rebotar con 409'
-status4c="$(curl -s -b "$COOKIES" -o "$TMPDIR_HUMO/resp-base-vieja.json" -w '%{http_code}' \
+paso '4c) Publicar de nuevo con la base VIEJA (la de antes de 4b) — esperado: 409'
+status4c="$(curl -s -o "$TMPDIR_HUMO/resp-base-vieja.json" -w '%{http_code}' -b "$COOKIES" \
   -X POST "$BASE/api/panel?accion=publicar" \
   -H 'Content-Type: application/json' -H "Origin: $ORIGEN" \
-  -d "$(cuerpo_publicar "$TMPDIR_HUMO/doc-pub.json" '0000000000000000000000000000000000000000')")"
+  -d "$(cuerpo_publicar "$TMPDIR_HUMO/doc-pub.json" "$SHA_ANTES_DEL_CAMBIO")")"
 echo "  respuesta: $(cat "$TMPDIR_HUMO/resp-base-vieja.json")"
-espera_status 409 "$status4c" 'base vieja: alguien "cambió el sitio en el medio", tiene que rebotar'
+espera_status 409 "$status4c" 'base vieja: alguien "cambió el sitio en el medio" (fue este mismo ensayo, en 4b) — tiene que rebotar'
 
 paso '4d) El commit que publicó el cambio — autor y trailers'
 git fetch origin main --quiet
@@ -460,53 +554,147 @@ if ! git log origin/main -1 --format='%b' | grep -q "Panel-Autor: $CORREO"; then
 fi
 echo '  autor y trailers correctos.'
 
-paso '4e) Esperar el deploy y verificar que la portada muestra el texto nuevo'
-if ! espera_en_vivo "$DERECHOS_NUEVO"; then
-  echo "Corto en «$PASO_ACTUAL»: pasaron 6 minutos y la portada todavía no muestra el texto" \
-    'nuevo. El commit YA está en GitHub (paso 4d), así que lo peor que pasó es que el' \
-    'deploy tarda — revisá Deployments en Vercel a mano antes de asumir algo peor.' >&2
+# 5) `estado` con el sha publicado — sondear hasta "listo", obedeciendo
+# `reintentarEn`. Este es el paso que prueba de verdad la Tarea 5: es la
+# PRIMERA vez que la API de la plataforma (Vercel) se toca desde la
+# función, en producción — todo lo que `src/servidor/vercel.ts` asume
+# sobre la forma de esa API (ver su docstring, RULING T5-1: el parámetro
+# `sha=`, la clave `deployments[0].state`, `app=` para el proyecto) se
+# ejercita acá por primera vez contra algo real.
+
+paso '5) estado del sha publicado — sondear hasta "listo"'
+if ! sondea_estado "$SHA_PUBLICADO" "$PUBLICADO_EN_MS"; then
+  echo "Corto en «$PASO_ACTUAL»: el sondeo de \`estado\` no llegó a \"listo\". El commit YA" \
+    'está en GitHub (paso 4d) — antes de asumir que algo del panel se rompió, mirá' \
+    'Deployments en Vercel a mano. Si el sitio quedó con el texto de prueba, el mensaje' \
+    'de salida de este script te da el comando de rescate.' >&2
   exit 1
 fi
+echo '  "listo" — el despliegue terminó y el CDN ya sirve este sha.'
 
-# 5) Dejar el sitio como estaba — publicando el valor ORIGINAL por el
-# MISMO canal. Nunca con `git revert` desde la computadora: la vuelta
-# tiene que probar el mismo camino que la clienta usa de verdad, si no
-# esta prueba no prueba nada sobre lo que le importa (que ELLA pueda
-# deshacer un cambio, no que vos puedas arreglarlo con Git).
+# 6) `historial` — la publicación del paso 4b tiene que aparecer arriba de
+# todo (es la más nueva).
 
-paso '5a) Publicar el valor original (revertir por el mismo canal)'
-if ! publica_derechos "$DERECHOS_ORIGINAL"; then
-  echo "Corto en «$PASO_ACTUAL»: LA RESTAURACIÓN FALLÓ — el sitio sigue con el texto de" \
-    'prueba. Reintentá este script (o entrá al panel a mano); el mensaje final de esta' \
-    'corrida también te va a dejar el comando exacto para arreglarlo.' >&2
+paso '6) historial — la publicación de este ensayo, arriba de todo'
+status6="$(curl -s -o "$TMPDIR_HUMO/resp-historial.json" -w '%{http_code}' -b "$COOKIES" \
+  -X POST "$BASE/api/panel?accion=historial" \
+  -H 'Content-Type: application/json' -H "Origin: $ORIGEN" -d '{}')"
+echo "  respuesta: $(cat "$TMPDIR_HUMO/resp-historial.json")"
+espera_status 200 "$status6" 'historial con sesión válida'
+PRIMER_SHA_HISTORIAL="$(jq -r '.publicaciones[0].sha // empty' "$TMPDIR_HUMO/resp-historial.json")"
+if [ "$PRIMER_SHA_HISTORIAL" != "$SHA_PUBLICADO" ]; then
+  echo "Corto en «$PASO_ACTUAL»: el primero del historial es «$PRIMER_SHA_HISTORIAL», no" \
+    "«$SHA_PUBLICADO» — la publicación de este ensayo tendría que estar arriba de todo." >&2
   exit 1
 fi
-SITIO_MODIFICADO=0  # la publicación de vuelta ya salió — se cierra la ventana peligrosa.
+echo '  la publicación de este ensayo está arriba de todo — bien.'
 
-paso '5b) El commit de la reversión'
-git fetch origin main --quiet
-git log origin/main -1 --format='%an <%ae>%n%s%n%n%b'
+# 7) `deshacer` con el sha publicado — 200, por el MISMO canal que usa la
+# clienta, nunca `git revert` desde la computadora: si esta prueba no
+# prueba que ELLA puede deshacer un cambio, no prueba nada de lo que le
+# importa.
 
-paso '5c) Esperar el segundo deploy y verificar que la portada volvió al texto original'
+paso '7) deshacer con el sha publicado — esperado: 200'
+status7="$(curl -s -o "$TMPDIR_HUMO/resp-deshacer.json" -w '%{http_code}' -b "$COOKIES" \
+  -X POST "$BASE/api/panel?accion=deshacer" \
+  -H 'Content-Type: application/json' -H "Origin: $ORIGEN" \
+  -d "$(jq -n --arg sha "$SHA_PUBLICADO" '{sha: $sha}')")"
+echo "  respuesta: $(cat "$TMPDIR_HUMO/resp-deshacer.json")"
+espera_status 200 "$status7" 'deshacer sobre la publicación de este ensayo'
+SHA_DESHECHO="$(jq -r '.sha // empty' "$TMPDIR_HUMO/resp-deshacer.json")"
+if [ -z "$SHA_DESHECHO" ] || [ "$SHA_DESHECHO" = 'null' ]; then
+  echo "Corto en «$PASO_ACTUAL»: deshacer contestó ok pero \"sha\" vino null/vacío — no" \
+    'tengo qué sondear en el paso siguiente.' >&2
+  exit 1
+fi
+echo "  sha del commit de reversión: $SHA_DESHECHO"
+PUBLICADO_EN_DESHACER_MS=$(( $(date -u +%s) * 1000 ))
+SITIO_MODIFICADO=0  # el commit que deshace ya existe en GitHub — se cierra la ventana peligrosa.
+
+# 8) `estado` del sha del deshacer — el mismo sondeo de arriba, ahora sobre
+# el commit de la reversión: tiene que llegar a "listo" igual que
+# cualquier otra publicación, porque para el pipeline de despliegue ES
+# una publicación cualquiera.
+
+paso '8) estado del sha del deshacer — sondear hasta "listo"'
+if ! sondea_estado "$SHA_DESHECHO" "$PUBLICADO_EN_DESHACER_MS"; then
+  echo "Corto en «$PASO_ACTUAL»: el sondeo del deshacer no llegó a \"listo\". El commit de" \
+    'reversión YA está en GitHub (paso 7) — mirá Deployments en Vercel a mano antes de' \
+    'asumir algo peor.' >&2
+  exit 1
+fi
+echo '  "listo" — el despliegue del deshacer terminó y el CDN ya lo sirve.'
+
+# 9) `version.json` tiene que traer el sha del deshacer. `sondea_estado` ya
+# lo confirmó puertas adentro (es la misma fuente que usa para decidir
+# "listo"), pero este ensayo lo vuelve a leer por su cuenta, en vez de
+# confiar solo en la palabra del servidor.
+
+paso '9) version.json — el CDN ya sirve el sha del deshacer'
+VERSION_SHA="$(curl -s "$BASE/version.json?t=$(date +%s)$RANDOM" | jq -r '.sha // empty')"
+echo "  version.json dice: ${VERSION_SHA:-(vacío o no contestó)}"
+if [ "$VERSION_SHA" != "$SHA_DESHECHO" ]; then
+  echo "Corto en «$PASO_ACTUAL»: version.json dice «$VERSION_SHA», no «$SHA_DESHECHO» —" \
+    'pero el paso 8 recién dijo "listo" para ese sha, leyendo la MISMA fuente. Esto no' \
+    'debería pasar nunca — mirá Deployments en Vercel a mano.' >&2
+  exit 1
+fi
+echo '  coincide con el sha del deshacer — bien.'
+
+# 10) La portada en vivo volvió a mostrar el texto ORIGINAL, y ya NO
+# muestra la marca de prueba — no alcanza con que el texto original
+# aparezca en algún lado de la página, tiene que haber reemplazado al de
+# prueba.
+
+paso '10) La portada en vivo volvió a mostrar el texto original'
 if ! espera_en_vivo "$DERECHOS_ORIGINAL" "$MARCA_DE_HUMO"; then
   echo "Corto en «$PASO_ACTUAL»: pasaron 6 minutos y la portada TODAVÍA muestra el texto de" \
-    'prueba (o algo raro). El commit de reversión ya está en GitHub (paso 5b) — el dato ya' \
-    'está bien, andá a Deployments en Vercel y mirá el deploy a mano.' >&2
+    'prueba (o algo raro), aunque los pasos 8 y 9 ya dijeron que el sha correcto está' \
+    'servido. Revisá a mano — puede ser un caché intermedio que este script no ve.' >&2
   exit 1
 fi
 
-# 6) El freno de intentos, al final — sin dependencia de lo de arriba, así
-# que no hace falta probarlo antes de lo que sí importa mirar en vivo
-# (RULING T7-b). Se manda contraseña mala hasta que UNA conteste 429, con
-# margen (hasta 8 intentos) en vez de asumir que va a ser exactamente la
-# sexta: los dos logins de los pasos 2 y 3 (acción `entrar`) ya gastaron
-# dos de los 5 cada 15 minutos de SU PROPIO presupuesto — desde la Ronda 1
-# de la Tarea 12 cada acción tiene el suyo (`<acción>:<ip>`,
-# `intentoPermitido`, sesion.ts), así que `salud` (paso 1) ya no cuenta
-# acá. El margen es por si una corrida anterior en la misma ventana de 15
+# 11) El freno de `publicar`, siempre al final de la parte que publica:
+# mandar un documento que el panel no conoce tiene que rebotar con 422
+# SIN escribir nada — ni un commit, ni un cambio en la cabeza de main.
+# Va acá y no antes porque necesita la sesión (ya la tenemos) y porque es
+# la última vez que este ensayo llama a `publicar`: si algún día esto
+# deja de rebotar, es la última alarma antes de que el panel pueda
+# escribir cualquier archivo con cualquier nombre.
+
+paso '11) Publicar un documento fuera de la lista blanca — esperado: 422, sin escribir nada'
+git fetch origin main --quiet
+CABEZA_ANTES_DEL_422="$(git rev-parse origin/main)"
+status11="$(curl -s -o "$TMPDIR_HUMO/resp-422.json" -w '%{http_code}' -b "$COOKIES" \
+  -X POST "$BASE/api/panel?accion=publicar" \
+  -H 'Content-Type: application/json' -H "Origin: $ORIGEN" \
+  -d "$(jq -n --arg base "$CABEZA_ANTES_DEL_422" '{base: $base, documentos: {"no-es-un-documento-de-verdad": {}}}')")"
+echo "  respuesta: $(cat "$TMPDIR_HUMO/resp-422.json")"
+espera_status 422 "$status11" 'documento que el panel no conoce, tiene que rebotar sin escribir'
+git fetch origin main --quiet
+CABEZA_DESPUES_DEL_422="$(git rev-parse origin/main)"
+if [ "$CABEZA_ANTES_DEL_422" != "$CABEZA_DESPUES_DEL_422" ]; then
+  echo "Corto en «$PASO_ACTUAL»: la cabeza de main cambió de $CABEZA_ANTES_DEL_422 a" \
+    "$CABEZA_DESPUES_DEL_422 después de un 422 que tendría que haber escrito CERO" \
+    'commits.' >&2
+  exit 1
+fi
+echo '  main no se movió — el 422 no escribió nada, como tiene que ser.'
+
+# 12) El freno de intentos de `entrar`, al final — sin dependencia de lo de
+# arriba, así que no hace falta probarlo antes de lo que sí importa mirar
+# en vivo (RULING T7-b). Se manda contraseña mala hasta que UNA conteste
+# 429, con margen (hasta 8 intentos) en vez de asumir que va a ser
+# exactamente la sexta: los dos logins de los pasos 2 y 3 (acción
+# `entrar`) ya gastaron dos de los 5 cada 15 minutos de SU PROPIO
+# presupuesto — cada acción tiene el suyo (`<acción>:<ip>`,
+# `intentoPermitido`, sesion.ts), así que ninguno de los pedidos de
+# `publicar`/`estado`/`historial`/`deshacer` de los pasos 4 a 11 (que no
+# llaman a `intentoPermitido` en absoluto) le tocó nada a este contador.
+# El margen es por si una corrida anterior en la misma ventana de 15
 # minutos dejó algo pendiente, no porque el número sea impredecible hoy.
 
-paso '6) El freno de intentos: mandar contraseñas malas hasta que una dé 429'
+paso '12) El freno de intentos de entrar: mandar contraseñas malas hasta que una dé 429'
 TOPE_INTENTOS_FRENO=8
 freno_saltado=0
 intentos_hechos=0
@@ -540,14 +728,31 @@ echo "  el freno saltó en el intento $intentos_hechos de esta tanda: los dos lo
 
 echo
 echo '=== Prueba de humo completa ==='
-echo 'Un resultado en verde acá prueba cinco cosas, cada una por su cuenta:'
-echo '  1. La puerta funciona: la contraseña equivocada no entra (paso 2), y la correcta sí (paso 3).'
-echo '  2. Un cambio de la clienta llega de verdad al sitio en vivo, no solo a GitHub (paso 4).'
-echo '  3. Publicar contra una base vieja se rechaza, sin pisar en silencio lo que cambió en el medio (paso 4c).'
-echo '  4. Cada commit queda a nombre del panel («Panel Maracacao»), nunca al tuyo (paso 4d).'
-echo '  5. Deshacer un cambio funciona por el mismo canal que publicarlo, sin Git ni computadora (paso 5).'
+echo 'Un resultado en verde acá prueba, cada cosa por su cuenta:'
+echo '   1. La puerta funciona: la contraseña equivocada no entra (paso 2), y la correcta sí (paso 3).'
+echo '   2. `publicar` exige declarar contra qué versión del sitio se editó: sin `base`, 400 (paso 4a); con una base vieja, 409 sin pisar nada en silencio (paso 4c).'
+echo '   3. Un cambio de la clienta llega de verdad al sitio en vivo, no solo a GitHub (pasos 4b-4d).'
+echo '   4. Cada commit queda a nombre del panel («Panel Maracacao»), nunca al tuyo (paso 4d).'
+echo '   5. `estado` sondea la API real de la plataforma y obedece su propio `reintentarEn` hasta "listo" (paso 5) — la primera vez que ese camino se mide contra producción.'
+echo '   6. `historial` muestra la publicación de este ensayo arriba de todo (paso 6).'
+echo '   7. `deshacer` vuelve atrás una publicación por el mismo canal que usa la clienta, sin Git ni computadora (paso 7), y ESE commit también se puede sondear con `estado` (paso 8).'
+echo '   8. `version.json` refleja el sha que el CDN sirve de verdad, no lo que GitHub tiene (paso 9).'
+echo '   9. Publicar un documento que el panel no conoce rebota con 422 sin escribir un solo commit (paso 11).'
+echo '  10. El sitio quedó EXACTAMENTE como lo encontró esta corrida.'
 echo
-echo 'IMPORTANTE: el freno de `entrar` (paso 6) quedó gastado para esta IP durante los' \
+echo "  sha de main ANTES de esta corrida: $SHA_ANTES_DEL_CAMBIO"
+echo "  sha de main DESPUÉS de esta corrida: $CABEZA_DESPUES_DEL_422"
+if [ "$SHA_ANTES_DEL_CAMBIO" = "$CABEZA_DESPUES_DEL_422" ]; then
+  echo '  coinciden — el sitio quedó exactamente como lo encontró este ensayo.'
+else
+  echo '  NO COINCIDEN. El deshacer (paso 7) y el 422 sin escritura (paso 11) tendrían que' \
+    'haber dejado main en el mismo sha de arranque — si esto no coincide, algo más tocó' \
+    '`main` DURANTE esta corrida (Marcos publicando código, por ejemplo) y no es un bug' \
+    'de este script. Comparalo a mano con `git log' \
+    "$SHA_ANTES_DEL_CAMBIO..$CABEZA_DESPUES_DEL_422\` antes de preocuparte." >&2
+fi
+echo
+echo 'IMPORTANTE: el freno de `entrar` (paso 12) quedó gastado para esta IP durante los' \
   'próximos 15 minutos — a propósito, es la prueba que hicimos recién. Si corrés' \
   '`entrar` de nuevo antes de que se vacíe la ventana, vas a ver 429: es exactamente lo' \
   'que tiene que pasar, no es que algo se rompió. `salud` tiene su PROPIO freno (cada' \

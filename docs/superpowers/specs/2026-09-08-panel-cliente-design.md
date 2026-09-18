@@ -793,10 +793,21 @@ Lista blanca de escritura (defensa en profundidad):
   /^src\/contenido\/datos\/[a-z0-9-]+\.json$/
   /^public\/sitio\/(marca|envoltura)\/[a-z0-9-]+\.webp$/
   /^public\/sitio\/etiqueta-[a-z0-9-]+\.webp$/
-  TOPE_ARCHIVOS 40 · TOPE_CUERPO 3.5 MB (por debajo del tope de 4.5 MB
-  de cuerpo de request de Vercel, y contando que la API de blobs exige
-  base64: 3.5 MB de binario son ~4.7 MB de cuerpo, así que el tope real
-  se aplica sobre el CUERPO, no sobre el binario).
+  TOPE_ARCHIVOS 40 · TOPE_CUERPO 3.5 MB, medido sobre el CUERPO DEL
+  PEDIDO que llega a la función —no sobre los binarios—, porque el
+  límite que hay que no pasar es el de 4.5 MB de cuerpo de request de
+  la plataforma. Como la API de blobs exige base64 (≈4/3 del original),
+  3.5 MB de cuerpo son ~2.6 MB de binario real: ese, y no 3.5 MB, es el
+  tamaño de foto que entra.
+
+  [CORREGIDO 2026-09-17, fase 5B tarea 15: la versión anterior de este
+  párrafo decía «3.5 MB de binario son ~4.7 MB de cuerpo (…) por debajo
+  del tope de 4.5 MB», que se contradice sola — si 3.5 MB de binario
+  pesan 4.7 MB en base64, ESO pasa el tope de 4.5 MB, no queda por
+  debajo. El código nunca tuvo ese error: desde la Tarea 1 de esta fase
+  (`TOPE_CUERPO` en `src/servidor/rutas-permitidas.ts`) el tope siempre
+  se aplicó sobre el cuerpo del pedido, nunca sobre el binario. Lo que
+  estaba mal era la aritmética de este párrafo del spec, no el código.]
 
 Autor del commit: `Panel Maracacao <panel@maracacao.mx>`, trailers
 `Panel: sí` y `Panel-Autor: <correo>`. El historial dice QUIÉN publicó
@@ -836,6 +847,19 @@ de main reusa ese sha. Cero re-subida.
      lista blanca de rutas + cabeceras WebP. Si falla: 422, CERO
      commits, borrador intacto, mensaje en español con [Ir al campo].
      Es la única capa que le habla a la clienta a tiempo.
+
+     [CORREGIDO 2026-09-17, fase 5B tarea 15: «antes de tocar GitHub» no
+     es del todo cierto desde la Parte A — hay que leerlo como «antes de
+     ESCRIBIR en GitHub». Validar el documento `sitio` EXIGE leer
+     `sabores.json` vivo, para injertarle los cinco derivados que
+     `serializa()` nunca escribe (ver `acciones.ts`, función
+     `publicarAccion`, fase 5A): sin esa lectura, el esquema rechaza
+     cualquier publicación real de `sitio` con «el campo quedó vacío»
+     sobre el primer derivado que encuentra. Esa lectura es la ÚNICA
+     llamada de red que hace la capa 2, corre después de todo lo que SÍ
+     se puede validar sin red (para no gastarla si el lote ya iba a
+     rechazarse por otra razón) y no escribe nada — sigue siendo cierto
+     que la capa 2 no produce NINGÚN commit.]
   3. `pnpm build` de Vercel = `astro build && vitest run && astro check`
      [MEDIDO: ~1 s de build + 2.6 s de tests + ~5.6 s de typecheck ≈ 9 s
      por deploy]. Si falla, Vercel deja servido el último deploy bueno.

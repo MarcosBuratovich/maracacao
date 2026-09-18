@@ -4814,3 +4814,227 @@ Paso 1 es la medición y por eso el default de un estado desconocido es
 «seguí esperando». Si la medición contradice al plan, **gana la medición** y el
 docstring del módulo lo deja escrito con fecha, igual que se hizo con el
 experimento de tracing en la Parte A.
+
+## Cierre de la Parte B
+
+### Qué se ejecutó
+
+Las quince tareas de este plan corrieron completas, en el orden que fija
+«Orden y dependencias» de arriba. Cada una terminó con `pnpm vitest run`
+y `pnpm typecheck` en verde antes de commitear — el detalle tarea por tarea
+está en el `git log` de la rama, no repetido acá. Al cerrar esta Parte B,
+`pnpm vitest run` da **1203 tests verdes en 57 archivos** y `pnpm typecheck`
+da **0 errores, 0 warnings, 3 hints**; la Tarea 15 (esta) es solo
+documentación y script, así que no tenía que mover ese número, y no lo movió.
+
+**Lo único que sigue sin ejecutarse es la medición real de la Tarea 5**
+(`src/servidor/vercel.ts`, RULING T5-1): el módulo se escribió contra la
+forma DOCUMENTADA de la API de Vercel, sin un `curl` real, porque el token
+no existe en este entorno y no se le puede pedir a nadie (restricción
+global del plan). El Paso 5 del ensayo (`scripts/humo-panel.sh`) es la
+medición — pero el ensayo se EDITA acá, no se CORRE: alguien con las
+credenciales reales (Marcos) tiene que correrlo a mano contra producción
+para que ese riesgo quede cerrado de verdad. Si esa corrida contradice
+alguna de las tres suposiciones que el docstring de `vercel.ts` declara
+(el parámetro `sha=`, la clave `deployments[0].state`, `app=` para el
+proyecto), **gana la medición** y hay que corregir el módulo con fecha,
+como pide su propio docstring.
+
+### Qué encontraron las revisiones
+
+Tres hallazgos que le importan a quien siga tocando este código, más allá
+del detalle de cada tarea:
+
+- **El freno de intentos pasó de un contador por IP a uno por
+  `<acción>:IP`** (Ronda 1 de la Tarea 12) después de que la Ronda 1
+  encontrara que compartirlo entre `entrar`/`salud`/`enlace`/
+  `entrar-con-enlace` dejaba a la clienta sin poder usar su contraseña
+  si había pedido el enlace de recuperación varias veces — el freno que
+  protege una puerta le comía el presupuesto a otra. La lección para
+  cualquier freno nuevo: si dos puertas distintas van a compartir un
+  contador, medí primero si una legítimamente ocupada puede dejar a la
+  otra sin margen.
+- **El enlace mágico tuvo tres rondas de revisión sobre el MISMO problema**
+  (el oráculo de tiempo entre una dirección listada y una que no lo está,
+  `src/servidor/acciones.ts`, `enlaceAccion`): la Ronda 1 lo cerró
+  mandando un correo señuelo siempre, lo que abrió un generador de rebotes
+  duros contra la reputación del remitente; la Ronda 2 lo reemplazó por un
+  piso de tiempo fijo (`PISO_ENLACE_MS`); la Ronda 3 encontró que ese piso
+  solo protege MIENTRAS el proveedor sea más rápido que él, y decidió
+  declarar el residuo en vez de perseguirlo con un timeout (cortar el
+  envío en una función serverless puede matar el correo a mitad de
+  camino). Para la fase 6: cualquier pantalla que toque el flujo de
+  recuperación no puede mostrar un estado de carga distinto según si el
+  correo existe o no — reintroduciría el mismo oráculo del otro lado.
+- **El bug del propio ensayo de humo, encontrado recién en esta tarea**: el
+  paso que prueba la Tarea 2 (`publicar` con una `base` vieja → 409) usaba
+  un sha inventado (`000…0`) desde que se escribió (Tarea 2, commit
+  `a7caefb`) — el plan ya tenía la corrección escrita en su propia sección
+  de la Tarea 2 (ruling T2-1, más arriba en este archivo) pero el script
+  nunca se actualizó para aplicarla. Con un sha que no existe, GitHub no
+  puede comparar y el router cae en el `catch` de la Fase 2 (502), nunca
+  en el chequeo de `base` (409): el ensayo afirmaba un resultado que el
+  código no produce. Corregido acá reusando la cabeza real de ANTES de
+  publicar el cambio de prueba, que queda vieja de verdad en cuanto el
+  paso siguiente mueve `main`. Se los menciona para que quede claro que
+  **este plan no se leyó sin verificar**: el código y el ensayo se
+  compararon línea por línea contra lo que hay hoy, no contra lo que el
+  brief de la Tarea 15 decía que había.
+
+### Qué quedó pendiente
+
+- **Fase 6 (el panel de verdad):** capa 1 del borrador (IndexedDB, cada
+  tecla), la pantalla de conflicto de borrador (dos resúmenes en español,
+  spec §4.3), el botón «Ver mi sitio» con el parámetro que saltea el
+  caché, y las pantallas para `entrar`/`estado`/`historial`/`deshacer`
+  sobre el contrato que se detalla abajo.
+- **Fase 7 (fotos):** subir a `pendientes/<hash>.webp` en el ref de
+  borrador; el ref ya existe (Tarea 11), pero nada sube nada todavía.
+- **`.github/workflows/verifica.yml` (capa 4 de la compuerta, spec §4.4):**
+  no existe. Es un juez POSTERIOR que le avisa a Marcos por correo, no una
+  compuerta —el PAT del panel no tiene permiso de `Actions`, así que ni
+  con el peor bug podría tocarlo—, y queda anotado como pendiente de
+  Marcos, no de ninguna fase del panel.
+- **El 422 de un documento desconocido no escapa el texto del pedido**
+  (herencia viva de la Parte A, `acciones.ts`, `publicarAccion`: el `id`
+  que llega en `Object.keys(documentos)` se interpola directo en
+  `titulo` — `No se puede publicar «${id}»: no es un documento que el
+  panel conozca.`). Si la fase 6 pinta `problema` como HTML en vez de
+  como texto de un nodo, esto es una inyección esperando un `id` como
+  `<img src=x onerror=...>`. Sigue sin resolverse: no lo tocó ninguna
+  tarea de esta Parte B, y la fase 6 es quien decide cómo pinta esa
+  cadena — la forma más simple es tratar `problema` (y `titulo`, y
+  `detalle`) como texto SIEMPRE, nunca como `innerHTML`.
+- **Residuos declarados, no bugs:** el freno de intentos vive en memoria
+  de una sola instancia serverless (E4, sección «Lo que todavía NO está
+  cubierto» del runbook); el piso de tiempo del enlace mágico protege
+  mientras el proveedor de correo sea más rápido que él (arriba); el
+  tope de diez pedidos por destinatario en `enlace` es un balance
+  deliberado, no un número final.
+
+### Qué hereda la fase 6
+
+El contrato exacto que las pantallas nuevas tienen que respetar — esto es
+lo que de verdad ahorra tiempo, más que cualquier resumen de tareas:
+
+**1. La forma exacta de cada respuesta nueva.**
+
+`estado` (`POST /api/panel?accion=estado`, cuerpo `{ sha, publicadoEn? }`)
+devuelve `{ ok: true, estado, frase, reintentarEn, url }` — el
+`Veredicto` de `src/servidor/estado.ts`:
+```ts
+interface Veredicto {
+  estado: 'enCurso' | 'listo' | 'falló'
+  frase: string            // ya en español, sin jerga — para pintar directo
+  reintentarEn: number | null   // ms hasta la próxima pregunta; null = dejá de preguntar
+  url: string | null       // dónde quedó el despliegue, cuando la hay
+}
+```
+**`publicadoEn` es opcional en el cuerpo, pero si la pantalla no lo manda,
+el sondeo se comporta distinto de lo esperado**: el servidor cae a
+`contexto.ahora()` (o sea, «se publicó ahora mismo») en cada pedido, así
+que `desdeHaceMs` nunca crece — la cadencia lenta (después de un minuto) y
+el corte a los cinco minutos («nunca gira infinito», spec §4.5) NUNCA se
+disparan. La pantalla tiene que guardar el epoch ms de cuando `publicar`
+contestó y mandarlo en cada pedido de `estado` para ese sha —
+`scripts/humo-panel.sh` (Tarea 15) tuvo que resolver exactamente este
+mismo punto para sondear de verdad.
+
+`historial` (`POST /api/panel?accion=historial`, sin cuerpo) devuelve
+`{ ok: true, publicaciones: Publicada[] }` — del más nuevo al más viejo,
+`src/servidor/historial.ts`:
+```ts
+interface Publicada {
+  sha: string
+  resumen: string          // el asunto del commit, tal cual ella lo vio antes de publicar
+  autor: string | null     // null si el commit no lleva el trailer (no debería pasar nunca en la práctica)
+  cuando: string           // ISO 8601, tal cual lo dio GitHub
+  revierteA: string | null // el sha al que revierte, si esta publicación ES una reversión
+}
+```
+
+`borrador.leer` devuelve `{ ok: true, borrador: Borrador | null }` (`null`
+= no hay ninguno guardado todavía, el estado normal de un panel recién
+estrenado) — `src/servidor/borrador.ts`:
+```ts
+interface Borrador {
+  documentos: Record<string, unknown>
+  base: string        // el sha contra el que se escribió
+  dispositivo: string // de `sesion.dispositivo`, nunca del cuerpo del pedido
+  autor: string
+  hora: number         // epoch ms
+}
+```
+`borrador.guardar` (cuerpo `{ documentos, base, pisar? }`) devuelve
+`{ ok: true }` si guardó, o **409** con
+`{ ok: false, motivo: 'hay-uno-mas-nuevo', otro: { dispositivo, hora }, problema }`
+si hay uno de OTRO aparato más nuevo y no se mandó `pisar: true` — el
+único campo que distingue este 409 de cualquier otro error es `motivo`.
+
+`publicar` exitoso siempre trae `avisos` — un array, **nunca ausente,
+vacío si no hay nada que avisar** (`acciones.ts`: «para que la pantalla
+pueda leer `avisos.length` sin preguntarse primero si el campo vino») — de
+`Problema[]`, `src/contenido/validacion.ts`, ya filtrado a
+`gravedad: 'avisa'` (los de `gravedad: 'impide'` nunca llegan acá: esos
+bloquearon la publicación antes de escribir):
+```ts
+interface Problema {
+  campo: string
+  gravedad: 'impide' | 'avisa'  // acá siempre 'avisa'
+  titulo: string        // sin jerga — para pintar directo, pero NUNCA como HTML (ver más abajo)
+  detalle?: string
+  arreglo?: { etiqueta: string; valor: unknown }
+}
+```
+
+**Un gotcha de forma que no está en ningún lado más que acá:** `salud`
+tiene TRES formas de cuerpo distintas según la rama, y la del error más
+común —variables faltantes— es la más angosta de las tres.
+`{ ok: false, faltan, github: null }` (503, faltan variables) **no trae
+`tokenVence` ni `diasParaVencer`** — los otros dos caminos (freno
+omitido, o la lectura de GitHub completa) sí los traen siempre, aunque
+sea en `null`. Una pantalla que lea `tokenVence` sin primero chequear que
+existe se cae justo en el caso que más necesita mostrar algo claro (le
+faltan variables a Marcos).
+
+**2. `VENTANA_DESHACER_MS`** (`src/servidor/acciones.ts`) **= 30 minutos.**
+Es el techo de cuándo el botón «Deshacer esta publicación» puede seguir
+mostrándose: pasada la ventana, `deshacer` contesta 409 con «Ya pasó mucho
+tiempo para deshacer esto desde aquí. Búscalo en el historial de
+cambios.» — la pantalla tiene que esconder el botón ANTES de que eso
+pase, calculando contra `Publicada.cuando` del historial (o contra el
+`publicadoEn` que ya venía guardando para `estado`), no esperar a que el
+servidor lo rechace para enterarse.
+
+**3. `borrador.leer` no resuelve el conflicto.** Devuelve el borrador del
+servidor tal cual, sin comparar nada contra lo que el aparato que
+pregunta tenga guardado en IndexedDB — la decisión de qué mostrarle a
+ella («celular, ayer 11:04, 3 cambios» / «esta compu, hace 6 días, 1
+cambio», spec §4.3) es exclusivamente de la pantalla. El servidor solo
+sabe frenar la escritura silenciosa (`borrador.guardar` con
+`hay-uno-mas-nuevo`); no sabe, y no le corresponde saber, cuál de los dos
+borradores ELLA prefiere.
+
+**4. El 422 de un documento desconocido no viene escapado** (ver «Qué
+quedó pendiente», arriba) — tratá `problema`/`titulo`/`detalle` de
+CUALQUIER respuesta como texto plano, nunca como HTML, en toda la fase 6:
+no es solo este caso, es la postura correcta para cualquier string que
+el servidor arma interpolando algo que vino del pedido.
+
+**5. Qué pasa con `estado` cuando ella cierra el panel — la más importante
+de las cinco.** No hay ningún proceso sondeando en segundo plano: la
+reversión automática (`revisaLaCabeza()`, Tarea 8) SOLO corre cuando algo
+autenticado hace un pedido nuevo. Si ella publica, ve el veredicto
+«enCurso» y cierra el teléfono, y el despliegue FALLA después, nadie lo
+revierte hasta que alguien —ella reabriendo el panel, Marcos entrando,
+cualquier acción autenticada— dispare `revisaLaCabeza()` de nuevo. Eso
+significa que **la primera pantalla que ve al reabrir el panel tiene que
+estar preparada para encontrarse con que lo que publicó ya fue deshecho**:
+si esa primera acción es `historial` o `estado` de otra cosa,
+`revisaLaCabeza()` corre ahí, revierte en silencio (para ella: no hay
+nadie sondeando ESE sha en ESE instante) y le manda el correo recién en
+ese momento — la pantalla no puede asumir que «lo publiqué y no vi el
+resultado» significa «probablemente salió bien». El primer chequeo al
+abrir el panel debería ser un `historial` (o un `estado` del último sha
+publicado, si se guardó) para confirmar el estado real antes de mostrar
+cualquier cosa que dé por sentado que la última publicación sigue en pie.

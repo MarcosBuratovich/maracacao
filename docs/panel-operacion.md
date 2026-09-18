@@ -6,16 +6,20 @@ no de una sola vez.
 
 Si algo del panel deja de andar, `scripts/humo-panel.sh` es el ensayo de
 este documento en forma de script: pega contra `www.maracacao.mx` de
-verdad —salud, un login que falla a propósito, un login que funciona, una
-publicación real y su vuelta atrás, y por último el freno de intentos— y
-en el camino confirma o descarta la mitad de las preguntas que este
-runbook contesta por escrito. El freno va al final a propósito: no
-depende de nada de lo que hace `publicar`, así que probarlo antes solo
+verdad —salud, un login que falla a propósito, un login que funciona,
+publicar sin declarar `base` (400) y con una `base` vieja (409), una
+publicación real, `estado` sondeando la API de Vercel hasta «listo»,
+`historial`, `deshacer` por el mismo canal que usa la clienta, `version.json`
+confirmando el sha del deshacer, un documento fuera de la lista blanca
+(422), y por último el freno de intentos de `entrar`— y en el camino
+confirma o descarta la mayoría de las preguntas que este runbook contesta
+por escrito. El freno va al final a propósito: no depende de nada de lo que
+hace `publicar`/`estado`/`historial`/`deshacer`, así que probarlo antes solo
 agregaría una espera de quince minutos en el medio de un ensayo que se
 supone hay que poder repetir. Correrlo primero, antes de tocar nada a
 mano, ahorra tiempo. Si una corrida se corta justo después de publicar el
-cambio de prueba y antes de restaurarlo, el propio script te deja, en el
-mensaje de error, el comando exacto para arreglarlo
+cambio de prueba y antes de dejar el sitio como estaba, el propio script te
+deja, en el mensaje de error, el comando exacto para arreglarlo
 (`scripts/humo-panel.sh --restaurar '…'`) — no hace falta ni leer el
 script ni tocar Git a mano.
 
@@ -453,6 +457,13 @@ el servidor usa.
 
 ## Si `main` queda roto
 
+**Si el commit que rompió `main` lleva el trailer `Panel: sí` (lo publicó
+el panel, no vos a mano), probablemente ya no necesites esta sección: la
+reversión automática (ver «Se cayó el sitio después de una publicación»,
+más abajo) ya lo arregló solo, en la próxima acción autenticada. Esta
+sección es para un commit TUYO, o para el residuo de casos en que esa
+reversión no pudo (también explicados ahí abajo).**
+
 No hay apuro. El sitio en producción sigue sirviendo el ÚLTIMO deploy
 bueno — Vercel no tira abajo lo que ya está andando solo porque el commit
 de arriba de `main` no compila o falla un check. `www.maracacao.mx` sigue
@@ -474,6 +485,168 @@ desde **Deployments** en Vercel (los tres puntos → **Cancel**) mientras
 armás el arreglo, pero ni siquiera eso es urgente: el peor caso es que
 Vercel termine de intentarlo, falle, y el sitio en vivo siga siendo el
 mismo de antes.
+
+## Se cayó el sitio después de una publicación
+
+Esto es distinto de «`main` queda roto» de arriba: acá el commit SÍ era
+válido y SÍ lo publicó el panel (`Panel: sí` en el trailer), pero el
+despliegue de Vercel terminó en error o se canceló — un problema de
+infraestructura, no de contenido. Desde la Tarea 8 de la fase 5 Parte B,
+el panel intenta arreglar esto SOLO.
+
+**Qué hace la reversión automática.** `revisaLaCabeza()`
+(`src/servidor/acciones.ts`) corre como lo PRIMERO que hace cualquier
+acción autenticada —`publicar`, `estado`, `deshacer`, `historial`—, apenas
+después de sus propias validaciones baratas (secreto, sesión, forma del
+sha) y antes de hacer lo que sea que esa acción vino a hacer. Pregunta: ¿la
+cabeza de `main` es un commit del panel (trailer `Panel: sí`) que no es ya
+una reversión, y cuyo despliegue en Vercel terminó en `ERROR` o
+`CANCELED`? Si sí, lo revierte ahí mismo — un commit NUEVO con los blobs
+VIEJOS (`src/servidor/revertir.ts`), **nunca** un `git reset`, **nunca**
+`--force`: el historial tiene que poder contar que hubo un cambio y que se
+deshizo.
+
+**A quién avisa, y por qué puede ser distinto según quién dispara la
+limpieza:**
+
+- Si es ELLA quien está sondeando `estado` para ESE sha (el caso normal:
+  publicó, y todavía tiene el panel abierto esperando el veredicto), le
+  llega un correo a ELLA («No salió; lo dejé como estaba y ya le avisé a
+  Marcos.», sin jerga) Y a vos (`PANEL_AVISOS_A`, con el sha, el autor real
+  —leído del trailer `Panel-Autor:` del commit, nunca de quien dispara la
+  limpieza— y el resultado técnico de la reversión).
+- Si NADIE está mirando ese sha en particular en este instante —cerró el
+  panel, o sos vos entrando a mirar `historial`, o ella publicando OTRA
+  cosa y `revisaLaCabeza()` de paso encuentra la cabeza rota de una
+  publicación anterior—, te avisa SOLO a vos. Ella se entera recién la
+  PRÓXIMA vez que algo autenticado vuelva a pasar por `revisaLaCabeza()`
+  con ese mismo sha: si reabre el panel más tarde y lo primero que dispara
+  es justo esa acción, ahí recién le llega su correo — la pantalla que abre
+  el panel tiene que estar preparada para encontrarse con que lo que
+  publicó ya fue deshecho, no para asumir que sigue publicado hasta que
+  algo le diga lo contrario.
+
+**No hay ningún proceso sondeando en segundo plano.** Una función
+serverless de Vercel no vive entre pedidos: la reversión automática SOLO
+corre cuando alguien —ella, vos, o cualquier acción autenticada— hace un
+pedido nuevo. Si ella publica y cierra el teléfono, y el deploy falla
+después, `main` se queda con el commit roto hasta que ALGUIEN vuelva a
+tocar el panel — el sitio en vivo no se cae mientras tanto (sigue sirviendo
+el último deploy bueno, como en la sección de arriba), pero `main` no se
+arregla solo por el paso del tiempo.
+
+**Cuándo la reversión automática NO puede arreglarlo sola** —`main` se
+queda con el commit roto, y el correo a vos nombra el motivo exacto
+(`intentaRevertir()`, acciones.ts):
+
+- **`no-valida`** — el contenido VIEJO (al que habría que volver) ya no
+  pasa las reglas de HOY: el esquema cambió entre esa publicación y ahora.
+- **`no-es-la-cabeza`** — una carrera: algo más movió `main` justo en el
+  medio. La PRÓXIMA acción autenticada lo vuelve a intentar desde cero.
+- **`nada-que-revertir`** — el commit roto no tocó ningún documento de
+  contenido. Hoy no puede pasar (todo commit del panel toca al menos un
+  `src/contenido/datos/*.json`), pero deja de ser imposible en cuanto la
+  fase 7 publique fotos sueltas.
+- **Un error duro de GitHub** (token vencido, red caída, `502`) — mismo
+  diagnóstico que cualquier otro `502` del panel: revisá `PANEL_GITHUB_TOKEN`
+  primero («Renovar el token de GitHub», abajo).
+
+**El arreglo a mano, cuando la reversión automática no pudo:**
+
+```bash
+git fetch origin main
+git revert --no-edit <sha-del-commit-roto>
+git push origin main
+```
+
+`--no-edit` porque no hay nada que decidir en el mensaje: es un revert
+simple, sin merges de por medio (nunca hace falta `-m 1` acá). **Nunca**
+`git push --force`: un commit de reversión es un commit NUEVO que se suma
+arriba, igual que hace el panel con los suyos — forzar reescribiría la
+historia y podría llevarse puesto algo que alguien más haya empujado en el
+medio, y acá no hay ninguna razón para necesitarlo. Un `git revert` hecho
+así no lleva el trailer `Panel: sí` (lo escribís vos, no el panel), así que
+`revisaLaCabeza()` lo deja tranquilo — nunca va a intentar «arreglar tu
+arreglo».
+
+Confirmá con `curl -s https://www.maracacao.mx/version.json` (o la sección
+de abajo) que el deploy de tu revert salió bien antes de dar el problema
+por cerrado.
+
+## La clienta dice que publicó y no ve el cambio
+
+Dos números, comparados:
+
+```bash
+curl -s https://www.maracacao.mx/version.json   # qué sha sirve el CDN AHORA MISMO
+git fetch origin main --quiet && git rev-parse origin/main   # la cabeza de main
+```
+
+- **Coinciden** — el sitio ya sirve exactamente lo último que hay en
+  `main`. Si ella jura que no ve el cambio, el problema está de SU lado:
+  el navegador (o un proxy de su operador) tiene la página vieja en
+  caché. Pedile que recargue forzado (Ctrl/Cmd+Shift+R) o que la abra en
+  una ventana privada — no hay nada que arreglar del lado del panel.
+- **`version.json` va ATRÁS de `origin/main`, y el deploy de ese commit en
+  Vercel sigue "Building"/"Queued"** — normal, es la ventana de segundos
+  (a veces minutos) entre que el commit existe y el CDN lo sirve (spec
+  §4.5, decisión B2: las DOS fuentes tienen que coincidir). Esperá y
+  volvé a mirar.
+- **El deploy de `origin/main` en Vercel dice "Error" o "Canceled"** — ver
+  «Se cayó el sitio después de una publicación», arriba: si el commit
+  lleva `Panel: sí` (`git log origin/main -1 --format=%B`), dale un minuto
+  a la reversión automática y volvé a mirar `origin/main`; si no lleva ese
+  trailer, es un commit tuyo — andá a «Si `main` queda roto».
+- **`version.json` no contesta, o el sha que trae no aparece en ningún
+  lado de `git log origin/main`** — algo raro de verdad. Revisá
+  **Deployments** en Vercel a mano antes de asumir nada: puede ser un
+  deploy manual fuera del panel, un dominio mal apuntado, o una caché
+  intermedia sirviendo otra cosa.
+
+## No le llegan los correos
+
+Los avisos por correo son SIEMPRE un acompañante, con una sola excepción
+(el enlace mágico, más abajo). `manda()` (`src/servidor/correo.ts`) NUNCA
+tira una excepción: si `RESEND_API_KEY`/`PANEL_REMITENTE` faltan, el
+proveedor rechaza el envío, o la red falla, devuelve `{ok:false, motivo}`;
+quien lo llamó (`mandaProtegido`, `revierteYAvisa*`, `salud`) lo anota con
+`console.error` y sigue su camino igual (B3, spec §4.1). Esto es a
+propósito, no un bug: publicar, deshacer y la reversión automática
+funcionan aunque NINGÚN correo salga — verificar un dominio en el
+proveedor es un trámite de días (SPF+DKIM en el DNS), y el panel no puede
+quedar esperando eso para dejarla publicar.
+
+**Todos los avisos pasan por acá** — el correo a ella cuando algo no salió,
+los dos correos a vos de un deploy fallido, el aviso de que alguien entró
+con el enlace mágico, y el aviso de que `PANEL_GITHUB_TOKEN` está por
+vencer— así que si NINGUNO está llegando, sospechá primero la
+configuración del proveedor antes de revisar acción por acción.
+
+**La única excepción es `enlace` (el enlace mágico de recuperación).** Ahí
+el correo ES el producto: sin `RESEND_API_KEY`/`PANEL_REMITENTE`, pedirlo
+contesta 503 («Ahora mismo no puedo mandarte el enlace. Escríbele a
+Marcos.») en vez de fingir que se mandó — ver «El enlace mágico de
+recuperación», arriba.
+
+**Cómo verificar el dominio en el proveedor (Resend):**
+
+1. resend.com → **Domains** → buscá `maracacao.mx` (agregalo si no está).
+2. Copiá los registros DNS que te da (típicamente SPF y DKIM, a veces
+   DMARC) y cargalos donde esté delegado el DNS del dominio.
+3. La propagación tarda —de minutos a un día, según el proveedor de DNS—;
+   el estado en Resend pasa de «Pending» a «Verified» solo, sin que haya
+   que tocar nada más del lado del panel ni de Vercel.
+
+**Mientras `maracacao.mx` no esté verificado, los avisos solo llegan a la
+casilla del dueño de la cuenta en Resend** —la que usaste para crear la
+cuenta—, nunca a la clienta ni a `PANEL_AVISOS_A` si es otra dirección. Es
+la misma advertencia que ya está en la fila de `PANEL_REMITENTE` de la
+tabla de variables, arriba: hasta que el dominio esté verde en Resend,
+tratá cualquier «no le llegó nada» como sospechoso de esto primero, antes
+de revisar el código o los logs. El panel de Resend (pestaña **Emails**)
+muestra cada intento de envío, se haya entregado o no — es la forma más
+rápida de confirmar si el correo salió de acá y se perdió en el camino, o
+si nunca llegó a intentarse.
 
 ## Qué NO puede hacer el panel, aunque quisiera
 
@@ -502,6 +675,13 @@ pedirle al panel que lo haga, es que cada candado existe a propósito:
 - **No puede forzar un push.** Cada commit se arma con `force: false`
   contra el `main` que el panel acaba de leer — si `main` se movió en el
   medio, el commit falla en vez de pisar lo que sea que haya cambiado.
+- **No puede publicar sin declarar contra qué versión del sitio editó.**
+  `publicar` exige `base` (el sha que el panel leyó al abrir el editor):
+  sin ese campo, 400 antes de mirar el documento; si `base` quedó vieja Y
+  lo que cambió en el medio toca alguno de los documentos que este lote
+  escribe, 409 en vez de pisarlo en silencio (Tarea 2 de la fase 5 Parte
+  B — ver también «Lo que todavía NO está cubierto», abajo, sobre lo que
+  esto SÍ y NO resuelve).
 - **No puede hacerse pasar por vos.** Cada commit lleva el autor `Panel
   Maracacao <panel@maracacao.mx>`, nunca tu nombre — para que el historial
   de Git siempre diga «esto lo publicó el panel», no «esto lo publicó
@@ -514,21 +694,28 @@ pedirle al panel que lo haga, es que cada candado existe a propósito:
 
 ## Lo que todavía NO está cubierto
 
-Dos cosas quedaron anotadas, a propósito, para más adelante — no son bugs
-de esta parte, son límites conocidos de lo que se construyó hasta acá:
+**[Actualizado, fase 5 Parte B, Tarea 15]** La primera versión de esta
+sección tenía un ítem que dejó de ser cierto y no se había corregido: decía
+que dos personas editando el mismo documento a la vez podían pisarse SIN
+que nadie se entere, y eso ya no es así del lado del servidor —lo cerró la
+Tarea 2 de esta misma fase (`base` obligatoria + 409 de pisada, ver la
+tabla de arriba, «Qué NO puede hacer el panel»)—. Lo que queda pendiente es
+más angosto que lo que decía antes:
 
-- **Dos personas editando el mismo documento a la vez pueden pisarse sin
-  que nadie se entere.** El panel escribe el documento ENTERO en cada
-  publicación, así que si vos y tu hermana editan `sitio.json` al mismo
-  tiempo, quien publica segundo sobreescribe TODO lo que publicó quien lo
-  hizo primero, sin conflicto y sin aviso — el segundo commit entra como un
-  fast-forward limpio, porque para Git no hay ningún dato de que el
-  contenido cambió en el medio (a diferencia de un archivo de código, donde
-  un merge marcaría el choque). Hoy hay una sola persona con acceso, así
-  que el riesgo es bajo, pero está anotado (ledger de esta fase, ítem I-5):
-  la Fase 5 Parte B es la que tiene que traer el número de versión que el
-  navegador leyó, para que el servidor pueda decir «esto cambió mientras
-  editabas» en vez de pisarlo en silencio.
+- **El servidor detecta la pisada, pero la PANTALLA que le explica el
+  conflicto a ella («celular, ayer 11:04, 3 cambios» / «esta compu, hace 6
+  días, 1 cambio», spec §4.3) es de la fase 6, no de esta.** Hoy, si
+  publica con una `base` vieja que de verdad se pisa con algo, recibe un
+  409 — correcto, no le sobreescribe nada a nadie en silencio —, pero el
+  mensaje («Marcos cambió algo del sitio mientras editabas: vuelve a
+  intentar la publicación») no le ofrece ningún camino para RESOLVER el
+  conflicto ahí mismo (ver dos ítems, arriba, en «Qué NO puede hacer el
+  panel», y el cierre de la Parte B al final de
+  `docs/superpowers/plans/2026-09-17-panel-fase-5-parte-b.md` para el
+  contrato completo que la fase 6 tiene que construir sobre esto).
+  `borrador.leer` tiene la misma limitación a propósito: devuelve el
+  borrador del servidor tal cual, sin decidir nada — la pantalla es quien
+  compara y pregunta.
 - **El freno de los cinco intentos vive en la memoria de una sola función
   en ejecución (E4), no en una base de datos compartida.** Las funciones
   serverless de Vercel son efímeras y pueden correr varias a la vez: alguien
@@ -536,16 +723,18 @@ de esta parte, son límites conocidos de lo que se construyó hasta acá:
   simplemente tenga paciencia y espere a que Vercel recicle una instancia,
   se salta el freno sin mucho esfuerzo. No es la defensa principal —esa es
   tener una contraseña larga (E2)— sino el freno al intento casual y al
-  script tonto. **[Actualizado, Ronda 1 de la Tarea 12]** Cada acción
-  (`entrar`, `salud`, `enlace`, `entrar-con-enlace`) tiene su PROPIO
-  presupuesto de cinco cada quince minutos —antes compartían uno solo por
-  IP, y eso dejaba a la clienta sin poder usar la contraseña si había
-  pedido el enlace de recuperación varias veces seguidas—, así que
-  `scripts/humo-panel.sh` (paso 6) hoy gasta el freno de `entrar`
-  específicamente: los dos logins de los pasos 2 y 3 ya usan dos de los
-  cinco, y el script sigue sin asumir un número fijo (prueba hasta ocho
-  veces y para en el primer 429) por las dudas de que alguna corrida
-  anterior haya dejado algo pendiente en la misma ventana de quince
-  minutos. Si algún día hace falta un freno de verdad, contra un atacante
-  de verdad, hace falta un almacén compartido entre instancias (Redis, o
-  algo así) — hoy no existe.
+  script tonto. **[Actualizado, Ronda 1 de la Tarea 12]** Cada acción tiene
+  su PROPIO presupuesto de cinco cada quince minutos —antes `entrar`,
+  `salud`, `enlace` y `entrar-con-enlace` compartían uno solo por IP, y eso
+  dejaba a la clienta sin poder usar la contraseña si había pedido el
+  enlace de recuperación varias veces seguidas—; `publicar`, `estado`,
+  `historial`, `deshacer` y `borrador.*` no tienen NINGÚN freno de intentos
+  propio, porque ya exigen una sesión válida (E3) y no tiene sentido
+  frenar algo que ya pasó ese candado. `scripts/humo-panel.sh` (el último
+  paso) hoy gasta el freno de `entrar` específicamente: los dos logins de
+  los pasos 2 y 3 ya usan dos de los cinco, y el script sigue sin asumir un
+  número fijo (prueba hasta ocho veces y para en el primer 429) por las
+  dudas de que alguna corrida anterior haya dejado algo pendiente en la
+  misma ventana de quince minutos. Si algún día hace falta un freno de
+  verdad, contra un atacante de verdad, hace falta un almacén compartido
+  entre instancias (Redis, o algo así) — hoy no existe.
