@@ -1362,6 +1362,138 @@ describe('publicar', () => {
       expect((porElRouter.cuerpo as { problema: string }).problema).toBe((porElRef as { problema: string }).problema)
     })
   })
+
+  // Tarea 14: los avisos de conteo (`gravedad: 'avisa'`, `avisosDeConteo()`
+  // en validacion.ts) vuelven a la respuesta de publicar. El aviso NUNCA
+  // bloquea —por eso se calcula DESPUÉS de escribir, nunca antes: si se
+  // calculara antes y algo fallara ahí, un aviso habría bloqueado una
+  // publicación— pero hasta esta tarea se perdía en silencio: el sitio
+  // podía decir «LOS 15 SABORES» arriba de una lista de dieciséis y nada
+  // se enteraba.
+  describe('los avisos de conteo en la respuesta de publicar (Tarea 14)', () => {
+    // La cabeza de `main` en estos tests: coincide con `cuerpo.base`, así
+    // que la Fase 2 nunca entra a la rama de «pisada» (`gh.comparaRefs`) —
+    // un pedido menos que programar en cada caso.
+    const SHA_BASE = 'main-1'
+
+    // El documento real de `sabores.json`, leído del disco, con un sabor
+    // más — nunca a mano (un fixture a mano se desincroniza del esquema y
+    // el test empieza a probar otra cosa sin que nadie se entere), sino
+    // clonando un elemento real y dándole una identidad propia: el mismo
+    // truco que ya usa «de dónde salen las fuentes…», más arriba, para su
+    // `saboresConUnoNuevo`.
+    const conDieciseisSabores = () => {
+      const doc = saboresCrudoDeDisco()
+      const nuevo = JSON.parse(JSON.stringify(doc.sabores[0]))
+      nuevo.orden = 16
+      nuevo.slug = 'sabor-prueba-16'
+      nuevo.nombre = 'Sabor de prueba n.º 16'
+      doc.sabores.push(nuevo)
+      return doc
+    }
+
+    // Lo vivo de `sitio`, tal cual está hoy en el repo: es lo que el
+    // router lee para calcular los avisos cuando `sitio` no vino en el
+    // lote (ver `publicarAccion`, el bloque de avisos, después de
+    // `publica()`). Su `anaquel.kicker` dice «LOS 15 SABORES» — el texto
+    // que se queda viejo apenas hay dieciséis.
+    const textoSitioVivo = serializa(esquemaSitio, sitioCrudoDeDisco())
+
+    /**
+     * Las respuestas que hacen falta para publicar `sabores` SOLO (sin
+     * `sitio` en el lote) de punta a punta: el costo fijo de
+     * `revisaLaCabeza()`, el sha base de la Fase 2, lo vivo de `sabores`
+     * para el diff, las seis de `publica()` — y, recién DESPUÉS de esas
+     * seis (el commit ya hecho), lo vivo de `sitio` que pide el cálculo de
+     * avisos. El orden de esta lista es el orden real de los pedidos; si
+     * el router alguna vez leyera `sitio` ANTES de escribir, `fetchFalso`
+     * lo serviría igual (no valida orden por URL) pero el test 2 de abajo
+     * —que exige el commit hecho aunque el cálculo de avisos reviente— es
+     * el que de verdad vigila que el orden sea el correcto.
+     */
+    const respuestasDeUnaPublicacionDeSabores = () => [
+      ...respuestasDeNingunaReversionPendiente(),
+      { cuerpo: { object: { sha: SHA_BASE } } }, // gh.ref (Fase 2: el sha base del lote)
+      { cuerpo: { content: Buffer.from(textoSaboresVivo).toString('base64'), encoding: 'base64' } }, // archivoEnRef(sabores): lo vivo, para el diff
+      ...respuestasDeUnaPublicacionDirecta(), // las seis de publica()
+      { cuerpo: { content: Buffer.from(textoSitioVivo).toString('base64'), encoding: 'base64' } }, // archivoEnRef(sitio): DESPUÉS de escribir, para los avisos
+    ]
+
+    it('avisa cuando un texto menciona una cantidad que ya no coincide', async () => {
+      // Ella agrega el sabor 16 y el texto del anaquel sigue diciendo «LOS
+      // 15 SABORES». Publicar NO se bloquea —es su decisión, y puede ser
+      // que lo arregle después— pero tiene que enterarse, porque desde su
+      // pantalla el texto se ve perfecto: lo que está mal es la relación
+      // entre dos cosas que no se ven juntas.
+      const { f } = fetchFalso([...respuestasDeUnaPublicacionDeSabores()])
+      const r = await maneja(
+        'publicar',
+        { cuerpo: { base: SHA_BASE, documentos: { sabores: conDieciseisSabores() } }, cookie: cookieValida() },
+        contextoBase(f),
+      )
+      expect(r.status).toBe(200)
+      const avisos = (r.cuerpo as { avisos: Array<{ campo: string; titulo: string; detalle?: string }> }).avisos
+      expect(avisos.map((a) => a.campo)).toContain('anaquel.kicker')
+      // El texto de cada aviso es lo que ella lee (fase 6): sin jerga,
+      // igual que cualquier otro texto de esta respuesta.
+      for (const a of avisos) {
+        expect(jergaEn(a.titulo), a.titulo).toBeNull()
+        if (a.detalle) expect(jergaEn(a.detalle), a.detalle).toBeNull()
+      }
+    })
+
+    it('un aviso NUNCA bloquea: el commit se hizo igual', async () => {
+      const { f, pedidos } = fetchFalso([...respuestasDeUnaPublicacionDeSabores()])
+      const r = await maneja(
+        'publicar',
+        { cuerpo: { base: SHA_BASE, documentos: { sabores: conDieciseisSabores() } }, cookie: cookieValida() },
+        contextoBase(f),
+      )
+      expect((r.cuerpo as { sha: string | null }).sha).not.toBeNull()
+      expect(pedidos.some((p) => p.url.endsWith('/git/commits') && p.metodo === 'POST')).toBe(true)
+    })
+
+    it('sin nada que avisar, la lista viene VACÍA, nunca ausente', async () => {
+      // Que el campo exista siempre es lo que le permite a la fase 6
+      // escribir `avisos.length` sin un `?.` que esconda un bug de la
+      // respuesta el día que este código deje de calcularlos.
+      const { f } = fetchFalso([...respuestasDeUnaPublicacionDeSabores()])
+      const r = await maneja(
+        'publicar',
+        { cuerpo: { base: SHA_BASE, documentos: { sabores: saboresConUnPrecioDistinto() } }, cookie: cookieValida() },
+        contextoBase(f),
+      )
+      expect(r.status).toBe(200)
+      expect((r.cuerpo as { avisos: unknown[] }).avisos).toEqual([])
+    })
+
+    // El cuarto test que pide el brief («si calcular los avisos revienta,
+    // la publicación ya está hecha») queda documentado acá en vez de
+    // escrito. Se intentó construir un `sabores` que pasara
+    // `validarContra(esquemaSabores, ...)` —condición obligatoria para que
+    // el lote llegue a escribirse: si no pasa, el 422 sale ANTES, sin
+    // commit, y un test así no probaría el orden que le importa a esta
+    // tarea— y que a la vez le faltara a `conteosDe()` alguna de las
+    // listas que la tabla de conteos (conteos.ts, `DONDE`) dice contar de
+    // `sabores`: `sabores`, `gotas` y `polvo`. No hay forma: las tres son
+    // listas con `minItems: 1` en el esquema (sabores.ts) — comprobado a
+    // mano, borrando o vaciando cada una por separado, o cambiándole el
+    // tipo: las tres formas de dejar a `conteosDe()` sin esa lista rompen
+    // primero el ESQUEMA, con un 422 antes de escribir nada. Un `sabores`
+    // que ya pasó su propio esquema no le puede faltar a `conteosDe()`
+    // ninguna de las tres listas que lee de él.
+    //
+    // Un test que no puede fallar es peor que ninguno: ocupa lugar, da
+    // falsa confianza, y el próximo que lo lea va a creer que ese camino
+    // está cubierto. El `try/catch` que protege el cálculo de avisos
+    // (`acciones.ts`, el bloque después de `publica()`) sigue ahí igual —
+    // cubre el caso real de esta tarea, que es de RED: la lectura de
+    // `sitio` o `sabores` vivo que hace falta para los avisos cuando
+    // ninguno de los dos vino en el lote puede fallar (GitHub no
+    // contesta), y esa falla tiene que dejar el `sha` de la respuesta sin
+    // tocar— aunque ningún test la dispare con un documento inválido a
+    // propósito, porque no existe ese documento.
+  })
 })
 
 // Tarea 3 de la Parte B: cortar UNA sesión sin rotar `PANEL_SECRETO` — el

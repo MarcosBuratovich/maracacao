@@ -31,7 +31,8 @@ import { revierte, TRAILER_REVIERTE, TRAILER_PANEL, tieneTrailer, valorDeTrailer
 import { lee } from './historial'
 import type { Cambio } from '../contenido/diff'
 import { resume } from '../contenido/diff'
-import { validarContra, type Problema } from '../contenido/validacion'
+import { validarContra, validar, type Problema } from '../contenido/validacion'
+import { conteosDe } from '../contenido/conteos'
 import { serializa } from '../contenido/carga'
 import { injerta, type FuentesDeDerivados } from '../contenido/derivados'
 import { DOCUMENTOS, type IdDocumento } from '../contenido/esquema'
@@ -1040,13 +1041,15 @@ async function revisaLaCabeza(contexto: Contexto): Promise<string | null> {
  * nunca un `ok: true`— y jamás se cae de vuelta a ninguna copia
  * empaquetada: una base vieja es EXACTAMENTE lo que produjo este bug.
  *
- * La validación de esquema (`validarContra`, no `validar`) no necesita
- * conteos: los avisos de conteo (`gravedad: 'avisa'`) nunca bloquean una
- * publicación —son la misma comodidad que el navegador ya le mostró antes
- * de que ella apretara publicar—, así que no hace falta leer un documento
- * que no se va a escribir solo para calcularlos. Si algún día un aviso
- * tiene que bloquear o mostrarse en la respuesta, ESE es el momento de
- * traer los conteos de vuelta, con el caso real delante.
+ * La validación de esquema de ARRIBA (`validarContra`, no `validar`) no
+ * necesita conteos: los avisos de conteo (`gravedad: 'avisa'`) nunca
+ * bloquean una publicación —son la misma comodidad que el navegador ya le
+ * mostró antes de que ella apretara publicar—, así que no hace falta leer
+ * un documento que no se va a escribir solo para decidir si esta
+ * publicación PUEDE pasar. [Tarea 14] Para MOSTRARLOS en la respuesta —el
+ * caso real llegó— sí hacen falta, pero recién DESPUÉS de escribir, nunca
+ * acá: ver el bloque de avisos al final de esta función, que corre cuando
+ * el commit ya es un hecho y por eso no puede fallar cerrado.
  *
  * Esa validación corre ANTES de tocar GitHub para escribir, PERO no
  * siempre antes de tocar GitHub del todo: `sitio` tiene cinco campos
@@ -1176,6 +1179,17 @@ async function publicarAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
   // que comparar contra el MISMO instante.
   let base: { sha: string } | undefined
 
+  // Lo que la Fase 1b ya leyó o calculó, para que los AVISOS de conteo
+  // (después de publicar, más abajo) lo reusen en vez de pedirlo de
+  // nuevo: `sabores` vivo completo (solo se llena en la rama que lee
+  // vivo, nunca en la que usa `documentos.sabores`) y `sitio` ya con sus
+  // derivados injertados (solo se llena si `sitio` vino en el lote —es
+  // el mismo documento que ya pasó `validarContra` dos líneas más abajo,
+  // así que reusarlo para los avisos no repite ni el injerto ni la
+  // lectura).
+  let saboresVivoCrudo: unknown
+  let sitioInjertado: unknown
+
   // Fase 1b: `sitio`, si vino, con sus cinco derivados injertados antes
   // de validar (ver el docstring de esta función).
   if (idsConocidos.includes('sitio')) {
@@ -1189,7 +1203,8 @@ async function publicarAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
       } else {
         base = await gh.ref('heads/main')
         const vivoSaboresTexto = await gh.archivoEnRef(RUTA_DEL_DOCUMENTO('sabores'), base.sha)
-        fuentes = fuentesDeSabores(JSON.parse(vivoSaboresTexto))
+        saboresVivoCrudo = JSON.parse(vivoSaboresTexto)
+        fuentes = fuentesDeSabores(saboresVivoCrudo)
       }
     } catch (e) {
       // Mismo tratamiento que la Fase 2 cuando GitHub no contesta: un
@@ -1218,6 +1233,8 @@ async function publicarAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
     if (problemas.length > 0) {
       return error(422, problemas[0].titulo, `sitio.${problemas[0].campo}`)
     }
+
+    sitioInjertado = paraValidar
   }
 
   // Fase 2: recién acá se toca GitHub para escribir. Reusa el sha base de
@@ -1265,7 +1282,12 @@ async function publicarAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
   }
 
   if (archivos.length === 0) {
-    return ok({ ok: true, sha: null, resumen: SIN_CAMBIOS })
+    // Nada que escribir: ningún documento cambió, así que tampoco hay un
+    // estado nuevo del sitio del que avisar. `avisos` viaja igual, vacío
+    // —nunca ausente (ver el bloque de avisos, más abajo)— para que la
+    // pantalla pueda leer `avisos.length` sin preguntarse primero si el
+    // campo vino.
+    return ok({ ok: true, sha: null, resumen: SIN_CAMBIOS, avisos: [] })
   }
 
   const resultado = await publica(gh, {
@@ -1282,7 +1304,51 @@ async function publicarAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
   })
   if (!resultado.ok) return error(resultado.codigo, resultado.problema)
 
-  return ok({ ok: true, sha: resultado.sha, resumen: resultado.resumen })
+  // Los avisos de conteo (`gravedad: 'avisa'`, `avisosDeConteo()` en
+  // validacion.ts): el sitio menciona una cantidad («LOS 15 SABORES») que
+  // ya no coincide con la lista real. El commit YA se hizo —arriba— así
+  // que esto corre DESPUÉS, nunca antes: un aviso, por definición, no
+  // puede bloquear una publicación, y calcularlo antes de escribir habría
+  // dejado abierta esa posibilidad el día que este bloque tuviera un bug.
+  // Por la misma razón, cualquier falla ACÁ —de red, leyendo lo vivo que
+  // haga falta; o de `conteosDe()`, si algún documento no tuviera la
+  // lista que la tabla de conteos dice contar— se traduce en «sin
+  // avisos», nunca en un error de respuesta sobre una publicación que ya
+  // es un hecho.
+  //
+  // Reusa lo que esta misma llamada ya leyó o calculó —el sha base
+  // (`base.sha`, el mismo de toda la Fase 2), el `sitio` ya injertado y
+  // el `sabores` ya leído vivo que armó la Fase 1b, si los armó— y solo
+  // pide de más lo que hace falta y todavía no está: pasa cuando el
+  // documento en cuestión ni vino en el lote ni hizo falta leerlo para
+  // los derivados de `sitio` (por ejemplo, publicar `sabores` solo, sin
+  // `sitio` en el lote).
+  let avisos: Problema[] = []
+  try {
+    const saboresParaConteos = idsConocidos.includes('sabores')
+      ? documentos.sabores
+      : saboresVivoCrudo !== undefined
+        ? saboresVivoCrudo
+        : JSON.parse(await gh.archivoEnRef(RUTA_DEL_DOCUMENTO('sabores'), base.sha))
+
+    const sitioParaConteos =
+      sitioInjertado !== undefined
+        ? sitioInjertado
+        : injerta(
+            JSON.parse(await gh.archivoEnRef(RUTA_DEL_DOCUMENTO('sitio'), base.sha)),
+            fuentesDeSabores(saboresParaConteos),
+          )
+
+    const conteos = conteosDe({ sitio: sitioParaConteos, sabores: saboresParaConteos })
+    avisos = validar(DOCUMENTOS.sitio, sitioParaConteos, conteos).filter((p) => p.gravedad === 'avisa')
+  } catch (e) {
+    console.error(
+      'publicar: no se pudieron calcular los avisos de conteo (no bloquea: la publicación ya está hecha) —',
+      e,
+    )
+  }
+
+  return ok({ ok: true, sha: resultado.sha, resumen: resultado.resumen, avisos })
 }
 
 /*

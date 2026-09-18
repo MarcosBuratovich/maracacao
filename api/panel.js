@@ -15698,6 +15698,82 @@ async function guarda(gh, args) {
   return r.ok ? { ok: true } : { ok: false, motivo: "no-se-pudo-guardar", problema: r.problema };
 }
 
+// src/contenido/conteos.ts
+var LETRAS = [
+  "cero",
+  "uno",
+  "dos",
+  "tres",
+  "cuatro",
+  "cinco",
+  "seis",
+  "siete",
+  "ocho",
+  "nueve",
+  "diez",
+  "once",
+  "doce",
+  "trece",
+  "catorce",
+  "quince",
+  "diecis\xE9is",
+  "diecisiete",
+  "dieciocho",
+  "diecinueve",
+  "veinte"
+];
+var enLetras = (n) => LETRAS[n] ?? String(n);
+function cruzaConteo(texto2, esperado, sustantivo) {
+  const formas = /* @__PURE__ */ new Set([sustantivo]);
+  if (sustantivo.endsWith("es")) formas.add(sustantivo.slice(0, -2));
+  if (sustantivo.endsWith("s")) formas.add(sustantivo.slice(0, -1));
+  const esSustantivo = (token) => formas.has(token.toLowerCase());
+  const tokens = texto2.match(/[0-9]+|[a-záéíóúñ]+/gi) ?? [];
+  for (let i = 0; i < tokens.length; i++) {
+    if (!esSustantivo(tokens[i])) continue;
+    for (const vecino of [tokens[i - 1], tokens[i + 1]]) {
+      if (vecino === void 0) continue;
+      for (let n = 0; n <= 20; n++) {
+        if (n === esperado) continue;
+        if (vecino === String(n)) return `dice \xAB${n}\xBB pero hoy hay ${esperado}.`;
+        if (vecino.toLowerCase() === enLetras(n)) return `dice \xAB${enLetras(n)}\xBB pero hoy hay ${esperado}.`;
+      }
+    }
+  }
+  return null;
+}
+var DONDE = {
+  sabores: ["sabores", "sabores"],
+  gotas: ["sabores", "gotas"],
+  polvo: ["sabores", "polvo"],
+  recetas: ["sitio", "recetas.lista"],
+  preguntas: ["sitio", "preguntas.items"],
+  pasos: ["sitio", "catar.pasos"],
+  ingredientes: ["sitio", "postura.lleva"]
+};
+var enRuta = (dato, ruta2) => {
+  let actual = dato;
+  for (const paso of ruta2.split(".")) {
+    if (actual === null || typeof actual !== "object") return void 0;
+    actual = actual[paso];
+  }
+  return actual;
+};
+function conteosDe(fuentes) {
+  const conteos = {};
+  for (const nombre of Object.keys(DONDE)) {
+    const [documento, ruta2] = DONDE[nombre];
+    const lista2 = enRuta(fuentes[documento], ruta2);
+    if (!Array.isArray(lista2)) {
+      throw new Error(
+        `conteosDe(): \xAB${nombre}\xBB sale de \xAB${documento}.${ruta2}\xBB y ah\xED no hay una lista.`
+      );
+    }
+    conteos[nombre] = lista2.length;
+  }
+  return conteos;
+}
+
 // src/contenido/validacion.ts
 var TIENE_ESPACIO_BLANDO = cifraUnidad();
 var CADA_ESPACIO_BLANDO = cifraUnidad("g");
@@ -15713,7 +15789,7 @@ function proponeArreglo(valor) {
   }
   return void 0;
 }
-function enRuta(crudo, ruta2) {
+function enRuta2(crudo, ruta2) {
   let actual = crudo;
   for (const paso of ruta2) {
     if (actual === null || typeof actual !== "object") return void 0;
@@ -15744,7 +15820,7 @@ function validarContra(esquema, crudo) {
   if (r.success) return [];
   return r.error.issues.map((issue2) => {
     const campo = issue2.path.join(".");
-    const valor = enRuta(crudo, issue2.path);
+    const valor = enRuta2(crudo, issue2.path);
     const titulo = JERGA_DE_ZOD.test(issue2.message) ? tituloSinJerga(issue2, valor) : issue2.message;
     return {
       campo,
@@ -15753,6 +15829,70 @@ function validarContra(esquema, crudo) {
       arreglo: proponeArreglo(valor)
     };
   });
+}
+var une2 = (a, b) => a === "" ? String(b) : `${a}.${b}`;
+var PARTE2 = /^([^<[]*)((?:\[\])*)(?:<([^=>]+)=([^>]+)>)?$/;
+var enRutas = (dato, ruta2) => {
+  let actuales = [{ ruta: "", valor: dato }];
+  for (const parte of ruta2.split(".")) {
+    const m = PARTE2.exec(parte);
+    if (!m) throw new Error(`enRutas(): no entiendo la parte \xAB${parte}\xBB de la ruta \xAB${ruta2}\xBB.`);
+    const [, clave, corchetes, discriminante, variante] = m;
+    const niveles = corchetes.length / 2;
+    const siguiente = [];
+    for (const { ruta: r, valor } of actuales) {
+      if (valor === null || valor === void 0) continue;
+      const base = clave ? une2(r, clave) : r;
+      const dentro = clave ? valor[clave] : valor;
+      let candidatos = [{ ruta: base, valor: dentro }];
+      for (let nivel = 0; nivel < niveles; nivel++) {
+        const desenvueltos = [];
+        for (const { ruta: r2, valor: v2 } of candidatos) {
+          if (Array.isArray(v2)) v2.forEach((v, i) => desenvueltos.push({ ruta: une2(r2, i), valor: v }));
+        }
+        candidatos = desenvueltos;
+      }
+      for (const c of candidatos) {
+        if (discriminante !== void 0) {
+          const v = c.valor;
+          if (v === null || typeof v !== "object" || v[discriminante] !== variante) continue;
+        }
+        siguiente.push(c);
+      }
+    }
+    actuales = siguiente;
+  }
+  return actuales;
+};
+function avisosDeConteo(esquema, crudo, conteos) {
+  const avisos = [];
+  recorre(esquema, (ruta2, meta3) => {
+    const cuenta2 = meta3?.cuenta;
+    if (!cuenta2) return;
+    const esperado = conteos[cuenta2.de];
+    if (esperado === void 0) {
+      throw new Error(
+        `validar(): el campo \xAB${ruta2}\xBB declara un conteo sobre \xAB${cuenta2.de}\xBB, que no vino en los conteos.`
+      );
+    }
+    for (const { ruta: concreta, valor } of enRutas(crudo, ruta2)) {
+      if (typeof valor !== "string") continue;
+      const aviso = cruzaConteo(valor, esperado, cuenta2.sustantivo);
+      if (aviso === null) continue;
+      avisos.push({
+        campo: concreta,
+        gravedad: "avisa",
+        titulo: `Este texto ${aviso}`,
+        detalle: "Si agregaste o quitaste algo de la lista, este texto qued\xF3 viejo."
+      });
+    }
+  });
+  return avisos;
+}
+function validar(esquema, crudo, conteos = {}) {
+  const impiden = validarContra(esquema, crudo);
+  if (impiden.length > 0) return impiden;
+  return avisosDeConteo(esquema, crudo, conteos);
 }
 
 // src/contenido/derivados.ts
@@ -18593,6 +18733,8 @@ async function publicarAccion(pedido, contexto) {
     }
   }
   let base;
+  let saboresVivoCrudo;
+  let sitioInjertado;
   if (idsConocidos.includes("sitio")) {
     let fuentes;
     try {
@@ -18601,7 +18743,8 @@ async function publicarAccion(pedido, contexto) {
       } else {
         base = await gh.ref("heads/main");
         const vivoSaboresTexto = await gh.archivoEnRef(RUTA_DEL_DOCUMENTO2("sabores"), base.sha);
-        fuentes = fuentesDeSabores2(JSON.parse(vivoSaboresTexto));
+        saboresVivoCrudo = JSON.parse(vivoSaboresTexto);
+        fuentes = fuentesDeSabores2(saboresVivoCrudo);
       }
     } catch (e) {
       console.error("publicar: no se pudo leer \xABsabores\xBB en vivo para calcular los derivados de \xABsitio\xBB \u2014", e);
@@ -18617,6 +18760,7 @@ async function publicarAccion(pedido, contexto) {
     if (problemas.length > 0) {
       return error51(422, problemas[0].titulo, `sitio.${problemas[0].campo}`);
     }
+    sitioInjertado = paraValidar;
   }
   const archivos = [];
   const cambios = [];
@@ -18648,7 +18792,7 @@ async function publicarAccion(pedido, contexto) {
     return error51(502, PROBLEMA_NO_SE_PUDO_LEER);
   }
   if (archivos.length === 0) {
-    return ok({ ok: true, sha: null, resumen: SIN_CAMBIOS });
+    return ok({ ok: true, sha: null, resumen: SIN_CAMBIOS, avisos: [] });
   }
   const resultado = await publica(gh, {
     archivos,
@@ -18663,7 +18807,22 @@ async function publicarAccion(pedido, contexto) {
     ...cambios.length > 0 ? { cambios } : {}
   });
   if (!resultado.ok) return error51(resultado.codigo, resultado.problema);
-  return ok({ ok: true, sha: resultado.sha, resumen: resultado.resumen });
+  let avisos = [];
+  try {
+    const saboresParaConteos = idsConocidos.includes("sabores") ? documentos.sabores : saboresVivoCrudo !== void 0 ? saboresVivoCrudo : JSON.parse(await gh.archivoEnRef(RUTA_DEL_DOCUMENTO2("sabores"), base.sha));
+    const sitioParaConteos = sitioInjertado !== void 0 ? sitioInjertado : injerta(
+      JSON.parse(await gh.archivoEnRef(RUTA_DEL_DOCUMENTO2("sitio"), base.sha)),
+      fuentesDeSabores2(saboresParaConteos)
+    );
+    const conteos = conteosDe({ sitio: sitioParaConteos, sabores: saboresParaConteos });
+    avisos = validar(DOCUMENTOS.sitio, sitioParaConteos, conteos).filter((p) => p.gravedad === "avisa");
+  } catch (e) {
+    console.error(
+      "publicar: no se pudieron calcular los avisos de conteo (no bloquea: la publicaci\xF3n ya est\xE1 hecha) \u2014",
+      e
+    );
+  }
+  return ok({ ok: true, sha: resultado.sha, resumen: resultado.resumen, avisos });
 }
 var VARIABLES_REQUERIDAS = [
   "PANEL_CLAVE_HASH",
