@@ -1838,6 +1838,127 @@ describe('salud', () => {
       expect(cuerpo.diasParaVencer).toBeNull()
     })
   })
+
+  /*
+   * [Revisión final de la rama, I5] La vigilancia ya no cuelga de `salud`.
+   *
+   * `salud` es la única acción que ningún flujo automático llama: el
+   * escenario medido era que el token vence en cuarenta días, ella publica
+   * todos los días, Marcos no corre el `curl` del runbook porque nada se lo
+   * recuerda, y el aviso de los treinta días no sale NUNCA — el día D ella
+   * recibe un 502 incomprensible, que es el modo de falla que la Tarea 13
+   * existía para evitar. Ahora la vigilancia va colgada de `alResponder`
+   * (github.ts), que `clienteDeGitHub()` le pone a toda acción autenticada.
+   *
+   * `borrador.leer` es la acción más barata para probarlo: un solo pedido a
+   * GitHub, sin `revisaLaCabeza()` de por medio.
+   */
+  describe('I5: cualquier acción autenticada dispara la vigilancia, no solo `salud`', () => {
+    const cabeceraVence = (dias: number, ahora: number) => ({
+      'github-authentication-token-expiration': new Date(ahora + dias * 86_400_000).toISOString(),
+    })
+
+    // Los `ahora` de estos tests están lejísimos en el futuro —el freno del
+    // aviso es una clave GLOBAL de 24 h que comparte todo el archivo— así
+    // que la cookie tiene que estar viva EN ESE instante, no en el de hoy.
+    const cookieVivaEn = (ahora: number) =>
+      firmaSesion({ correo: 'clienta@ejemplo.mx', vence: ahora + 86_400_000, dispositivo: 'test', emitida: ahora }, SECRETO)
+
+    it('`borrador.leer` avisa a Marcos cuando faltan treinta días o menos', async () => {
+      const cartas: Carta[] = []
+      // Lejos de los `ahora` de los tests de arriba: el freno del aviso es
+      // una clave GLOBAL de 24 h, compartida por todo el archivo.
+      const ahora = 12_000_000_000_000
+      const { f } = fetchFalso([
+        { cuerpo: { object: { sha: 'refBorrador' } }, cabeceras: cabeceraVence(12, ahora) },
+        { cuerpo: { content: Buffer.from('{}').toString('base64'), encoding: 'base64' } },
+      ])
+      const r = await maneja(
+        'borrador.leer',
+        { cuerpo: {}, cookie: cookieVivaEn(ahora) },
+        contextoDePrueba({
+          fetch: f,
+          ahora: () => ahora,
+          correo: correoQueAnota(cartas),
+          env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
+        }),
+      )
+
+      expect(r.status).toBe(200)
+      expect(cartas).toHaveLength(1)
+      expect(cartas[0].a).toEqual(['marcos@ejemplo.mx'])
+      expect(cartas[0].asunto).toContain('12')
+    })
+
+    it('avisa aunque el pedido a GitHub haya FALLADO: es el día en que más hace falta', async () => {
+      // El 401 del token ya vencido sigue trayendo la cabecera. Si la
+      // vigilancia corriera solo después de una respuesta buena, el aviso
+      // se apagaría exactamente el día que el token muere.
+      const cartas: Carta[] = []
+      const ahora = 13_000_000_000_000
+      const { f } = fetchFalso([
+        { status: 401, cuerpo: { message: 'Bad credentials' }, cabeceras: cabeceraVence(0, ahora) },
+      ])
+      const r = await maneja(
+        'borrador.leer',
+        { cuerpo: {}, cookie: cookieVivaEn(ahora) },
+        contextoDePrueba({
+          fetch: f,
+          ahora: () => ahora,
+          correo: correoQueAnota(cartas),
+          env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
+        }),
+      )
+
+      expect(r.status).toBe(502) // el pedido falló, y eso se le contesta igual
+      expect(cartas).toHaveLength(1)
+    })
+
+    it('a treinta y un días, ninguna acción autenticada avisa', async () => {
+      const ahora = 14_000_000_000_000
+      const { f } = fetchFalso([
+        { cuerpo: { object: { sha: 'refBorrador' } }, cabeceras: cabeceraVence(31, ahora) },
+        { cuerpo: { content: Buffer.from('{}').toString('base64'), encoding: 'base64' } },
+      ])
+      const r = await maneja(
+        'borrador.leer',
+        { cuerpo: {}, cookie: cookieVivaEn(ahora) },
+        contextoDePrueba({
+          fetch: f,
+          ahora: () => ahora,
+          correo: correoQueNoSeUsa(),
+          env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
+        }),
+      )
+      expect(r.status).toBe(200)
+    })
+
+    it('`salud` sigue SIN la vigilancia colgada: es la única puerta sin sesión', async () => {
+      // `clienteDeGitHub()` le cuelga el aviso a cada respuesta; `salud`
+      // arma su cliente a mano justamente para no darle a cualquiera con un
+      // `curl` una forma de hacer que el panel le escriba a Marcos. Lo que
+      // sí manda es su propio aviso, una vez cada 24 h por instancia — y
+      // este test corre con el freno de 24 h ya gastado por los de arriba,
+      // así que lo que mide es que NO salga un correo por pedido.
+      const ahora = 14_000_000_100_000 // dentro de las 24 h del test anterior
+      const { f } = fetchFalso([{ cuerpo: { object: { sha: 'x' } }, cabeceras: cabeceraVence(5, ahora) }])
+      const r = await maneja(
+        'salud',
+        { cuerpo: {}, cookie: '' },
+        {
+          ...contextoDePrueba({
+            fetch: f,
+            ahora: () => ahora,
+            correo: correoQueNoSeUsa(),
+            env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
+          }),
+          ip: `i5-salud-${Math.random()}`,
+        },
+      )
+      expect(r.status).toBe(200)
+      expect((r.cuerpo as { diasParaVencer: number | null }).diasParaVencer).toBe(5)
+    })
+  })
 })
 
 // C-1: hoy, en producción, el token de GitHub está cargado y

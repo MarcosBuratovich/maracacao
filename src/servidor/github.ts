@@ -31,6 +31,23 @@ export interface Credenciales {
   duenio: string
   repo: string
   fetch: typeof globalThis.fetch
+  /**
+   * [Revisión final de la rama, I5] Se llama después de CADA respuesta de
+   * GitHub —le haya ido bien o mal a ese pedido— con el vencimiento del
+   * token que esa respuesta trajo (o `null` si no lo trajo).
+   *
+   * Existe porque la vigilancia del vencimiento estaba colgada de `salud`,
+   * que es la única acción que ningún flujo automático llama: el aviso de
+   * los treinta días no salía nunca, y el día D ella recibía un 502
+   * incomprensible — literalmente el modo de falla que esa vigilancia
+   * existía para evitar. El enganche va ACÁ, donde la cabecera se lee, y no
+   * en cada llamador: una invariante que depende de que todos se acuerden
+   * no es una invariante.
+   *
+   * Si tira, se loguea y se sigue: este cliente no puede hacer fallar un
+   * pedido de la clienta por culpa de una vigilancia que ella ni pidió.
+   */
+  alResponder?: (vencimiento: string | null) => Promise<void>
 }
 
 export interface EntradaArbol {
@@ -123,6 +140,18 @@ export function cliente(c: Credenciales) {
     // si tirar deja que la vigilancia vea el vencimiento aunque este pedido
     // en particular haya fallado.
     vencimientoToken = respuesta.headers.get('github-authentication-token-expiration')
+
+    // [Revisión final, I5] Y se AVISA, antes del `throw` de abajo por la
+    // misma razón por la que se lee antes: el día que el token ya venció y
+    // GitHub contesta 401, esa misma respuesta puede seguir trayendo la
+    // fecha, y es el día en que más hace falta que el aviso salga.
+    if (c.alResponder) {
+      try {
+        await c.alResponder(vencimientoToken)
+      } catch (e) {
+        console.error('github: la vigilancia del vencimiento del token reventó (no afecta a este pedido) —', e)
+      }
+    }
 
     const cuerpo: unknown = await respuesta.json().catch(() => undefined)
 

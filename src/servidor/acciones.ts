@@ -794,6 +794,48 @@ function listaTiene(lista: string | undefined, valor: string): boolean {
 
 /*
  * ---------------------------------------------------------------------
+ * el cliente de GitHub, uno solo
+ * ---------------------------------------------------------------------
+ */
+
+/**
+ * El cliente de GitHub de una acción autenticada, con la vigilancia del
+ * vencimiento del token ya colgada.
+ *
+ * [Revisión final de la rama, I5] Antes este literal de cinco líneas estaba
+ * escrito NUEVE veces en este archivo, y ocho de las nueve leían la cabecera
+ * del vencimiento y la tiraban a la basura: la única que la consultaba era
+ * `salud`, que ningún flujo automático llama. El modo de falla estaba
+ * medido: el token vence en cuarenta días, ella publica todos los días,
+ * Marcos no corre el `curl` del runbook porque nada se lo recuerda, el aviso
+ * de los treinta días nunca sale, y el día D ella recibe un 502
+ * incomprensible — que es literalmente el modo de falla que la Tarea 13
+ * existía para evitar.
+ *
+ * Con `alResponder` (github.ts), CUALQUIER acción autenticada que hable con
+ * GitHub dispara la vigilancia, sin un pedido de más: la cabecera viaja
+ * arriba de respuestas que ya se estaban pidiendo. Y borrar ocho copias del
+ * mismo literal no es cosmética: la copia que se olvide de algo es
+ * exactamente cómo esta vigilancia se murió la primera vez.
+ *
+ * `salud` NO usa esta función, y es a propósito — ver su docstring.
+ */
+function clienteDeGitHub(contexto: Contexto): ReturnType<typeof cliente> {
+  return cliente({
+    token: contexto.env.PANEL_GITHUB_TOKEN ?? '',
+    duenio: contexto.env.GITHUB_DUENIO ?? '',
+    repo: contexto.env.GITHUB_REPO ?? '',
+    fetch: contexto.fetch,
+    // `vigilaVencimiento` está declarada más abajo, junto al resto de la
+    // vigilancia (`DIAS_AVISO_VENCIMIENTO_TOKEN` y compañía): es una
+    // `function` declarada, así que JS la levanta antes de correr una sola
+    // línea de este módulo.
+    alResponder: (vencimiento) => vigilaVencimiento(vencimiento, contexto),
+  })
+}
+
+/*
+ * ---------------------------------------------------------------------
  * la reversión automática (Tarea 8, spec §4.6)
  * ---------------------------------------------------------------------
  */
@@ -886,12 +928,7 @@ async function avisaAElla(correoDeElla: string, contexto: Contexto): Promise<voi
  * al lado. Sondear `estado` no prueba que quien sondea sea quien publicó.
  */
 async function revierteYAvisa(sha: string, correoDeElla: string, contexto: Contexto): Promise<void> {
-  const gh = cliente({
-    token: contexto.env.PANEL_GITHUB_TOKEN ?? '',
-    duenio: contexto.env.GITHUB_DUENIO ?? '',
-    repo: contexto.env.GITHUB_REPO ?? '',
-    fetch: contexto.fetch,
-  })
+  const gh = clienteDeGitHub(contexto)
 
   // El autor real, del trailer — nunca de quien está sondeando. Si esto
   // falla (GitHub no contesta, el commit no existe más), se cae a
@@ -938,12 +975,7 @@ async function revierteYAvisa(sha: string, correoDeElla: string, contexto: Conte
  * `Panel-Autor:` del propio commit, que es quien de verdad lo publicó.
  */
 async function revierteYAvisaAMarcos(sha: string, autorReal: string, contexto: Contexto): Promise<void> {
-  const gh = cliente({
-    token: contexto.env.PANEL_GITHUB_TOKEN ?? '',
-    duenio: contexto.env.GITHUB_DUENIO ?? '',
-    repo: contexto.env.GITHUB_REPO ?? '',
-    fetch: contexto.fetch,
-  })
+  const gh = clienteDeGitHub(contexto)
 
   const resumen = await intentaRevertir(gh, sha, autorReal)
 
@@ -997,12 +1029,7 @@ async function revisaLaCabeza(contexto: Contexto): Promise<string | null> {
   try {
     if (!contexto.env.PANEL_VERCEL_TOKEN) return null
 
-    const gh = cliente({
-      token: contexto.env.PANEL_GITHUB_TOKEN ?? '',
-      duenio: contexto.env.GITHUB_DUENIO ?? '',
-      repo: contexto.env.GITHUB_REPO ?? '',
-      fetch: contexto.fetch,
-    })
+    const gh = clienteDeGitHub(contexto)
 
     const cabeza = await gh.ref('heads/main')
     const commit = await gh.commit(cabeza.sha)
@@ -1175,12 +1202,7 @@ async function publicarAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
   // contra un commit que acaba de dejar de existir.
   await revisaLaCabeza(contexto)
 
-  const gh = cliente({
-    token: contexto.env.PANEL_GITHUB_TOKEN ?? '',
-    duenio: contexto.env.GITHUB_DUENIO ?? '',
-    repo: contexto.env.GITHUB_REPO ?? '',
-    fetch: contexto.fetch,
-  })
+  const gh = clienteDeGitHub(contexto)
 
   // Fase 1a, sin tocar GitHub: el esquema COMPLETO de cada documento que
   // NO necesita nada inyectado —hoy, cualquiera menos `sitio`—, en el
@@ -1481,6 +1503,40 @@ function avisoDeVencimientoPermitido(ahora: number): boolean {
   return true
 }
 
+/**
+ * [Revisión final de la rama, I5] La vigilancia misma, colgada de
+ * `alResponder` (github.ts) por `clienteDeGitHub()` — o sea de CADA
+ * respuesta de GitHub de CUALQUIER acción autenticada, que es lo que le
+ * faltaba: antes vivía suelta adentro de `salud`, la única acción que ningún
+ * flujo automático llama.
+ *
+ * No pide nada: la cabecera ya vino arriba de una respuesta que se estaba
+ * pidiendo igual, así que esto no le cuesta al PAT ni un pedido más. Y no
+ * puede hacer fallar al pedido que la disparó: lo único que hace es
+ * `mandaProtegido()`, que se traga todo.
+ *
+ * Los dos frenos siguen siendo los de la Tarea 13: una vez cada 24 h por
+ * instancia (`avisoDeVencimientoPermitido`) y solo dentro de los últimos
+ * treinta días. Con la vigilancia colgada de cada pedido —y una publicación
+ * hace media docena— el freno de 24 h pasa de ser una comodidad a ser lo que
+ * impide que una sola publicación le mande seis correos iguales a Marcos.
+ */
+async function vigilaVencimiento(tokenVence: string | null, contexto: Contexto): Promise<void> {
+  if (tokenVence === null) return
+  const ahora = contexto.ahora()
+  const dias = diasHastaVencimiento(tokenVence, ahora)
+  if (dias === null || dias > DIAS_AVISO_VENCIMIENTO_TOKEN) return
+
+  const paraMarcos = contexto.env.PANEL_AVISOS_A
+  if (!paraMarcos || !avisoDeVencimientoPermitido(ahora)) return
+
+  await mandaProtegido(contexto, {
+    a: [paraMarcos],
+    asunto: ASUNTO_AVISO_VENCIMIENTO(dias),
+    texto: textoAvisoVencimiento(tokenVence, dias),
+  })
+}
+
 const ASUNTO_AVISO_VENCIMIENTO = (dias: number): string =>
   `[panel] El token de GitHub vence en ${dias} día${dias === 1 ? '' : 's'}`
 
@@ -1521,6 +1577,12 @@ function textoAvisoVencimiento(tokenVence: string, dias: number): string {
  * que usa `entrar` (E4): si ya se gastaron los cinco pedidos de la
  * ventana, se contesta con las variables (que están bien) y se avisa que
  * la conexión no se revisó, en vez de gastar un pedido más del PAT.
+ *
+ * [Revisión final de la rama, I5] Es la única acción que arma su cliente de
+ * GitHub a mano en vez de con `clienteDeGitHub()`, y es a propósito: esa
+ * función cuelga la vigilancia del vencimiento de CADA respuesta, y `salud`
+ * es la única puerta sin sesión. Enchufarla acá sería dejar que cualquiera
+ * con un `curl` haga que el panel le escriba a Marcos.
  *
  * [Tarea 13] El cuerpo también suma `tokenVence`/`diasParaVencer`, leídos
  * de la MISMA respuesta de `gh.ref('heads/main')` que ya se pedía para
@@ -1820,12 +1882,7 @@ async function deshacerAccion(pedido: Pedido, contexto: Contexto): Promise<Respu
 
   await revisaLaCabeza(contexto)
 
-  const gh = cliente({
-    token: env.PANEL_GITHUB_TOKEN ?? '',
-    duenio: env.GITHUB_DUENIO ?? '',
-    repo: env.GITHUB_REPO ?? '',
-    fetch: contexto.fetch,
-  })
+  const gh = clienteDeGitHub(contexto)
 
   // La ventana, antes de tocar nada más: si ya pasó, no hay razón para leer
   // el contenido viejo del padre ni para armar nada — un 409 franco y listo.
@@ -1926,12 +1983,7 @@ async function historialAccion(pedido: Pedido, contexto: Contexto): Promise<Resp
 
   await revisaLaCabeza(contexto)
 
-  const gh = cliente({
-    token: env.PANEL_GITHUB_TOKEN ?? '',
-    duenio: env.GITHUB_DUENIO ?? '',
-    repo: env.GITHUB_REPO ?? '',
-    fetch: contexto.fetch,
-  })
+  const gh = clienteDeGitHub(contexto)
 
   let commits: Array<{ sha: string; mensaje: string; fecha: string }>
   try {
@@ -2037,12 +2089,7 @@ async function borradorGuardarAccion(pedido: Pedido, contexto: Contexto): Promis
   // es «no leí ningún borrador», que es la rama conservadora de `guarda()`.
   const horaLeida = typeof cuerpo.horaLeida === 'number' ? cuerpo.horaLeida : undefined
 
-  const gh = cliente({
-    token: env.PANEL_GITHUB_TOKEN ?? '',
-    duenio: env.GITHUB_DUENIO ?? '',
-    repo: env.GITHUB_REPO ?? '',
-    fetch: contexto.fetch,
-  })
+  const gh = clienteDeGitHub(contexto)
 
   try {
     const r = await guarda(gh, {
@@ -2105,12 +2152,7 @@ async function borradorLeerAccion(pedido: Pedido, contexto: Contexto): Promise<R
   const sesion = sesionVigente(pedido.cookie, env, contexto.ahora())
   if (!sesion) return error(401, PROBLEMA_SESION)
 
-  const gh = cliente({
-    token: env.PANEL_GITHUB_TOKEN ?? '',
-    duenio: env.GITHUB_DUENIO ?? '',
-    repo: env.GITHUB_REPO ?? '',
-    fetch: contexto.fetch,
-  })
+  const gh = clienteDeGitHub(contexto)
 
   try {
     const borrador = await leeBorrador(gh)

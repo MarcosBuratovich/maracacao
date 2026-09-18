@@ -146,6 +146,13 @@ function cliente(c) {
       ...init?.body !== void 0 ? { body: JSON.stringify(init.body) } : {}
     });
     vencimientoToken = respuesta.headers.get("github-authentication-token-expiration");
+    if (c.alResponder) {
+      try {
+        await c.alResponder(vencimientoToken);
+      } catch (e) {
+        console.error("github: la vigilancia del vencimiento del token revent\xF3 (no afecta a este pedido) \u2014", e);
+      }
+    }
     const cuerpo = await respuesta.json().catch(() => void 0);
     if (!respuesta.ok) {
       const mensaje = cuerpo?.message;
@@ -18585,6 +18592,19 @@ function listaTiene(lista2, valor) {
   if (!lista2) return false;
   return lista2.split(",").some((x) => x.trim() === valor);
 }
+function clienteDeGitHub(contexto) {
+  return cliente({
+    token: contexto.env.PANEL_GITHUB_TOKEN ?? "",
+    duenio: contexto.env.GITHUB_DUENIO ?? "",
+    repo: contexto.env.GITHUB_REPO ?? "",
+    fetch: contexto.fetch,
+    // `vigilaVencimiento` está declarada más abajo, junto al resto de la
+    // vigilancia (`DIAS_AVISO_VENCIMIENTO_TOKEN` y compañía): es una
+    // `function` declarada, así que JS la levanta antes de correr una sola
+    // línea de este módulo.
+    alResponder: (vencimiento) => vigilaVencimiento(vencimiento, contexto)
+  });
+}
 var ASUNTO_PARA_ELLA = "Tu cambio no se pudo publicar";
 var TEXTO_PARA_ELLA = "No sali\xF3; lo dej\xE9 como estaba y ya le avis\xE9 a Marcos.\n\nPuedes volver a intentarlo cuando quieras.";
 async function mandaProtegido(contexto, carta) {
@@ -18616,12 +18636,7 @@ async function avisaAElla(correoDeElla, contexto) {
   await mandaProtegido(contexto, { a: [correoDeElla], asunto: ASUNTO_PARA_ELLA, texto: TEXTO_PARA_ELLA });
 }
 async function revierteYAvisa(sha, correoDeElla, contexto) {
-  const gh = cliente({
-    token: contexto.env.PANEL_GITHUB_TOKEN ?? "",
-    duenio: contexto.env.GITHUB_DUENIO ?? "",
-    repo: contexto.env.GITHUB_REPO ?? "",
-    fetch: contexto.fetch
-  });
+  const gh = clienteDeGitHub(contexto);
   let autorReal = correoDeElla;
   try {
     const commit = await gh.commit(sha);
@@ -18645,12 +18660,7 @@ async function revierteYAvisa(sha, correoDeElla, contexto) {
   }
 }
 async function revierteYAvisaAMarcos(sha, autorReal, contexto) {
-  const gh = cliente({
-    token: contexto.env.PANEL_GITHUB_TOKEN ?? "",
-    duenio: contexto.env.GITHUB_DUENIO ?? "",
-    repo: contexto.env.GITHUB_REPO ?? "",
-    fetch: contexto.fetch
-  });
+  const gh = clienteDeGitHub(contexto);
   const resumen = await intentaRevertir(gh, sha, autorReal);
   const paraMarcos = contexto.env.PANEL_AVISOS_A;
   if (paraMarcos) {
@@ -18669,12 +18679,7 @@ async function revierteYAvisaAMarcos(sha, autorReal, contexto) {
 async function revisaLaCabeza(contexto) {
   try {
     if (!contexto.env.PANEL_VERCEL_TOKEN) return null;
-    const gh = cliente({
-      token: contexto.env.PANEL_GITHUB_TOKEN ?? "",
-      duenio: contexto.env.GITHUB_DUENIO ?? "",
-      repo: contexto.env.GITHUB_REPO ?? "",
-      fetch: contexto.fetch
-    });
+    const gh = clienteDeGitHub(contexto);
     const cabeza = await gh.ref("heads/main");
     const commit = await gh.commit(cabeza.sha);
     if (!tieneTrailer(commit.message, TRAILER_PANEL)) return null;
@@ -18719,12 +18724,7 @@ async function publicarAccion(pedido, contexto) {
   if (ids.length === 0) return error51(400, PROBLEMA_SIN_DOCUMENTOS);
   const idsConocidos = ids;
   await revisaLaCabeza(contexto);
-  const gh = cliente({
-    token: contexto.env.PANEL_GITHUB_TOKEN ?? "",
-    duenio: contexto.env.GITHUB_DUENIO ?? "",
-    repo: contexto.env.GITHUB_REPO ?? "",
-    fetch: contexto.fetch
-  });
+  const gh = clienteDeGitHub(contexto);
   for (const id of idsConocidos) {
     if (id === "sitio") continue;
     const problemas = validarContra(DOCUMENTOS[id], documentos[id]);
@@ -18853,6 +18853,19 @@ function avisoDeVencimientoPermitido(ahora) {
   marcas.push(ahora);
   AVISOS_VENCIMIENTO_TOKEN.set(CLAVE_AVISO_VENCIMIENTO_TOKEN, marcas);
   return true;
+}
+async function vigilaVencimiento(tokenVence, contexto) {
+  if (tokenVence === null) return;
+  const ahora = contexto.ahora();
+  const dias = diasHastaVencimiento(tokenVence, ahora);
+  if (dias === null || dias > DIAS_AVISO_VENCIMIENTO_TOKEN) return;
+  const paraMarcos = contexto.env.PANEL_AVISOS_A;
+  if (!paraMarcos || !avisoDeVencimientoPermitido(ahora)) return;
+  await mandaProtegido(contexto, {
+    a: [paraMarcos],
+    asunto: ASUNTO_AVISO_VENCIMIENTO(dias),
+    texto: textoAvisoVencimiento(tokenVence, dias)
+  });
 }
 var ASUNTO_AVISO_VENCIMIENTO = (dias) => `[panel] El token de GitHub vence en ${dias} d\xEDa${dias === 1 ? "" : "s"}`;
 function textoAvisoVencimiento(tokenVence, dias) {
@@ -18987,12 +19000,7 @@ async function deshacerAccion(pedido, contexto) {
     return error51(400, PROBLEMA_INESPERADO);
   }
   await revisaLaCabeza(contexto);
-  const gh = cliente({
-    token: env.PANEL_GITHUB_TOKEN ?? "",
-    duenio: env.GITHUB_DUENIO ?? "",
-    repo: env.GITHUB_REPO ?? "",
-    fetch: contexto.fetch
-  });
+  const gh = clienteDeGitHub(contexto);
   let publicadoEn;
   try {
     const commit = await gh.commit(cuerpo.sha);
@@ -19045,12 +19053,7 @@ async function historialAccion(pedido, contexto) {
   const sesion = sesionVigente(pedido.cookie, env, contexto.ahora());
   if (!sesion) return error51(401, PROBLEMA_SESION);
   await revisaLaCabeza(contexto);
-  const gh = cliente({
-    token: env.PANEL_GITHUB_TOKEN ?? "",
-    duenio: env.GITHUB_DUENIO ?? "",
-    repo: env.GITHUB_REPO ?? "",
-    fetch: contexto.fetch
-  });
+  const gh = clienteDeGitHub(contexto);
   let commits;
   try {
     commits = await gh.listaCommits("heads/main", CANTIDAD_HISTORIAL);
@@ -19079,12 +19082,7 @@ async function borradorGuardarAccion(pedido, contexto) {
   const documentos = comoDocumentos(cuerpo.documentos);
   const pisar = cuerpo.pisar === true;
   const horaLeida = typeof cuerpo.horaLeida === "number" ? cuerpo.horaLeida : void 0;
-  const gh = cliente({
-    token: env.PANEL_GITHUB_TOKEN ?? "",
-    duenio: env.GITHUB_DUENIO ?? "",
-    repo: env.GITHUB_REPO ?? "",
-    fetch: contexto.fetch
-  });
+  const gh = clienteDeGitHub(contexto);
   try {
     const r = await guarda(gh, {
       documentos,
@@ -19123,12 +19121,7 @@ async function borradorLeerAccion(pedido, contexto) {
   }
   const sesion = sesionVigente(pedido.cookie, env, contexto.ahora());
   if (!sesion) return error51(401, PROBLEMA_SESION);
-  const gh = cliente({
-    token: env.PANEL_GITHUB_TOKEN ?? "",
-    duenio: env.GITHUB_DUENIO ?? "",
-    repo: env.GITHUB_REPO ?? "",
-    fetch: contexto.fetch
-  });
+  const gh = clienteDeGitHub(contexto);
   try {
     const borrador = await leeBorrador(gh);
     return ok({ ok: true, borrador });
