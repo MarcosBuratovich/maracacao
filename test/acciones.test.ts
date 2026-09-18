@@ -503,6 +503,41 @@ describe('accion=enlace', () => {
     expect(cartasNoListado).toHaveLength(0) // nunca manda nada a quien no tiene acceso
   }, 3000)
 
+  // [Ronda 3 de revisión] Medido por la revisión: con el proveedor a 800 ms
+  // contra un piso de 400, las dos ramas vuelven a diferir 400 ms — el
+  // oráculo se reabre cada vez que el proveedor tiene un mal día. No se
+  // corta el envío con un timeout (ruling T12-K: abandonar el pedido en
+  // una función serverless puede matar el correo, y ésta es la puerta de
+  // RECUPERACIÓN) — lo que sí tiene que pasar es que quede logueado.
+  // OJO acá: el proveedor de este test tarda MÁS que `PISO_ENLACE_MS`
+  // (400 ms) a propósito — con uno rápido (como el resto de los tests de
+  // este describe) esta rama nunca se ejercita, y el test no podría fallar
+  // nunca aunque el `console.error` desapareciera del código.
+  it('la alarma del piso: si el proveedor tarda más que el piso, un console.error avisa', async () => {
+    const correo = `piso-lento-${Math.random()}@ejemplo.mx`
+    const env = { ...CORREO_REMITENTE, PANEL_CORREOS: correo }
+    const correoLento = async (): Promise<ResultadoCorreo> => {
+      await new Promise((resuelve) => setTimeout(resuelve, 500)) // > PISO_ENLACE_MS (400)
+      return { ok: true }
+    }
+    const errorEspia = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const r = await maneja(
+      'enlace',
+      { cuerpo: { correo }, cookie: '' },
+      { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoLento, env }), ip: `enlace-piso-lento-${Math.random()}` },
+    )
+
+    // Contesta bien igual — no se corta el envío ni se le miente a quien pidió.
+    expect(r.status).toBe(200)
+    expect((r.cuerpo as { mensaje: string }).mensaje).toBe(
+      'Si esa dirección tiene acceso, te llegó un correo con el enlace.',
+    )
+    expect(errorEspia).toHaveBeenCalledWith(expect.stringContaining('el envío tardó'))
+    expect(errorEspia).toHaveBeenCalledWith(expect.stringContaining('más que el piso de 400 ms'))
+    errorEspia.mockRestore()
+  }, 3000)
+
   it('E4: el freno por IP se aplica igual que en `entrar` — el sexto pedido seguido es 429', async () => {
     // Un correo DISTINTO en cada intento: así se ejercita el freno por IP
     // (E4) sin chocar con el freno por destinatario (F, tope 10) que

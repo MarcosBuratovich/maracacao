@@ -18350,6 +18350,10 @@ async function enlaceAccion(pedido, contexto) {
   const transcurrido = Date.now() - inicio;
   if (transcurrido < PISO_ENLACE_MS) {
     await new Promise((resuelve) => setTimeout(resuelve, PISO_ENLACE_MS - transcurrido));
+  } else if (transcurrido > PISO_ENLACE_MS) {
+    console.error(
+      `enlace: el env\xEDo tard\xF3 ${transcurrido} ms, m\xE1s que el piso de ${PISO_ENLACE_MS} ms \u2014 mientras eso pase, el tiempo de respuesta distingue una direcci\xF3n con acceso de una sin acceso.`
+    );
   }
   return ok({ ok: true, mensaje: FRASE_ENLACE });
 }

@@ -417,6 +417,17 @@ const TOPE_ENLACES_POR_DESTINO = 10
  * vuelve—, y el test de abajo lo vigila con el mismo criterio que el de la
  * puerta de contraseña (I-3, `entrar()`): las dos ramas medidas, con la
  * diferencia por debajo de un umbral chico.
+ *
+ * [Ronda 3 de revisión — residuo declarado] Este piso protege MIENTRAS el
+ * proveedor sea más rápido que él: medido, con el proveedor a 800 ms contra
+ * este piso de 400, las dos ramas vuelven a diferir 400 ms — el oráculo se
+ * reabre cada vez que el proveedor tiene un mal día. No se corta el envío
+ * con un timeout para evitarlo (ver el `console.error` de la rama
+ * `transcurrido > PISO_ENLACE_MS`, en `enlaceAccion()`, y el ruling T12-K
+ * ahí mismo): la alarma es cómo se sabe que el piso dejó de alcanzar, para
+ * subirlo — no hay forma de eliminar el residuo sin arriesgar el correo
+ * mismo, y arriesgar el correo en la puerta de recuperación es peor que una
+ * ventana de oráculo intermitente y no reproducible a voluntad.
  */
 const PISO_ENLACE_MS = 400
 
@@ -559,6 +570,23 @@ async function enlaceAccion(pedido: Pedido, contexto: Contexto): Promise<Respues
   const transcurrido = Date.now() - inicio
   if (transcurrido < PISO_ENLACE_MS) {
     await new Promise((resuelve) => setTimeout(resuelve, PISO_ENLACE_MS - transcurrido))
+  } else if (transcurrido > PISO_ENLACE_MS) {
+    // [Ronda 3 de revisión] El proveedor tardó más que el piso, así que
+    // esta rama —la que SÍ manda— acaba de tardar más que la que no manda
+    // nada: por esta ventana, el tiempo de respuesta vuelve a decir si la
+    // dirección tiene acceso. No se corta el envío para evitarlo (ruling
+    // T12-K: abandonar el pedido en una función serverless puede matar el
+    // correo —la plataforma congela el proceso después de responder— y
+    // ésta es la puerta que tiene que funcionar el peor día; que el correo
+    // no salga el día que ella perdió el teléfono es peor que una señal de
+    // tiempo intermitente, que además solo aparece mientras el proveedor
+    // está lento y no es reproducible a voluntad por quien ataca). Lo que
+    // sí se hace es avisar, para que esto no sea invisible: si aparece
+    // seguido, hay que subir el piso.
+    console.error(
+      `enlace: el envío tardó ${transcurrido} ms, más que el piso de ${PISO_ENLACE_MS} ms — ` +
+        'mientras eso pase, el tiempo de respuesta distingue una dirección con acceso de una sin acceso.',
+    )
   }
 
   return ok({ ok: true, mensaje: FRASE_ENLACE })

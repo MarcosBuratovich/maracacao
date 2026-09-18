@@ -247,6 +247,24 @@ exija hostigarla a propósito — y si eso pasa, un `console.error` con la
 dirección se lo dice a Marcos. No lo bajes de diez sin devolverle a su
 bandeja el problema que este freno existe para evitar.
 
+**El piso de tiempo tiene su propio residuo, declarado igual que el del
+tope:** protege MIENTRAS el proveedor de correo sea más rápido que él.
+Medido en la Ronda 3 de revisión: con el proveedor a 800 ms contra el piso
+de 400, las dos ramas —dirección listada y no listada— vuelven a diferir
+400 ms, y el oráculo de tiempo se reabre. No se cierra ese residuo con un
+timeout que corte el envío: en una función serverless, abandonar un pedido
+a mitad de camino puede matarlo —la plataforma congela el proceso apenas
+la función contesta—, y ésta es la puerta de RECUPERACIÓN: que el correo
+no salga el día que ella perdió el teléfono es peor que una ventana de
+oráculo intermitente, que además solo aparece mientras el proveedor está
+lento de verdad y no es algo que quien ataca pueda provocar a voluntad. Lo
+que sí existe es la alarma: si el envío tarda más que el piso,
+`console.error` lo dice con el tiempo exacto (`enlace: el envío tardó …
+ms, más que el piso de 400 ms`). Si eso aparece seguido en los logs, es la
+señal de que hay que subir `PISO_ENLACE_MS` — el piso protege mientras el
+proveedor sea más rápido que él, y la alarma es cómo se sabe que dejó de
+serlo.
+
 **Por qué la sesión que deja `entrar-con-enlace` dura solo UN DÍA, no
 treinta:** como el enlace no es de un solo uso (arriba), nada impide
 reusar uno válido más de una vez dentro de los quince minutos — el único
