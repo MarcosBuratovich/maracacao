@@ -377,19 +377,48 @@ const PROBLEMA_ENLACE_SIN_CORREO = 'Ahora mismo no puedo mandarte el enlace. Esc
 // tokens al azar una forma de diferenciar «vencido» de «nunca existió».
 const PROBLEMA_ENLACE_INVALIDO = 'Ese enlace ya no sirve: pide uno nuevo.'
 
-// [F, Minor — Ronda 1 de revisión] El freno de arriba (`enlace`, por IP)
-// no protege SU bandeja: veinte IPs distintas pueden mandarle a la MISMA
-// dirección cien correos desde nuestro remitente (medido). Un tope más
-// chico, por destinatario en vez de por IP, cierra eso sin infraestructura
-// nueva — misma mecánica (`intentoPermitido`), otro número.
-const TOPE_ENLACES_POR_DESTINO = 3
+// [F, Minor — Ronda 1; número subido en la Ronda 2 de revisión] El freno de
+// arriba (`enlace`, por IP) no protege SU bandeja: veinte IPs distintas
+// pueden mandarle a la MISMA dirección cien correos desde nuestro
+// remitente (medido). Un tope por destinatario, además del de por IP,
+// cierra eso sin infraestructura nueva — misma mecánica
+// (`intentoPermitido`), otro número.
+//
+// [Ronda 2] Con 3 (el número de la Ronda 1) esto era, al revés, una
+// negación de servicio CONTRA la puerta de recuperación: medido, un
+// extraño pidiendo el enlace de ELLA tres veces desde tres IPs cualquiera
+// la dejaba afuera de su propia puerta de emergencia — sin necesitar saber
+// nada, porque este chequeo corre antes de mirar si la dirección está en
+// la lista. Diez es bajo para proteger su bandeja (frente a los cien que
+// había) y alto como para que dejarla afuera exija hostigarla a propósito.
+// Sigue siendo un residuo real —está declarado en `docs/panel-operacion.md`—
+// y no se puede bajar sin devolverle el problema a la bandeja.
+const TOPE_ENLACES_POR_DESTINO = 10
 
-// [B, Critical — Ronda 1 de revisión] Un destinatario que no es la
-// casilla de nadie, para que el envío corra con el MISMO costo exista o
-// no la dirección real en `PANEL_CORREOS` — ver el comentario largo en
-// `enlaceAccion()`, más abajo. Mismo criterio que `HASH_SENUELO` (I-3, en
-// `entrar()`): ahí el señuelo es un hash: acá es un destinatario.
-const CORREO_SENUELO = 'senuelo@descarte.maracacao.mx'
+/**
+ * [B, Critical — Ronda 1; reemplazado en la Ronda 2 de revisión] El piso
+ * de tiempo de `enlace`.
+ *
+ * Las dos ramas —dirección listada y no listada— tienen que tardar lo
+ * mismo, o el endpoint se vuelve una forma de averiguar quién tiene acceso
+ * al panel probando direcciones una por una. La primera versión de este
+ * arreglo (Ronda 1) igualaba el reloj MANDANDO un correo señuelo, y eso
+ * cerraba el oráculo pero abría algo peor: medido, veinte pedidos desde
+ * veinte IPs con veinte direcciones inventadas eran veinte correos —todos
+ * a una casilla que no existe (`maracacao.mx` no tiene registros MX)—,
+ * cada uno con un token de enlace VÁLIDO adentro. Un generador ilimitado
+ * de rebotes duros contra la reputación del remitente, y el tope por
+ * destinatario no lo frenaba porque su clave es la dirección que mandó
+ * quien pide, no el señuelo.
+ *
+ * Esperar es más barato y no le escribe a nadie. El número tiene que ser
+ * cómodamente mayor que lo que tarda el proveedor de correo de verdad —si
+ * queda corto, la rama que manda de verdad se pasa del piso y el oráculo
+ * vuelve—, y el test de abajo lo vigila con el mismo criterio que el de la
+ * puerta de contraseña (I-3, `entrar()`): las dos ramas medidas, con la
+ * diferencia por debajo de un umbral chico.
+ */
+const PISO_ENLACE_MS = 400
 
 // [C, Important — Ronda 1 de revisión] Un día, no treinta: esta vía es
 // una puerta de RECUPERACIÓN, sirve para volver a entrar, no para
@@ -456,18 +485,20 @@ function correoCanonico(correo: string, lista: string | undefined): string {
  *    arriba). Este chequeo puede ir ANTES de mirar si la dirección está en
  *    la lista porque es un estado del SERVIDOR, no un dato de la clienta:
  *    contestarlo igual para cualquiera no delata nada de nadie.
- * 4. [F] El tope por DESTINATARIO (`TOPE_ENLACES_POR_DESTINO`), corrido
- *    SIEMPRE con la dirección tal cual llegó —exista o no en la lista—
- *    así que tampoco este freno distingue una dirección real de una
- *    inventada por su resultado.
- * 5. [B, Critical] El envío corre SIEMPRE, como sentencia propia — NUNCA
- *    adentro de un `if (correoOk)` que la rama sin acceso pueda saltear.
- *    Antes, la rama con acceso llamaba de verdad al proveedor de correo
- *    (~150 ms medidos) y la rama sin acceso no llamaba a nada (~0.03 ms):
- *    un endpoint público, sin sesión, con un oráculo de ~5000× por el
- *    reloj. Mismo criterio que I-3 en `entrar()` (`claveCorrecta` corre
- *    siempre, contra un hash señuelo si el correo no está en la lista):
- *    acá el señuelo es el DESTINATARIO (`CORREO_SENUELO`), no el contenido.
+ * 4. [F] El tope por DESTINATARIO (`TOPE_ENLACES_POR_DESTINO`, diez cada
+ *    quince minutos desde la Ronda 2), corrido SIEMPRE con la dirección tal
+ *    cual llegó —exista o no en la lista— así que tampoco este freno
+ *    distingue una dirección real de una inventada por su resultado. Con
+ *    `console.error`: si se dispara diez veces contra la MISMA dirección en
+ *    quince minutos, o es un ataque o es alguien que necesita ayuda de
+ *    Marcos, y las dos cosas quedan en el log.
+ * 5. [B, Critical — reemplazado en la Ronda 2] El PISO DE TIEMPO
+ *    (`PISO_ENLACE_MS`): las dos ramas —listada o no— tardan lo mismo
+ *    porque las dos esperan hasta el mismo piso antes de contestar, nunca
+ *    porque las dos mandan algo. La Ronda 1 igualaba el reloj mandando un
+ *    correo señuelo siempre; eso cerraba el oráculo de tiempo pero abría
+ *    un generador de rebotes duros (ver el docstring de `PISO_ENLACE_MS`).
+ *    Solo la rama LISTADA manda de verdad.
  * 6. 200, siempre, con `FRASE_ENLACE`.
  */
 async function enlaceAccion(pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
@@ -492,24 +523,42 @@ async function enlaceAccion(pedido: Pedido, contexto: Contexto): Promise<Respues
 
   const claveDestino = `enlace-destino:${correo.toLowerCase()}`
   if (!intentoPermitido(claveDestino, contexto.ahora(), TOPE_ENLACES_POR_DESTINO)) {
+    // [Ronda 2] Fuerte a propósito: diez pedidos contra la MISMA dirección
+    // en quince minutos, sin importar desde cuántas IPs, es o un ataque o
+    // alguien hostigándola — y las dos cosas ameritan que Marcos se entere.
+    console.error(`enlace: tope por destinatario alcanzado para «${correo}» — diez pedidos en quince minutos.`)
     return error(429, PROBLEMA_DEMASIADOS_INTENTOS)
   }
 
-  // [I-3, aplicado acá — B] `correoOk` se calcula, pero el ENVÍO no lo mira
-  // para decidir si correr: corre siempre, y solo el DESTINATARIO cambia.
-  const correoOk = correoEnLista(correo, env.PANEL_CORREOS)
-  const correoParaFirmar = correoOk ? correoCanonico(correo, env.PANEL_CORREOS) : correo
-  const vence = contexto.ahora() + DURACION_ENLACE_MS
-  const token = firmaEnlace(correoParaFirmar, vence, env.PANEL_SECRETO)
-  const url = `${SITIO}/panel/entrar?token=${encodeURIComponent(token)}`
+  // [Ronda 2] Reloj de PARED, no `contexto.ahora()`: lo que hay que igualar
+  // es cuánto tarda el pedido HTTP de verdad —lo que un atacante mide desde
+  // afuera—, y `ahora()` es el reloj de NEGOCIO (inyectable, a veces
+  // congelado en los tests), no el tiempo que de verdad pasa mientras se
+  // espera el proveedor de correo o el piso de abajo.
+  const inicio = Date.now()
 
-  const r = await contexto.correo({
-    a: [correoOk ? correoParaFirmar : CORREO_SENUELO],
-    asunto: ASUNTO_ENLACE,
-    texto: textoEnlace(url),
-  })
-  if (correoOk && !r.ok) {
-    console.error(`enlace: no se pudo mandar el enlace a ${correoParaFirmar} — ${r.motivo}`)
+  const correoOk = correoEnLista(correo, env.PANEL_CORREOS)
+  if (correoOk) {
+    // [H] Firma la forma CANÓNICA de `PANEL_CORREOS`, no la que tipeó quien
+    // pidió el enlace — ver `correoCanonico()`, arriba.
+    const correoParaFirmar = correoCanonico(correo, env.PANEL_CORREOS)
+    const vence = contexto.ahora() + DURACION_ENLACE_MS
+    const token = firmaEnlace(correoParaFirmar, vence, env.PANEL_SECRETO)
+    const url = `${SITIO}/panel/entrar?token=${encodeURIComponent(token)}`
+    const r = await contexto.correo({ a: [correoParaFirmar], asunto: ASUNTO_ENLACE, texto: textoEnlace(url) })
+    if (!r.ok) {
+      console.error(`enlace: no se pudo mandar el enlace a ${correoParaFirmar} — ${r.motivo}`)
+    }
+  }
+  // Si `correo` no está en la lista, no se firma ni se manda nada — nunca
+  // hubo, ni hay ahora, ningún señuelo a quien escribirle.
+
+  // [B, Ronda 2] El piso: ninguna de las dos ramas contesta antes de que
+  // pase `PISO_ENLACE_MS` desde que arrancó este pedido. Si la rama que
+  // manda de verdad ya tardó eso o más, no se espera nada de más.
+  const transcurrido = Date.now() - inicio
+  if (transcurrido < PISO_ENLACE_MS) {
+    await new Promise((resuelve) => setTimeout(resuelve, PISO_ENLACE_MS - transcurrido))
   }
 
   return ok({ ok: true, mensaje: FRASE_ENLACE })

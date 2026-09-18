@@ -18296,8 +18296,8 @@ function entrar(pedido, contexto) {
 var FRASE_ENLACE = "Si esa direcci\xF3n tiene acceso, te lleg\xF3 un correo con el enlace.";
 var PROBLEMA_ENLACE_SIN_CORREO = "Ahora mismo no puedo mandarte el enlace. Escr\xEDbele a Marcos.";
 var PROBLEMA_ENLACE_INVALIDO = "Ese enlace ya no sirve: pide uno nuevo.";
-var TOPE_ENLACES_POR_DESTINO = 3;
-var CORREO_SENUELO = "senuelo@descarte.maracacao.mx";
+var TOPE_ENLACES_POR_DESTINO = 10;
+var PISO_ENLACE_MS = 400;
 var DIAS_SESION_ENLACE = 1;
 var ASUNTO_ENLACE = "Tu enlace para entrar al panel";
 var textoEnlace = (url3) => [
@@ -18332,20 +18332,24 @@ async function enlaceAccion(pedido, contexto) {
   const correo2 = typeof cuerpo.correo === "string" ? cuerpo.correo.trim() : "";
   const claveDestino = `enlace-destino:${correo2.toLowerCase()}`;
   if (!intentoPermitido(claveDestino, contexto.ahora(), TOPE_ENLACES_POR_DESTINO)) {
+    console.error(`enlace: tope por destinatario alcanzado para \xAB${correo2}\xBB \u2014 diez pedidos en quince minutos.`);
     return error51(429, PROBLEMA_DEMASIADOS_INTENTOS);
   }
+  const inicio = Date.now();
   const correoOk = correoEnLista(correo2, env.PANEL_CORREOS);
-  const correoParaFirmar = correoOk ? correoCanonico(correo2, env.PANEL_CORREOS) : correo2;
-  const vence = contexto.ahora() + DURACION_ENLACE_MS;
-  const token = firmaEnlace(correoParaFirmar, vence, env.PANEL_SECRETO);
-  const url3 = `${SITIO}/panel/entrar?token=${encodeURIComponent(token)}`;
-  const r = await contexto.correo({
-    a: [correoOk ? correoParaFirmar : CORREO_SENUELO],
-    asunto: ASUNTO_ENLACE,
-    texto: textoEnlace(url3)
-  });
-  if (correoOk && !r.ok) {
-    console.error(`enlace: no se pudo mandar el enlace a ${correoParaFirmar} \u2014 ${r.motivo}`);
+  if (correoOk) {
+    const correoParaFirmar = correoCanonico(correo2, env.PANEL_CORREOS);
+    const vence = contexto.ahora() + DURACION_ENLACE_MS;
+    const token = firmaEnlace(correoParaFirmar, vence, env.PANEL_SECRETO);
+    const url3 = `${SITIO}/panel/entrar?token=${encodeURIComponent(token)}`;
+    const r = await contexto.correo({ a: [correoParaFirmar], asunto: ASUNTO_ENLACE, texto: textoEnlace(url3) });
+    if (!r.ok) {
+      console.error(`enlace: no se pudo mandar el enlace a ${correoParaFirmar} \u2014 ${r.motivo}`);
+    }
+  }
+  const transcurrido = Date.now() - inicio;
+  if (transcurrido < PISO_ENLACE_MS) {
+    await new Promise((resuelve) => setTimeout(resuelve, PISO_ENLACE_MS - transcurrido));
   }
   return ok({ ok: true, mensaje: FRASE_ENLACE });
 }

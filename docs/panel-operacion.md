@@ -180,7 +180,12 @@ acceso, te llegó un correo con el enlace.»—, exista o no esa dirección en
 sesión, así que una respuesta distinta según exista o no la dirección
 serviría para probar direcciones una por una hasta encontrar cuáles tienen
 acceso al panel — el mismo criterio por el que `entrar` no dice si falló el
-correo o la contraseña.
+correo o la contraseña. **Y siempre tarda lo mismo** (`PISO_ENLACE_MS`,
+`src/servidor/acciones.ts`: 400 ms, hoy) exista o no la dirección — si eso
+no fuera cierto, cronometrar la respuesta sería otra forma de probar
+direcciones una por una. Si algún día pedir el enlace empieza a contestar
+sospechosamente rápido y alguien va a "optimizarlo" sacando la espera: no,
+esos 400 ms no son una demora de más, son la mitad del mecanismo.
 
 **Cómo se consume:** el correo trae un enlace a
 `/panel/entrar?token=…`, una página sin JavaScript de más (sin React, sin
@@ -218,16 +223,29 @@ decir «te lo mandé» y no mandar nada. Es la misma fila de la tabla de
 variables, arriba: mientras `maracacao.mx` no esté verificado en el
 proveedor, el enlace mágico no está disponible para nadie.
 
-**El freno de intentos (E4) se aplica en las tres puertas de esta sección**
+**El freno de intentos (E4) se aplica en las DOS puertas de esta sección**
 (pedir el enlace, y consumirlo) **y en `entrar`/`salud`, pero — desde la
 Ronda 1 de revisión de esta tarea — cada acción tiene su PROPIO
 presupuesto de cinco cada quince minutos**, no uno compartido por IP.
 Antes lo compartían, y eso se volvía en contra el día que más importaba:
 la clienta que pide el enlace cinco veces porque no le llega se quedaba,
 de paso, sin poder usar su contraseña por quince minutos — justo el día de
-la recuperación. `enlace` suma un segundo freno, por DESTINATARIO (tres
-cada quince minutos, no cinco): sin él, veinte IPs distintas podrían
-mandarle a la MISMA dirección cien correos desde nuestro remitente.
+la recuperación.
+
+`enlace` suma un segundo freno, por DESTINATARIO: **diez pedidos cada
+quince minutos para la MISMA dirección**, sin importar desde cuántas IPs
+—sin él, veinte IPs distintas podrían mandarle a la MISMA dirección cien
+correos desde nuestro remitente—. El número importa: empezó en tres
+(Ronda 1) y subió a diez (Ronda 2) porque tres era, al revés, una forma de
+dejarla afuera de su propia puerta de emergencia — un extraño pidiendo su
+enlace tres veces desde tres IPs cualquiera, sin necesitar saber nada
+(este chequeo corre ANTES de mirar si la dirección está en la lista), y
+ella recibía 429 al pedirlo de verdad. **Diez es un residuo declarado, no
+un número final que se pueda subir sin pensarlo:** es bajo para proteger
+su bandeja (frente a los cien de antes) y alto para que dejarla afuera
+exija hostigarla a propósito — y si eso pasa, un `console.error` con la
+dirección se lo dice a Marcos. No lo bajes de diez sin devolverle a su
+bandeja el problema que este freno existe para evitar.
 
 **Por qué la sesión que deja `entrar-con-enlace` dura solo UN DÍA, no
 treinta:** como el enlace no es de un solo uso (arriba), nada impide

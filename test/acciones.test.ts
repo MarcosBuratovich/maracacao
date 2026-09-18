@@ -3,7 +3,7 @@
  * el contenido y delega. Estos tests son los que cubren la compuerta, que es
  * la capa que de verdad decide si algo entra al sitio.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { createHmac } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { maneja, idDeDispositivo, VENTANA_DESHACER_MS, type Entorno } from '../src/servidor/acciones'
@@ -375,10 +375,20 @@ describe('entrar', () => {
 // [Ronda 1 de revisión] Cada test que llega a mandar un correo usa su
 // PROPIO correo listado (`env.PANEL_CORREOS` sobreescrito) además de su
 // propia IP: desde esta ronda, `enlace` frena por DESTINATARIO además de
-// por IP (hallazgo F, tope 3 cada 15 minutos) — compartir 'clienta@ejemplo.mx'
-// entre muchos tests haría que unos le comieran el presupuesto a otros.
+// por IP (hallazgo F; tope 10 cada 15 minutos desde la Ronda 2 — empezó en
+// 3, ver el test F más abajo) — compartir 'clienta@ejemplo.mx' entre
+// muchos tests haría que unos le comieran el presupuesto a otros.
 // `CORREO_REMITENTE` vive a nivel de archivo porque lo usan los dos
 // describes de esta tarea, no solo este.
+//
+// [Ronda 2 de revisión] `enlaceAccion()` espera hasta `PISO_ENLACE_MS`
+// (400 ms) antes de contestar, exista o no la dirección (hallazgo B de la
+// Ronda 1, reemplazado en la Ronda 2 — ver el docstring de `PISO_ENLACE_MS`
+// en acciones.ts): cada test que llega hasta esa espera tarda, como
+// mínimo, esos 400 ms de verdad — no hay forma de acelerarlo desde el
+// test sin dejar de probar lo que hay que probar. Los tests que hacen
+// varios pedidos seguidos (E4, F) llevan un tercer argumento a `it(...)`
+// con un timeout más generoso que el default de vitest (5 s).
 const CORREO_REMITENTE = { RESEND_API_KEY: 'clave-de-prueba', PANEL_REMITENTE: 'Panel <panel@ejemplo.mx>' }
 
 describe('accion=enlace', () => {
@@ -419,7 +429,7 @@ describe('accion=enlace', () => {
     expect(cartas[0].texto).toMatch(/panel\/entrar\?token=/)
   })
 
-  it('con un correo que NO está en la lista: la MISMA respuesta, byte a byte', async () => {
+  it('con un correo que NO está en la lista: la MISMA respuesta, byte a byte, y no manda nada', async () => {
     const correoListado = `cmp-listado-${Math.random()}@ejemplo.mx`
     const correoAjeno = `cmp-ajeno-${Math.random()}@fuera.mx`
     const cartasListado: Carta[] = []
@@ -439,48 +449,63 @@ describe('accion=enlace', () => {
 
     expect(conListado.status).toBe(sinListado.status)
     expect(JSON.stringify(conListado.cuerpo)).toBe(JSON.stringify(sinListado.cuerpo))
-  })
+    expect(cartasListado).toHaveLength(1) // sí mandó
+    // [Ronda 2] Ya no hay ningún señuelo a quien escribirle: la rama sin
+    // acceso no manda NADA — el piso de tiempo (abajo) es lo que iguala el
+    // reloj, no un envío de más.
+    expect(cartasNoListado).toHaveLength(0)
+  }, 3000)
 
-  // [B, Critical — Ronda 1 de revisión] Antes, la rama con acceso llamaba
-  // de verdad al proveedor de correo (~150 ms medidos) y la rama sin
-  // acceso no llamaba a nada (~0.03 ms) — una diferencia de ~5000× que
-  // convertía un endpoint público y sin sesión en un oráculo perfecto para
-  // probar direcciones una por una. El arreglo: el envío corre SIEMPRE,
-  // nunca adentro de un `if` que la rama sin acceso pueda saltear — este
-  // test prueba la SIMETRÍA (mismo llamado, en las dos ramas), que es lo
-  // que hace que el costo sea el mismo del otro lado del reloj.
-  it('B: el envío a `contexto.correo` corre SIEMPRE, listado o no — nunca a la dirección que lo pidió si no tiene acceso', async () => {
-    const correoListado = `simetria-listado-${Math.random()}@ejemplo.mx`
-    const correoAjeno = `simetria-ajeno-${Math.random()}@fuera.mx`
+  // [B, Critical — Ronda 1; reemplazado en la Ronda 2 de revisión] La
+  // Ronda 1 cerraba el oráculo de tiempo mandando SIEMPRE un correo —real
+  // si la dirección estaba en la lista, a un señuelo si no—. La Ronda 2 lo
+  // encontró: eso convertía el endpoint en un generador ilimitado de
+  // rebotes duros contra un dominio sin registros MX, con un token válido
+  // adentro de cada uno. El arreglo de la Ronda 2 —`PISO_ENLACE_MS`— cierra
+  // el mismo oráculo ESPERANDO en vez de mandando: este test mide las dos
+  // ramas, mismo patrón que I-3 (`entrar()`, más arriba en este archivo).
+  it('B: piso de tiempo — las dos ramas tardan lo mismo, y solo la listada manda algo', async () => {
+    const correoListado = `piso-listado-${Math.random()}@ejemplo.mx`
+    const correoAjeno = `piso-ajeno-${Math.random()}@fuera.mx`
     const env = { ...CORREO_REMITENTE, PANEL_CORREOS: correoListado }
     const cartasListado: Carta[] = []
     const cartasNoListado: Carta[] = []
 
+    // Bien por debajo de los 400 ms reales de `PISO_ENLACE_MS`, para no
+    // acoplar el test al número exacto (que puede subir el día que el
+    // proveedor de correo tarde más) — solo afirma que las dos ramas
+    // tardan «bastante», nunca microsegundos.
+    const PISO_ESPERADO_MS = 350
+
+    const t0 = performance.now()
     await maneja(
       'enlace',
       { cuerpo: { correo: correoListado }, cookie: '' },
-      { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoQueAnota(cartasListado), env }), ip: `enlace-b-listado-${Math.random()}` },
+      { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoQueAnota(cartasListado), env }), ip: `enlace-piso-listado-${Math.random()}` },
     )
+    const duracionListado = performance.now() - t0
+
+    const t1 = performance.now()
     await maneja(
       'enlace',
       { cuerpo: { correo: correoAjeno }, cookie: '' },
-      { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoQueAnota(cartasNoListado), env }), ip: `enlace-b-nolistado-${Math.random()}` },
+      { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoQueAnota(cartasNoListado), env }), ip: `enlace-piso-nolistado-${Math.random()}` },
     )
+    const duracionNoListado = performance.now() - t1
 
-    // Las DOS ramas llaman a `contexto.correo` exactamente una vez: ni cero
-    // (que era el bug) ni dos.
+    expect(duracionListado).toBeGreaterThan(PISO_ESPERADO_MS)
+    expect(duracionNoListado).toBeGreaterThan(PISO_ESPERADO_MS)
+    // La diferencia entre las dos, chica — nunca los ~5000× que medía la
+    // Ronda 1 antes del arreglo (150 ms contra 0.03 ms).
+    expect(Math.abs(duracionListado - duracionNoListado)).toBeLessThan(100)
+
     expect(cartasListado).toHaveLength(1)
-    expect(cartasNoListado).toHaveLength(1)
-    // Mismo asunto en las dos — mismo "shape" de pedido, mismo costo.
-    expect(cartasListado[0].asunto).toBe(cartasNoListado[0].asunto)
-    // Pero la dirección sin acceso NUNCA recibe nada: el destinatario real
-    // de esa rama es un señuelo, no lo que pidió.
-    expect(cartasNoListado[0].a).not.toEqual([correoAjeno])
-  })
+    expect(cartasNoListado).toHaveLength(0) // nunca manda nada a quien no tiene acceso
+  }, 3000)
 
   it('E4: el freno por IP se aplica igual que en `entrar` — el sexto pedido seguido es 429', async () => {
     // Un correo DISTINTO en cada intento: así se ejercita el freno por IP
-    // (E4) sin chocar con el freno por destinatario (F, tope 3) que
+    // (E4) sin chocar con el freno por destinatario (F, tope 10) que
     // pisaría este test antes de llegar al sexto pedido.
     const ip = `enlace-freno-ip-${Math.random()}`
     const env = { ...CORREO_REMITENTE, PANEL_CORREOS: Array.from({ length: 6 }, (_, i) => `freno-ip-${i}-${Math.random()}@ejemplo.mx`).join(',') }
@@ -496,28 +521,45 @@ describe('accion=enlace', () => {
 
     expect(r.status).toBe(429)
     expect(cartas).toHaveLength(5) // los primeros cinco sí mandaron; el sexto, frenado, no
-  })
+  }, 5000) // cinco pedidos reales, cada uno paga el piso de tiempo (~400 ms) — margen sobre el default de vitest
 
-  // [F, Minor — Ronda 1 de revisión] El freno de arriba es por IP; este es
-  // por DESTINATARIO, con un tope más chico (tres) — sin él, veinte IPs
+  // [F, Minor — Ronda 1; tope subido en la Ronda 2 de revisión] El freno de
+  // arriba es por IP; este es por DESTINATARIO — sin él, veinte IPs
   // distintas pueden mandarle a la MISMA dirección cien correos desde
   // nuestro remitente (medido). IPs distintas en cada intento para
-  // aislarlo del freno por IP (E4), que necesita seis para dispararse.
-  it('F: tope por destinatario — el cuarto pedido para el MISMO correo, desde IPs distintas, es 429', async () => {
+  // aislarlo del freno por IP (E4).
+  //
+  // [Ronda 2] El tope empezó en tres (Ronda 1) y subió a diez: medido, tres
+  // alcanzaba para que un extraño —desde tres IPs cualquiera, sin saber si
+  // esa dirección tiene acceso siquiera— dejara a ELLA afuera de su propia
+  // puerta de emergencia con solo pedir su enlace tres veces. Diez sigue
+  // protegiendo su bandeja (frente a los cien que había sin ningún tope) y
+  // hace falta hostigarla a propósito para dejarla afuera — y si eso pasa,
+  // un `console.error` con la dirección avisa a Marcos (test de abajo).
+  it('F: tope por destinatario (diez) — el onceavo pedido para el MISMO correo, desde IPs distintas, es 429', async () => {
     const correo = `destino-${Math.random()}@ejemplo.mx`
     const env = { ...CORREO_REMITENTE, PANEL_CORREOS: correo }
     const cartas: Carta[] = []
     const ctxDesde = (ip: string) => ({ ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoQueAnota(cartas), env }), ip })
 
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 10; i++) {
       const r = await maneja('enlace', { cuerpo: { correo }, cookie: '' }, ctxDesde(`enlace-f-${i}-${Math.random()}`))
       expect(r.status).toBe(200)
     }
-    const r4 = await maneja('enlace', { cuerpo: { correo }, cookie: '' }, ctxDesde(`enlace-f-3-${Math.random()}`))
+    const errorEspia = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const r11 = await maneja('enlace', { cuerpo: { correo }, cookie: '' }, ctxDesde(`enlace-f-10-${Math.random()}`))
 
-    expect(r4.status).toBe(429)
-    expect(cartas).toHaveLength(3) // el cuarto no mandó nada, ni siquiera al señuelo
-  })
+    expect(r11.status).toBe(429)
+    expect(cartas).toHaveLength(10) // el onceavo no mandó nada
+    // El `console.error` fuerte que pide el hallazgo F de la Ronda 2: se
+    // dispara con la dirección adentro, para que Marcos pueda distinguir
+    // «alguien la está hostigando» de cualquier otro 429. La aserción va
+    // ANTES de `mockRestore()`: restaurar el espía también limpia su
+    // historial de llamadas (mismo efecto que `mockReset()`), así que
+    // preguntarle después siempre daría cero.
+    expect(errorEspia).toHaveBeenCalledWith(expect.stringContaining(correo))
+    errorEspia.mockRestore()
+  }, 8000) // diez pedidos reales, cada uno paga el piso de tiempo (~400 ms)
 
   it('C-1: PANEL_SECRETO ausente o corto, 503 antes de tocar nada — ni siquiera el correo', async () => {
     for (const secreto of [undefined, 'corto']) {
