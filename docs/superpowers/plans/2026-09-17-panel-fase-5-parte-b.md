@@ -3934,6 +3934,131 @@ nuevo de OTRO dispositivo** salvo que el pedido traiga `pisar: true`. Sin eso,
 dos aparatos editando a la vez se borran el trabajo en silencio, que es el mismo
 bug que la Tarea 2 arregla para publicar, un nivel más abajo.
 
+- [ ] **Step 4b: Los once arreglos de la revisión**
+
+La revisión **confirmó la divergencia**: apartarse de lo que este brief
+ilustraba era obligatorio. Con el diseño original, el primer guardado andaba,
+la primera LECTURA devolvía 404 → `null` —o sea, **el borrador desaparecía en
+silencio**— y desde ahí cada guardado reintentaba el arranque y moría con
+`Reference already exists`, para siempre. Y encontró el argumento decisivo por
+el commit huérfano, que vale la pena dejar escrito en el código: **un commit
+raíz no tiene ancestro común con `main`, así que git se niega a mergearlo**
+(«refusing to merge unrelated histories»). Las dos listas blancas son un candado
+de software; el huérfano es un candado de matemática.
+
+**A (Important) · El candado anti-pisada se apoya en un dato del cliente.**
+`dispositivo` sale del cuerpo del pedido, teniendo `sesion.dispositivo`
+—firmado— a mano. Y `idDeDispositivo(undefined)` devuelve `'sin-nombre'`, nunca
+falla: si la fase 6 arma el pedido sin ese campo, los dos aparatos son
+`'sin-nombre'`, el candado no dispara nunca, y la hermana pisa el borrador de la
+clienta en silencio — literalmente el bug que esta tarea vino a arreglar.
+Ningún test lo pesca porque todos pasan el campo explícito. **Sale de la
+sesión**, como ya salen `autor` y el reloj. Y va el test del pedido sin campo.
+
+**B (Important) · Un borrador corrupto deja el panel en estado terminal.**
+Un `JSON.parse` que falla sube intacto y las DOS acciones dan 502 — y no hay
+salida, porque para escribir un borrador nuevo hay que leer el corrupto primero.
+Sólo se arregla a mano en git. El diseño ya decidió que «no puedo leer el
+borrador» no le rompe la pantalla (el 404 da `null`); un JSON corrupto es el
+mismo estado desde el lado de ella. Se trata igual, con `console.error` para
+Marcos. **Lo mismo con el ref que existe sin su archivo**, que hoy cae en el
+mismo bucle de 422.
+
+**C (Important) · La guardia del `force` mira el valor equivocado.**
+Tanto la guardia como la elección de lista blanca son «todo lo que no sea
+exactamente `heads/main`». Medido: un ref tercero con `forzar: true` pasa. Si
+ese ref cayera adentro de `refs/heads/` —un typo como `'heads/borrador'`— el
+borrador a medio escribir aterriza en una **rama**, que la plataforma sí mira, y
+se despliega: justo la pregunta que el ref fuera de `refs/heads/` vino a cerrar.
+
+Pasa a ser un **mapa explícito** de refs conocidos a su lista blanca, con
+`throw` para el desconocido, y el `force` permitido **solo** en la entrada del
+borrador. Una regla positiva («este ref permite forzar») en vez de una
+prohibición sobre un único valor.
+
+**D (Important) · El arranque no pasa por ningún tope.**
+`borradorGuardarAccion` nunca pasa `contexto.bytesDelCuerpo` —a diferencia de
+las otras dos acciones que escriben— y el camino de arranque va directo a
+`creaBlob()` sin pasar por `revisaLote()`: ni lista blanca ni tope de cuerpo.
+Los dos caminos tienen que pasar por las mismas barreras.
+
+**E (Minor) · Y siete cosas chicas:**
+
+1. **`ARBOL_VACIO` es el único paso que ningún test puede cubrir.** En vez de
+   dejarlo y mandar a alguien a verificarlo con un `curl` que se va a olvidar,
+   `creaArbol()` pasa a **omitir** `base_tree` cuando no hay base — que es la
+   forma documentada de «un árbol de cero». Elimina el riesgo en vez de
+   diferirlo.
+2. **El centinela `padre: ''`** pasa a `string | null`. `''` es justo el valor
+   que una variable `string` toma por accidente (`padre: sha ?? ''`), así que
+   hoy «no tengo padre» y «perdí el padre» son el mismo valor y el modo de falla
+   es silencioso por construcción.
+3. **Cualquier 404 se lee como «no hay borrador»** — incluido un token sin
+   permiso o un repo mal escrito. Ella ve «no hay borrador» y su trabajo parece
+   perdido cuando el panel está mal configurado. Va un `console.error` que lo
+   distinga.
+4. **El conflicto usa `>` y no `>=`**: dos guardados del mismo milisegundo desde
+   aparatos distintos y el segundo pisa sin avisar.
+5. **Un borrador sin `hora` se pisa sin avisar** (`undefined > 1000` es `false`).
+   El trato es el correcto —mejor escribir que bloquear— pero tiene que estar
+   declarado y con test, no ser un accidente del operador.
+6. **Los commits del ref del borrador no se parecen entre sí:** el raíz dice
+   «Borrador» y los siguientes usan el asunto genérico de publicar, con los
+   trailers del panel. Nada los lee, pero si Marcos mira ese ref ve commits que
+   parecen publicaciones del sitio.
+7. **Cada arreglo va con su test.** Los de A, B, C y D sobre todo.
+
+- [ ] **Step 4c: Los tres que quedaron abiertos**
+
+**1 · El hallazgo B quedó a medias, y la raíz es una sola.** El estado terminal
+se eliminó en todos los casos menos uno: un archivo cuyo contenido es
+exactamente `null`. Ahí `JSON.parse` **no falla** —`null` es JSON válido— así
+que la lectura se declara «ok» con un borrador nulo, y el guardado revienta al
+mirarle el `dispositivo`: 502. Y como leer traduce eso a «no hay borrador», el
+panel nunca va a mandar `pisar: true`: **sin salida por la interfaz**, que es
+exactamente lo que B vino a matar.
+
+La misma raíz cubre cuatro casos más que hoy pasan silenciosamente: `[]`, `42`,
+`"hola"`, `true`. En todos ellos `borrador.leer` le entrega a la fase 6 un valor
+que **no es un `Borrador`** pero está tipado como si lo fuera, porque
+`JSON.parse(texto) as Borrador` no valida nada. Un `as` no es una validación: es
+una promesa que el archivo del repo no tiene por qué cumplir.
+
+```ts
+  // `JSON.parse` no falla con `null`, `[]`, `42` ni `"hola"`: todos son JSON
+  // válido. El `as Borrador` de acá abajo es una promesa que este archivo no
+  // tiene por qué cumplir —lo escribe el panel, pero también lo puede tocar
+  // una mano—, así que la forma se mira de verdad. Sin esto, un archivo con
+  // `null` adentro deja el panel sin salida: leer dice «no hay borrador»,
+  // guardar revienta, y como la pantalla cree que no hay nada, nunca manda el
+  // `pisar` que lo destrabaría.
+  const crudo: unknown = JSON.parse(texto)
+  if (typeof crudo !== 'object' || crudo === null || Array.isArray(crudo)) {
+    return { estado: 'ilegible', sha }
+  }
+```
+
+**2 · Rotura nueva (Minor, latente): el mapa de refs acepta claves heredadas.**
+`REFS_CONOCIDOS` es un objeto literal y la búsqueda es `REFS_CONOCIDOS[ref]`, así
+que `__proto__`, `constructor`, `toString` y `valueOf` **no tiran** con
+`forzar: false`: la búsqueda devuelve algo heredado y truthy, `permiteRuta` sale
+`undefined`, y al caer en el default del parámetro **se aplica la lista blanca de
+`main`** — y publica de verdad.
+
+No es alcanzable hoy desde un pedido HTTP (el ref nunca sale de datos del
+cliente) y el `force` sigue siendo imposible fuera del borrador, así que no es
+grave. Pero contradice por escrito la invariante que el arreglo C fijó: `throw`
+para el desconocido. `Object.hasOwn(REFS_CONOCIDOS, ref)` —o un `Map`, o
+`Object.create(null)`— lo cierra, y `permiteRuta` pasa a pasarse siempre
+explícito en vez de depender de un default.
+
+**3 · El log nuevo grita en el caso más común.** Quedó en nivel `error` y
+dispara en el camino **normal**: cada lectura y cada guardado de un panel que
+todavía no tiene borrador. Con el mismo texto que tendría el 404 de un token
+vencido, así que no distingue los dos casos —que era lo que ese log venía a
+hacer— y de paso llena de «error» el estado más común de un panel recién
+estrenado. Bajalo de nivel y que el texto diga las dos posibilidades.
+
 - [ ] **Step 5: Corré, reempaquetá y commiteá**
 
 ```bash
@@ -4094,6 +4219,131 @@ las tres cabeceras son parte del mecanismo, no decoración. `no-referrer` es lo
 que impide que el token se filtre en la primera navegación que salga de la
 página; `no-store` es lo que impide que una página con token quede en un caché
 compartido.
+
+- [ ] **Step 4b: Los once arreglos de la revisión**
+
+La revisión **confirmó la divergencia**: apartarse de lo que este brief
+ilustraba era obligatorio. Con el diseño original, el primer guardado andaba,
+la primera LECTURA devolvía 404 → `null` —o sea, **el borrador desaparecía en
+silencio**— y desde ahí cada guardado reintentaba el arranque y moría con
+`Reference already exists`, para siempre. Y encontró el argumento decisivo por
+el commit huérfano, que vale la pena dejar escrito en el código: **un commit
+raíz no tiene ancestro común con `main`, así que git se niega a mergearlo**
+(«refusing to merge unrelated histories»). Las dos listas blancas son un candado
+de software; el huérfano es un candado de matemática.
+
+**A (Important) · El candado anti-pisada se apoya en un dato del cliente.**
+`dispositivo` sale del cuerpo del pedido, teniendo `sesion.dispositivo`
+—firmado— a mano. Y `idDeDispositivo(undefined)` devuelve `'sin-nombre'`, nunca
+falla: si la fase 6 arma el pedido sin ese campo, los dos aparatos son
+`'sin-nombre'`, el candado no dispara nunca, y la hermana pisa el borrador de la
+clienta en silencio — literalmente el bug que esta tarea vino a arreglar.
+Ningún test lo pesca porque todos pasan el campo explícito. **Sale de la
+sesión**, como ya salen `autor` y el reloj. Y va el test del pedido sin campo.
+
+**B (Important) · Un borrador corrupto deja el panel en estado terminal.**
+Un `JSON.parse` que falla sube intacto y las DOS acciones dan 502 — y no hay
+salida, porque para escribir un borrador nuevo hay que leer el corrupto primero.
+Sólo se arregla a mano en git. El diseño ya decidió que «no puedo leer el
+borrador» no le rompe la pantalla (el 404 da `null`); un JSON corrupto es el
+mismo estado desde el lado de ella. Se trata igual, con `console.error` para
+Marcos. **Lo mismo con el ref que existe sin su archivo**, que hoy cae en el
+mismo bucle de 422.
+
+**C (Important) · La guardia del `force` mira el valor equivocado.**
+Tanto la guardia como la elección de lista blanca son «todo lo que no sea
+exactamente `heads/main`». Medido: un ref tercero con `forzar: true` pasa. Si
+ese ref cayera adentro de `refs/heads/` —un typo como `'heads/borrador'`— el
+borrador a medio escribir aterriza en una **rama**, que la plataforma sí mira, y
+se despliega: justo la pregunta que el ref fuera de `refs/heads/` vino a cerrar.
+
+Pasa a ser un **mapa explícito** de refs conocidos a su lista blanca, con
+`throw` para el desconocido, y el `force` permitido **solo** en la entrada del
+borrador. Una regla positiva («este ref permite forzar») en vez de una
+prohibición sobre un único valor.
+
+**D (Important) · El arranque no pasa por ningún tope.**
+`borradorGuardarAccion` nunca pasa `contexto.bytesDelCuerpo` —a diferencia de
+las otras dos acciones que escriben— y el camino de arranque va directo a
+`creaBlob()` sin pasar por `revisaLote()`: ni lista blanca ni tope de cuerpo.
+Los dos caminos tienen que pasar por las mismas barreras.
+
+**E (Minor) · Y siete cosas chicas:**
+
+1. **`ARBOL_VACIO` es el único paso que ningún test puede cubrir.** En vez de
+   dejarlo y mandar a alguien a verificarlo con un `curl` que se va a olvidar,
+   `creaArbol()` pasa a **omitir** `base_tree` cuando no hay base — que es la
+   forma documentada de «un árbol de cero». Elimina el riesgo en vez de
+   diferirlo.
+2. **El centinela `padre: ''`** pasa a `string | null`. `''` es justo el valor
+   que una variable `string` toma por accidente (`padre: sha ?? ''`), así que
+   hoy «no tengo padre» y «perdí el padre» son el mismo valor y el modo de falla
+   es silencioso por construcción.
+3. **Cualquier 404 se lee como «no hay borrador»** — incluido un token sin
+   permiso o un repo mal escrito. Ella ve «no hay borrador» y su trabajo parece
+   perdido cuando el panel está mal configurado. Va un `console.error` que lo
+   distinga.
+4. **El conflicto usa `>` y no `>=`**: dos guardados del mismo milisegundo desde
+   aparatos distintos y el segundo pisa sin avisar.
+5. **Un borrador sin `hora` se pisa sin avisar** (`undefined > 1000` es `false`).
+   El trato es el correcto —mejor escribir que bloquear— pero tiene que estar
+   declarado y con test, no ser un accidente del operador.
+6. **Los commits del ref del borrador no se parecen entre sí:** el raíz dice
+   «Borrador» y los siguientes usan el asunto genérico de publicar, con los
+   trailers del panel. Nada los lee, pero si Marcos mira ese ref ve commits que
+   parecen publicaciones del sitio.
+7. **Cada arreglo va con su test.** Los de A, B, C y D sobre todo.
+
+- [ ] **Step 4c: Los tres que quedaron abiertos**
+
+**1 · El hallazgo B quedó a medias, y la raíz es una sola.** El estado terminal
+se eliminó en todos los casos menos uno: un archivo cuyo contenido es
+exactamente `null`. Ahí `JSON.parse` **no falla** —`null` es JSON válido— así
+que la lectura se declara «ok» con un borrador nulo, y el guardado revienta al
+mirarle el `dispositivo`: 502. Y como leer traduce eso a «no hay borrador», el
+panel nunca va a mandar `pisar: true`: **sin salida por la interfaz**, que es
+exactamente lo que B vino a matar.
+
+La misma raíz cubre cuatro casos más que hoy pasan silenciosamente: `[]`, `42`,
+`"hola"`, `true`. En todos ellos `borrador.leer` le entrega a la fase 6 un valor
+que **no es un `Borrador`** pero está tipado como si lo fuera, porque
+`JSON.parse(texto) as Borrador` no valida nada. Un `as` no es una validación: es
+una promesa que el archivo del repo no tiene por qué cumplir.
+
+```ts
+  // `JSON.parse` no falla con `null`, `[]`, `42` ni `"hola"`: todos son JSON
+  // válido. El `as Borrador` de acá abajo es una promesa que este archivo no
+  // tiene por qué cumplir —lo escribe el panel, pero también lo puede tocar
+  // una mano—, así que la forma se mira de verdad. Sin esto, un archivo con
+  // `null` adentro deja el panel sin salida: leer dice «no hay borrador»,
+  // guardar revienta, y como la pantalla cree que no hay nada, nunca manda el
+  // `pisar` que lo destrabaría.
+  const crudo: unknown = JSON.parse(texto)
+  if (typeof crudo !== 'object' || crudo === null || Array.isArray(crudo)) {
+    return { estado: 'ilegible', sha }
+  }
+```
+
+**2 · Rotura nueva (Minor, latente): el mapa de refs acepta claves heredadas.**
+`REFS_CONOCIDOS` es un objeto literal y la búsqueda es `REFS_CONOCIDOS[ref]`, así
+que `__proto__`, `constructor`, `toString` y `valueOf` **no tiran** con
+`forzar: false`: la búsqueda devuelve algo heredado y truthy, `permiteRuta` sale
+`undefined`, y al caer en el default del parámetro **se aplica la lista blanca de
+`main`** — y publica de verdad.
+
+No es alcanzable hoy desde un pedido HTTP (el ref nunca sale de datos del
+cliente) y el `force` sigue siendo imposible fuera del borrador, así que no es
+grave. Pero contradice por escrito la invariante que el arreglo C fijó: `throw`
+para el desconocido. `Object.hasOwn(REFS_CONOCIDOS, ref)` —o un `Map`, o
+`Object.create(null)`— lo cierra, y `permiteRuta` pasa a pasarse siempre
+explícito en vez de depender de un default.
+
+**3 · El log nuevo grita en el caso más común.** Quedó en nivel `error` y
+dispara en el camino **normal**: cada lectura y cada guardado de un panel que
+todavía no tiene borrador. Con el mismo texto que tendría el 404 de un token
+vencido, así que no distingue los dos casos —que era lo que ese log venía a
+hacer— y de paso llena de «error» el estado más común de un panel recién
+estrenado. Bajalo de nivel y que el texto diga las dos posibilidades.
 
 - [ ] **Step 5: Corré, reempaquetá y commiteá**
 
