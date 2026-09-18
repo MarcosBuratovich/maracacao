@@ -2452,6 +2452,7 @@ describe('accion=estado', () => {
         },
       }, // gh.commit (revisaLaCabeza)
       { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // vercel (revisaLaCabeza)
+      cdnSirviendoLoViejo(), // version.json — revisaLaCabeza() también consulta al CDN antes de revertir (Ronda 3)
       ...respuestasDeUnaReversionCompleta(sha), // revierte() dentro de revierteYAvisaAMarcos()
       { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // vercel (la lectura propia de estadoAccion)
       cdnSirviendoLoViejo(), // version.json — la lectura propia de estadoAccion, SIEMPRE
@@ -2818,6 +2819,7 @@ describe('accion=estado', () => {
         },
       }, // gh.commit: es del panel, no es una reversión
       { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // vercel.despliegueDe: falló
+      cdnSirviendoLoViejo(), // version.json — revisaLaCabeza() también consulta al CDN antes de revertir (Ronda 3)
       ...respuestasDeUnaReversionCompleta(cabezaRota), // adentro de revierteYAvisaAMarcos()
     ])
     const r = await maneja(
@@ -2841,6 +2843,60 @@ describe('accion=estado', () => {
     expect(cartas[0].a).toEqual(['marcos@ejemplo.mx'])
     expect(cartas[0].texto).toContain(cabezaRota)
     expect(cartas[0].texto).toContain('clienta@ejemplo.mx') // el autor real, del trailer — no de quien pidió esta publicación
+  })
+
+  /*
+   * Ronda 3: el mismo blindaje que B1, de arriba, pero para EL CAMINO SIN
+   * NADIE MIRANDO — que es justo por qué esto importa más ahí. `estadoAccion`
+   * ya tiene su propia guardia (Ronda 2) para cuando alguien está sondeando;
+   * `revisaLaCabeza()` es la red de seguridad que corre SOLA, sin que nadie
+   * la pida, desde CUALQUIER acción autenticada (acá, `publicar`, que no
+   * tiene ninguna guardia propia contra esto — la única protección posible
+   * es la de `revisaLaCabeza()` misma). Si el reporte de la plataforma
+   * está mal, este es el camino donde el panel revertiría por su cuenta una
+   * publicación sana sin que nadie se entere en el momento — el resultado
+   * más caro que tiene este sistema.
+   *
+   * Misma advertencia que en la Ronda 2: no alcanza con mirar el status
+   * HTTP (acá, 422 por `fichas: {}`, que no cambia se revierta o no) — hay
+   * que verificar el EFECTO. Cuatro pedidos programados y ni uno más, y
+   * ninguna carta: si `revierteYAvisaAMarcos()` se hubiera disparado,
+   * habría pedido el autor real y los pasos de `revierte()`, que nadie
+   * programó, y habría mandado el correo a Marcos que este test prueba que
+   * NO sale.
+   */
+  it('Ronda 3: si el CDN ya sirve la cabeza rota, revisaLaCabeza() NO la revierte', async () => {
+    const cartas: Array<{ a: string[]; asunto: string }> = []
+    const cabezaRota = 'b'.repeat(40)
+    const { f, pedidos } = fetchFalso([
+      { cuerpo: { object: { sha: cabezaRota } } }, // gh.ref (revisaLaCabeza)
+      {
+        cuerpo: {
+          sha: cabezaRota,
+          tree: { sha: 't' },
+          message: 'cambia algo\n\nPanel: sí\nPanel-Autor: clienta@ejemplo.mx',
+          author: { date: '2026-09-17T12:00:00Z' },
+          parents: [{ sha: 'padre' }],
+        },
+      }, // gh.commit: es del panel, no es una reversión
+      { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // la plataforma dice que falló
+      { cuerpo: { sha: cabezaRota, construido: '2026-09-17T12:00:00.000Z' } }, // pero el CDN YA sirve esa cabeza
+    ])
+    const r = await maneja(
+      'publicar',
+      { cuerpo: { base: SHA_MAIN, documentos: { fichas: {} } }, cookie: cookieValida() },
+      contextoDePrueba({
+        fetch: f,
+        correo: async (c) => { cartas.push(c); return { ok: true } },
+        env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
+      }),
+    )
+    // La acción sigue su curso normal: `fichas: {}` sigue sin pasar el
+    // esquema — abstenerse de revertir no le cambia el resultado a quien
+    // pidió la publicación.
+    expect(r.status).toBe(422)
+    expect(pedidos).toHaveLength(4)
+    expect(cartas).toHaveLength(0)
   })
 })
 

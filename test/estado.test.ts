@@ -21,8 +21,8 @@ const base = { despliegue: 'enCurso' as const, url: null, shaServido: null, shaP
 describe('el veredicto', () => {
   /*
    * [Inversión de precedencia] El CDN sirviendo el sha publicado alcanza
-   * para «listo» solo, pase lo que pase con `despliegue`. Tres de estas
-   * cuatro celdas CAMBIARON de resultado con el arreglo:
+   * para «listo» solo, pase lo que pase con `despliegue`. Cuatro de estas
+   * cinco celdas CAMBIARON de resultado con el arreglo:
    *   - `'listo'`: ya daba `'listo'` antes también — el caso fácil, el
    *     único que no cambia, y se deja acá para que la fila quede completa.
    *   - `'enCurso'` y `'desconocido'`: daban `'enCurso'` antes — el
@@ -32,8 +32,11 @@ describe('el veredicto', () => {
    *     que discute el comentario de `decide()` — un reporte de fracaso
    *     sobre un sha que el CDN ya está sirviendo—, y acá se deja escrito
    *     que gana el hecho observable, no el reporte.
+   *   - `null` (Ronda 2/3): ni siquiera se le pudo preguntar a la
+   *     plataforma. Antes eso cortaba con 502 sin mirar el CDN; ahora, si
+   *     el CDN confirma, ni falta que hacer la pregunta.
    */
-  it.each(['listo', 'enCurso', 'desconocido', 'falló'] as const)(
+  it.each(['listo', 'enCurso', 'desconocido', 'falló', null] as const)(
     'el CDN sirviendo el sha publicado alcanza para "listo" solo, sin importar qué diga el despliegue (%s)',
     (despliegue) => {
       const v = decide({ ...base, despliegue, url: 'https://x.vercel.app', shaServido: SHA })
@@ -134,6 +137,24 @@ describe('el veredicto', () => {
     // La plataforma todavía no vio el commit. Tratarlo como fracaso
     // dispararía una reversión automática por un webhook que tardó.
     const v = decide({ ...base, despliegue: 'desconocido' })
+    expect(v.estado).toBe('enCurso')
+  })
+
+  /*
+   * [Ronda 3] `null` tampoco es «falló» — y tampoco es «desconocido», aunque
+   * caigan en el mismo lado de la asimetría. Son dos hechos distintos:
+   * `'desconocido'` es un reporte REAL de la plataforma («no tengo ningún
+   * despliegue para este commit»); `null` es la AUSENCIA de reporte —no se
+   * le pudo preguntar nada—. Mezclarlos fue un bug real de esta misma
+   * vuelta de arreglos (Ronda 2 usaba `'desconocido'` para «no contestó»).
+   * Este test existe para que si alguien intenta unificarlos de nuevo —dos
+   * valores que se comportan igual son un candidato tentador a fusionar—,
+   * se acuerde de por qué no: el tipo, no el comportamiento, es lo que los
+   * separa, y el tipo es lo que evita que el log de Marcos mienta sobre
+   * cuál de las dos cosas pasó.
+   */
+  it('`despliegue: null` —no se le pudo preguntar nada a la plataforma— tampoco es «falló»', () => {
+    const v = decide({ ...base, despliegue: null })
     expect(v.estado).toBe('enCurso')
   })
 

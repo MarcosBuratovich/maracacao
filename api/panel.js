@@ -18733,6 +18733,13 @@ async function revisaLaCabeza(contexto) {
     const vercel = clienteVercel({ token: contexto.env.PANEL_VERCEL_TOKEN, proyecto, fetch: contexto.fetch });
     const { estado } = await vercel.despliegueDe(cabeza.sha);
     if (estado !== "fall\xF3") return null;
+    const shaServido = await shaQueSirveElCdn(contexto);
+    if (shaServido === cabeza.sha) {
+      console.error(
+        `revisaLaCabeza: la plataforma dice que el despliegue de ${cabeza.sha} fall\xF3, pero el sitio YA lo est\xE1 sirviendo \u2014 no se revierte.`
+      );
+      return null;
+    }
     const autorReal = autorDelCommit(commit.message) ?? "alguien del panel";
     console.error(`revisaLaCabeza: ${cabeza.sha} es un commit del panel cuyo despliegue fall\xF3 \u2014 revirtiendo.`);
     const fracaso = await revierteYAvisaAMarcos(cabeza.sha, autorReal, contexto);
@@ -18991,7 +18998,7 @@ async function estadoAccion(pedido, contexto) {
       return ok({
         ok: true,
         ...decide({
-          despliegue: "desconocido",
+          despliegue: null,
           url: null,
           shaServido,
           shaPublicado: cuerpo.sha,
@@ -19009,6 +19016,10 @@ async function estadoAccion(pedido, contexto) {
       await avisaAElla(sesion.correo, contexto, fracaso);
     } else if (shaServido !== cuerpo.sha) {
       fracaso = await revierteYAvisa(cuerpo.sha, sesion.correo, contexto);
+    } else {
+      console.error(
+        `estado: la plataforma dice que el despliegue de ${cuerpo.sha} fall\xF3, pero el sitio YA lo est\xE1 sirviendo \u2014 no se revierte.`
+      );
     }
   }
   const veredicto = decide({

@@ -1178,6 +1178,20 @@ async function revierteYAvisaAMarcos(sha: string, autorReal: string, contexto: C
  * si pudo avisarle a Marcos—, porque la frase que ella lee lo promete. Sin
  * esto, `estadoAccion` tenía que elegir entre repetir el intento para
  * averiguarlo o prometer a ciegas.
+ *
+ * [Ronda 3] Antes de revertir, consulta al CDN: si YA está sirviendo la
+ * cabeza que la plataforma reporta como fallida, se abstiene. Esta es LA
+ * red de seguridad —corre sin que nadie la pida, desde cuatro acciones—,
+ * así que es también el camino más peligroso: si el reporte de la
+ * plataforma está mal (que es justo lo que se midió en producción), acá es
+ * donde el panel revertiría por su cuenta una publicación sana, sin que
+ * nadie esté mirando para darse cuenta. `estadoAccion` ya tiene su propia
+ * guardia contra esto (Ronda 2) para el camino en que alguien SÍ está
+ * mirando, pero esa guardia vive en el llamador — y «una invariante que
+ * depende de que todos los llamadores se acuerden no es una invariante»
+ * (mismo argumento que ya usamos para la guardia de «no revertir una
+ * reversión», más arriba en esta función). Acá va la misma regla, en el
+ * lugar que de verdad decide: adentro de la función que revierte.
  */
 async function revisaLaCabeza(contexto: Contexto): Promise<({ sha: string } & Fracaso) | null> {
   // Todo lo de acá adentro es "mejor esfuerzo": si algo falla, se loguea y se
@@ -1214,6 +1228,23 @@ async function revisaLaCabeza(contexto: Contexto): Promise<({ sha: string } & Fr
     const vercel = clienteVercel({ token: contexto.env.PANEL_VERCEL_TOKEN, proyecto, fetch: contexto.fetch })
     const { estado } = await vercel.despliegueDe(cabeza.sha)
     if (estado !== 'falló') return null
+
+    // [Ronda 3] Antes de revertir: ¿el CDN ya está sirviendo esta cabeza?
+    // Si es así, el reporte de la plataforma está equivocado —el mismo
+    // argumento que reordenó `decide()` (estado.ts) y que ya frena a
+    // `estadoAccion` (Ronda 2), acá aplicado al camino sin nadie mirando.
+    // Revertir en ese caso no es un error inocuo: es el panel destruyendo
+    // por su cuenta una publicación sana. Es información que Marcos quiere
+    // ver, así que queda en el log aunque no dispare ningún correo —no hay
+    // «fracaso» que contar todavía, el sitio está bien.
+    const shaServido = await shaQueSirveElCdn(contexto)
+    if (shaServido === cabeza.sha) {
+      console.error(
+        `revisaLaCabeza: la plataforma dice que el despliegue de ${cabeza.sha} falló, ` +
+          'pero el sitio YA lo está sirviendo — no se revierte.',
+      )
+      return null
+    }
 
     // El autor real —para el correo de Marcos— sale del propio trailer del
     // commit, nunca de quien disparó esta limpieza.
@@ -1936,15 +1967,15 @@ async function estadoAccion(pedido: Pedido, contexto: Contexto): Promise<Respues
   // «falló» de «todavía va»— y corresponde el 502 de siempre.
   if (despliegue === null) {
     if (shaServido === cuerpo.sha) {
-      // El valor de `despliegue` que sigue no importa: la primera rama de
-      // `decide()` corta en cuanto `shaServido === shaPublicado`, antes de
-      // mirarlo. `'desconocido'` es el más honesto de los cuatro posibles
-      // acá — es exactamente lo que sabemos del despliegue en este
-      // instante: nada, porque la plataforma no contestó.
+      // [Ronda 3] `null`, no `'desconocido'`: son dos hechos distintos.
+      // `'desconocido'` es un reporte REAL de la plataforma («no tengo
+      // ningún despliegue para este commit», vercel.ts); acá no hubo
+      // reporte de ningún tipo, la plataforma no contestó nada. `decide()`
+      // (estado.ts) ya distingue los dos en su tipo — ver el comentario ahí.
       return ok({
         ok: true,
         ...decide({
-          despliegue: 'desconocido',
+          despliegue: null,
           url: null,
           shaServido,
           shaPublicado: cuerpo.sha,
@@ -1991,6 +2022,14 @@ async function estadoAccion(pedido: Pedido, contexto: Contexto): Promise<Respues
       await avisaAElla(sesion.correo, contexto, fracaso)
     } else if (shaServido !== cuerpo.sha) {
       fracaso = await revierteYAvisa(cuerpo.sha, sesion.correo, contexto)
+    } else {
+      // [Ronda 3] Mismo log que `revisaLaCabeza()` para el mismo caso: la
+      // plataforma reportando mal es información que Marcos quiere ver,
+      // aunque acá no haga falta ningún correo —el sitio está bien.
+      console.error(
+        `estado: la plataforma dice que el despliegue de ${cuerpo.sha} falló, ` +
+          'pero el sitio YA lo está sirviendo — no se revierte.',
+      )
     }
   }
 

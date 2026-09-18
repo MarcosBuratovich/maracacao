@@ -137,7 +137,19 @@ export interface Veredicto {
 }
 
 export function decide(e: {
-  despliegue: EstadoDeDespliegue
+  /**
+   * `null` es un valor DISTINTO de `'desconocido'`, a propósito. `'desconocido'`
+   * es un reporte real de la plataforma: «no tengo ningún despliegue para
+   * este commit» (vercel.ts). `null` es la AUSENCIA de reporte: no se le
+   * pudo preguntar nada — la plataforma no contestó. Mezclar los dos fue un
+   * bug real de esta misma vuelta de arreglos: `estadoAccion` usaba
+   * `'desconocido'` para «no pudimos preguntarle», y son dos hechos
+   * distintos que un log de Marcos necesita poder distinguir. Las dos caen
+   * en la misma asimetría igual —nunca `'listo'` ni `'falló'` por sí
+   * solas— así que `decide()` no necesita una rama nueva, solo el tipo que
+   * lo diga.
+   */
+  despliegue: EstadoDeDespliegue | null
   url: string | null
   /**
    * El sha que `version.json` dice que el CDN está sirviendo, o `null` si
@@ -179,7 +191,10 @@ export function decide(e: {
   // Eso es exactamente lo que se ve tanto si el despliegue falló como si
   // sigue yendo — `version.json` no puede distinguir los dos casos, porque
   // en los dos sigue mostrando lo viejo. Para esa distinción sí hace falta
-  // la plataforma.
+  // la plataforma — y si ni siquiera a ELLA se le pudo preguntar
+  // (`despliegue === null`), `null !== 'falló'` deja esto caer derecho a la
+  // asimetría de abajo: lo que no se entiende se lee como «en curso»,
+  // nunca como «falló».
   if (e.despliegue === 'falló') {
     return { estado: 'falló', frase: fraseDeFracaso(e.fracaso), reintentarEn: null, url: e.url }
   }
