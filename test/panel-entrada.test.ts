@@ -122,3 +122,49 @@ describe('M-9: el borde mide el cuerpo del pedido', () => {
     expect(visto).toEqual([4096, undefined, undefined])
   })
 })
+
+/*
+ * [Revisión final de la rama, C2] Los dos relojes nuevos del `Contexto`.
+ *
+ * `acciones.ts` dejó de tomar `Date.now()` y `setTimeout` del global —la
+ * regla del proyecto es que todo `src/servidor/**` fuera de `entradas/**`
+ * recibe el reloj por parámetro— así que ahora hay alguien que tiene que
+ * armarlos, y ese alguien es este archivo. Si el borde se olvidara de
+ * pasarlos, el piso de tiempo del enlace mágico (`PISO_ENLACE_MS`) —lo
+ * único que impide que el tiempo de respuesta delate si una dirección tiene
+ * acceso al panel— reventaría con un `TypeError` en producción, en la
+ * puerta de recuperación, el día que ella ya perdió el teléfono.
+ */
+describe('C2: el borde arma el reloj monótono y la espera', () => {
+  it('pasa `monotono` y `espera`, y `monotono` avanza sin saltar hacia atrás', async () => {
+    contextosVistos.length = 0
+    const { res } = respuestaFalsa()
+    await handler({ method: 'GET', headers: {}, query: { accion: 'no-existe' } } as never, res as never)
+
+    const contexto = contextosVistos[0] as { monotono: () => number; espera: (ms: number) => Promise<void> }
+    expect(typeof contexto.monotono).toBe('function')
+    expect(typeof contexto.espera).toBe('function')
+
+    const t0 = contexto.monotono()
+    await contexto.espera(5)
+    const t1 = contexto.monotono()
+    expect(Number.isFinite(t0)).toBe(true)
+    expect(t1).toBeGreaterThanOrEqual(t0) // monótono: nunca para atrás
+  })
+
+  it('`espera` espera de verdad: no resuelve antes de que pase el tiempo pedido', async () => {
+    contextosVistos.length = 0
+    const { res } = respuestaFalsa()
+    await handler({ method: 'GET', headers: {}, query: { accion: 'no-existe' } } as never, res as never)
+    const contexto = contextosVistos[0] as { espera: (ms: number) => Promise<void> }
+
+    // Un `espera` que resolviera al toque —por ejemplo, un
+    // `Promise.resolve()` puesto de apuro— dejaría el piso de tiempo del
+    // enlace mágico sin efecto NINGUNO en producción, y sin que nada se
+    // queje. Los 30 ms son un número chico a propósito: alcanza para
+    // distinguir «espera» de «no espera» sin sumarle sueño a la suite.
+    const t0 = performance.now()
+    await contexto.espera(30)
+    expect(performance.now() - t0).toBeGreaterThanOrEqual(25)
+  })
+})

@@ -18498,7 +18498,7 @@ async function enlaceAccion(pedido, contexto) {
     console.error(`enlace: tope por destinatario alcanzado para \xAB${correo2}\xBB \u2014 diez pedidos en quince minutos.`);
     return error51(429, PROBLEMA_DEMASIADOS_INTENTOS);
   }
-  const inicio = Date.now();
+  const inicio = contexto.monotono();
   const correoOk = correoEnLista(correo2, env.PANEL_CORREOS);
   if (correoOk) {
     const correoParaFirmar = correoCanonico(correo2, env.PANEL_CORREOS);
@@ -18510,9 +18510,9 @@ async function enlaceAccion(pedido, contexto) {
       console.error(`enlace: no se pudo mandar el enlace a ${correoParaFirmar} \u2014 ${r.motivo}`);
     }
   }
-  const transcurrido = Date.now() - inicio;
+  const transcurrido = contexto.monotono() - inicio;
   if (transcurrido < PISO_ENLACE_MS) {
-    await new Promise((resuelve) => setTimeout(resuelve, PISO_ENLACE_MS - transcurrido));
+    await contexto.espera(PISO_ENLACE_MS - transcurrido);
   } else if (transcurrido > PISO_ENLACE_MS) {
     console.error(
       `enlace: el env\xEDo tard\xF3 ${transcurrido} ms, m\xE1s que el piso de ${PISO_ENLACE_MS} ms \u2014 mientras eso pase, el tiempo de respuesta distingue una direcci\xF3n con acceso de una sin acceso.`
@@ -19255,6 +19255,15 @@ async function handler(req, res) {
     env: entorno(),
     fetch: globalThis.fetch,
     ahora: () => Date.now(),
+    // [Revisión final de la rama, C2] Los dos relojes se arman ACÁ, que es
+    // el único archivo autorizado a tocar el global. `monotono` usa
+    // `performance.now()` —que no salta si el reloj del sistema se
+    // reajusta, y medir el piso de tiempo del enlace mágico contra un reloj
+    // que puede saltar para atrás es justamente cómo se reabre el oráculo
+    // que ese piso cierra—; `espera` es el `setTimeout` de verdad, el que
+    // un test reemplaza por uno que no duerme.
+    monotono: () => performance.now(),
+    espera: (ms) => new Promise((resuelve) => setTimeout(resuelve, ms)),
     ip: ipDelPedido(req.headers),
     bytesDelCuerpo: bytesDeCuerpo(req.headers),
     correo: (carta) => manda({ clave: process.env.RESEND_API_KEY, remitente: process.env.PANEL_REMITENTE, fetch: globalThis.fetch }, carta)

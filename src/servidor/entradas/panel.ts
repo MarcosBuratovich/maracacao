@@ -119,6 +119,15 @@ export default async function handler(req: PedidoHTTP, res: RespuestaHTTP) {
     env: entorno(),
     fetch: globalThis.fetch,
     ahora: () => Date.now(),
+    // [Revisión final de la rama, C2] Los dos relojes se arman ACÁ, que es
+    // el único archivo autorizado a tocar el global. `monotono` usa
+    // `performance.now()` —que no salta si el reloj del sistema se
+    // reajusta, y medir el piso de tiempo del enlace mágico contra un reloj
+    // que puede saltar para atrás es justamente cómo se reabre el oráculo
+    // que ese piso cierra—; `espera` es el `setTimeout` de verdad, el que
+    // un test reemplaza por uno que no duerme.
+    monotono: () => performance.now(),
+    espera: (ms) => new Promise<void>((resuelve) => setTimeout(resuelve, ms)),
     ip: ipDelPedido(req.headers),
     bytesDelCuerpo: bytesDeCuerpo(req.headers),
     correo: (carta) => manda({ clave: process.env.RESEND_API_KEY, remitente: process.env.PANEL_REMITENTE, fetch: globalThis.fetch }, carta),

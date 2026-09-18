@@ -147,6 +147,41 @@ function correoQueAnota(cartas: Carta[]): (carta: Carta) => Promise<ResultadoCor
   }
 }
 
+/**
+ * Un reloj monótono de mentira, con su espera. Arranca en cero y SOLO
+ * avanza cuando algo lo empuja: `espera(ms)` lo empuja esos ms sin dormir
+ * de verdad, y `avanza(ms)` lo empuja a mano (para simular un proveedor de
+ * correo lento sin un `setTimeout` real).
+ *
+ * [Revisión final de la rama, C2] Es el par que reemplaza al `Date.now()` +
+ * `setTimeout` que `enlaceAccion()` tomaba del global. Antes de esto, los
+ * quince tests que llegan al piso de `PISO_ENLACE_MS` dormían 400 ms cada
+ * uno DE VERDAD: 17,1 s de los 28,5 s que tardaba este archivo, en el
+ * camino crítico del deploy. Y los que medían el piso lo hacían con un
+ * cronómetro (`performance.now()`), o sea contra la carga de la máquina;
+ * ahora lo miden contra el número exacto que el código pidió esperar, que
+ * es lo que de verdad hay que afirmar.
+ */
+function relojDeMentira() {
+  let t = 0
+  const esperas: number[] = []
+  return {
+    monotono: () => t,
+    espera: async (ms: number) => {
+      esperas.push(ms)
+      t += ms
+    },
+    /** Lo que el código pidió esperar, en orden. */
+    esperas,
+    /** Empujar el reloj sin que nadie haya esperado: un proveedor que tardó. */
+    avanza: (ms: number) => {
+      t += ms
+    },
+    /** Cuánto marca el reloj ahora. */
+    marca: () => t,
+  }
+}
+
 const contextoBase = (fetch: typeof globalThis.fetch) => ({
   env: {
     PANEL_CLAVE_HASH: hashDeClave(CLAVE),
@@ -163,6 +198,14 @@ const contextoBase = (fetch: typeof globalThis.fetch) => ({
   },
   fetch,
   ahora: () => Date.now(),
+  // Un reloj monótono propio por contexto, y una espera que no duerme (ver
+  // `relojDeMentira()`, arriba). Los tests que necesitan MIRAR lo que se
+  // esperó arman el suyo y lo pisan; a los demás les alcanza con que el
+  // piso del enlace mágico no cueste 400 ms de reloj real.
+  ...(() => {
+    const r = relojDeMentira()
+    return { monotono: r.monotono, espera: r.espera }
+  })(),
   ip: '1.2.3.4',
   // [RULING T1-1] Sin `bytesDelCuerpo`, a propósito: queda `undefined`, que
   // es justo lo que arma el borde cuando el pedido no trae `Content-Length`
@@ -203,12 +246,15 @@ const contextoDePrueba = (p: {
   ahora?: () => number
   correo?: (carta: Carta) => Promise<ResultadoCorreo>
   env?: Partial<Entorno>
+  /** El reloj monótono + espera de este contexto, cuando el test necesita mirarlos (`relojDeMentira()`). */
+  reloj?: { monotono: () => number; espera: (ms: number) => Promise<void> }
 }) => {
   const base = contextoBase(p.fetch)
   return {
     ...base,
     ...(p.ahora ? { ahora: p.ahora } : {}),
     ...(p.correo ? { correo: p.correo } : {}),
+    ...(p.reloj ? { monotono: p.reloj.monotono, espera: p.reloj.espera } : {}),
     env: { ...base.env, ...(p.env ?? {}) },
   }
 }
@@ -384,11 +430,15 @@ describe('entrar', () => {
 // [Ronda 2 de revisión] `enlaceAccion()` espera hasta `PISO_ENLACE_MS`
 // (400 ms) antes de contestar, exista o no la dirección (hallazgo B de la
 // Ronda 1, reemplazado en la Ronda 2 — ver el docstring de `PISO_ENLACE_MS`
-// en acciones.ts): cada test que llega hasta esa espera tarda, como
-// mínimo, esos 400 ms de verdad — no hay forma de acelerarlo desde el
-// test sin dejar de probar lo que hay que probar. Los tests que hacen
-// varios pedidos seguidos (E4, F) llevan un tercer argumento a `it(...)`
-// con un timeout más generoso que el default de vitest (5 s).
+// en acciones.ts).
+//
+// [Revisión final de la rama, C2] Esa espera ya NO cuesta 400 ms de reloj
+// real por test: viene inyectada en el contexto (`relojDeMentira()`, arriba
+// en este archivo), así que se simula. Los tests de este describe que hacen
+// cinco o diez pedidos seguidos (E4, F) llevaban por eso un timeout propio
+// de 5 s y 8 s; ya no lo necesitan, y volvieron al default de vitest — que
+// ahora, además, vuelve a ser un guardián útil en vez de un techo que el
+// sueño de mentira consumía entero.
 const CORREO_REMITENTE = { RESEND_API_KEY: 'clave-de-prueba', PANEL_REMITENTE: 'Panel <panel@ejemplo.mx>' }
 
 describe('accion=enlace', () => {
@@ -454,7 +504,7 @@ describe('accion=enlace', () => {
     // acceso no manda NADA — el piso de tiempo (abajo) es lo que iguala el
     // reloj, no un envío de más.
     expect(cartasNoListado).toHaveLength(0)
-  }, 3000)
+  })
 
   // [B, Critical — Ronda 1; reemplazado en la Ronda 2 de revisión] La
   // Ronda 1 cerraba el oráculo de tiempo mandando SIEMPRE un correo —real
@@ -471,37 +521,38 @@ describe('accion=enlace', () => {
     const cartasListado: Carta[] = []
     const cartasNoListado: Carta[] = []
 
-    // Bien por debajo de los 400 ms reales de `PISO_ENLACE_MS`, para no
-    // acoplar el test al número exacto (que puede subir el día que el
-    // proveedor de correo tarde más) — solo afirma que las dos ramas
-    // tardan «bastante», nunca microsegundos.
-    const PISO_ESPERADO_MS = 350
+    // [Revisión final, C2] Antes esto se medía con un cronómetro
+    // (`performance.now()`) alrededor de cada rama, y por eso cada corrida
+    // dormía 400 ms de verdad, dos veces. Ahora el reloj y la espera vienen
+    // inyectados, así que se afirma algo MÁS fuerte y gratis: las dos ramas
+    // terminan en la MISMA marca del reloj monótono, y esa marca es
+    // exactamente el piso. Un cronómetro solo podía decir «tardaron
+    // parecido», y su cota de 100 ms de diferencia dependía de la carga de
+    // la máquina.
+    const relojListado = relojDeMentira()
+    const relojNoListado = relojDeMentira()
 
-    const t0 = performance.now()
     await maneja(
       'enlace',
       { cuerpo: { correo: correoListado }, cookie: '' },
-      { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoQueAnota(cartasListado), env }), ip: `enlace-piso-listado-${Math.random()}` },
+      { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoQueAnota(cartasListado), env, reloj: relojListado }), ip: `enlace-piso-listado-${Math.random()}` },
     )
-    const duracionListado = performance.now() - t0
 
-    const t1 = performance.now()
     await maneja(
       'enlace',
       { cuerpo: { correo: correoAjeno }, cookie: '' },
-      { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoQueAnota(cartasNoListado), env }), ip: `enlace-piso-nolistado-${Math.random()}` },
+      { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoQueAnota(cartasNoListado), env, reloj: relojNoListado }), ip: `enlace-piso-nolistado-${Math.random()}` },
     )
-    const duracionNoListado = performance.now() - t1
 
-    expect(duracionListado).toBeGreaterThan(PISO_ESPERADO_MS)
-    expect(duracionNoListado).toBeGreaterThan(PISO_ESPERADO_MS)
-    // La diferencia entre las dos, chica — nunca los ~5000× que medía la
-    // Ronda 1 antes del arreglo (150 ms contra 0.03 ms).
-    expect(Math.abs(duracionListado - duracionNoListado)).toBeLessThan(100)
+    // Las dos ramas esperaron, y esperaron lo mismo: el piso entero, porque
+    // el proveedor de mentira de este test no tarda nada.
+    expect(relojListado.esperas).toEqual([400])
+    expect(relojNoListado.esperas).toEqual([400])
+    expect(relojListado.marca()).toBe(relojNoListado.marca())
 
     expect(cartasListado).toHaveLength(1)
     expect(cartasNoListado).toHaveLength(0) // nunca manda nada a quien no tiene acceso
-  }, 3000)
+  })
 
   // [Ronda 3 de revisión] Medido por la revisión: con el proveedor a 800 ms
   // contra un piso de 400, las dos ramas vuelven a diferir 400 ms — el
@@ -516,8 +567,15 @@ describe('accion=enlace', () => {
   it('la alarma del piso: si el proveedor tarda más que el piso, un console.error avisa', async () => {
     const correo = `piso-lento-${Math.random()}@ejemplo.mx`
     const env = { ...CORREO_REMITENTE, PANEL_CORREOS: correo }
+    // [Revisión final, C2] El proveedor «lento» ya no duerme 500 ms de
+    // verdad: empuja el reloj monótono inyectado esos 500 ms, que es lo
+    // ÚNICO que el código mira para decidir si la alarma sale. Sigue siendo
+    // > PISO_ENLACE_MS (400), que es lo que hace que esta rama se ejercite
+    // de verdad — con un proveedor rápido este test no podría fallar nunca
+    // aunque el `console.error` desapareciera del código.
+    const reloj = relojDeMentira()
     const correoLento = async (): Promise<ResultadoCorreo> => {
-      await new Promise((resuelve) => setTimeout(resuelve, 500)) // > PISO_ENLACE_MS (400)
+      reloj.avanza(500)
       return { ok: true }
     }
     const errorEspia = vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -525,7 +583,7 @@ describe('accion=enlace', () => {
     const r = await maneja(
       'enlace',
       { cuerpo: { correo }, cookie: '' },
-      { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoLento, env }), ip: `enlace-piso-lento-${Math.random()}` },
+      { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoLento, env, reloj }), ip: `enlace-piso-lento-${Math.random()}` },
     )
 
     // Contesta bien igual — no se corta el envío ni se le miente a quien pidió.
@@ -535,8 +593,11 @@ describe('accion=enlace', () => {
     )
     expect(errorEspia).toHaveBeenCalledWith(expect.stringContaining('el envío tardó'))
     expect(errorEspia).toHaveBeenCalledWith(expect.stringContaining('más que el piso de 400 ms'))
+    // Y no esperó NADA de más encima de los 500 que ya había tardado: el
+    // piso es un piso, no un peaje que se suma.
+    expect(reloj.esperas).toEqual([])
     errorEspia.mockRestore()
-  }, 3000)
+  })
 
   it('E4: el freno por IP se aplica igual que en `entrar` — el sexto pedido seguido es 429', async () => {
     // Un correo DISTINTO en cada intento: así se ejercita el freno por IP
@@ -556,7 +617,7 @@ describe('accion=enlace', () => {
 
     expect(r.status).toBe(429)
     expect(cartas).toHaveLength(5) // los primeros cinco sí mandaron; el sexto, frenado, no
-  }, 5000) // cinco pedidos reales, cada uno paga el piso de tiempo (~400 ms) — margen sobre el default de vitest
+  })
 
   // [F, Minor — Ronda 1; tope subido en la Ronda 2 de revisión] El freno de
   // arriba es por IP; este es por DESTINATARIO — sin él, veinte IPs
@@ -594,7 +655,7 @@ describe('accion=enlace', () => {
     // preguntarle después siempre daría cero.
     expect(errorEspia).toHaveBeenCalledWith(expect.stringContaining(correo))
     errorEspia.mockRestore()
-  }, 8000) // diez pedidos reales, cada uno paga el piso de tiempo (~400 ms)
+  })
 
   it('C-1: PANEL_SECRETO ausente o corto, 503 antes de tocar nada — ni siquiera el correo', async () => {
     for (const secreto of [undefined, 'corto']) {
@@ -1392,12 +1453,34 @@ describe('publicar', () => {
       return doc
     }
 
-    // Lo vivo de `sitio`, tal cual está hoy en el repo: es lo que el
-    // router lee para calcular los avisos cuando `sitio` no vino en el
-    // lote (ver `publicarAccion`, el bloque de avisos, después de
-    // `publica()`). Su `anaquel.kicker` dice «LOS 15 SABORES» — el texto
-    // que se queda viejo apenas hay dieciséis.
-    const textoSitioVivo = serializa(esquemaSitio, sitioCrudoDeDisco())
+    // Lo vivo de `sitio` que el router va a leer para calcular los avisos
+    // cuando `sitio` no vino en el lote (ver `publicarAccion`, el bloque de
+    // avisos, después de `publica()`) — con el `anaquel.kicker` FABRICADO
+    // acá, nunca el que diga hoy `src/contenido/datos/sitio.json`.
+    //
+    // [Revisión final de la rama, C1] Antes esto era el archivo del repo
+    // tal cual y el primer test de abajo se apoyaba en que ese archivo
+    // dijera «LOS 15 SABORES». Eso es un test que CONGELA contenido
+    // editable, lo que `docs/tests-que-congelan-contenido.md` prohíbe con
+    // todas las letras porque EL DEPLOY CORRE LOS TESTS: medido, con el
+    // kicker renombrado a «NUESTROS SABORES» —una edición perfectamente
+    // legítima de la clienta, sin ningún conflicto de conteo— este archivo
+    // era el ÚNICO de los 57 que se ponía rojo; en producción eso es el
+    // deploy fallando, la reversión automática deshaciéndole el cambio y
+    // «No salió; lo dejé como estaba», una y otra vez, sin ninguna pista de
+    // por qué. El desfase que estos tests necesitan se FABRICA en el
+    // documento de prueba que se les pasa; lo que el repo diga hoy dejó de
+    // importar.
+    const sitioConKicker = (kicker: string) => {
+      const doc = sitioCrudoDeDisco()
+      doc.anaquel.kicker = kicker
+      return serializa(esquemaSitio, doc)
+    }
+
+    /** Un `sitio` que dice quince cuando el lote publica dieciséis: el desfase que el aviso tiene que ver. */
+    const SITIO_QUE_DICE_QUINCE = sitioConKicker('LOS 15 SABORES')
+    /** Un `sitio` cuyo antetítulo no menciona ninguna cantidad: no hay nada que avisar sobre él. */
+    const SITIO_SIN_CONTEO = sitioConKicker('NUESTROS SABORES')
 
     /**
      * Las respuestas que hacen falta para publicar `sabores` SOLO (sin
@@ -1410,13 +1493,17 @@ describe('publicar', () => {
      * lo serviría igual (no valida orden por URL) pero el test 2 de abajo
      * —que exige el commit hecho aunque el cálculo de avisos reviente— es
      * el que de verdad vigila que el orden sea el correcto.
+     *
+     * `textoSitio` es el documento de `sitio` que el fetch falso va a
+     * servir como «lo vivo»: cada test elige el suyo, y ninguno depende de
+     * lo que el archivo del repo diga hoy (ver `sitioConKicker`, arriba).
      */
-    const respuestasDeUnaPublicacionDeSabores = () => [
+    const respuestasDeUnaPublicacionDeSabores = (textoSitio: string) => [
       ...respuestasDeNingunaReversionPendiente(),
       { cuerpo: { object: { sha: SHA_BASE } } }, // gh.ref (Fase 2: el sha base del lote)
       { cuerpo: { content: Buffer.from(textoSaboresVivo).toString('base64'), encoding: 'base64' } }, // archivoEnRef(sabores): lo vivo, para el diff
       ...respuestasDeUnaPublicacionDirecta(), // las seis de publica()
-      { cuerpo: { content: Buffer.from(textoSitioVivo).toString('base64'), encoding: 'base64' } }, // archivoEnRef(sitio): DESPUÉS de escribir, para los avisos
+      { cuerpo: { content: Buffer.from(textoSitio).toString('base64'), encoding: 'base64' } }, // archivoEnRef(sitio): DESPUÉS de escribir, para los avisos
     ]
 
     it('avisa cuando un texto menciona una cantidad que ya no coincide', async () => {
@@ -1425,7 +1512,7 @@ describe('publicar', () => {
       // que lo arregle después— pero tiene que enterarse, porque desde su
       // pantalla el texto se ve perfecto: lo que está mal es la relación
       // entre dos cosas que no se ven juntas.
-      const { f } = fetchFalso([...respuestasDeUnaPublicacionDeSabores()])
+      const { f } = fetchFalso([...respuestasDeUnaPublicacionDeSabores(SITIO_QUE_DICE_QUINCE)])
       const r = await maneja(
         'publicar',
         { cuerpo: { base: SHA_BASE, documentos: { sabores: conDieciseisSabores() } }, cookie: cookieValida() },
@@ -1443,7 +1530,7 @@ describe('publicar', () => {
     })
 
     it('un aviso NUNCA bloquea: el commit se hizo igual', async () => {
-      const { f, pedidos } = fetchFalso([...respuestasDeUnaPublicacionDeSabores()])
+      const { f, pedidos } = fetchFalso([...respuestasDeUnaPublicacionDeSabores(SITIO_QUE_DICE_QUINCE)])
       const r = await maneja(
         'publicar',
         { cuerpo: { base: SHA_BASE, documentos: { sabores: conDieciseisSabores() } }, cookie: cookieValida() },
@@ -1457,7 +1544,7 @@ describe('publicar', () => {
       // Que el campo exista siempre es lo que le permite a la fase 6
       // escribir `avisos.length` sin un `?.` que esconda un bug de la
       // respuesta el día que este código deje de calcularlos.
-      const { f } = fetchFalso([...respuestasDeUnaPublicacionDeSabores()])
+      const { f } = fetchFalso([...respuestasDeUnaPublicacionDeSabores(SITIO_SIN_CONTEO)])
       const r = await maneja(
         'publicar',
         { cuerpo: { base: SHA_BASE, documentos: { sabores: saboresConUnPrecioDistinto() } }, cookie: cookieValida() },

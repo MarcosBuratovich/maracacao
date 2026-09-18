@@ -100,6 +100,30 @@ export interface Contexto {
   fetch: typeof globalThis.fetch
   /** El reloj. Nunca `Date.now()` llamado directo acá adentro: así un test lo puede fijar. */
   ahora: () => number
+  /**
+   * Reloj MONÓTONO, para medir cuánto pasó de verdad. Distinto de `ahora`,
+   * que es el reloj de NEGOCIO —los tests lo congelan, y una publicación de
+   * hace media hora se compara contra él—.
+   *
+   * [Revisión final de la rama, C2] Existe porque `enlaceAccion()` necesita
+   * medir tiempo de PARED —lo que un atacante cronometra desde afuera, para
+   * el piso de `PISO_ENLACE_MS`— y hasta acá lo tomaba con un `Date.now()`
+   * suelto, o sea del global, en un archivo que no es el borde. La regla del
+   * proyecto es que TODO `src/servidor/**` fuera de `entradas/**` recibe el
+   * reloj por parámetro; que el reloj que hacía falta fuera otro no es una
+   * excepción a la regla, es un segundo campo en el contexto.
+   */
+  monotono: () => number
+  /**
+   * Esperar. Inyectada por la misma razón que `monotono`, más una medida:
+   * `test/acciones.test.ts` tardaba 28,5 s y 17,1 s de eso eran sueño REAL
+   * —quince tests durmiendo los 400 ms de `PISO_ENLACE_MS` cada uno—, en el
+   * camino crítico del deploy, que está en el camino crítico de la
+   * publicación de ella. Con la espera inyectada, un test la simula y el
+   * piso se sigue probando igual (mejor, de hecho: contra el número exacto
+   * en vez de contra un cronómetro que la carga de la máquina mueve).
+   */
+  espera: (ms: number) => Promise<void>
   /** La IP de quien pide, para el freno de intentos de `entrar` (E4). */
   ip: string
   /**
@@ -547,7 +571,12 @@ async function enlaceAccion(pedido: Pedido, contexto: Contexto): Promise<Respues
   // afuera—, y `ahora()` es el reloj de NEGOCIO (inyectable, a veces
   // congelado en los tests), no el tiempo que de verdad pasa mientras se
   // espera el proveedor de correo o el piso de abajo.
-  const inicio = Date.now()
+  //
+  // [Revisión final, C2] De pared SÍ, pero INYECTADO: `contexto.monotono()`,
+  // no `Date.now()` del global. Este archivo no es el borde (ver el
+  // docstring de `Contexto`), y de paso un test puede simular un proveedor
+  // lento sin dormir de verdad.
+  const inicio = contexto.monotono()
 
   const correoOk = correoEnLista(correo, env.PANEL_CORREOS)
   if (correoOk) {
@@ -568,9 +597,9 @@ async function enlaceAccion(pedido: Pedido, contexto: Contexto): Promise<Respues
   // [B, Ronda 2] El piso: ninguna de las dos ramas contesta antes de que
   // pase `PISO_ENLACE_MS` desde que arrancó este pedido. Si la rama que
   // manda de verdad ya tardó eso o más, no se espera nada de más.
-  const transcurrido = Date.now() - inicio
+  const transcurrido = contexto.monotono() - inicio
   if (transcurrido < PISO_ENLACE_MS) {
-    await new Promise((resuelve) => setTimeout(resuelve, PISO_ENLACE_MS - transcurrido))
+    await contexto.espera(PISO_ENLACE_MS - transcurrido)
   } else if (transcurrido > PISO_ENLACE_MS) {
     // [Ronda 3 de revisión] El proveedor tardó más que el piso, así que
     // esta rama —la que SÍ manda— acaba de tardar más que la que no manda
