@@ -251,8 +251,20 @@ espera_en_vivo() {
 # lenta (después de un minuto) ni el corte de los 5 minutos ("nunca gira
 # infinito", spec §4.5) se ejercitarían — este ensayo probaría una versión
 # más simple de `estado` que la que corre en producción.
+#
+# $3 = '1' cuando el sha que se sondea es EL COMMIT DE UN DESHACER (un
+# `Panel-Revierte:`), '0' o ausente en cualquier otro caso. Importa para el
+# mensaje que se imprime si el despliegue "falló": la reversión automática
+# (`revisaLaCabeza()`, acciones.ts) revierte un commit del panel roto, pero
+# `revierte()` (revertir.ts) se niega EXPLÍCITAMENTE a volver a pasar por un
+# commit que YA es una reversión —si no, se revertiría a sí mismo para
+# siempre—, así que cuando el que falla es el propio commit del deshacer,
+# `revisaLaCabeza()` no hace nada y el correo que le llega a ella («lo dejé
+# como estaba») queda siendo falso: nada se arregló. [Ronda de arreglo 1,
+# Tarea 15] Sin distinguir los dos casos, este script mentía en ese
+# escenario tanto como el correo que critica.
 sondea_estado() {
-  local sha="$1" publicado_en="$2" intento=0 tope=120 status estado reintentar_en
+  local sha="$1" publicado_en="$2" es_reversion="${3:-0}" intento=0 tope=120 status estado reintentar_en
   while [ "$intento" -lt "$tope" ]; do
     intento=$((intento + 1))
     status="$(curl -s -b "$COOKIES" -o "$TMPDIR_HUMO/resp-estado.json" -w '%{http_code}' \
@@ -269,12 +281,27 @@ sondea_estado() {
       return 0
     fi
     if [ "$estado" = 'falló' ]; then
-      echo '  el despliegue FALLÓ. Con `PANEL_VERCEL_TOKEN` cargado, la reversión' \
-        'automática (revisaLaCabeza(), acciones.ts) ya debería haber corrido DENTRO' \
-        'de esta misma respuesta — revisá el correo de Marcos y los logs de Vercel' \
-        'antes de asumir que este script puede arreglarlo solo (ver' \
-        '«Se cayó el sitio después de una publicación» en' \
-        'docs/panel-operacion.md).' >&2
+      if [ "$es_reversion" = '1' ]; then
+        echo '  el despliegue del DESHACER falló — esto NO es el caso normal. `revierte()`' \
+          '(revertir.ts) se niega a pasar de nuevo por un commit que YA es una reversión' \
+          '(si no, se revertiría a sí mismo para siempre), así que la reversión automática' \
+          'NO APLICA acá: no va a arreglar nada, y el correo que le llega a ella («lo dejé' \
+          'como estaba») es ENGAÑOSO en este caso puntual — nada se arregló, `main` sigue' \
+          'con un commit que no despliega. El CONTENIDO ya es el correcto (eso es lo que' \
+          'hizo `deshacer`), así que `--restaurar` NO sirve acá: publicaría bytes' \
+          'idénticos a los que ya están y `publicar` contestaría "no había nada que' \
+          'publicar", nunca un sha nuevo. Lo que hay que investigar es por qué algo que' \
+          'antes desplegaba bien dejó de hacerlo — tratalo como «Si main queda roto» en' \
+          'docs/panel-operacion.md: revisá el log de build en Vercel y arreglalo con un' \
+          'commit nuevo, normal, desde tu computadora.' >&2
+      else
+        echo '  el despliegue FALLÓ. Con `PANEL_VERCEL_TOKEN` cargado, la reversión' \
+          'automática (revisaLaCabeza(), acciones.ts) ya debería haber corrido DENTRO' \
+          'de esta misma respuesta — revisá el correo de Marcos y los logs de Vercel' \
+          'antes de asumir que este script puede arreglarlo solo (ver' \
+          '«Se cayó el sitio después de una publicación» en' \
+          'docs/panel-operacion.md).' >&2
+      fi
       return 1
     fi
     reintentar_en="$(jq -r '.reintentarEn // empty' "$TMPDIR_HUMO/resp-estado.json")"
@@ -613,14 +640,19 @@ SITIO_MODIFICADO=0  # el commit que deshace ya existe en GitHub — se cierra la
 
 # 8) `estado` del sha del deshacer — el mismo sondeo de arriba, ahora sobre
 # el commit de la reversión: tiene que llegar a "listo" igual que
-# cualquier otra publicación, porque para el pipeline de despliegue ES
-# una publicación cualquiera.
+# cualquier otra publicación, porque para el pipeline de despliegue ES una
+# publicación cualquiera. El tercer argumento (`1`) le dice a
+# `sondea_estado` que ESTE sha es un `Panel-Revierte:` — si acá el
+# despliegue "falla", la reversión automática NO corre (revertir.ts se
+# niega a revertir una reversión) y el mensaje tiene que decirlo, en vez de
+# repetir el genérico que asume que el auto-arreglo ya pasó.
 
 paso '8) estado del sha del deshacer — sondear hasta "listo"'
-if ! sondea_estado "$SHA_DESHECHO" "$PUBLICADO_EN_DESHACER_MS"; then
+if ! sondea_estado "$SHA_DESHECHO" "$PUBLICADO_EN_DESHACER_MS" 1; then
   echo "Corto en «$PASO_ACTUAL»: el sondeo del deshacer no llegó a \"listo\". El commit de" \
     'reversión YA está en GitHub (paso 7) — mirá Deployments en Vercel a mano antes de' \
-    'asumir algo peor.' >&2
+    'asumir algo peor. Si lo que viste arriba fue "falló", leé el mensaje completo: acá no' \
+    'aplica la reversión automática.' >&2
   exit 1
 fi
 echo '  "listo" — el despliegue del deshacer terminó y el CDN ya lo sirve.'
