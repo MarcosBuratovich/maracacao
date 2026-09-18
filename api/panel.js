@@ -37,6 +37,8 @@ function claveCorrecta(clave, guardado) {
     return false;
   }
 }
+var DOMINIO_SESION = "sesion";
+var mensajeFirmado = (dominio, cuerpo) => `${dominio}|${cuerpo}`;
 function firmaSesion(sesion, secreto) {
   if (secreto.length < LARGO_MIN_SECRETO) {
     throw new Error(
@@ -44,7 +46,7 @@ function firmaSesion(sesion, secreto) {
     );
   }
   const cuerpo = Buffer.from(JSON.stringify(sesion)).toString("base64url");
-  const firma = createHmac("sha256", secreto).update(cuerpo).digest("base64url");
+  const firma = createHmac("sha256", secreto).update(mensajeFirmado(DOMINIO_SESION, cuerpo)).digest("base64url");
   return `${cuerpo}.${firma}`;
 }
 function verificaSesion(cookie, secreto, ahora = Date.now()) {
@@ -55,12 +57,12 @@ function verificaSesion(cookie, secreto, ahora = Date.now()) {
     const cuerpo = cookie.slice(0, punto);
     const firma = cookie.slice(punto + 1);
     if (cookie.indexOf(".", punto + 1) !== -1) return null;
-    const firmaEsperada = createHmac("sha256", secreto).update(cuerpo).digest();
+    const firmaEsperada = createHmac("sha256", secreto).update(mensajeFirmado(DOMINIO_SESION, cuerpo)).digest();
     const firmaRecibida = Buffer.from(firma, "base64url");
     if (firmaRecibida.length !== firmaEsperada.length) return null;
     if (!timingSafeEqual(firmaRecibida, firmaEsperada)) return null;
     const sesion = JSON.parse(Buffer.from(cuerpo, "base64url").toString("utf8"));
-    if (typeof sesion.correo !== "string" || typeof sesion.vence !== "number" || typeof sesion.dispositivo !== "string") {
+    if (typeof sesion.correo !== "string" || typeof sesion.vence !== "number" || typeof sesion.dispositivo !== "string" || typeof sesion.emitida !== "number") {
       return null;
     }
     if (sesion.vence <= ahora) return null;
@@ -76,15 +78,60 @@ function cookieDeSesion(valor, dias) {
 var INTENTOS = /* @__PURE__ */ new Map();
 var VENTANA_MS = 15 * 6e4;
 var TOPE_INTENTOS = 5;
-function intentoPermitido(ip, ahora = Date.now()) {
-  const marcas = (INTENTOS.get(ip) ?? []).filter((t) => ahora - t < VENTANA_MS);
-  if (marcas.length >= TOPE_INTENTOS) {
-    INTENTOS.set(ip, marcas);
+var CLAVES_ANTES_DE_BARRER = 1e3;
+function barreVencidas(ahora) {
+  for (const [clave, marcas] of INTENTOS) {
+    if (marcas.every((t) => ahora - t >= VENTANA_MS)) INTENTOS.delete(clave);
+  }
+}
+function intentoPermitido(clave, ahora = Date.now(), tope = TOPE_INTENTOS) {
+  if (INTENTOS.size > CLAVES_ANTES_DE_BARRER) barreVencidas(ahora);
+  const marcas = (INTENTOS.get(clave) ?? []).filter((t) => ahora - t < VENTANA_MS);
+  if (marcas.length >= tope) {
+    INTENTOS.set(clave, marcas);
     return false;
   }
   marcas.push(ahora);
-  INTENTOS.set(ip, marcas);
+  INTENTOS.set(clave, marcas);
   return true;
+}
+
+// src/servidor/enlace.ts
+import { createHmac as createHmac2, timingSafeEqual as timingSafeEqual2 } from "node:crypto";
+var DOMINIO_ENLACE = "entrar";
+var DURACION_ENLACE_MS = 15 * 6e4;
+function esCuerpoEnlace(v) {
+  return v !== null && typeof v === "object" && typeof v.correo === "string" && typeof v.vence === "number";
+}
+function firmaEnlace(correo2, vence, secreto) {
+  if (secreto.length < LARGO_MIN_SECRETO) {
+    throw new Error(
+      `firmaEnlace(): el secreto mide menos de ${LARGO_MIN_SECRETO} caracteres \u2014 una clave as\xED de corta es, para HMAC, lo mismo que no tener firma.`
+    );
+  }
+  const cuerpo = Buffer.from(JSON.stringify({ correo: correo2, vence })).toString("base64url");
+  const firma = createHmac2("sha256", secreto).update(mensajeFirmado(DOMINIO_ENLACE, cuerpo)).digest("base64url");
+  return `${cuerpo}.${firma}`;
+}
+function verificaEnlace(token, secreto, ahora = Date.now()) {
+  if (secreto.length < LARGO_MIN_SECRETO) return null;
+  try {
+    const punto = token.indexOf(".");
+    if (punto <= 0 || punto === token.length - 1) return null;
+    const cuerpo = token.slice(0, punto);
+    const firma = token.slice(punto + 1);
+    if (token.indexOf(".", punto + 1) !== -1) return null;
+    const firmaEsperada = createHmac2("sha256", secreto).update(mensajeFirmado(DOMINIO_ENLACE, cuerpo)).digest();
+    const firmaRecibida = Buffer.from(firma, "base64url");
+    if (firmaRecibida.length !== firmaEsperada.length) return null;
+    if (!timingSafeEqual2(firmaRecibida, firmaEsperada)) return null;
+    const datos = JSON.parse(Buffer.from(cuerpo, "base64url").toString("utf8"));
+    if (!esCuerpoEnlace(datos)) return null;
+    if (datos.vence <= ahora) return null;
+    return { correo: datos.correo };
+  } catch {
+    return null;
+  }
 }
 
 // src/servidor/github.ts
@@ -92,6 +139,7 @@ var VERSION_API = "2022-11-28";
 var codificaRuta = (ruta2) => ruta2.split("/").map(encodeURIComponent).join("/");
 function cliente(c) {
   const base = `https://api.github.com/repos/${c.duenio}/${c.repo}`;
+  let vencimientoToken = null;
   async function pedir(ruta2, init) {
     const respuesta = await c.fetch(`${base}${ruta2}`, {
       method: init?.method ?? "GET",
@@ -104,6 +152,14 @@ function cliente(c) {
       },
       ...init?.body !== void 0 ? { body: JSON.stringify(init.body) } : {}
     });
+    vencimientoToken = respuesta.headers.get("github-authentication-token-expiration");
+    if (c.alResponder) {
+      try {
+        await c.alResponder(vencimientoToken);
+      } catch (e) {
+        console.error("github: la vigilancia del vencimiento del token revent\xF3 (no afecta a este pedido) \u2014", e);
+      }
+    }
     const cuerpo = await respuesta.json().catch(() => void 0);
     if (!respuesta.ok) {
       const mensaje = cuerpo?.message;
@@ -112,15 +168,47 @@ function cliente(c) {
     return cuerpo;
   }
   return {
+    /**
+     * [Tarea 13] La fecha de vencimiento del PAT, tal cual la mandó GitHub en
+     * la cabecera `github-authentication-token-expiration` del ÚLTIMO pedido
+     * que hizo este cliente — o `null` si esa cabecera no vino (un token
+     * clásico, por ejemplo, no la manda).
+     *
+     * SINCRÓNICA y sin pedido propio, a propósito: la cabecera llega arriba
+     * de CUALQUIER respuesta autenticada, así que no hace falta —ni se
+     * permite acá— salir a pedirle nada a GitHub solo para mirar esto. Si
+     * esta función disparara su propio pedido, la vigilancia le costaría al
+     * PAT una llamada cada vez que alguien llama a `salud`, que es
+     * exactamente lo que el freno por IP de la Parte A (I-6) existe para
+     * evitar.
+     *
+     * Nunca inventa una fecha: si la cabecera no vino, `null` — decir «vence
+     * en un año» sería peor que no saber, porque callaría la vigilancia
+     * justo el día en que no puede ver.
+     */
+    vencimientoDelToken() {
+      return vencimientoToken;
+    },
     /** El sha que apunta un ref (`heads/main`, por ejemplo). */
     async ref(nombre) {
       const cuerpo = await pedir(`/git/ref/${codificaRuta(nombre)}`);
       return { sha: cuerpo.object.sha };
     },
-    /** Los datos de un commit: su árbol, su mensaje, cuándo lo hizo su autor. */
+    /**
+     * Los datos de un commit: su árbol, su mensaje, cuándo lo hizo su autor y
+     * de quién viene. Los PADRES los necesita la reversión (`revertir.ts`):
+     * volver atrás un commit es publicar lo que decían sus archivos en el
+     * padre, así que sin el padre no hay a qué volver.
+     */
     async commit(sha) {
       const cuerpo = await pedir(`/git/commits/${sha}`);
-      return { sha: cuerpo.sha, tree: cuerpo.tree.sha, message: cuerpo.message, author: cuerpo.author };
+      return {
+        sha: cuerpo.sha,
+        tree: cuerpo.tree.sha,
+        message: cuerpo.message,
+        author: cuerpo.author,
+        padres: (cuerpo.parents ?? []).map((p) => p.sha)
+      };
     },
     /** El contenido de un blob, decodificado de base64 a texto. Necesita el SHA del blob, no la ruta. */
     async contenido(sha) {
@@ -132,13 +220,45 @@ function cliente(c) {
      * sha) — la API de Contents, no la de blobs: esta resuelve ruta+ref
      * directo, sin que quien llama tenga que ir a buscar el sha del blob
      * primero. La usa el router (`acciones.ts`) para leer el contenido VIVO
-     * de un documento antes de compararlo contra lo que la clienta mandó:
-     * lo que esbuild metió en el bundle en el momento de empaquetar es una
-     * foto vieja; esto es lo que GitHub tiene ahora mismo.
+     * de un documento antes de compararlo contra lo que la clienta mandó.
+     *
+     * [M-8] Arriba de 1 MB, la API de Contents contesta 200 con
+     * `content: ""` y `encoding: "none"` — o sea, te miente por omisión: no
+     * es un error, es un cuerpo vacío que parece un archivo vacío. Ahí se
+     * pide el blob por el sha que la MISMA respuesta trae, que sí viene en
+     * base64 hasta 100 MB. Con los JSON de hoy (el más grande son 24 KB)
+     * esta rama no corre nunca; con las fotos de producto de la fase 7 corre
+     * siempre, y el modo de falla sin esto es publicar creyendo que el
+     * archivo vivo estaba vacío.
      */
     async archivoEnRef(ruta2, ref) {
       const cuerpo = await pedir(`/contents/${codificaRuta(ruta2)}?ref=${encodeURIComponent(ref)}`);
+      if (cuerpo.encoding !== "base64") {
+        const blob = await pedir(`/git/blobs/${cuerpo.sha}`);
+        return Buffer.from(blob.content, "base64").toString("utf8");
+      }
       return Buffer.from(cuerpo.content, "base64").toString("utf8");
+    },
+    /**
+     * Qué RUTAS cambiaron entre dos shas. Es la pregunta que el router
+     * necesita para distinguir las dos formas de «alguien publicó mientras
+     * ella editaba»: si lo que cambió en el medio son documentos de
+     * contenido, la publicación de ella los pisaría y hay que frenarla; si
+     * es código del sitio (Marcos arreglando una plantilla), no se tocan y
+     * puede seguir.
+     *
+     * Devuelve solo los nombres, no el diff: el router no tiene nada que
+     * hacer con el contenido del cambio ajeno, y traerlo sería traer texto
+     * arbitrario a una función que después lo podría loguear.
+     *
+     * `files` no viene cuando los dos shas son el mismo, así que se lee con
+     * un default en vez de asumir que está.
+     */
+    async comparaRefs(base2, cabeza) {
+      const cuerpo = await pedir(
+        `/compare/${encodeURIComponent(base2)}...${encodeURIComponent(cabeza)}`
+      );
+      return { archivos: (cuerpo.files ?? []).map((f) => f.filename) };
     },
     /** Crea un blob con este contenido (codificado a base64) y devuelve su sha. */
     async creaBlob(contenido) {
@@ -151,25 +271,38 @@ function cliente(c) {
     /**
      * Crea un árbol sobre `base`, con las entradas dadas. `sha: null` en una
      * entrada es cómo la Git Data API borra esa ruta del árbol nuevo.
+     *
+     * [Tarea 11, Ronda 1 hallazgo E1] `base: null` OMITE `base_tree` del
+     * cuerpo del pedido en vez de mandar un sha inventado para «un árbol de
+     * cero»: es la forma documentada de la Git Data API para un árbol sin
+     * base, y evita que ese camino dependa de que un sha mágico —el árbol
+     * vacío universal de git— esté bien escrito. Con eso, el único paso del
+     * bootstrap del borrador que ningún mock de test podía verificar por sí
+     * mismo deja de existir, en vez de quedar diferido a que alguien lo
+     * revise a mano contra la API real.
      */
     async creaArbol(base2, entradas) {
       const cuerpo = await pedir("/git/trees", {
         method: "POST",
         body: {
-          base_tree: base2,
+          ...base2 !== null ? { base_tree: base2 } : {},
           tree: entradas.map((e) => ({ path: e.path, sha: e.sha, mode: "100644", type: "blob" }))
         }
       });
       return cuerpo.sha;
     },
-    /** Crea un commit con un solo padre y devuelve su sha. */
+    /**
+     * Crea un commit y devuelve su sha. Con un padre —el caso de siempre—
+     * manda `parents: [padre]`; con `padre: null` manda `parents: []`, un
+     * commit RAÍZ (ver el comentario de `DatosCommit.padre`).
+     */
     async creaCommit(datos) {
       const cuerpo = await pedir("/git/commits", {
         method: "POST",
         body: {
           message: datos.mensaje,
           tree: datos.arbol,
-          parents: [datos.padre],
+          parents: datos.padre !== null ? [datos.padre] : [],
           author: datos.autor
         }
       });
@@ -183,10 +316,46 @@ function cliente(c) {
      * nunca `force: true` salvo que quien llama lo pida explícitamente.
      */
     async mueveRef(nombre, sha, forzar = false) {
-      await pedir(`/git/refs/${nombre}`, {
+      await pedir(`/git/refs/${codificaRuta(nombre)}`, {
         method: "PATCH",
         body: { sha, force: forzar }
       });
+    },
+    /**
+     * [Tarea 11] Crea un ref NUEVO apuntando a `sha`. `mueveRef` mueve un ref
+     * que YA existe —GitHub lo rechaza si no—, así que este es el único
+     * camino para el PRIMER commit de un ref que la plataforma todavía no
+     * conoce: sin esto, el primer borrador de la vida del panel moriría con
+     * un 404 que no le dice nada a nadie.
+     */
+    async creaRef(nombre, sha) {
+      await pedir("/git/refs", {
+        method: "POST",
+        body: { ref: `refs/${nombre}`, sha }
+      });
+    },
+    /**
+     * Los últimos `cuantos` commits de `ref`, del más nuevo al más viejo —tal
+     * cual los da GitHub, sin reordenar—. Es la fuente del historial
+     * (`historial.ts`, Tarea 10): el asunto de cada commit ES el resumen que
+     * la clienta vio antes de publicar, así que esto es lo único que hace
+     * falta leer para reconstruirlo.
+     *
+     * [Inconsistencia de la API] Este endpoint —la API de "Commits" (REST),
+     * no la Git Data API que usa el resto de este cliente— quiere el nombre
+     * de la rama PELADO: `?sha=main`, nunca `?sha=heads/main`. Con
+     * `heads/main` contesta 404, no un error obvio, y un 404 tratado como
+     * "no hay commits" daría una lista vacía indistinguible de "no hay
+     * historial" — un bug silencioso. Por eso quien llama sigue pasando
+     * `ref` con la MISMA forma que el resto de este cliente (`heads/main`,
+     * como `ref()` y `mueveRef()`) y el pelado pasa ACÁ ADENTRO: la
+     * excepción de esta API queda en un solo lugar, no en la cabeza de cada
+     * llamador.
+     */
+    async listaCommits(ref, cuantos) {
+      const rama = ref.startsWith("heads/") ? ref.slice("heads/".length) : ref;
+      const cuerpo = await pedir(`/commits?sha=${encodeURIComponent(rama)}&per_page=${cuantos}`);
+      return cuerpo.map((c2) => ({ sha: c2.sha, mensaje: c2.commit.message, fecha: c2.commit.author.date }));
     }
   };
 }
@@ -200,9 +369,14 @@ var RUTAS_PERMITIDAS = [
 function rutaPermitida(ruta2) {
   return RUTAS_PERMITIDAS.some((patron) => patron.test(ruta2));
 }
+var REF_BORRADOR = "panel/borrador";
+var RUTA_BORRADOR_PERMITIDA = /^panel\/borrador\.json$/;
+function rutaDeBorradorPermitida(ruta2) {
+  return RUTA_BORRADOR_PERMITIDA.test(ruta2);
+}
 var TOPE_ARCHIVOS = 40;
 var TOPE_CUERPO = 3.5 * 1024 * 1024;
-function revisaLote(rutas, bytesDelCuerpo2) {
+function revisaLote(rutas, bytesDelCuerpo2, permiteRuta = rutaPermitida) {
   if (rutas.length > TOPE_ARCHIVOS) {
     return { ok: false, problema: `Son demasiadas fotos para una sola publicaci\xF3n: manda hasta ${TOPE_ARCHIVOS} por vez.` };
   }
@@ -210,7 +384,7 @@ function revisaLote(rutas, bytesDelCuerpo2) {
     return { ok: false, problema: "Es demasiado contenido para una sola publicaci\xF3n: manda menos fotos, o de menor tama\xF1o." };
   }
   for (const ruta2 of rutas) {
-    if (!rutaPermitida(ruta2)) {
+    if (!permiteRuta(ruta2)) {
       return { ok: false, problema: `No se puede publicar "${ruta2}": no es un archivo que el panel pueda tocar.` };
     }
   }
@@ -15324,8 +15498,17 @@ function frase(cambios) {
 
 // src/servidor/publicar.ts
 var AUTOR_PANEL = { name: "Panel Maracacao", email: "panel@maracacao.mx" };
-var REF = "heads/main";
+var REF_MAIN = "heads/main";
+var REFS_CONOCIDOS = {
+  [REF_MAIN]: { permiteRuta: rutaPermitida, permiteForzar: false },
+  [REF_BORRADOR]: { permiteRuta: rutaDeBorradorPermitida, permiteForzar: true }
+};
 var ASUNTO_GENERICO = "Actualiza contenido del panel";
+function mensajeDeCommit(asunto, autor, trailers) {
+  const extras = Object.entries(trailers ?? {}).map(([k, v]) => `${k}: ${v}`);
+  return [asunto, "", "Panel: s\xED", `Panel-Autor: ${autor}`, ...extras].join("\n");
+}
+var PROBLEMA_NO_SE_PUDO_PUBLICAR = "No pudimos publicar: hubo un problema para conectarnos con el sitio. Prueba de nuevo en unos minutos.";
 var CONCURRENCIA_BLOBS = 4;
 async function mapaConcurrencia(items, limite, tarea) {
   const resultados = new Array(items.length);
@@ -15369,39 +15552,56 @@ function esConflictoDeRef(e) {
   const { status, mensaje } = analizaError(e);
   return status === 422 && /fast forward/i.test(mensaje);
 }
-async function intento(gh, archivos, mensaje) {
-  const { sha: shaDelRef } = await gh.ref(REF);
+async function intento(gh, archivos, mensaje, ref, forzar) {
+  const { sha: shaDelRef } = await gh.ref(ref);
   const padre = await gh.commit(shaDelRef);
   const shasDeBlobs = await mapaConcurrencia(archivos, CONCURRENCIA_BLOBS, (a) => gh.creaBlob(a.contenido));
   const entradas = archivos.map((a, i) => ({ path: a.ruta, sha: shasDeBlobs[i] }));
   const arbol = await gh.creaArbol(padre.tree, entradas);
   const shaDelCommit = await gh.creaCommit({ mensaje, arbol, padre: padre.sha, autor: AUTOR_PANEL });
   try {
-    await gh.mueveRef(REF, shaDelCommit, false);
+    await gh.mueveRef(ref, shaDelCommit, forzar);
   } catch (e) {
     throw new FalloAlMoverRef(e, shaDelCommit);
   }
   return shaDelCommit;
 }
 async function publica(gh, p) {
+  const ref = p.ref ?? REF_MAIN;
+  const forzar = p.forzar ?? false;
+  if (!Object.hasOwn(REFS_CONOCIDOS, ref)) {
+    throw new Error(`publica(): "${ref}" no es un ref conocido \u2014 revis\xE1 REFS_CONOCIDOS en publicar.ts.`);
+  }
+  const config2 = REFS_CONOCIDOS[ref];
+  if (forzar && !config2.permiteForzar) {
+    throw new Error(`publica(): forzar:true contra "${ref}" no es una opci\xF3n \u2014 ese ref no lo permite.`);
+  }
   const rutas = p.archivos.map((a) => a.ruta);
-  const chequeo = revisaLote(rutas, bytesDelCuerpo(p.archivos));
+  const chequeo = revisaLote(rutas, p.bytesDelCuerpo ?? bytesDelCuerpo(p.archivos), config2.permiteRuta);
   if (!chequeo.ok) return { ok: false, codigo: 422, problema: chequeo.problema };
   const asunto = p.cambios !== void 0 ? frase(p.cambios) : ASUNTO_GENERICO;
   if (asunto === "") {
     return { ok: true, sha: null, resumen: "No hab\xEDa nada que publicar: no cambiaste ning\xFAn dato del sitio." };
   }
-  const mensaje = `${asunto}
-
-Panel: s\xED
-Panel-Autor: ${p.autor}`;
+  const mensaje = mensajeDeCommit(asunto, p.autor, p.trailers);
   try {
-    const sha = await intento(gh, p.archivos, mensaje);
+    const sha = await intento(gh, p.archivos, mensaje, ref, forzar);
     return { ok: true, sha, resumen: asunto };
   } catch (primerError) {
     if (!esConflictoDeRef(primerError)) return traduceError(primerError, p);
+    if (p.reintentar === false) {
+      const { status, mensaje: mensajeDeGitHub, sha } = analizaError(primerError);
+      console.error(
+        `publicar: el PATCH del ref choc\xF3 y no se reintenta \u2014reintentar:false\u2014 (autor: ${p.autor}, archivos: ${rutas.join(", ")}${sha ? `, commit hu\xE9rfano: ${sha}` : ""}) \u2014 status ${status ?? "(sin status)"}: ${mensajeDeGitHub}`
+      );
+      return {
+        ok: false,
+        codigo: 409,
+        problema: "Marcos cambi\xF3 algo del sitio mientras editabas: vuelve a intentar la publicaci\xF3n."
+      };
+    }
     try {
-      const sha = await intento(gh, p.archivos, mensaje);
+      const sha = await intento(gh, p.archivos, mensaje, ref, forzar);
       return { ok: true, sha, resumen: asunto };
     } catch (segundoError) {
       if (!esConflictoDeRef(segundoError)) return traduceError(segundoError, p);
@@ -15425,8 +15625,167 @@ function traduceError(e, p) {
   return {
     ok: false,
     codigo: 502,
-    problema: "No pudimos publicar: hubo un problema para conectarnos con el sitio. Prueba de nuevo en unos minutos."
+    problema: PROBLEMA_NO_SE_PUDO_PUBLICAR
   };
+}
+
+// src/servidor/borrador.ts
+var RUTA_BORRADOR = "panel/borrador.json";
+function es404(e) {
+  return e instanceof Error && /^GitHub respondió 404:/.test(e.message);
+}
+async function intentaLeer(gh) {
+  let sha;
+  try {
+    ;
+    ({ sha } = await gh.ref(REF_BORRADOR));
+  } catch (e) {
+    if (!es404(e)) throw e;
+    console.warn(
+      `borrador: ${REF_BORRADOR} no existe (404) \u2014 normal si todav\xEDa no se guard\xF3 ning\xFAn borrador; si esto persiste despu\xE9s de guardar, revis\xE1 el token/repo.`
+    );
+    return { estado: "no-existe" };
+  }
+  let texto2;
+  try {
+    texto2 = await gh.archivoEnRef(RUTA_BORRADOR, sha);
+  } catch (e) {
+    if (!es404(e)) throw e;
+    console.error(`borrador: ${REF_BORRADOR} (${sha}) existe pero no tiene ${RUTA_BORRADOR} \u2014 se trata como ilegible.`);
+    return { estado: "ilegible", sha };
+  }
+  try {
+    const crudo = JSON.parse(texto2);
+    if (typeof crudo !== "object" || crudo === null || Array.isArray(crudo)) {
+      console.error(
+        `borrador: el JSON de ${RUTA_BORRADOR} en ${sha} no tiene forma de borrador (${crudo === null ? "null" : Array.isArray(crudo) ? "array" : typeof crudo}) \u2014 se trata como ilegible.`
+      );
+      return { estado: "ilegible", sha };
+    }
+    return { estado: "ok", sha, borrador: crudo };
+  } catch (e) {
+    console.error(`borrador: el JSON de ${RUTA_BORRADOR} en ${sha} no parsea \u2014 se trata como ilegible.`, e);
+    return { estado: "ilegible", sha };
+  }
+}
+async function leeBorrador(gh) {
+  const actual = await intentaLeer(gh);
+  return actual.estado === "ok" ? actual.borrador : null;
+}
+function bytesDeContenido(contenido) {
+  return Buffer.from(contenido, "utf8").toString("base64").length;
+}
+async function guarda(gh, args) {
+  const actual = await intentaLeer(gh);
+  if (actual.estado === "ok" && !args.pisar && actual.borrador.dispositivo !== args.dispositivo && typeof actual.borrador.hora === "number" && args.horaLeida !== actual.borrador.hora) {
+    return { ok: false, motivo: "hay-uno-mas-nuevo", otro: { dispositivo: actual.borrador.dispositivo, hora: actual.borrador.hora } };
+  }
+  const contenido = JSON.stringify({
+    documentos: args.documentos,
+    base: args.base,
+    dispositivo: args.dispositivo,
+    autor: args.autor,
+    hora: args.ahora
+  });
+  const bytes = args.bytesDelCuerpo ?? bytesDeContenido(contenido);
+  if (actual.estado === "no-existe") {
+    const chequeo = revisaLote([RUTA_BORRADOR], bytes, rutaDeBorradorPermitida);
+    if (!chequeo.ok) return { ok: false, motivo: "no-se-pudo-guardar", problema: chequeo.problema };
+    const shaDelBlob = await gh.creaBlob(contenido);
+    const shaDelArbol = await gh.creaArbol(null, [{ path: RUTA_BORRADOR, sha: shaDelBlob }]);
+    const shaDelCommit = await gh.creaCommit({
+      mensaje: mensajeDeCommit(ASUNTO_GENERICO, args.autor),
+      arbol: shaDelArbol,
+      padre: null,
+      autor: AUTOR_PANEL
+    });
+    await gh.creaRef(REF_BORRADOR, shaDelCommit);
+    return { ok: true };
+  }
+  const r = await publica(gh, {
+    archivos: [{ ruta: RUTA_BORRADOR, contenido }],
+    autor: args.autor,
+    ref: REF_BORRADOR,
+    forzar: true,
+    bytesDelCuerpo: bytes
+  });
+  return r.ok ? { ok: true } : { ok: false, motivo: "no-se-pudo-guardar", problema: r.problema };
+}
+
+// src/contenido/conteos.ts
+var LETRAS = [
+  "cero",
+  "uno",
+  "dos",
+  "tres",
+  "cuatro",
+  "cinco",
+  "seis",
+  "siete",
+  "ocho",
+  "nueve",
+  "diez",
+  "once",
+  "doce",
+  "trece",
+  "catorce",
+  "quince",
+  "diecis\xE9is",
+  "diecisiete",
+  "dieciocho",
+  "diecinueve",
+  "veinte"
+];
+var enLetras = (n) => LETRAS[n] ?? String(n);
+function cruzaConteo(texto2, esperado, sustantivo) {
+  const formas = /* @__PURE__ */ new Set([sustantivo]);
+  if (sustantivo.endsWith("es")) formas.add(sustantivo.slice(0, -2));
+  if (sustantivo.endsWith("s")) formas.add(sustantivo.slice(0, -1));
+  const esSustantivo = (token) => formas.has(token.toLowerCase());
+  const tokens = texto2.match(/[0-9]+|[a-záéíóúñ]+/gi) ?? [];
+  for (let i = 0; i < tokens.length; i++) {
+    if (!esSustantivo(tokens[i])) continue;
+    for (const vecino of [tokens[i - 1], tokens[i + 1]]) {
+      if (vecino === void 0) continue;
+      for (let n = 0; n <= 20; n++) {
+        if (n === esperado) continue;
+        if (vecino === String(n)) return `dice \xAB${n}\xBB pero hoy hay ${esperado}.`;
+        if (vecino.toLowerCase() === enLetras(n)) return `dice \xAB${enLetras(n)}\xBB pero hoy hay ${esperado}.`;
+      }
+    }
+  }
+  return null;
+}
+var DONDE = {
+  sabores: ["sabores", "sabores"],
+  gotas: ["sabores", "gotas"],
+  polvo: ["sabores", "polvo"],
+  recetas: ["sitio", "recetas.lista"],
+  preguntas: ["sitio", "preguntas.items"],
+  pasos: ["sitio", "catar.pasos"],
+  ingredientes: ["sitio", "postura.lleva"]
+};
+var enRuta = (dato, ruta2) => {
+  let actual = dato;
+  for (const paso of ruta2.split(".")) {
+    if (actual === null || typeof actual !== "object") return void 0;
+    actual = actual[paso];
+  }
+  return actual;
+};
+function conteosDe(fuentes) {
+  const conteos = {};
+  for (const nombre of Object.keys(DONDE)) {
+    const [documento, ruta2] = DONDE[nombre];
+    const lista2 = enRuta(fuentes[documento], ruta2);
+    if (!Array.isArray(lista2)) {
+      throw new Error(
+        `conteosDe(): \xAB${nombre}\xBB sale de \xAB${documento}.${ruta2}\xBB y ah\xED no hay una lista.`
+      );
+    }
+    conteos[nombre] = lista2.length;
+  }
+  return conteos;
 }
 
 // src/contenido/validacion.ts
@@ -15444,7 +15803,7 @@ function proponeArreglo(valor) {
   }
   return void 0;
 }
-function enRuta(crudo, ruta2) {
+function enRuta2(crudo, ruta2) {
   let actual = crudo;
   for (const paso of ruta2) {
     if (actual === null || typeof actual !== "object") return void 0;
@@ -15475,7 +15834,7 @@ function validarContra(esquema, crudo) {
   if (r.success) return [];
   return r.error.issues.map((issue2) => {
     const campo = issue2.path.join(".");
-    const valor = enRuta(crudo, issue2.path);
+    const valor = enRuta2(crudo, issue2.path);
     const titulo = JERGA_DE_ZOD.test(issue2.message) ? tituloSinJerga(issue2, valor) : issue2.message;
     return {
       campo,
@@ -15484,6 +15843,70 @@ function validarContra(esquema, crudo) {
       arreglo: proponeArreglo(valor)
     };
   });
+}
+var une2 = (a, b) => a === "" ? String(b) : `${a}.${b}`;
+var PARTE2 = /^([^<[]*)((?:\[\])*)(?:<([^=>]+)=([^>]+)>)?$/;
+var enRutas = (dato, ruta2) => {
+  let actuales = [{ ruta: "", valor: dato }];
+  for (const parte of ruta2.split(".")) {
+    const m = PARTE2.exec(parte);
+    if (!m) throw new Error(`enRutas(): no entiendo la parte \xAB${parte}\xBB de la ruta \xAB${ruta2}\xBB.`);
+    const [, clave, corchetes, discriminante, variante] = m;
+    const niveles = corchetes.length / 2;
+    const siguiente = [];
+    for (const { ruta: r, valor } of actuales) {
+      if (valor === null || valor === void 0) continue;
+      const base = clave ? une2(r, clave) : r;
+      const dentro = clave ? valor[clave] : valor;
+      let candidatos = [{ ruta: base, valor: dentro }];
+      for (let nivel = 0; nivel < niveles; nivel++) {
+        const desenvueltos = [];
+        for (const { ruta: r2, valor: v2 } of candidatos) {
+          if (Array.isArray(v2)) v2.forEach((v, i) => desenvueltos.push({ ruta: une2(r2, i), valor: v }));
+        }
+        candidatos = desenvueltos;
+      }
+      for (const c of candidatos) {
+        if (discriminante !== void 0) {
+          const v = c.valor;
+          if (v === null || typeof v !== "object" || v[discriminante] !== variante) continue;
+        }
+        siguiente.push(c);
+      }
+    }
+    actuales = siguiente;
+  }
+  return actuales;
+};
+function avisosDeConteo(esquema, crudo, conteos) {
+  const avisos = [];
+  recorre(esquema, (ruta2, meta3) => {
+    const cuenta2 = meta3?.cuenta;
+    if (!cuenta2) return;
+    const esperado = conteos[cuenta2.de];
+    if (esperado === void 0) {
+      throw new Error(
+        `validar(): el campo \xAB${ruta2}\xBB declara un conteo sobre \xAB${cuenta2.de}\xBB, que no vino en los conteos.`
+      );
+    }
+    for (const { ruta: concreta, valor } of enRutas(crudo, ruta2)) {
+      if (typeof valor !== "string") continue;
+      const aviso = cruzaConteo(valor, esperado, cuenta2.sustantivo);
+      if (aviso === null) continue;
+      avisos.push({
+        campo: concreta,
+        gravedad: "avisa",
+        titulo: `Este texto ${aviso}`,
+        detalle: "Si agregaste o quitaste algo de la lista, este texto qued\xF3 viejo."
+      });
+    }
+  });
+  return avisos;
+}
+function validar(esquema, crudo, conteos = {}) {
+  const impiden = validarContra(esquema, crudo);
+  if (impiden.length > 0) return impiden;
+  return avisosDeConteo(esquema, crudo, conteos);
 }
 
 // src/contenido/derivados.ts
@@ -17801,6 +18224,218 @@ var DOCUMENTOS = {
   fichas: esquemaFichas
 };
 
+// src/servidor/revertir.ts
+var TRAILER_REVIERTE = "Panel-Revierte";
+var TRAILER_PANEL = "Panel: s\xED";
+var TRAILER_AUTOR = "Panel-Autor";
+var RUTA_DEL_DOCUMENTO = (id) => `src/contenido/datos/${id}.json`;
+var DOCUMENTO_DE_RUTA = new Map(
+  Object.keys(DOCUMENTOS).map((id) => [RUTA_DEL_DOCUMENTO(id), id])
+);
+function tieneTrailer(mensaje, lineaExacta) {
+  return mensaje.split("\n").includes(lineaExacta);
+}
+function valorDeTrailer(mensaje, clave) {
+  const prefijo = `${clave}: `;
+  const linea = mensaje.split("\n").find((l) => l.startsWith(prefijo));
+  return linea === void 0 ? void 0 : linea.slice(prefijo.length);
+}
+function fuentesDeSabores(v) {
+  const doc = v ?? {};
+  return {
+    sabores: Array.isArray(doc.sabores) ? doc.sabores : [],
+    gotas: Array.isArray(doc.gotas) ? doc.gotas : []
+  };
+}
+async function revierte(gh, p) {
+  const cabeza = await gh.ref("heads/main");
+  if (cabeza.sha !== p.sha) {
+    const cabezaCommit = await gh.commit(cabeza.sha);
+    if (valorDeTrailer(cabezaCommit.message, TRAILER_REVIERTE) === p.sha) {
+      return { ok: false, motivo: "ya-revertido", detalle: `${cabeza.sha} ya revierte ${p.sha}` };
+    }
+    return { ok: false, motivo: "no-es-la-cabeza", detalle: `la cabeza es ${cabeza.sha}` };
+  }
+  const commit = await gh.commit(p.sha);
+  if (!tieneTrailer(commit.message, TRAILER_PANEL)) {
+    return { ok: false, motivo: "no-es-del-panel", detalle: `${p.sha} no lleva \xAB${TRAILER_PANEL}\xBB` };
+  }
+  if (valorDeTrailer(commit.message, TRAILER_REVIERTE) !== void 0) {
+    return { ok: false, motivo: "ya-revertido", detalle: `${p.sha} ya es una reversi\xF3n` };
+  }
+  const padre = commit.padres[0];
+  if (!padre) {
+    return { ok: false, motivo: "fall\xF3", detalle: `${p.sha} no tiene padre` };
+  }
+  const { archivos: tocadas } = await gh.comparaRefs(padre, p.sha);
+  const documentos = tocadas.flatMap((ruta2) => {
+    const id = DOCUMENTO_DE_RUTA.get(ruta2);
+    return id ? [{ ruta: ruta2, id }] : [];
+  });
+  if (documentos.length === 0) {
+    return { ok: false, motivo: "nada-que-revertir", detalle: `${p.sha} no toc\xF3 ning\xFAn documento de contenido` };
+  }
+  const contenidos = /* @__PURE__ */ new Map();
+  for (const { ruta: ruta2, id } of documentos) {
+    contenidos.set(id, await gh.archivoEnRef(ruta2, padre));
+  }
+  const archivos = [];
+  for (const { ruta: ruta2, id } of documentos) {
+    const viejo = contenidos.get(id);
+    let crudo;
+    try {
+      crudo = JSON.parse(viejo);
+    } catch (e) {
+      return { ok: false, motivo: "fall\xF3", detalle: `${ruta2}: el contenido del padre no es JSON v\xE1lido (${String(e)})` };
+    }
+    let paraValidar = crudo;
+    if (id === "sitio") {
+      const textoSabores = contenidos.has("sabores") ? contenidos.get("sabores") : await gh.archivoEnRef(RUTA_DEL_DOCUMENTO("sabores"), padre);
+      let saboresCrudo;
+      try {
+        saboresCrudo = JSON.parse(textoSabores);
+      } catch {
+        saboresCrudo = void 0;
+      }
+      const fuentes = fuentesDeSabores(saboresCrudo);
+      try {
+        paraValidar = injerta(crudo, fuentes);
+      } catch {
+      }
+    }
+    const problemas = validarContra(DOCUMENTOS[id], paraValidar);
+    if (problemas.length > 0) {
+      return { ok: false, motivo: "no-valida", detalle: `${ruta2}: ${problemas[0].titulo}` };
+    }
+    archivos.push({ ruta: ruta2, contenido: viejo });
+  }
+  const resultado = await publica(gh, {
+    archivos,
+    autor: p.autor,
+    trailers: { [TRAILER_REVIERTE]: p.sha },
+    // [E] Sin el reintento interno de `publica()`: ese reintento rearmaría
+    // el árbol SOBRE el commit que ganó la carrera, pero con los bytes
+    // VIEJOS de esta reversión — si ese commit es de Marcos, publicado justo
+    // en la ventana entre que se leyó el ref y se movió, su cambio
+    // desaparecería sin 409 y sin log. Perder la carrera acá se traduce
+    // abajo en `no-es-la-cabeza`: la próxima invocación relee todo desde
+    // cero, que es lo correcto para algo idempotente.
+    reintentar: false
+    // [Revisión final de la rama] SIN `bytesDelCuerpo`. Lo tenía, y el único
+    // llamador que se lo pasaba (`deshacerAccion`) le daba el peso del cuerpo
+    // HTTP del pedido de deshacer — unos cincuenta bytes—, así que el tope de
+    // 3,5 MB se comparaba contra eso y quedaba desactivado justo en el camino
+    // que más lo necesita: lo que se escribe acá no es el cuerpo del pedido,
+    // son los archivos VIEJOS que se están restaurando, y pueden pesar
+    // cualquier cosa. `publica()` los mide solo, que es la cuenta correcta.
+    // El parámetro se fue entero: dejarlo era dejar armada la misma trampa
+    // para el próximo llamador.
+  });
+  if (!resultado.ok) {
+    return {
+      ok: false,
+      // [E] El 409 de `publica()` con `reintentar:false` es exactamente la
+      // misma situación que la guardia de arriba detecta ANTES de escribir:
+      // la cabeza cambió. Contarlo con el mismo motivo es lo que le permite a
+      // quien llama tratar los dos casos igual.
+      motivo: resultado.codigo === 409 ? "no-es-la-cabeza" : "fall\xF3",
+      detalle: resultado.problema
+    };
+  }
+  return { ok: true, sha: resultado.sha, revirtio: p.sha };
+}
+var autorDelCommit = (mensaje) => valorDeTrailer(mensaje, TRAILER_AUTOR);
+
+// src/servidor/historial.ts
+function lee(commits, ahora) {
+  void ahora;
+  return commits.filter((c) => tieneTrailer(c.mensaje, TRAILER_PANEL)).map((c) => ({
+    sha: c.sha,
+    resumen: c.mensaje.split("\n")[0],
+    autor: autorDelCommit(c.mensaje) ?? null,
+    cuando: c.fecha,
+    revierteA: valorDeTrailer(c.mensaje, TRAILER_REVIERTE) ?? null
+  }));
+}
+
+// src/servidor/vercel.ts
+var TERMINADOS = {
+  READY: "listo",
+  ERROR: "fall\xF3",
+  CANCELED: "fall\xF3"
+};
+function clienteVercel(c) {
+  return {
+    /**
+     * El estado del despliegue de un commit, y la dirección donde quedó
+     * servido. `'desconocido'` cuando la plataforma todavía no tiene ningún
+     * despliegue para ese commit — que NO es lo mismo que «en curso»: puede
+     * ser que el webhook no haya llegado aún, o que no vaya a llegar nunca.
+     * Qué hacer con esa diferencia lo decide `estado.ts`, que es el que sabe
+     * cuánto hace que se publicó.
+     */
+    async despliegueDe(sha) {
+      const url3 = `https://api.vercel.com/v6/deployments?app=${encodeURIComponent(c.proyecto)}&sha=${encodeURIComponent(sha)}&limit=1`;
+      const respuesta = await c.fetch(url3, {
+        headers: { Authorization: `Bearer ${c.token}`, "User-Agent": "panel-maracacao" }
+      });
+      const cuerpo = await respuesta.json().catch(() => void 0);
+      if (!respuesta.ok) {
+        const mensaje = cuerpo?.error?.message;
+        throw new Error(
+          `La plataforma respondi\xF3 ${respuesta.status}: ${typeof mensaje === "string" ? mensaje : "sin mensaje"}`
+        );
+      }
+      if (cuerpo === void 0) {
+        throw new Error(`La plataforma respondi\xF3 ${respuesta.status} con un cuerpo que no se pudo leer.`);
+      }
+      const despliegues = cuerpo?.deployments ?? [];
+      const primero = despliegues[0];
+      if (!primero) return { estado: "desconocido", url: null };
+      return {
+        estado: TERMINADOS[primero.state ?? ""] ?? "enCurso",
+        // La API devuelve el host pelado («maracacao-abc.vercel.app»); lo que
+        // el panel necesita es algo que se pueda abrir.
+        url: primero.url ? `https://${primero.url}` : null
+      };
+    }
+  };
+}
+
+// src/servidor/estado.ts
+var SITIO = "https://www.maracacao.mx";
+var CADENCIA_RAPIDA_MS = 3e3;
+var CADENCIA_LENTA_MS = 6e3;
+var CAMBIA_DE_CADENCIA_MS = 6e4;
+var DEJA_DE_PREGUNTAR_MS = 3e5;
+var FRASE_LISTO = "Tu cambio ya est\xE1 en el sitio.";
+var FRASE_EN_CURSO = "Estamos subiendo tu cambio al sitio.";
+var FRASE_TARDA = "Tu cambio est\xE1 tardando m\xE1s de lo normal. Vuelve a abrir el panel en un rato para ver c\xF3mo qued\xF3.";
+function fraseDeFracaso(f) {
+  if (f === void 0) return "No sali\xF3. Av\xEDsale a Marcos para que lo revise.";
+  if (f.revertido && f.avisadoAMarcos) return "No sali\xF3; lo dej\xE9 como estaba y ya le avis\xE9 a Marcos.";
+  if (f.revertido) return "No sali\xF3; lo dej\xE9 como estaba. Av\xEDsale a Marcos para que lo revise.";
+  if (f.avisadoAMarcos) return "No sali\xF3 y no pude dejarlo como estaba. Ya le avis\xE9 a Marcos.";
+  return "No sali\xF3 y no pude dejarlo como estaba. Av\xEDsale a Marcos para que lo revise.";
+}
+function decide(e) {
+  if (e.despliegue === "fall\xF3") {
+    return { estado: "fall\xF3", frase: fraseDeFracaso(e.fracaso), reintentarEn: null, url: e.url };
+  }
+  if (e.despliegue === "listo" && e.shaServido === e.shaPublicado) {
+    return { estado: "listo", frase: FRASE_LISTO, reintentarEn: null, url: e.url };
+  }
+  if (e.desdeHaceMs > DEJA_DE_PREGUNTAR_MS) {
+    return { estado: "enCurso", frase: FRASE_TARDA, reintentarEn: null, url: e.url };
+  }
+  return {
+    estado: "enCurso",
+    frase: FRASE_EN_CURSO,
+    reintentarEn: e.desdeHaceMs > CAMBIA_DE_CADENCIA_MS ? CADENCIA_LENTA_MS : CADENCIA_RAPIDA_MS,
+    url: e.url
+  };
+}
+
 // src/servidor/acciones.ts
 var ok = (cuerpo, cookie) => ({ status: 200, cuerpo, cookie });
 var error51 = (status, problema, campo) => ({
@@ -17811,6 +18446,7 @@ var PROBLEMA_INESPERADO = "Algo sali\xF3 mal de nuestro lado. Intenta de nuevo e
 function secretoUtilizable(env) {
   return typeof env.PANEL_SECRETO === "string" && env.PANEL_SECRETO.length >= LARGO_MIN_SECRETO;
 }
+var claveFreno = (accion, ip) => `${accion}:${ip}`;
 var PROBLEMA_ENTRAR = "No se pudo entrar: revisa tus datos y vuelve a intentar.";
 var PROBLEMA_DEMASIADOS_INTENTOS = "Demasiados intentos. Espera 15 minutos y vuelve a probar.";
 var DIAS_SESION_LARGA = 365;
@@ -17820,11 +18456,16 @@ function correoEnLista(correo2, lista2) {
   return lista2.split(",").map((c) => c.trim().toLowerCase()).includes(correo2.trim().toLowerCase());
 }
 var HASH_SENUELO = hashDeClave("se\xF1uelo \u2014 nunca es la contrase\xF1a de nadie, existe solo para parejar el reloj");
+var idDeDispositivo = (crudo) => {
+  const texto2 = typeof crudo === "string" ? crudo : "";
+  const limpio = texto2.replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 64).replace(/-+$/, "");
+  return limpio === "" ? "sin-nombre" : limpio;
+};
 function entrar(pedido, contexto) {
   const cuerpo = pedido.cuerpo ?? {};
   const correo2 = typeof cuerpo.correo === "string" ? cuerpo.correo.trim() : "";
   const clave = typeof cuerpo.clave === "string" ? cuerpo.clave : "";
-  if (!intentoPermitido(contexto.ip, contexto.ahora())) {
+  if (!intentoPermitido(claveFreno("entrar", contexto.ip), contexto.ahora())) {
     return error51(429, PROBLEMA_DEMASIADOS_INTENTOS);
   }
   const env = contexto.env;
@@ -17838,27 +18479,268 @@ function entrar(pedido, contexto) {
   const claveOk = correoOk && claveEsLaDelHash;
   if (!claveOk) return error51(401, PROBLEMA_ENTRAR);
   const dias = cuerpo.recuerdame === true ? DIAS_SESION_LARGA : DIAS_SESION_CORTA;
-  const dispositivo = typeof cuerpo.dispositivo === "string" ? cuerpo.dispositivo : "sin identificar";
+  const dispositivo = idDeDispositivo(cuerpo.dispositivo);
   const vence = contexto.ahora() + dias * 864e5;
-  const token = firmaSesion({ correo: correo2, vence, dispositivo }, env.PANEL_SECRETO);
+  const token = firmaSesion({ correo: correo2, vence, dispositivo, emitida: contexto.ahora() }, env.PANEL_SECRETO);
   return ok({ ok: true }, cookieDeSesion(token, dias));
+}
+var FRASE_ENLACE = "Si esa direcci\xF3n tiene acceso, te lleg\xF3 un correo con el enlace.";
+var PROBLEMA_ENLACE_SIN_CORREO = "Ahora mismo no puedo mandarte el enlace. Escr\xEDbele a Marcos.";
+var PROBLEMA_ENLACE_INVALIDO = "Ese enlace ya no sirve: pide uno nuevo.";
+var TOPE_ENLACES_POR_DESTINO = 10;
+var PISO_ENLACE_MS = 400;
+var DIAS_SESION_ENLACE = 1;
+var ASUNTO_ENLACE = "Tu enlace para entrar al panel";
+var textoEnlace = (url3) => [
+  "Este es tu enlace para entrar al panel, sin necesitar la contrase\xF1a:",
+  "",
+  url3,
+  "",
+  "Vale por quince minutos. Si t\xFA no lo pediste, ignora este correo: nadie puede entrar sin darle clic."
+].join("\n");
+var ASUNTO_AVISO_CONSUMO = "Alguien entr\xF3 al panel con tu enlace";
+var TEXTO_AVISO_CONSUMO = "Alguien acaba de entrar al panel usando tu enlace de recuperaci\xF3n. Si fuiste t\xFA, no hay nada que hacer. Si no fuiste t\xFA, av\xEDsale a Marcos.";
+function correoCanonico(correo2, lista2) {
+  if (!lista2) return correo2;
+  const normalizado = correo2.trim().toLowerCase();
+  const entrada = lista2.split(",").map((c) => c.trim()).find((c) => c.toLowerCase() === normalizado);
+  return entrada ?? correo2;
+}
+async function enlaceAccion(pedido, contexto) {
+  const env = contexto.env;
+  if (!intentoPermitido(claveFreno("enlace", contexto.ip), contexto.ahora())) {
+    return error51(429, PROBLEMA_DEMASIADOS_INTENTOS);
+  }
+  if (!secretoUtilizable(env)) {
+    console.error("enlace: PANEL_SECRETO falta o mide menos de 32 caracteres \u2014 no se puede firmar ning\xFAn enlace.");
+    return error51(503, PROBLEMA_INESPERADO);
+  }
+  if (!env.RESEND_API_KEY || !env.PANEL_REMITENTE) {
+    console.error("enlace: RESEND_API_KEY o PANEL_REMITENTE no est\xE1n cargadas \u2014 no hay forma de mandar el enlace.");
+    return error51(503, PROBLEMA_ENLACE_SIN_CORREO);
+  }
+  const cuerpo = pedido.cuerpo ?? {};
+  const correo2 = typeof cuerpo.correo === "string" ? cuerpo.correo.trim() : "";
+  const claveDestino = `enlace-destino:${correo2.toLowerCase()}`;
+  if (!intentoPermitido(claveDestino, contexto.ahora(), TOPE_ENLACES_POR_DESTINO)) {
+    console.error(`enlace: tope por destinatario alcanzado para \xAB${correo2}\xBB \u2014 diez pedidos en quince minutos.`);
+    return error51(429, PROBLEMA_DEMASIADOS_INTENTOS);
+  }
+  const inicio = contexto.monotono();
+  const correoOk = correoEnLista(correo2, env.PANEL_CORREOS);
+  if (correoOk) {
+    const correoParaFirmar = correoCanonico(correo2, env.PANEL_CORREOS);
+    const vence = contexto.ahora() + DURACION_ENLACE_MS;
+    const token = firmaEnlace(correoParaFirmar, vence, env.PANEL_SECRETO);
+    const url3 = `${SITIO}/panel/entrar?token=${encodeURIComponent(token)}`;
+    const r = await contexto.correo({ a: [correoParaFirmar], asunto: ASUNTO_ENLACE, texto: textoEnlace(url3) });
+    if (!r.ok) {
+      console.error(`enlace: no se pudo mandar el enlace a ${correoParaFirmar} \u2014 ${r.motivo}`);
+    }
+  }
+  const transcurrido = contexto.monotono() - inicio;
+  if (transcurrido < PISO_ENLACE_MS) {
+    await contexto.espera(PISO_ENLACE_MS - transcurrido);
+  } else if (transcurrido > PISO_ENLACE_MS) {
+    console.error(
+      `enlace: el env\xEDo tard\xF3 ${transcurrido} ms, m\xE1s que el piso de ${PISO_ENLACE_MS} ms \u2014 mientras eso pase, el tiempo de respuesta distingue una direcci\xF3n con acceso de una sin acceso.`
+    );
+  }
+  return ok({ ok: true, mensaje: FRASE_ENLACE });
+}
+async function entrarConEnlaceAccion(pedido, contexto) {
+  const env = contexto.env;
+  if (!intentoPermitido(claveFreno("entrar-con-enlace", contexto.ip), contexto.ahora())) {
+    return error51(429, PROBLEMA_DEMASIADOS_INTENTOS);
+  }
+  if (!secretoUtilizable(env)) {
+    console.error("entrar-con-enlace: PANEL_SECRETO falta o mide menos de 32 caracteres.");
+    return error51(503, PROBLEMA_INESPERADO);
+  }
+  const cuerpo = pedido.cuerpo ?? {};
+  const token = typeof cuerpo.token === "string" ? cuerpo.token : "";
+  const verificado = token !== "" ? verificaEnlace(token, env.PANEL_SECRETO, contexto.ahora()) : null;
+  if (!verificado || !correoEnLista(verificado.correo, env.PANEL_CORREOS)) {
+    return error51(401, PROBLEMA_ENLACE_INVALIDO);
+  }
+  const dias = DIAS_SESION_ENLACE;
+  const dispositivo = idDeDispositivo(cuerpo.dispositivo);
+  const vence = contexto.ahora() + dias * 864e5;
+  const sesionToken = firmaSesion(
+    { correo: verificado.correo, vence, dispositivo, emitida: contexto.ahora() },
+    env.PANEL_SECRETO
+  );
+  await mandaProtegido(contexto, { a: [verificado.correo], asunto: ASUNTO_AVISO_CONSUMO, texto: TEXTO_AVISO_CONSUMO });
+  return ok({ ok: true }, cookieDeSesion(sesionToken, dias));
 }
 var PROBLEMA_SESION = "Tu sesi\xF3n no es v\xE1lida: vuelve a entrar.";
 var PROBLEMA_SIN_DOCUMENTOS = "No mandaste ning\xFAn documento para publicar.";
 var PROBLEMA_NO_SE_PUDO_LEER = "No pudimos revisar el contenido actual del sitio: prueba de nuevo en unos minutos.";
 var SIN_CAMBIOS = "No hab\xEDa nada que publicar: no cambiaste ning\xFAn dato del sitio.";
-var RUTA_DEL_DOCUMENTO = (id) => `src/contenido/datos/${id}.json`;
+var PROBLEMA_SIN_BASE = "No pudimos publicar: vuelve a abrir el panel y hazlo de nuevo.";
+var PROBLEMA_PISARIA = "Marcos cambi\xF3 algo del sitio mientras editabas: vuelve a intentar la publicaci\xF3n.";
+var comoAviso = (p) => ({
+  campo: p.campo,
+  titulo: p.titulo,
+  ...p.detalle !== void 0 ? { detalle: p.detalle } : {}
+});
+var esShaDeCommit = (v) => typeof v === "string" && /^[0-9a-f]{40}$/.test(v);
+var RUTA_DEL_DOCUMENTO2 = (id) => `src/contenido/datos/${id}.json`;
 var esIdDocumento = (v) => Object.prototype.hasOwnProperty.call(DOCUMENTOS, v);
 function comoDocumentos(v) {
   if (v !== null && typeof v === "object" && !Array.isArray(v)) return v;
   return {};
 }
-function fuentesDeSabores(v) {
+function fuentesDeSabores2(v) {
   const doc = v ?? {};
   return {
     sabores: Array.isArray(doc.sabores) ? doc.sabores : [],
     gotas: Array.isArray(doc.gotas) ? doc.gotas : []
   };
+}
+function sesionVigente(cookie, env, ahora) {
+  const sesion = verificaSesion(cookie, env.PANEL_SECRETO, ahora);
+  if (!sesion) return null;
+  if (!correoEnLista(sesion.correo, env.PANEL_CORREOS)) return null;
+  if (env.PANEL_SESIONES_DESDE) {
+    const desde = Date.parse(env.PANEL_SESIONES_DESDE);
+    if (!Number.isFinite(desde)) {
+      console.error(
+        `sesi\xF3n: PANEL_SESIONES_DESDE no es una fecha que se pueda leer (\xAB${env.PANEL_SESIONES_DESDE}\xBB) \u2014 se rechaza toda sesi\xF3n hasta que se corrija.`
+      );
+      return null;
+    }
+    if (sesion.emitida < desde) return null;
+  }
+  if (listaTiene(env.PANEL_DISPOSITIVOS_REVOCADOS, sesion.dispositivo)) return null;
+  return sesion;
+}
+function listaTiene(lista2, valor) {
+  if (!lista2) return false;
+  return lista2.split(",").some((x) => x.trim() === valor);
+}
+function clienteDeGitHub(contexto) {
+  return cliente({
+    token: contexto.env.PANEL_GITHUB_TOKEN ?? "",
+    duenio: contexto.env.GITHUB_DUENIO ?? "",
+    repo: contexto.env.GITHUB_REPO ?? "",
+    fetch: contexto.fetch,
+    // `vigilaVencimiento` está declarada más abajo, junto al resto de la
+    // vigilancia (`DIAS_AVISO_VENCIMIENTO_TOKEN` y compañía): es una
+    // `function` declarada, así que JS la levanta antes de correr una sola
+    // línea de este módulo.
+    alResponder: (vencimiento) => vigilaVencimiento(vencimiento, contexto)
+  });
+}
+var ASUNTO_PARA_ELLA = "Tu cambio no se pudo publicar";
+async function mandaProtegido(contexto, carta) {
+  try {
+    const r = await contexto.correo(carta);
+    if (!r.ok) {
+      console.error(`aviso: no se pudo mandar \xAB${carta.asunto}\xBB a ${carta.a.join(", ")} \u2014 ${r.motivo}`);
+    }
+    return r.ok;
+  } catch (e) {
+    console.error("revertir: el env\xEDo de un correo de aviso revent\xF3 \u2014", e);
+    return false;
+  }
+}
+async function intentaRevertir(gh, sha, autor) {
+  try {
+    const r = await revierte(gh, { sha, autor });
+    if (r.ok) return { revertido: true, resumen: `revertido (commit ${r.sha ?? "sin cambios"})` };
+    if (r.motivo === "ya-revertido") {
+      return { revertido: true, resumen: `ya estaba revertido (${r.detalle})` };
+    }
+    if (r.motivo === "nada-que-revertir") {
+      console.error(`revertir: ${sha} no ten\xEDa nada que revertir \u2014 main sigue con el commit roto (${r.detalle}).`);
+      return {
+        // El commit roto se queda en la cabeza: el sitio NO quedó como
+        // estaba, aunque no hubiera contenido que deshacer.
+        revertido: false,
+        resumen: "no hab\xEDa nada que revertir: el commit no toc\xF3 ning\xFAn documento de contenido"
+      };
+    }
+    console.error(`revertir: la reversi\xF3n autom\xE1tica de ${sha} no se pudo hacer \u2014 ${r.motivo}: ${r.detalle}`);
+    return { revertido: false, resumen: `NO se pudo revertir: ${r.motivo} \u2014 ${r.detalle}` };
+  } catch (e) {
+    console.error(`revertir: la reversi\xF3n autom\xE1tica de ${sha} revent\xF3 \u2014`, e);
+    return { revertido: false, resumen: `NO se pudo revertir: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+async function avisaAElla(correoDeElla, contexto, fracaso) {
+  await mandaProtegido(contexto, {
+    a: [correoDeElla],
+    asunto: ASUNTO_PARA_ELLA,
+    texto: `${fraseDeFracaso(fracaso)}
+
+Puedes volver a intentarlo cuando quieras.`
+  });
+}
+async function revierteYAvisa(sha, correoDeElla, contexto) {
+  const gh = clienteDeGitHub(contexto);
+  let autorReal = correoDeElla;
+  try {
+    const commit = await gh.commit(sha);
+    autorReal = autorDelCommit(commit.message) ?? correoDeElla;
+  } catch {
+  }
+  const { revertido, resumen } = await intentaRevertir(gh, sha, autorReal);
+  const paraMarcos = contexto.env.PANEL_AVISOS_A;
+  const avisadoAMarcos = paraMarcos === void 0 ? false : await mandaProtegido(contexto, {
+    a: [paraMarcos],
+    asunto: `[panel] El deploy de ${sha.slice(0, 7)} fall\xF3`,
+    texto: [
+      `El commit ${sha} publicado por ${autorReal} no construy\xF3.`,
+      `Reversi\xF3n autom\xE1tica: ${resumen}.`,
+      "",
+      "El sitio sigue sirviendo el \xFAltimo deploy bueno."
+    ].join("\n")
+  });
+  const fracaso = { revertido, avisadoAMarcos };
+  await avisaAElla(correoDeElla, contexto, fracaso);
+  return fracaso;
+}
+async function revierteYAvisaAMarcos(sha, autorReal, contexto) {
+  const gh = clienteDeGitHub(contexto);
+  const { revertido, resumen } = await intentaRevertir(gh, sha, autorReal);
+  const paraMarcos = contexto.env.PANEL_AVISOS_A;
+  const avisadoAMarcos = paraMarcos === void 0 ? false : await mandaProtegido(contexto, {
+    a: [paraMarcos],
+    asunto: `[panel] El deploy de ${sha.slice(0, 7)} fall\xF3`,
+    texto: [
+      `El commit ${sha} publicado por ${autorReal} no construy\xF3 (nadie ten\xEDa el panel abierto).`,
+      `Reversi\xF3n autom\xE1tica: ${resumen}.`,
+      "",
+      "El sitio sigue sirviendo el \xFAltimo deploy bueno."
+    ].join("\n")
+  });
+  return { revertido, avisadoAMarcos };
+}
+async function revisaLaCabeza(contexto) {
+  try {
+    if (!contexto.env.PANEL_VERCEL_TOKEN) return null;
+    const gh = clienteDeGitHub(contexto);
+    const cabeza = await gh.ref("heads/main");
+    const commit = await gh.commit(cabeza.sha);
+    if (!tieneTrailer(commit.message, TRAILER_PANEL)) return null;
+    if (valorDeTrailer(commit.message, TRAILER_REVIERTE) !== void 0) return null;
+    const proyecto = contexto.env.PANEL_VERCEL_PROYECTO ?? contexto.env.GITHUB_REPO ?? "";
+    if (proyecto === "") {
+      console.error("revisaLaCabeza: ni PANEL_VERCEL_PROYECTO ni GITHUB_REPO est\xE1n cargadas \u2014 no s\xE9 por qu\xE9 proyecto preguntar.");
+      return null;
+    }
+    const vercel = clienteVercel({ token: contexto.env.PANEL_VERCEL_TOKEN, proyecto, fetch: contexto.fetch });
+    const { estado } = await vercel.despliegueDe(cabeza.sha);
+    if (estado !== "fall\xF3") return null;
+    const autorReal = autorDelCommit(commit.message) ?? "alguien del panel";
+    console.error(`revisaLaCabeza: ${cabeza.sha} es un commit del panel cuyo despliegue fall\xF3 \u2014 revirtiendo.`);
+    const fracaso = await revierteYAvisaAMarcos(cabeza.sha, autorReal, contexto);
+    return { sha: cabeza.sha, ...fracaso };
+  } catch (e) {
+    console.error("revisaLaCabeza: no se pudo revisar la cabeza de main \u2014", e);
+    return null;
+  }
 }
 async function publicarAccion(pedido, contexto) {
   const env = contexto.env;
@@ -17866,10 +18748,15 @@ async function publicarAccion(pedido, contexto) {
     console.error("publicar: PANEL_SECRETO falta o mide menos de 32 caracteres \u2014 no se puede verificar ninguna sesi\xF3n.");
     return error51(503, PROBLEMA_INESPERADO);
   }
-  const sesion = verificaSesion(pedido.cookie, env.PANEL_SECRETO, contexto.ahora());
+  const sesion = sesionVigente(pedido.cookie, env, contexto.ahora());
   if (!sesion) return error51(401, PROBLEMA_SESION);
-  if (!correoEnLista(sesion.correo, env.PANEL_CORREOS)) return error51(401, PROBLEMA_SESION);
   const cuerpo = pedido.cuerpo ?? {};
+  if (!esShaDeCommit(cuerpo.base)) {
+    console.error(
+      `publicar: el cuerpo lleg\xF3 sin un \`base\` con forma de sha (${JSON.stringify(cuerpo.base)}) \u2014 el panel que lo mand\xF3 es de antes del sha base, o lo arm\xF3 mal.`
+    );
+    return error51(400, PROBLEMA_SIN_BASE);
+  }
   const documentos = comoDocumentos(cuerpo.documentos);
   const ids = Object.keys(documentos);
   for (const id of ids) {
@@ -17879,12 +18766,8 @@ async function publicarAccion(pedido, contexto) {
   }
   if (ids.length === 0) return error51(400, PROBLEMA_SIN_DOCUMENTOS);
   const idsConocidos = ids;
-  const gh = cliente({
-    token: contexto.env.PANEL_GITHUB_TOKEN ?? "",
-    duenio: contexto.env.GITHUB_DUENIO ?? "",
-    repo: contexto.env.GITHUB_REPO ?? "",
-    fetch: contexto.fetch
-  });
+  await revisaLaCabeza(contexto);
+  const gh = clienteDeGitHub(contexto);
   for (const id of idsConocidos) {
     if (id === "sitio") continue;
     const problemas = validarContra(DOCUMENTOS[id], documentos[id]);
@@ -17893,15 +18776,18 @@ async function publicarAccion(pedido, contexto) {
     }
   }
   let base;
+  let saboresVivoCrudo;
+  let sitioInjertado;
   if (idsConocidos.includes("sitio")) {
     let fuentes;
     try {
       if (idsConocidos.includes("sabores")) {
-        fuentes = fuentesDeSabores(documentos.sabores);
+        fuentes = fuentesDeSabores2(documentos.sabores);
       } else {
         base = await gh.ref("heads/main");
-        const vivoSaboresTexto = await gh.archivoEnRef(RUTA_DEL_DOCUMENTO("sabores"), base.sha);
-        fuentes = fuentesDeSabores(JSON.parse(vivoSaboresTexto));
+        const vivoSaboresTexto = await gh.archivoEnRef(RUTA_DEL_DOCUMENTO2("sabores"), base.sha);
+        saboresVivoCrudo = JSON.parse(vivoSaboresTexto);
+        fuentes = fuentesDeSabores2(saboresVivoCrudo);
       }
     } catch (e) {
       console.error("publicar: no se pudo leer \xABsabores\xBB en vivo para calcular los derivados de \xABsitio\xBB \u2014", e);
@@ -17917,13 +18803,25 @@ async function publicarAccion(pedido, contexto) {
     if (problemas.length > 0) {
       return error51(422, problemas[0].titulo, `sitio.${problemas[0].campo}`);
     }
+    sitioInjertado = paraValidar;
   }
   const archivos = [];
   const cambios = [];
   try {
     base ??= await gh.ref("heads/main");
+    if (cuerpo.base !== base.sha) {
+      const { archivos: movidos } = await gh.comparaRefs(cuerpo.base, base.sha);
+      const delLote = new Set(idsConocidos.map(RUTA_DEL_DOCUMENTO2));
+      const pisados = movidos.filter((ruta2) => delLote.has(ruta2));
+      if (pisados.length > 0) {
+        console.error(
+          `publicar: rechazado por pisada (autor: ${sesion.correo}) \u2014 edit\xF3 contra ${cuerpo.base}, la cabeza es ${base.sha}, y en el medio cambiaron: ${pisados.join(", ")}`
+        );
+        return error51(409, PROBLEMA_PISARIA);
+      }
+    }
     for (const id of idsConocidos) {
-      const ruta2 = RUTA_DEL_DOCUMENTO(id);
+      const ruta2 = RUTA_DEL_DOCUMENTO2(id);
       const vivoTexto = await gh.archivoEnRef(ruta2, base.sha);
       const crudo = documentos[id];
       const esquema = DOCUMENTOS[id];
@@ -17937,11 +18835,12 @@ async function publicarAccion(pedido, contexto) {
     return error51(502, PROBLEMA_NO_SE_PUDO_LEER);
   }
   if (archivos.length === 0) {
-    return ok({ ok: true, sha: null, resumen: SIN_CAMBIOS });
+    return ok({ ok: true, sha: null, resumen: SIN_CAMBIOS, avisos: [] });
   }
   const resultado = await publica(gh, {
     archivos,
     autor: sesion.correo,
+    bytesDelCuerpo: contexto.bytesDelCuerpo,
     // Si `cambios` quedó vacío pese a que los bytes SÍ cambiaron (`frase()`
     // no encuentra nada que contar), se omite el campo entero en vez de
     // mandar un array vacío: `publica()` lee `cambios: []` como «no hay
@@ -17951,7 +18850,22 @@ async function publicarAccion(pedido, contexto) {
     ...cambios.length > 0 ? { cambios } : {}
   });
   if (!resultado.ok) return error51(resultado.codigo, resultado.problema);
-  return ok({ ok: true, sha: resultado.sha, resumen: resultado.resumen });
+  let avisos = [];
+  try {
+    const saboresParaConteos = idsConocidos.includes("sabores") ? documentos.sabores : saboresVivoCrudo !== void 0 ? saboresVivoCrudo : JSON.parse(await gh.archivoEnRef(RUTA_DEL_DOCUMENTO2("sabores"), base.sha));
+    const sitioParaConteos = sitioInjertado !== void 0 ? sitioInjertado : injerta(
+      JSON.parse(await gh.archivoEnRef(RUTA_DEL_DOCUMENTO2("sitio"), base.sha)),
+      fuentesDeSabores2(saboresParaConteos)
+    );
+    const conteos = conteosDe({ sitio: sitioParaConteos, sabores: saboresParaConteos });
+    avisos = validar(DOCUMENTOS.sitio, sitioParaConteos, conteos).filter((p) => p.gravedad === "avisa");
+  } catch (e) {
+    console.error(
+      "publicar: no se pudieron calcular los avisos de conteo (no bloquea: la publicaci\xF3n ya est\xE1 hecha) \u2014",
+      e
+    );
+  }
+  return ok({ ok: true, sha: resultado.sha, resumen: resultado.resumen, avisos: avisos.map(comoAviso) });
 }
 var VARIABLES_REQUERIDAS = [
   "PANEL_CLAVE_HASH",
@@ -17959,16 +18873,64 @@ var VARIABLES_REQUERIDAS = [
   "PANEL_CORREOS",
   "PANEL_GITHUB_TOKEN",
   "GITHUB_DUENIO",
-  "GITHUB_REPO"
+  "GITHUB_REPO",
+  "PANEL_VERCEL_TOKEN"
 ];
 var PROBLEMA_SALUD_OMITIDA = "Las variables est\xE1n, pero no revisamos la conexi\xF3n con GitHub: hubo demasiados pedidos seguidos. Intenta de nuevo en unos minutos.";
+var DIAS_AVISO_VENCIMIENTO_TOKEN = 30;
+function diasHastaVencimiento(tokenVence, ahora) {
+  if (tokenVence === null) return null;
+  const vence = Date.parse(tokenVence);
+  if (!Number.isFinite(vence)) return null;
+  return Math.floor((vence - ahora) / 864e5);
+}
+var AVISOS_VENCIMIENTO_TOKEN = /* @__PURE__ */ new Map();
+var VENTANA_AVISO_VENCIMIENTO_MS = 24 * 60 * 6e4;
+var CLAVE_AVISO_VENCIMIENTO_TOKEN = "token-github";
+function avisoDeVencimientoPermitido(ahora) {
+  const marcas = (AVISOS_VENCIMIENTO_TOKEN.get(CLAVE_AVISO_VENCIMIENTO_TOKEN) ?? []).filter((t) => ahora - t < VENTANA_AVISO_VENCIMIENTO_MS);
+  if (marcas.length >= 1) {
+    AVISOS_VENCIMIENTO_TOKEN.set(CLAVE_AVISO_VENCIMIENTO_TOKEN, marcas);
+    return false;
+  }
+  marcas.push(ahora);
+  AVISOS_VENCIMIENTO_TOKEN.set(CLAVE_AVISO_VENCIMIENTO_TOKEN, marcas);
+  return true;
+}
+async function vigilaVencimiento(tokenVence, contexto) {
+  if (tokenVence === null) return;
+  const ahora = contexto.ahora();
+  const dias = diasHastaVencimiento(tokenVence, ahora);
+  if (dias === null || dias > DIAS_AVISO_VENCIMIENTO_TOKEN) return;
+  const paraMarcos = contexto.env.PANEL_AVISOS_A;
+  if (!paraMarcos || !avisoDeVencimientoPermitido(ahora)) return;
+  await mandaProtegido(contexto, {
+    a: [paraMarcos],
+    asunto: ASUNTO_AVISO_VENCIMIENTO(dias),
+    texto: textoAvisoVencimiento(tokenVence, dias)
+  });
+}
+var ASUNTO_AVISO_VENCIMIENTO = (dias) => `[panel] El token de GitHub vence en ${dias} d\xEDa${dias === 1 ? "" : "s"}`;
+function textoAvisoVencimiento(tokenVence, dias) {
+  const cuandoFalta = dias > 0 ? `faltan ${dias} d\xEDa${dias === 1 ? "" : "s"}` : "ya venci\xF3, o vence hoy";
+  return [
+    `El token de GitHub (\`PANEL_GITHUB_TOKEN\`) vence el ${tokenVence} \u2014 ${cuandoFalta}.`,
+    "",
+    "Gener\xE1 uno nuevo con los mismos permisos (Contents: Read and write, sin Workflows), cargalo en Vercel y redespleg\xE1 \u2014 las variables se leen al arrancar la funci\xF3n, as\xED que sin el redeploy el token nuevo no sirve de nada.",
+    "",
+    "Los pasos exactos: docs/panel-operacion.md, secci\xF3n \xABRenovar el token de GitHub\xBB."
+  ].join("\n");
+}
 async function salud(_pedido, contexto) {
   const faltan = VARIABLES_REQUERIDAS.filter((v) => !contexto.env[v]);
   if (faltan.length > 0) {
     return { status: 503, cuerpo: { ok: false, faltan, github: null } };
   }
-  if (!intentoPermitido(contexto.ip, contexto.ahora())) {
-    return { status: 200, cuerpo: { ok: true, faltan: [], github: null, problema: PROBLEMA_SALUD_OMITIDA } };
+  if (!intentoPermitido(claveFreno("salud", contexto.ip), contexto.ahora())) {
+    return {
+      status: 200,
+      cuerpo: { ok: true, faltan: [], github: null, tokenVence: null, diasParaVencer: null, problema: PROBLEMA_SALUD_OMITIDA }
+    };
   }
   const gh = cliente({
     token: contexto.env.PANEL_GITHUB_TOKEN,
@@ -17976,12 +18938,234 @@ async function salud(_pedido, contexto) {
     repo: contexto.env.GITHUB_REPO,
     fetch: contexto.fetch
   });
+  let githubOk;
   try {
     await gh.ref("heads/main");
-    return { status: 200, cuerpo: { ok: true, faltan: [], github: true } };
+    githubOk = true;
   } catch (e) {
     console.error("salud: GitHub no contest\xF3", e);
-    return { status: 503, cuerpo: { ok: false, faltan: [], github: false } };
+    githubOk = false;
+  }
+  const tokenVence = gh.vencimientoDelToken();
+  const diasParaVencer = diasHastaVencimiento(tokenVence, contexto.ahora());
+  return githubOk ? { status: 200, cuerpo: { ok: true, faltan: [], github: true, tokenVence, diasParaVencer } } : { status: 503, cuerpo: { ok: false, faltan: [], github: false, tokenVence, diasParaVencer } };
+}
+async function estadoAccion(pedido, contexto) {
+  const env = contexto.env;
+  if (!secretoUtilizable(env)) {
+    console.error("estado: PANEL_SECRETO falta o mide menos de 32 caracteres.");
+    return error51(503, PROBLEMA_INESPERADO);
+  }
+  const sesion = sesionVigente(pedido.cookie, env, contexto.ahora());
+  if (!sesion) return error51(401, PROBLEMA_SESION);
+  if (!env.PANEL_VERCEL_TOKEN) {
+    console.error("estado: PANEL_VERCEL_TOKEN no est\xE1 cargada \u2014 no hay forma de saber si el despliegue termin\xF3.");
+    return error51(503, PROBLEMA_INESPERADO);
+  }
+  const proyecto = env.PANEL_VERCEL_PROYECTO ?? env.GITHUB_REPO ?? "";
+  if (proyecto === "") {
+    console.error("estado: ni PANEL_VERCEL_PROYECTO ni GITHUB_REPO est\xE1n cargadas \u2014 no s\xE9 por qu\xE9 proyecto preguntar.");
+    return error51(503, PROBLEMA_INESPERADO);
+  }
+  const cuerpo = pedido.cuerpo ?? {};
+  if (!esShaDeCommit(cuerpo.sha)) {
+    return error51(400, PROBLEMA_INESPERADO);
+  }
+  const publicadoEn = typeof cuerpo.publicadoEn === "number" ? cuerpo.publicadoEn : contexto.ahora();
+  const shaYaAtendido = await revisaLaCabeza(contexto);
+  const vercel = clienteVercel({
+    token: env.PANEL_VERCEL_TOKEN,
+    proyecto,
+    fetch: contexto.fetch
+  });
+  let despliegue;
+  try {
+    despliegue = await vercel.despliegueDe(cuerpo.sha);
+  } catch (e) {
+    console.error("estado: la plataforma no contest\xF3 por el despliegue \u2014", e);
+    return error51(502, PROBLEMA_NO_SE_PUDO_LEER);
+  }
+  const shaServido = despliegue.estado === "listo" ? await shaQueSirveElCdn(contexto) : null;
+  let fracaso;
+  if (despliegue.estado === "fall\xF3") {
+    if (shaYaAtendido?.sha === cuerpo.sha) {
+      fracaso = { revertido: shaYaAtendido.revertido, avisadoAMarcos: shaYaAtendido.avisadoAMarcos };
+      await avisaAElla(sesion.correo, contexto, fracaso);
+    } else {
+      fracaso = await revierteYAvisa(cuerpo.sha, sesion.correo, contexto);
+    }
+  }
+  const veredicto = decide({
+    despliegue: despliegue.estado,
+    url: despliegue.url,
+    shaServido,
+    shaPublicado: cuerpo.sha,
+    desdeHaceMs: contexto.ahora() - publicadoEn,
+    ...fracaso ? { fracaso } : {}
+  });
+  return ok({ ok: true, ...veredicto });
+}
+async function shaQueSirveElCdn(contexto) {
+  try {
+    const r = await contexto.fetch(`${SITIO}/version.json?t=${contexto.ahora()}`, { cache: "no-store" });
+    if (!r.ok) return null;
+    const v = await r.json();
+    return typeof v.sha === "string" ? v.sha : null;
+  } catch (e) {
+    console.error("estado: no se pudo leer version.json del sitio \u2014", e);
+    return null;
+  }
+}
+var VENTANA_DESHACER_MS = 30 * 6e4;
+var RESUMEN_DESHECHO = "Listo, lo dej\xE9 como estaba antes.";
+var PROBLEMA_TARDE = "Ya pas\xF3 mucho tiempo para deshacer esto desde aqu\xED. B\xFAscalo en el historial de cambios.";
+var PROBLEMA_NO_VALIDA = "Ese contenido ya no cumple con las reglas de hoy. Puedo abr\xEDrtelo como borrador para que lo ajustes.";
+var PROBLEMA_NO_ES_TUYO = "Ese cambio no se public\xF3 desde aqu\xED, as\xED que no lo puedo deshacer.";
+var PROBLEMA_NADA_QUE_DESHACER = "Esa publicaci\xF3n no cambi\xF3 ning\xFAn dato del sitio, as\xED que no hay nada que deshacer.";
+async function deshacerAccion(pedido, contexto) {
+  const env = contexto.env;
+  if (!secretoUtilizable(env)) {
+    console.error("deshacer: PANEL_SECRETO falta o mide menos de 32 caracteres.");
+    return error51(503, PROBLEMA_INESPERADO);
+  }
+  const sesion = sesionVigente(pedido.cookie, env, contexto.ahora());
+  if (!sesion) return error51(401, PROBLEMA_SESION);
+  const cuerpo = pedido.cuerpo ?? {};
+  if (!esShaDeCommit(cuerpo.sha)) {
+    return error51(400, PROBLEMA_INESPERADO);
+  }
+  await revisaLaCabeza(contexto);
+  const gh = clienteDeGitHub(contexto);
+  let publicadoEn;
+  try {
+    const commit = await gh.commit(cuerpo.sha);
+    publicadoEn = Date.parse(commit.author.date);
+  } catch (e) {
+    console.error(`deshacer: no se pudo leer el commit ${cuerpo.sha} \u2014`, e);
+    return error51(502, PROBLEMA_NO_SE_PUDO_LEER);
+  }
+  if (!Number.isFinite(publicadoEn) || contexto.ahora() - publicadoEn > VENTANA_DESHACER_MS) {
+    return error51(409, PROBLEMA_TARDE);
+  }
+  const r = await revierte(gh, { sha: cuerpo.sha, autor: sesion.correo });
+  if (r.ok) return ok({ ok: true, sha: r.sha, resumen: RESUMEN_DESHECHO });
+  switch (r.motivo) {
+    case "no-es-la-cabeza":
+      return error51(409, PROBLEMA_TARDE);
+    // Ya está deshecho. Decirle que falló sería mentirle sobre el estado del
+    // sitio, que es lo único que ella quería saber.
+    case "ya-revertido":
+      return ok({ ok: true, sha: null, resumen: RESUMEN_DESHECHO });
+    case "no-es-del-panel":
+      return error51(403, PROBLEMA_NO_ES_TUYO);
+    case "no-valida":
+      console.error(`deshacer: el contenido viejo de ${cuerpo.sha} no pasa las reglas de hoy \u2014 ${r.detalle}`);
+      return error51(422, PROBLEMA_NO_VALIDA);
+    // Permanente, no una falla de red — ver el comentario de
+    // `PROBLEMA_NADA_QUE_DESHACER` más arriba.
+    case "nada-que-revertir":
+      console.error(`deshacer: ${cuerpo.sha} no ten\xEDa nada que revertir \u2014 ${r.detalle}`);
+      return error51(409, PROBLEMA_NADA_QUE_DESHACER);
+    // Solo `falló` llega hasta acá: un error de verdad del lado de GitHub
+    // (`revierte()`/`publica()`), la misma frase que usa `traduceError()`
+    // en `publicar.ts` — compartida para que las dos no se desincronicen.
+    default:
+      console.error(`deshacer: no se pudo deshacer ${cuerpo.sha} \u2014 ${r.motivo}: ${r.detalle}`);
+      return error51(502, PROBLEMA_NO_SE_PUDO_PUBLICAR);
+  }
+}
+var CANTIDAD_HISTORIAL = 20;
+async function historialAccion(pedido, contexto) {
+  const env = contexto.env;
+  if (!secretoUtilizable(env)) {
+    console.error("historial: PANEL_SECRETO falta o mide menos de 32 caracteres.");
+    return error51(503, PROBLEMA_INESPERADO);
+  }
+  const sesion = sesionVigente(pedido.cookie, env, contexto.ahora());
+  if (!sesion) return error51(401, PROBLEMA_SESION);
+  await revisaLaCabeza(contexto);
+  const gh = clienteDeGitHub(contexto);
+  let commits;
+  try {
+    commits = await gh.listaCommits("heads/main", CANTIDAD_HISTORIAL);
+  } catch (e) {
+    console.error("historial: no se pudo leer la lista de commits de GitHub \u2014", e);
+    return error51(502, PROBLEMA_NO_SE_PUDO_LEER);
+  }
+  return ok({
+    ok: true,
+    // [I9] Antes de filtrar: la cabeza de `main` puede ser un commit de
+    // Marcos, y ése es justo el caso en que el `base` de la lista filtrada
+    // estaría viejo y la publicación siguiente se rechazaría por pisada.
+    base: commits[0]?.sha ?? null,
+    publicaciones: lee(commits, contexto.ahora())
+  });
+}
+var PROBLEMA_BORRADOR_INCOMPLETO = "Falta informaci\xF3n para guardar tu borrador: vuelve a abrir el panel.";
+var PROBLEMA_NO_SE_PUDO_GUARDAR_BORRADOR = "No pudimos guardar tu borrador: prueba de nuevo en unos minutos.";
+var PROBLEMA_NO_SE_PUDO_LEER_BORRADOR = "No pudimos abrir tu borrador: prueba de nuevo en unos minutos.";
+var PROBLEMA_BORRADOR_MAS_NUEVO = "Alguien m\xE1s guard\xF3 un cambio m\xE1s reciente desde otro aparato.";
+async function borradorGuardarAccion(pedido, contexto) {
+  const env = contexto.env;
+  if (!secretoUtilizable(env)) {
+    console.error("borrador.guardar: PANEL_SECRETO falta o mide menos de 32 caracteres.");
+    return error51(503, PROBLEMA_INESPERADO);
+  }
+  const sesion = sesionVigente(pedido.cookie, env, contexto.ahora());
+  if (!sesion) return error51(401, PROBLEMA_SESION);
+  const cuerpo = pedido.cuerpo ?? {};
+  if (!esShaDeCommit(cuerpo.base)) {
+    return error51(400, PROBLEMA_BORRADOR_INCOMPLETO);
+  }
+  const documentos = comoDocumentos(cuerpo.documentos);
+  const pisar = cuerpo.pisar === true;
+  const horaLeida = typeof cuerpo.horaLeida === "number" ? cuerpo.horaLeida : void 0;
+  const gh = clienteDeGitHub(contexto);
+  try {
+    const r = await guarda(gh, {
+      documentos,
+      base: cuerpo.base,
+      dispositivo: sesion.dispositivo,
+      autor: sesion.correo,
+      ahora: contexto.ahora(),
+      ...horaLeida !== void 0 ? { horaLeida } : {},
+      pisar,
+      // [Ronda 1, hallazgo D] Antes esta acción nunca pasaba esto —a
+      // diferencia de `publicarAccion`/`deshacerAccion`, que sí—, así que el
+      // arranque y el guardado del borrador nunca podían chocar con el tope
+      // de cuerpo real, aunque el pedido HTTP que los trajo sí lo hubiera
+      // pasado.
+      bytesDelCuerpo: contexto.bytesDelCuerpo
+    });
+    if (r.ok) return ok({ ok: true });
+    if (r.motivo === "hay-uno-mas-nuevo") {
+      return {
+        status: 409,
+        cuerpo: { ok: false, motivo: "hay-uno-mas-nuevo", otro: r.otro, problema: PROBLEMA_BORRADOR_MAS_NUEVO }
+      };
+    }
+    console.error(`borrador.guardar: no se pudo guardar (autor: ${sesion.correo}) \u2014 ${r.problema}`);
+    return error51(502, PROBLEMA_NO_SE_PUDO_GUARDAR_BORRADOR);
+  } catch (e) {
+    console.error("borrador.guardar: revent\xF3 al guardar \u2014", e);
+    return error51(502, PROBLEMA_NO_SE_PUDO_GUARDAR_BORRADOR);
+  }
+}
+async function borradorLeerAccion(pedido, contexto) {
+  const env = contexto.env;
+  if (!secretoUtilizable(env)) {
+    console.error("borrador.leer: PANEL_SECRETO falta o mide menos de 32 caracteres.");
+    return error51(503, PROBLEMA_INESPERADO);
+  }
+  const sesion = sesionVigente(pedido.cookie, env, contexto.ahora());
+  if (!sesion) return error51(401, PROBLEMA_SESION);
+  const gh = clienteDeGitHub(contexto);
+  try {
+    const borrador = await leeBorrador(gh);
+    return ok({ ok: true, borrador });
+  } catch (e) {
+    console.error("borrador.leer: no se pudo leer el borrador \u2014", e);
+    return error51(502, PROBLEMA_NO_SE_PUDO_LEER_BORRADOR);
   }
 }
 var PROBLEMA_ACCION_INEXISTENTE = "Esta acci\xF3n todav\xEDa no existe.";
@@ -17990,10 +19174,24 @@ async function maneja(accion, pedido, contexto) {
     switch (accion) {
       case "entrar":
         return entrar(pedido, contexto);
+      case "enlace":
+        return await enlaceAccion(pedido, contexto);
+      case "entrar-con-enlace":
+        return await entrarConEnlaceAccion(pedido, contexto);
       case "publicar":
         return await publicarAccion(pedido, contexto);
       case "salud":
         return await salud(pedido, contexto);
+      case "estado":
+        return await estadoAccion(pedido, contexto);
+      case "deshacer":
+        return await deshacerAccion(pedido, contexto);
+      case "historial":
+        return await historialAccion(pedido, contexto);
+      case "borrador.guardar":
+        return await borradorGuardarAccion(pedido, contexto);
+      case "borrador.leer":
+        return await borradorLeerAccion(pedido, contexto);
       default:
         return error51(404, PROBLEMA_ACCION_INEXISTENTE);
     }
@@ -18026,8 +19224,29 @@ function ipDelPedido(headers) {
   return primera || "desconocida";
 }
 
+// src/servidor/correo.ts
+async function manda(c, carta) {
+  try {
+    if (!c?.clave || !c?.remitente) return { ok: false, motivo: "sin-configurar" };
+    if (!carta?.a?.length) return { ok: false, motivo: "sin-destino" };
+    const respuesta = await c.fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${c.clave}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: c.remitente, to: carta.a, subject: carta.asunto, text: carta.texto })
+    });
+    return respuesta.ok ? { ok: true } : { ok: false, motivo: "rechazado" };
+  } catch {
+    return { ok: false, motivo: "rechazado" };
+  }
+}
+
 // src/servidor/entradas/panel.ts
 var valorUnico2 = (v) => Array.isArray(v) ? v[0] ?? "" : v ?? "";
+function bytesDeCuerpo(headers) {
+  const crudo = valorUnico2(headers["content-length"]);
+  const n = Number.parseInt(crudo, 10);
+  return Number.isFinite(n) && n > 0 ? n : void 0;
+}
 function cookieDePanel(header) {
   const cadena = Array.isArray(header) ? header.join("; ") : header ?? "";
   for (const parte of cadena.split(";")) {
@@ -18050,7 +19269,12 @@ function entorno() {
     PANEL_CORREOS: process.env.PANEL_CORREOS,
     PANEL_GITHUB_TOKEN: process.env.PANEL_GITHUB_TOKEN,
     GITHUB_DUENIO: process.env.GITHUB_DUENIO ?? process.env.VERCEL_GIT_REPO_OWNER ?? "MarcosBuratovich",
-    GITHUB_REPO: process.env.GITHUB_REPO ?? process.env.VERCEL_GIT_REPO_SLUG ?? "maracacao"
+    GITHUB_REPO: process.env.GITHUB_REPO ?? process.env.VERCEL_GIT_REPO_SLUG ?? "maracacao",
+    PANEL_VERCEL_TOKEN: process.env.PANEL_VERCEL_TOKEN,
+    PANEL_VERCEL_PROYECTO: process.env.PANEL_VERCEL_PROYECTO ?? process.env.VERCEL_GIT_REPO_SLUG ?? "maracacao",
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    PANEL_REMITENTE: process.env.PANEL_REMITENTE,
+    PANEL_AVISOS_A: process.env.PANEL_AVISOS_A
   };
 }
 async function handler(req, res) {
@@ -18064,7 +19288,18 @@ async function handler(req, res) {
     env: entorno(),
     fetch: globalThis.fetch,
     ahora: () => Date.now(),
-    ip: ipDelPedido(req.headers)
+    // [Revisión final de la rama, C2] Los dos relojes se arman ACÁ, que es
+    // el único archivo autorizado a tocar el global. `monotono` usa
+    // `performance.now()` —que no salta si el reloj del sistema se
+    // reajusta, y medir el piso de tiempo del enlace mágico contra un reloj
+    // que puede saltar para atrás es justamente cómo se reabre el oráculo
+    // que ese piso cierra—; `espera` es el `setTimeout` de verdad, el que
+    // un test reemplaza por uno que no duerme.
+    monotono: () => performance.now(),
+    espera: (ms) => new Promise((resuelve) => setTimeout(resuelve, ms)),
+    ip: ipDelPedido(req.headers),
+    bytesDelCuerpo: bytesDeCuerpo(req.headers),
+    correo: (carta) => manda({ clave: process.env.RESEND_API_KEY, remitente: process.env.PANEL_REMITENTE, fetch: globalThis.fetch }, carta)
   };
   const r = await maneja(accion, pedido, contexto);
   if (r.cookie) res.setHeader("Set-Cookie", r.cookie);

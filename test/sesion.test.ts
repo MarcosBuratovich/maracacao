@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest'
 import { createHmac } from 'node:crypto'
 import {
   hashDeClave, claveCorrecta, firmaSesion, verificaSesion, cookieDeSesion, intentoPermitido,
-  LARGO_MIN_SECRETO,
+  clavesDeFreno, LARGO_MIN_SECRETO,
 } from '../src/servidor/sesion'
 
 const SECRETO = 'secreto-de-prueba-no-es-el-de-produccion'
@@ -34,7 +34,7 @@ describe('la contraseña', () => {
 })
 
 describe('la cookie de sesión', () => {
-  const sesion = { correo: 'clienta@ejemplo.mx', vence: Date.now() + 86_400_000, dispositivo: 'celu' }
+  const sesion = { correo: 'clienta@ejemplo.mx', vence: Date.now() + 86_400_000, dispositivo: 'celu', emitida: Date.now() }
 
   it('vuelve a leer lo que firmó', () => {
     expect(verificaSesion(firmaSesion(sesion, SECRETO), SECRETO)).toEqual(sesion)
@@ -98,7 +98,7 @@ describe('la cookie de sesión', () => {
 })
 
 describe('C-1: un PANEL_SECRETO corto o ausente no puede tratarse como el secreto real', () => {
-  const sesion = { correo: 'clienta@ejemplo.mx', vence: Date.now() + 86_400_000, dispositivo: 'celu' }
+  const sesion = { correo: 'clienta@ejemplo.mx', vence: Date.now() + 86_400_000, dispositivo: 'celu', emitida: Date.now() }
 
   it('firmaSesion() tira con la cadena vacía y con cualquier secreto corto', () => {
     // La cadena vacía es justo lo que `contexto.env.PANEL_SECRETO ?? ''`
@@ -142,6 +142,36 @@ describe('C-1: un PANEL_SECRETO corto o ausente no puede tratarse como el secret
   })
 })
 
+describe('emitida y el propósito adentro de la firma', () => {
+  it('la sesión firmada dice cuándo se emitió', () => {
+    const secreto = 'x'.repeat(40)
+    const cookie = firmaSesion(
+      { correo: 'a@b.mx', vence: 2_000_000, dispositivo: 'celu', emitida: 1_000_000 },
+      secreto,
+    )
+    expect(verificaSesion(cookie, secreto, 1_500_000)?.emitida).toBe(1_000_000)
+  })
+
+  it('una cookie sin `emitida` no vale, aunque la firma sea buena', () => {
+    // No es paranoia: es lo que hace que el candado de `PANEL_SESIONES_DESDE`
+    // no se pueda saltear mandando una cookie vieja a la que le falta el campo.
+    const secreto = 'x'.repeat(40)
+    const cuerpo = Buffer.from(JSON.stringify({ correo: 'a@b.mx', vence: 2_000_000, dispositivo: 'celu' })).toString('base64url')
+    const firma = createHmac('sha256', secreto).update(`sesion|${cuerpo}`).digest('base64url')
+    expect(verificaSesion(`${cuerpo}.${firma}`, secreto, 1_500_000)).toBeNull()
+  })
+
+  it('C-2: la firma lleva el propósito adentro, así que un token de otro propósito no sirve de cookie', () => {
+    // Sin esto, cualquier cosa que este mismo secreto firme —el enlace mágico
+    // de la Tarea 12— serviría como cookie de sesión y al revés. El propósito
+    // va ADENTRO de lo que se firma (spec §4.1), no al lado.
+    const secreto = 'x'.repeat(40)
+    const cuerpo = Buffer.from(JSON.stringify({ correo: 'a@b.mx', vence: 2_000_000, dispositivo: 'celu', emitida: 1 })).toString('base64url')
+    const firmaDeOtroProposito = createHmac('sha256', secreto).update(`entrar|${cuerpo}`).digest('base64url')
+    expect(verificaSesion(`${cuerpo}.${firmaDeOtroProposito}`, secreto, 1_500_000)).toBeNull()
+  })
+})
+
 describe('el freno a la fuerza bruta', () => {
   it('deja pasar cinco intentos y frena el sexto', () => {
     const ip = `prueba-${Math.random()}`
@@ -157,10 +187,77 @@ describe('el freno a la fuerza bruta', () => {
     expect(intentoPermitido(ip, t0 + 15 * 60_000 + 1)).toBe(true)
   })
 
-  it('cuenta por IP, no en total', () => {
+  it('cuenta por clave, no en total', () => {
     const a = `a-${Math.random()}`, b = `b-${Math.random()}`
     for (let i = 0; i < 5; i++) intentoPermitido(a)
     expect(intentoPermitido(a)).toBe(false)
     expect(intentoPermitido(b)).toBe(true)
+  })
+
+  // [Ronda 1, Tarea 12, hallazgo E] La clave ya no es solo la IP: cada
+  // llamador arma la suya (`<acción>:<ip>` en acciones.ts) para que el
+  // presupuesto de una acción no le coma el de otra — acá, con dos claves
+  // que comparten la misma IP pero un prefijo distinto, para probar que
+  // la función no le presta ninguna atención a lo que la clave signifique.
+  it('[Ronda 1, hallazgo E] dos claves con la misma IP pero prefijo distinto no comparten presupuesto', () => {
+    const ip = `${Math.random()}`
+    const claveA = `entrar:${ip}`
+    const claveB = `enlace:${ip}`
+    for (let i = 0; i < 5; i++) expect(intentoPermitido(claveA)).toBe(true)
+    expect(intentoPermitido(claveA)).toBe(false)
+    expect(intentoPermitido(claveB)).toBe(true) // otro prefijo, mismo "ip": presupuesto propio
+  })
+
+  // [Ronda 1, hallazgo F] `tope` es configurable para el freno por
+  // destinatario, que protege otra cosa (la bandeja de ella) con otro
+  // número (tres, no cinco).
+  it('[Ronda 1, hallazgo F] `tope` configurable: dos intentos permitidos, el tercero frena', () => {
+    const clave = `tope-chico-${Math.random()}`
+    expect(intentoPermitido(clave, Date.now(), 2)).toBe(true)
+    expect(intentoPermitido(clave, Date.now(), 2)).toBe(true)
+    expect(intentoPermitido(clave, Date.now(), 2)).toBe(false)
+  })
+})
+
+/*
+ * [Revisión final de la rama] El `Map` del freno filtraba las marcas viejas
+ * de la clave que se consultaba, pero NUNCA borraba una clave.
+ *
+ * Cada dirección distinta que alguien mande a `enlace` deja la suya
+ * (`enlace-destino:<correo>`, acciones.ts), y eso es entrada controlada por
+ * quien ataca: un bucle con direcciones inventadas hacía crecer este `Map`
+ * sin techo mientras la instancia viviera. Con el barrido, lo que queda vivo
+ * está acotado por las claves vistas EN LA VENTANA, no por todas las vistas
+ * desde que arrancó el proceso.
+ */
+describe('el freno de intentos no acumula claves para siempre', () => {
+  it('las claves que nadie volvió a usar en la ventana se sueltan', () => {
+    const ahora = 4_000_000_000_000
+    const antes = clavesDeFreno()
+
+    // Bien por encima del umbral de barrido (mil): es lo que simula el bucle
+    // con direcciones inventadas.
+    for (let i = 0; i < 1_500; i++) {
+      intentoPermitido(`basura-${ahora}-${i}`, ahora)
+    }
+    expect(clavesDeFreno()).toBeGreaterThan(antes + 1_000)
+
+    // Pasada la ventana de quince minutos, el primer pedido que llegue barre
+    // lo vencido: ninguna de esas mil quinientas claves sigue viva.
+    const despues = ahora + 16 * 60_000
+    intentoPermitido('alguien-de-verdad', despues)
+    expect(clavesDeFreno()).toBeLessThan(100)
+  })
+
+  it('barrer no le saca el presupuesto a quien SÍ está dentro de la ventana', () => {
+    // Lo que no puede pasar: que la limpieza le regale intentos a quien está
+    // siendo frenado ahora mismo. Es el freno de la puerta principal.
+    const ahora = 5_000_000_000_000
+    const clave = `vigente-${Math.random()}`
+    for (let i = 0; i < 5; i++) expect(intentoPermitido(clave, ahora)).toBe(true)
+    expect(intentoPermitido(clave, ahora)).toBe(false)
+
+    for (let i = 0; i < 1_500; i++) intentoPermitido(`ruido-${ahora}-${i}`, ahora)
+    expect(intentoPermitido(clave, ahora + 1_000)).toBe(false) // sigue frenado
   })
 })

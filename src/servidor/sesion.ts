@@ -12,11 +12,20 @@
  */
 import { scryptSync, randomBytes, timingSafeEqual, createHmac } from 'node:crypto'
 
-/** El cuerpo de la cookie: quién es, hasta cuándo vale, desde qué aparato. */
+/** El cuerpo de la cookie: quién es, hasta cuándo vale, desde qué aparato, desde cuándo. */
 export interface Sesion {
   correo: string
   vence: number
   dispositivo: string
+  /**
+   * Cuándo se firmó, en epoch ms. No es lo mismo que `vence` y no se puede
+   * derivar de él: `vence` depende de si el aparato se marcó como propio (un
+   * año) o no (treinta días), así que dos sesiones que vencen el mismo día
+   * pueden haberse emitido con once meses de diferencia. Esto es lo que hace
+   * posible «cerrar sesión en todos lados» sin rotar el secreto: se corre una
+   * fecha (`PANEL_SESIONES_DESDE`) y todo lo firmado antes deja de valer.
+   */
+  emitida: number
 }
 
 // Parámetros de scrypt: N=16384 (2^14), r=8, p=5. Es la fila N=2^14 de la
@@ -132,6 +141,24 @@ export function claveCorrecta(clave: string, guardado: string): boolean {
 }
 
 /**
+ * El propósito de un token firmado con `PANEL_SECRETO`, metido ADENTRO de lo
+ * que se firma. El mismo secreto va a firmar dos cosas distintas —la cookie
+ * de sesión y el enlace mágico de recuperación (spec §4.1)— y sin esto, un
+ * token de uno sirve de token del otro: quien tenga un enlace mágico
+ * interceptado en su bandeja de entrada lo pega como cookie y ya está
+ * adentro, sin que el enlace se «consuma» nunca.
+ *
+ * Va como prefijo del mensaje y no como campo del JSON a propósito: un campo
+ * del JSON también funcionaría, pero solo si TODOS los verificadores se
+ * acuerdan de mirarlo. Como prefijo, olvidarse no es una opción — la firma
+ * directamente no da.
+ */
+export const DOMINIO_SESION = 'sesion'
+
+/** Lo que se le pasa al HMAC: el propósito, una barra, y el cuerpo. */
+export const mensajeFirmado = (dominio: string, cuerpo: string): string => `${dominio}|${cuerpo}`
+
+/**
  * Firma una sesión: `<JSON en base64url>.<HMAC-SHA256 en base64url>`.
  *
  * [C-1] Tira si `secreto` mide menos de `LARGO_MIN_SECRETO`: una firma hecha
@@ -148,7 +175,7 @@ export function firmaSesion(sesion: Sesion, secreto: string): string {
     )
   }
   const cuerpo = Buffer.from(JSON.stringify(sesion)).toString('base64url')
-  const firma = createHmac('sha256', secreto).update(cuerpo).digest('base64url')
+  const firma = createHmac('sha256', secreto).update(mensajeFirmado(DOMINIO_SESION, cuerpo)).digest('base64url')
   return `${cuerpo}.${firma}`
 }
 
@@ -179,13 +206,18 @@ export function verificaSesion(cookie: string, secreto: string, ahora: number = 
     const firma = cookie.slice(punto + 1)
     if (cookie.indexOf('.', punto + 1) !== -1) return null
 
-    const firmaEsperada = createHmac('sha256', secreto).update(cuerpo).digest()
+    const firmaEsperada = createHmac('sha256', secreto).update(mensajeFirmado(DOMINIO_SESION, cuerpo)).digest()
     const firmaRecibida = Buffer.from(firma, 'base64url')
     if (firmaRecibida.length !== firmaEsperada.length) return null
     if (!timingSafeEqual(firmaRecibida, firmaEsperada)) return null
 
     const sesion = JSON.parse(Buffer.from(cuerpo, 'base64url').toString('utf8')) as Sesion
-    if (typeof sesion.correo !== 'string' || typeof sesion.vence !== 'number' || typeof sesion.dispositivo !== 'string') {
+    if (
+      typeof sesion.correo !== 'string' ||
+      typeof sesion.vence !== 'number' ||
+      typeof sesion.dispositivo !== 'string' ||
+      typeof sesion.emitida !== 'number'
+    ) {
       return null
     }
     if (sesion.vence <= ahora) return null
@@ -208,7 +240,18 @@ export function cookieDeSesion(valor: string, dias: number): string {
 }
 
 // Freno a la fuerza bruta: marcas de tiempo de los últimos quince minutos
-// por IP, en memoria del proceso.
+// por CLAVE, en memoria del proceso.
+//
+// [Ronda 1, Tarea 12, hallazgo E] La clave ya no es solo la IP. Antes,
+// `entrar` y `salud` (y ahora `enlace`/`entrar-con-enlace`) compartían un
+// único contador por IP — y eso se volvía en contra el día que más
+// importaba: la clienta que pide el enlace cinco veces porque no le llega
+// se quedaba, de paso, sin poder usar su contraseña por quince minutos.
+// Cada llamador arma su propia clave (`<acción>:<ip>` en `acciones.ts`) para
+// que el presupuesto de una acción no le coma el de otra. La misma función
+// también frena por DESTINATARIO (hallazgo F: `enlace-destino:<correo>`,
+// con su propio tope, más chico) — el mecanismo no sabe ni le importa qué
+// representa la clave, solo cuenta cuántas veces se la vio en la ventana.
 //
 // [E4] Esto NO es la defensa principal, y hay que decirlo cada vez que
 // alguien lo lea: las funciones serverless son efímeras y concurrentes —
@@ -223,20 +266,53 @@ const VENTANA_MS = 15 * 60_000
 const TOPE_INTENTOS = 5
 
 /**
- * ¿Esta IP puede intentar entrar de nuevo? Cuenta los intentos de los
- * últimos quince minutos y, si ya hubo cinco, frena — este llamado en sí
- * también cuenta como intento cuando se permite, así que "cinco intentos
- * permitidos, el sexto frena" es exacto.
+ * [Revisión final de la rama] A partir de cuántas claves vivas se barren las
+ * vencidas.
+ *
+ * El `Map` filtraba las marcas viejas de la clave que se estaba consultando,
+ * pero NUNCA borraba una clave: cada dirección distinta que alguien mande a
+ * `enlace` deja una (`enlace-destino:<correo>`), y eso es entrada controlada
+ * por quien ataca — un bucle con direcciones inventadas hace crecer este
+ * `Map` sin techo mientras la instancia viva. Con el barrido, lo que queda
+ * vivo está acotado por las claves VISTAS EN LA VENTANA, no por todas las
+ * vistas desde que arrancó el proceso.
+ *
+ * El umbral existe para que el camino normal siga siendo O(1): con menos
+ * claves que esto, barrer no vale la pena (el `Map` cabe de sobra en
+ * memoria); recién cuando alguien lo está inflando a propósito se paga el
+ * recorrido, y se paga una vez cada tanto, no en cada pedido.
  */
-export function intentoPermitido(ip: string, ahora: number = Date.now()): boolean {
-  const marcas = (INTENTOS.get(ip) ?? []).filter((t) => ahora - t < VENTANA_MS)
+const CLAVES_ANTES_DE_BARRER = 1_000
 
-  if (marcas.length >= TOPE_INTENTOS) {
-    INTENTOS.set(ip, marcas)
+/** Saca del `Map` las claves cuyas marcas están todas fuera de la ventana. */
+function barreVencidas(ahora: number): void {
+  for (const [clave, marcas] of INTENTOS) {
+    if (marcas.every((t) => ahora - t >= VENTANA_MS)) INTENTOS.delete(clave)
+  }
+}
+
+/** Cuántas claves tiene vivas el freno ahora mismo. Solo para tests: no la usa ninguna acción. */
+export const clavesDeFreno = (): number => INTENTOS.size
+
+/**
+ * ¿Esta clave puede intentar de nuevo? Cuenta los intentos de los últimos
+ * quince minutos y, si ya hubo `tope` (cinco por defecto), frena — este
+ * llamado en sí también cuenta como intento cuando se permite, así que
+ * "cinco intentos permitidos, el sexto frena" es exacto. `tope` es
+ * configurable para el freno por destinatario (hallazgo F), que protege
+ * otra cosa (su bandeja, no nuestra cuota de intentos) con otro número.
+ */
+export function intentoPermitido(clave: string, ahora: number = Date.now(), tope: number = TOPE_INTENTOS): boolean {
+  if (INTENTOS.size > CLAVES_ANTES_DE_BARRER) barreVencidas(ahora)
+
+  const marcas = (INTENTOS.get(clave) ?? []).filter((t) => ahora - t < VENTANA_MS)
+
+  if (marcas.length >= tope) {
+    INTENTOS.set(clave, marcas)
     return false
   }
 
   marcas.push(ahora)
-  INTENTOS.set(ip, marcas)
+  INTENTOS.set(clave, marcas)
   return true
 }

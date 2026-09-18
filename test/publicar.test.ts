@@ -8,7 +8,8 @@ import { describe, it, expect } from 'vitest'
 import { cliente } from '../src/servidor/github'
 import { publica } from '../src/servidor/publicar'
 import { frase, type Cambio } from '../src/contenido/diff'
-import { fetchFalso } from './lib/github-falso'
+import { TOPE_CUERPO } from '../src/servidor/rutas-permitidas'
+import { fetchFalso, respuestasDeUnaPublicacionDirecta } from './lib/github-falso'
 
 describe('publicar', () => {
   it('hace blobs, árbol, commit y mueve el ref, en ese orden', async () => {
@@ -144,5 +145,229 @@ describe('publicar', () => {
       expect(r.resumen).not.toBe('')
     }
     expect(pedidos).toHaveLength(0)
+  })
+
+  it('M-9: el tope de cuerpo se mide contra el PEDIDO, no contra los archivos', async () => {
+    // El tope existe para no pasarse del límite de cuerpo de request que
+    // impone la plataforma: es un límite sobre lo que ENTRA a la función. Un
+    // documento chico que llegó adentro de un pedido enorme (varias fotos en
+    // el mismo lote) tiene que rebotar, aunque el archivo pese nada.
+    const { f } = fetchFalso([])
+    const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+
+    const r = await publica(gh, {
+      archivos: [{ ruta: 'src/contenido/datos/sitio.json', contenido: '{}' }],
+      autor: 'quien@ejemplo.mx',
+      bytesDelCuerpo: TOPE_CUERPO + 1,
+    })
+
+    expect(r).toEqual({
+      ok: false,
+      codigo: 422,
+      problema: 'Es demasiado contenido para una sola publicación: manda menos fotos, o de menor tamaño.',
+    })
+  })
+
+  it('M-9: sin la medida del pedido se cae a la suma de los archivos, como antes', async () => {
+    // El borde puede no tener cómo medir el cuerpo (sin Content-Length). Ahí
+    // la cuenta vieja es mejor que ninguna: es una cota inferior de lo que
+    // pesó el pedido, así que sigue frenando el lote descomunal.
+    const { f } = fetchFalso([])
+    const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+
+    const enorme = 'x'.repeat(TOPE_CUERPO)
+    const r = await publica(gh, {
+      archivos: [{ ruta: 'src/contenido/datos/sitio.json', contenido: enorme }],
+      autor: 'quien@ejemplo.mx',
+    })
+
+    expect(r.ok).toBe(false)
+  })
+
+  it('los trailers extra salen después de los dos de siempre, uno por línea', async () => {
+    const { f, pedidos } = fetchFalso([...respuestasDeUnaPublicacionDirecta()])
+    const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+    await publica(gh, {
+      archivos: [{ ruta: 'src/contenido/datos/sitio.json', contenido: '{}' }],
+      autor: 'ella@ejemplo.mx',
+      trailers: { 'Panel-Revierte': 'abc123' },
+    })
+    const creaCommit = pedidos.find((p) => p.url.endsWith('/git/commits') && p.metodo === 'POST')!
+    expect((creaCommit.cuerpo as { message: string }).message).toBe(
+      'Actualiza contenido del panel\n\nPanel: sí\nPanel-Autor: ella@ejemplo.mx\nPanel-Revierte: abc123',
+    )
+  })
+
+  // Ronda 2, Grupo E: `revertir.ts` pasa `reintentar: false` porque su
+  // reintento rearmaría el árbol sobre el commit que ganó la carrera CON LOS
+  // BYTES VIEJOS de la reversión — si ese commit es de Marcos, desaparece sin
+  // 409 y sin log. Este test fija el comportamiento de `publica()` en sí:
+  // con `reintentar: false`, un solo choque basta para rendirse.
+  it('E: con `reintentar: false`, un choque del PATCH no reintenta — 409 directo, sin un segundo intento', async () => {
+    const choque = { status: 422, cuerpo: { message: 'Update is not a fast forward' } }
+    const { f, pedidos } = fetchFalso([
+      { cuerpo: { object: { sha: 'm' } } }, { cuerpo: { sha: 'c', tree: { sha: 'a' } } },
+      { cuerpo: { sha: 'b' } }, { cuerpo: { sha: 'a2' } }, { cuerpo: { sha: 'c2' } }, choque,
+    ])
+    const r = await publica(cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f }), {
+      archivos: [{ ruta: 'src/contenido/datos/sitio.json', contenido: '{}' }],
+      autor: 'x@y.mx',
+      reintentar: false,
+    })
+    expect(r.ok).toBe(false)
+    if (!r.ok) {
+      expect(r.codigo).toBe(409)
+      expect(r.problema).toMatch(/Marcos/)
+    }
+    // Nada de un segundo `gh.ref`, ni un segundo PATCH: un solo choque, y se rinde.
+    expect(pedidos.filter((p) => p.metodo === 'PATCH')).toHaveLength(1)
+    expect(pedidos).toHaveLength(6)
+  })
+
+  // Tarea 11, decisión B5: el ref del borrador (`borrador.ts`) no tiene
+  // historia que preservar, así que se mueve con `force: true` — la ÚNICA
+  // excepción de todo el proyecto a la regla de `force: false`.
+  describe('B5: el ref del borrador (force) — y por qué NUNCA es main', () => {
+    it('el ref de borrador se mueve con force; main NUNCA', async () => {
+      const { f, pedidos } = fetchFalso([...respuestasDeUnaPublicacionDirecta()])
+      const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+      await publica(gh, {
+        archivos: [{ ruta: 'panel/borrador.json', contenido: '{}' }],
+        autor: 'ella@x.mx',
+        ref: 'panel/borrador',
+        forzar: true,
+      })
+      const patch = pedidos.find((p) => p.metodo === 'PATCH')!
+      expect(patch.url).toContain('/git/refs/panel/borrador')
+      expect((patch.cuerpo as { force: boolean }).force).toBe(true)
+    })
+
+    it('la lista blanca que se aplica depende del ref', async () => {
+      // Un archivo de contenido mandado al ref de borrador se rechaza, y el
+      // archivo del borrador mandado a main también. Si una sola lista
+      // valiera para los dos, un bug del router podría publicar el
+      // borrador en el sitio, o un documento del sitio en el ref que la
+      // plataforma no despliega.
+      const { f } = fetchFalso([])
+      const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+      expect(
+        (await publica(gh, { archivos: [{ ruta: 'src/contenido/datos/sitio.json', contenido: '{}' }], autor: 'a@b.mx', ref: 'panel/borrador', forzar: true })).ok,
+      ).toBe(false)
+      expect((await publica(gh, { archivos: [{ ruta: 'panel/borrador.json', contenido: '{}' }], autor: 'a@b.mx' })).ok).toBe(false)
+    })
+
+    it('forzar:true contra `heads/main` (el default) tira: es un bug de quien llama, no un caso legítimo', async () => {
+      const { f, pedidos } = fetchFalso([])
+      const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+      await expect(
+        publica(gh, { archivos: [{ ruta: 'src/contenido/datos/sitio.json', contenido: '{}' }], autor: 'a@b.mx', forzar: true }),
+      ).rejects.toThrow()
+      // Ni un pedido: revienta ANTES de tocar GitHub, no a mitad de camino.
+      expect(pedidos).toHaveLength(0)
+    })
+
+    it('forzar:true contra `ref: \'heads/main\'` explícito también tira, no solo contra el default', async () => {
+      const { f, pedidos } = fetchFalso([])
+      const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+      await expect(
+        publica(gh, {
+          archivos: [{ ruta: 'src/contenido/datos/sitio.json', contenido: '{}' }],
+          autor: 'a@b.mx',
+          ref: 'heads/main',
+          forzar: true,
+        }),
+      ).rejects.toThrow()
+      expect(pedidos).toHaveLength(0)
+    })
+
+    it('sin `ref`/`forzar`, todo sigue exactamente igual: se escribe en main, sin force', async () => {
+      // El default nuevo tiene que ser invisible para todo lo que ya
+      // llamaba a publica() antes de esta tarea.
+      const { f, pedidos } = fetchFalso([...respuestasDeUnaPublicacionDirecta()])
+      const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+      const r = await publica(gh, {
+        archivos: [{ ruta: 'src/contenido/datos/sitio.json', contenido: '{}' }],
+        autor: 'x@y.mx',
+      })
+      expect(r.ok).toBe(true)
+      const patch = pedidos.find((p) => p.metodo === 'PATCH')!
+      expect(patch.url).toContain('/git/refs/heads/main')
+      expect((patch.cuerpo as { force: boolean }).force).toBe(false)
+    })
+
+    // [Ronda 1, hallazgo C] La guardia vieja era «todo lo que no sea
+    // heads/main» — así que CUALQUIER ref desconocido con `forzar: true`
+    // pasaba. Medido: un typo como `'heads/borrador'` —un nombre que cae
+    // DENTRO de `refs/heads/`, no el ref del borrador de verdad— también
+    // pasaba, y el borrador a medio escribir habría aterrizado en una RAMA
+    // que la plataforma sí despliega. Ahora es un mapa explícito: un ref
+    // fuera de él truena, forcé o no.
+    describe('C: un mapa explícito de refs conocidos, no una prohibición sobre un único valor', () => {
+      it('un ref de TERCEROS con forzar:true YA NO pasa: tira', async () => {
+        const { f, pedidos } = fetchFalso([])
+        const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+        await expect(
+          publica(gh, {
+            archivos: [{ ruta: 'panel/borrador.json', contenido: '{}' }],
+            autor: 'a@b.mx',
+            ref: 'refs/algo-inventado',
+            forzar: true,
+          }),
+        ).rejects.toThrow()
+        expect(pedidos).toHaveLength(0)
+      })
+
+      it('el caso que de verdad importa: un typo DENTRO de refs/heads/ (una rama real) también tira', async () => {
+        // Es justo la pregunta que el ref del borrador, fuera de
+        // refs/heads/, vino a cerrar (decisión B5): si esto NO tirara, el
+        // borrador a medio escribir se publicaría en una rama de verdad, que
+        // la plataforma SÍ mira y despliega.
+        const { f, pedidos } = fetchFalso([])
+        const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+        await expect(
+          publica(gh, {
+            archivos: [{ ruta: 'panel/borrador.json', contenido: '{}' }],
+            autor: 'a@b.mx',
+            ref: 'heads/borrador',
+            forzar: true,
+          }),
+        ).rejects.toThrow()
+        expect(pedidos).toHaveLength(0)
+      })
+
+      it('un ref desconocido tira aunque NO pida forzar: no es "probablemente el del borrador"', async () => {
+        const { f, pedidos } = fetchFalso([])
+        const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+        await expect(
+          publica(gh, {
+            archivos: [{ ruta: 'panel/borrador.json', contenido: '{}' }],
+            autor: 'a@b.mx',
+            ref: 'heads/borrador',
+          }),
+        ).rejects.toThrow()
+        expect(pedidos).toHaveLength(0)
+      })
+
+      // [Ronda 2, hallazgo 2] `REFS_CONOCIDOS[ref]` a secas —antes de este
+      // arreglo— indexa una propiedad HEREDADA de `Object.prototype` para
+      // estos cuatro nombres, y esa propiedad heredada es truthy: la
+      // guardia `!config` no disparaba, `config.permiteRuta` salía
+      // `undefined`, y `revisaLote()` caía en SU propio default
+      // (`rutaPermitida`, la lista de MAIN) — publicando de verdad con la
+      // lista equivocada, en vez de tirar. No alcanzable hoy por HTTP (el
+      // ref nunca sale de un dato de la clienta), pero contradecía la
+      // invariante que este mismo hallazgo C fijó por escrito.
+      it('Ronda 2, hallazgo 2: una clave heredada del prototipo (__proto__, constructor, toString, valueOf) también tira', async () => {
+        const { f, pedidos } = fetchFalso([])
+        const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+        for (const ref of ['__proto__', 'constructor', 'toString', 'valueOf', 'hasOwnProperty']) {
+          await expect(
+            publica(gh, { archivos: [{ ruta: 'panel/borrador.json', contenido: '{}' }], autor: 'a@b.mx', ref }),
+            ref,
+          ).rejects.toThrow()
+        }
+        expect(pedidos).toHaveLength(0)
+      })
+    })
   })
 })

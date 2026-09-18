@@ -1,0 +1,148 @@
+---
+/*
+ * El enlace mágico de recuperación (spec §4.1): la puerta de emergencia,
+ * la que tiene que andar el día que no queda sesión ni panel (la fase
+ * siguiente) con que entrar. HTML estático, sin React ni islas: nada acá
+ * adentro necesita hidratarse.
+ *
+ * A PROPÓSITO no usa el `candado` de `Base.astro`. Ese candado compara un
+ * SHA-256 EN EL NAVEGADOR, y su propio comentario lo dice con todas las
+ * letras: es «una tranca para que nadie llegue de casualidad, NO
+ * seguridad real» (el sitio es estático, el HTML viaja igual). La
+ * seguridad de VERDAD acá es el token HMAC de quince minutos que firma y
+ * verifica `src/servidor/enlace.ts`, en el servidor — ponerle el candado
+ * ENCIMA no protege nada más, solo le suma una contraseña de más a
+ * escribir el día que ella ya perdió la suya.
+ */
+---
+<!doctype html>
+<html lang="es-MX">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Entrar al panel</title>
+  </head>
+  <body>
+    <main>
+      <p id="aviso" aria-live="polite">Un momento…</p>
+      <button id="entrar" type="button" hidden>Entrar al panel</button>
+    </main>
+    <script is:inline>
+      // [A, Critical — Ronda 1 de revisión] El token se LEE primero. Antes,
+      // `history.replaceState` corría antes de leer `location.search` —lo
+      // reescribe de forma SÍNCRONA— así que para cuando el código de abajo
+      // leía el token, la barra ya estaba vacía: `token` daba siempre `''`,
+      // el botón no aparecía nunca, y la página decía siempre «no
+      // funciona». Verificado en un Chromium de verdad que invertir el
+      // orden lo arregla y, medido, NO reintroduce el token en la barra
+      // (`replaceState` igual reemplaza la entrada del historial, ahora
+      // después de haber leído lo que hacía falta).
+      const token = new URLSearchParams(location.search).get('token') ?? ''
+      history.replaceState(null, '', location.pathname)
+
+      const aviso = document.getElementById('aviso')
+      const boton = document.getElementById('entrar')
+
+      if (!token) {
+        aviso.textContent = 'Este enlace no funciona. Pide uno nuevo.'
+      } else {
+        aviso.hidden = true
+        boton.hidden = false
+      }
+
+      /*
+       * [Revisión final de la rama, I7] Un id propio de ESTE navegador,
+       * estable entre visitas.
+       *
+       * Antes esta página mandaba solo `{ token }`, y el servidor
+       * (`idDeDispositivo(undefined)`) resolvía eso como `'sin-nombre'` — que
+       * quedaba FIRMADO en la cookie. Dos consecuencias, las dos malas:
+       * revocar `sin-nombre` en `PANEL_DISPOSITIVOS_REVOCADOS` mataba las
+       * sesiones de recuperación de TODO el mundo a la vez, y el candado
+       * anti-pisada del borrador —que compara aparatos— no tenía nada que
+       * comparar entre dos personas que entraron las dos por enlace.
+       *
+       * Es un valor al azar, no un nombre: esta página no tiene forma de
+       * saber si esto es un celular o una tablet prestada, y adivinarlo con
+       * el `User-Agent` daría un dato falso con cara de cierto. Lo que sí
+       * tiene que ser es DISTINTO por navegador y el MISMO entre visitas del
+       * mismo navegador, que es lo único que necesitan la revocación y el
+       * borrador.
+       *
+       * Si el almacenamiento no se puede tocar (modo privado, permisos), sale
+       * uno de esta visita nomás: sigue siendo distinto del de los demás, que
+       * es lo que importa — perder la estabilidad es mucho menos grave que
+       * volver a compartir un id con todo el mundo.
+       */
+      function idDeAparato() {
+        const CLAVE = 'maracacao_aparato'
+        try {
+          const guardado = localStorage.getItem(CLAVE)
+          if (guardado) return guardado
+          const nuevo = 'aparato-' + crypto.randomUUID()
+          localStorage.setItem(CLAVE, nuevo)
+          return nuevo
+        } catch {
+          return 'aparato-' + crypto.randomUUID()
+        }
+      }
+
+      boton.addEventListener('click', async () => {
+        boton.disabled = true
+        aviso.hidden = false
+        aviso.textContent = 'Entrando…'
+        try {
+          // POST, nunca GET: así Gmail, Outlook y los antivirus pueden abrir
+          // ESTA página para escanearla sin gastar el enlace — solo un clic
+          // de verdad manda el pedido que lo consume.
+          const r = await fetch('/api/panel?accion=entrar-con-enlace', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, dispositivo: idDeAparato() }),
+          })
+
+          if (r.ok) {
+            boton.hidden = true
+            aviso.textContent = 'Listo, ya entraste.'
+            return
+          }
+
+          /*
+           * [Revisión final de la rama, I8] Los tres fracasos son distintos y
+           * ya venían con status distintos; esta página los aplastaba a todos
+           * en «este enlace ya no sirve».
+           *
+           * El escenario medido: ella perdió el teléfono y entra desde la
+           * tablet de una vecina. Detrás de ese NAT ya se gastaron los cinco
+           * intentos de la ventana, así que el servidor contesta 429. La
+           * página le decía que el enlace estaba muerto, ella pedía otro, lo
+           * probaba, otro 429, pedía otro… y a los diez pedidos se
+           * autobloqueaba la puerta de emergencia por quince minutos, con un
+           * enlace perfectamente válido en la mano.
+           *
+           * Por eso las dos ramas recuperables dicen EXPLÍCITAMENTE que el
+           * enlace sigue sirviendo y dejan el botón usable: lo único que hay
+           * que hacer es esperar, y pedir otro es lo que empeora las cosas.
+           */
+          if (r.status === 429) {
+            boton.disabled = false
+            aviso.textContent = 'Demasiados intentos desde esta conexión. Espera unos minutos y vuelve a darle al botón: tu enlace sigue sirviendo.'
+            return
+          }
+          if (r.status >= 500) {
+            boton.disabled = false
+            aviso.textContent = 'No pudimos entrar en este momento. Espera un poco y vuelve a darle al botón: tu enlace sigue sirviendo.'
+            return
+          }
+
+          boton.hidden = true
+          aviso.textContent = 'Ese enlace ya no sirve: pide uno nuevo.'
+        } catch {
+          boton.disabled = false
+          aviso.textContent = 'No se pudo conectar. Intenta de nuevo.'
+        }
+      })
+    </script>
+  </body>
+</html>

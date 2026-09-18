@@ -27,6 +27,7 @@
 import { maneja, type Pedido, type Contexto, type Entorno } from '../acciones'
 import { origenPermitido } from '../origen'
 import { ipDelPedido } from '../ip'
+import { manda } from '../correo'
 
 interface PedidoHTTP {
   method?: string
@@ -41,6 +42,21 @@ interface RespuestaHTTP {
 }
 
 const valorUnico = (v: string | string[] | undefined): string => (Array.isArray(v) ? (v[0] ?? '') : (v ?? ''))
+
+/**
+ * Cuánto pesó el cuerpo del pedido, según `Content-Length`. Devuelve
+ * `undefined` cuando la cabecera no vino o no es un número — «no lo sé», que
+ * es distinto de «midió cero»— y con eso `publica()` se cae a la suma de los
+ * archivos. No se mide serializando `req.body` de nuevo —eso sería medir la
+ * reconstrucción, no el pedido— ni se confía en que el número sea honesto: es
+ * un tope de comodidad contra el límite de la plataforma, no un control de
+ * seguridad.
+ */
+function bytesDeCuerpo(headers: Record<string, string | string[] | undefined>): number | undefined {
+  const crudo = valorUnico(headers['content-length'])
+  const n = Number.parseInt(crudo, 10)
+  return Number.isFinite(n) && n > 0 ? n : undefined
+}
 
 /** El valor de `panel_sesion` adentro del header `Cookie`, o `''` si no vino. */
 function cookieDePanel(header: string | string[] | undefined): string {
@@ -74,6 +90,11 @@ function entorno(): Entorno {
     PANEL_GITHUB_TOKEN: process.env.PANEL_GITHUB_TOKEN,
     GITHUB_DUENIO: process.env.GITHUB_DUENIO ?? process.env.VERCEL_GIT_REPO_OWNER ?? 'MarcosBuratovich',
     GITHUB_REPO: process.env.GITHUB_REPO ?? process.env.VERCEL_GIT_REPO_SLUG ?? 'maracacao',
+    PANEL_VERCEL_TOKEN: process.env.PANEL_VERCEL_TOKEN,
+    PANEL_VERCEL_PROYECTO: process.env.PANEL_VERCEL_PROYECTO ?? process.env.VERCEL_GIT_REPO_SLUG ?? 'maracacao',
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    PANEL_REMITENTE: process.env.PANEL_REMITENTE,
+    PANEL_AVISOS_A: process.env.PANEL_AVISOS_A,
   }
 }
 
@@ -98,7 +119,18 @@ export default async function handler(req: PedidoHTTP, res: RespuestaHTTP) {
     env: entorno(),
     fetch: globalThis.fetch,
     ahora: () => Date.now(),
+    // [Revisión final de la rama, C2] Los dos relojes se arman ACÁ, que es
+    // el único archivo autorizado a tocar el global. `monotono` usa
+    // `performance.now()` —que no salta si el reloj del sistema se
+    // reajusta, y medir el piso de tiempo del enlace mágico contra un reloj
+    // que puede saltar para atrás es justamente cómo se reabre el oráculo
+    // que ese piso cierra—; `espera` es el `setTimeout` de verdad, el que
+    // un test reemplaza por uno que no duerme.
+    monotono: () => performance.now(),
+    espera: (ms) => new Promise<void>((resuelve) => setTimeout(resuelve, ms)),
     ip: ipDelPedido(req.headers),
+    bytesDelCuerpo: bytesDeCuerpo(req.headers),
+    correo: (carta) => manda({ clave: process.env.RESEND_API_KEY, remitente: process.env.PANEL_REMITENTE, fetch: globalThis.fetch }, carta),
   }
 
   const r = await maneja(accion, pedido, contexto)
