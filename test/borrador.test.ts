@@ -134,10 +134,73 @@ describe('el borrador del servidor', () => {
     expect(r.ok).toBe(true)
   })
 
+  /*
+   * [Revisión final de la rama, I1] El candado de arriba estaba MUERTO en
+   * producción, y los tests no lo veían porque todos le inyectaban un
+   * borrador del FUTURO contra un pedido del PASADO (hora 2.000 contra
+   * `ahora` 1.000), una combinación que el borde no puede producir: el
+   * `ahora` que llega a `guarda()` sale de `contexto.ahora()`, o sea del
+   * reloj del servidor, que siempre avanza. La condición vieja
+   * —`borrador.hora >= args.ahora`— era por eso SIEMPRE falsa con datos
+   * reales.
+   *
+   * Estos cuatro tests son el orden temporal REAL —el guardado viejo es más
+   * VIEJO que el pedido nuevo, como en la vida— y el token de concurrencia
+   * (`horaLeida`) que lo reemplaza.
+   */
+  describe('I1: el token de concurrencia, con el orden temporal que el borde produce de verdad', () => {
+    const ONCE = Date.parse('2026-09-18T11:00:00Z')
+    const ONCE_CINCO = Date.parse('2026-09-18T11:05:00Z')
+    const deLaHermana = JSON.stringify({
+      documentos: { sitio: { footer: { derechos: 'lo que escribió la hermana' } } },
+      base: 'a'.repeat(40),
+      dispositivo: 'la-compu',
+      autor: 'hermana@ejemplo.mx',
+      hora: ONCE,
+    })
+    const elRefYElBorrador = () => [
+      { cuerpo: { object: { sha: 'refViejo' } } },
+      { cuerpo: { content: Buffer.from(deLaHermana).toString('base64'), encoding: 'base64', sha: 'b' } },
+    ]
+
+    it('la hermana guarda a las 11:00 desde la compu y la clienta a las 11:05 desde el celu: NO se pisa', async () => {
+      // El escenario medido de la revisión final. Con el candado viejo esto
+      // daba `{ ok: true }` y el trabajo de la hermana desaparecía en
+      // silencio — que es exactamente el bug que la Tarea 11 dice haber
+      // cerrado.
+      const { f, pedidos } = fetchFalso([...elRefYElBorrador()])
+      const r = await guarda(gh(f), { ...UN_BORRADOR, dispositivo: 'celu', ahora: ONCE_CINCO })
+      expect(r).toEqual({ ok: false, motivo: 'hay-uno-mas-nuevo', otro: { dispositivo: 'la-compu', hora: ONCE } })
+      expect(pedidos).toHaveLength(2) // no escribió nada
+    })
+
+    it('si el aparato DECLARA haber leído ese mismo borrador, sí escribe: sabe qué está pisando', async () => {
+      // Es la misma idea que el `base` de publicar: no se bloquea a quien
+      // editó sobre el estado que hay, se bloquea a quien editó sobre otro.
+      const { f } = fetchFalso([...elRefYElBorrador(), ...respuestasDeUnaPublicacionDirecta()])
+      const r = await guarda(gh(f), { ...UN_BORRADOR, dispositivo: 'celu', ahora: ONCE_CINCO, horaLeida: ONCE })
+      expect(r.ok).toBe(true)
+    })
+
+    it('si declara haber leído un borrador VIEJO, se bloquea: la hermana guardó en el medio', async () => {
+      const { f } = fetchFalso([...elRefYElBorrador()])
+      const r = await guarda(gh(f), { ...UN_BORRADOR, dispositivo: 'celu', ahora: ONCE_CINCO, horaLeida: ONCE - 60_000 })
+      expect(r).toEqual({ ok: false, motivo: 'hay-uno-mas-nuevo', otro: { dispositivo: 'la-compu', hora: ONCE } })
+    })
+
+    it('`pisar: true` sigue siendo la salida, aunque el token no coincida', async () => {
+      const { f } = fetchFalso([...elRefYElBorrador(), ...respuestasDeUnaPublicacionDirecta()])
+      const r = await guarda(gh(f), { ...UN_BORRADOR, dispositivo: 'celu', ahora: ONCE_CINCO, pisar: true })
+      expect(r.ok).toBe(true)
+    })
+  })
+
   // [Ronda 1, hallazgo E4] Antes era `>`: dos guardados del mismo
   // milisegundo desde aparatos DISTINTOS pasaban el chequeo igual, y el
-  // segundo pisaba al primero sin avisar. Con `>=`, empatar también cuenta
-  // como pisada.
+  // segundo pisaba al primero sin avisar. Con `>=`, empatar también contaba
+  // como pisada. [Revisión final, I1] Ese borde dejó de existir: el candado
+  // ya no compara tiempos, compara tokens, así que no hay ningún milisegundo
+  // que acertar. El test se queda porque el CASO sigue teniendo que dar 409.
   it('E4: un empate exacto de milisegundo entre DOS aparatos también bloquea, no solo lo estrictamente más nuevo', async () => {
     const yaGuardado = JSON.stringify({ ...UN_BORRADOR, dispositivo: 'la-compu', hora: 1_000 })
     const { f } = fetchFalso([

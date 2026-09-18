@@ -4965,11 +4965,36 @@ interface Borrador {
   hora: number         // epoch ms
 }
 ```
-`borrador.guardar` (cuerpo `{ documentos, base, pisar? }`) devuelve
-`{ ok: true }` si guardó, o **409** con
+`borrador.guardar` (cuerpo `{ documentos, base, horaLeida?, pisar? }`)
+devuelve `{ ok: true }` si guardó, o **409** con
 `{ ok: false, motivo: 'hay-uno-mas-nuevo', otro: { dispositivo, hora }, problema }`
-si hay uno de OTRO aparato más nuevo y no se mandó `pisar: true` — el
-único campo que distingue este 409 de cualquier otro error es `motivo`.
+si hay uno de OTRO aparato que este pedido no declaró haber leído y no se
+mandó `pisar: true` — el único campo que distingue este 409 de cualquier
+otro error es `motivo`.
+
+**`horaLeida` es el campo que la fase 6 tiene que empezar a mandar**
+(agregado en la ola de arreglos de la revisión final, grupo 2). Es el token
+de concurrencia del borrador: la `hora` del `Borrador` que ESTE aparato
+recibió de `borrador.leer`, tal cual. Es la misma idea que el `base` de
+publicar, un nivel más abajo — el pedido declara contra qué estado se
+escribió, y el servidor compara contra eso.
+
+- **Se manda `horaLeida` cuando `borrador.leer` devolvió un borrador**, y se
+  omite cuando devolvió `null`. Después de un `borrador.guardar` exitoso, el
+  aparato NO conoce la `hora` nueva (se la pone el servidor): no hace falta
+  que la conozca, porque un borrador del MISMO dispositivo nunca se rechaza
+  a sí mismo — la autoguardada tecla-a-tecla sigue funcionando sin mandar
+  nada.
+- **Omitirlo no es un 400**, a diferencia del `base` de publicar: omitirlo
+  significa «no leí ninguno», que es la rama conservadora (409 con salida
+  por `pisar: true`). Una pantalla que se olvide del campo no rompe, pero le
+  va a preguntar de más a la segunda persona que edite.
+- **Por qué existe:** el candado que había antes comparaba
+  `borrador.hora >= ahora` —la hora de un guardado anterior contra el `ahora`
+  de este pedido— y el reloj del servidor siempre avanza, así que era
+  siempre falso. Medido: la hermana guarda 11:00 desde la compu, la clienta
+  guarda 11:05 desde el celular, `{ ok: true }`, y el trabajo de la hermana
+  se pisa en silencio.
 
 `publicar` exitoso siempre trae `avisos` — un array, **nunca ausente,
 vacío si no hay nada que avisar** (`acciones.ts`: «para que la pantalla

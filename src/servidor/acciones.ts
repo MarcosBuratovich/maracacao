@@ -1964,6 +1964,15 @@ const PROBLEMA_BORRADOR_MAS_NUEVO = 'Alguien más guardó un cambio más recient
 interface CuerpoBorradorGuardar {
   documentos?: unknown
   base?: unknown
+  /**
+   * [Revisión final de la rama, I1] La `hora` del borrador que ESTE aparato
+   * leyó (de `borrador.leer`), o ausente si no leyó ninguno. Es el token de
+   * concurrencia que hace que el candado anti-pisada exista de verdad — ver
+   * `DatosParaGuardar.horaLeida` en `borrador.ts` para el escenario medido
+   * que tenía roto, y el cierre de la Parte B: es un campo que la pantalla
+   * de la fase 6 ahora tiene que mandar.
+   */
+  horaLeida?: unknown
   /** Si hay que pisar el borrador de OTRO aparato aunque sea más nuevo (ver `guarda()`, `borrador.ts`). */
   pisar?: unknown
 }
@@ -1984,9 +1993,18 @@ interface CuerpoBorradorGuardar {
  * `autor` sale de la SESIÓN, nunca del cuerpo —mismo criterio que
  * `publicarAccion`—: quien firma el borrador es quien está autenticada, no
  * lo que el navegador diga que es. `ahora` sale del reloj inyectado, nunca
- * de lo que mande el cliente: si el aparato tiene la hora mal, el chequeo
- * de conflicto de `guarda()` tiene que seguir siendo correcto contra la
- * hora del SERVIDOR, que es la única que los dos aparatos comparten.
+ * de lo que mande el cliente: si el aparato tiene la hora mal, la `hora` que
+ * se guarda tiene que seguir saliendo del reloj del SERVIDOR, que es el
+ * único que los dos aparatos comparten.
+ *
+ * [Revisión final de la rama, I1] Lo que SÍ sale del cuerpo es `horaLeida`:
+ * la `hora` del borrador que este aparato leyó, o sea el token de
+ * concurrencia. No es un dato de confianza ni hace falta que lo sea —es un
+ * valor que el servidor mismo escribió y devolvió, y lo único que puede
+ * lograr mintiendo es pisar un borrador que igual podía pisar mandando
+ * `pisar: true`—: lo que hace es distinguir «edité sobre lo que hay» de
+ * «edité sobre otra cosa», que es la única pregunta que el candado
+ * anti-pisada necesita contestar.
  *
  * [Ronda 1, hallazgo A] `dispositivo` sale de `sesion.dispositivo` —FIRMADO
  * al entrar (E3, `sesion.ts`)—, nunca del cuerpo del pedido. El cuerpo ya no
@@ -2015,6 +2033,9 @@ async function borradorGuardarAccion(pedido: Pedido, contexto: Contexto): Promis
   }
   const documentos = comoDocumentos(cuerpo.documentos)
   const pisar = cuerpo.pisar === true
+  // Solo un número cuenta: cualquier otra cosa (ausente, `null`, una cadena)
+  // es «no leí ningún borrador», que es la rama conservadora de `guarda()`.
+  const horaLeida = typeof cuerpo.horaLeida === 'number' ? cuerpo.horaLeida : undefined
 
   const gh = cliente({
     token: env.PANEL_GITHUB_TOKEN ?? '',
@@ -2030,6 +2051,7 @@ async function borradorGuardarAccion(pedido: Pedido, contexto: Contexto): Promis
       dispositivo: sesion.dispositivo,
       autor: sesion.correo,
       ahora: contexto.ahora(),
+      ...(horaLeida !== undefined ? { horaLeida } : {}),
       pisar,
       // [Ronda 1, hallazgo D] Antes esta acción nunca pasaba esto —a
       // diferencia de `publicarAccion`/`deshacerAccion`, que sí—, así que el

@@ -198,6 +198,31 @@ export interface DatosParaGuardar {
   dispositivo: string
   autor: string
   ahora: number
+  /**
+   * [Revisión final de la rama, I1] El token de concurrencia: la `hora` del
+   * borrador que ESTE aparato leyó antes de escribir, o `undefined` si no
+   * leyó ninguno (porque no había, o porque ni miró).
+   *
+   * Es la misma idea que el `base` de publicar, un nivel más abajo: el
+   * pedido declara CONTRA QUÉ ESTADO se escribió, y el servidor compara
+   * contra eso. Lo que había antes comparaba `borrador.hora >= ahora` —la
+   * hora de un guardado ANTERIOR contra el `ahora` de ESTE pedido— y el
+   * reloj del servidor siempre avanza, así que la condición era SIEMPRE
+   * falsa: el candado estaba muerto en producción. Medido corriendo
+   * `guarda()` de verdad: la hermana guarda a las 11:00 desde la compu, la
+   * clienta guarda a las 11:05 desde el celular, `{ ok: true }`, y el
+   * trabajo de la hermana se pisa en silencio. Los tests pasaban porque le
+   * inyectaban un borrador del FUTURO contra un pedido del PASADO, una
+   * combinación que el borde no puede producir.
+   *
+   * Ausente NO es un error (a diferencia del `base` de publicar, que da
+   * 400): ausente significa «no leí ninguno», que es la rama CONSERVADORA
+   * —bloquea si hay uno de otro aparato— y tiene salida por la interfaz
+   * (`pisar: true`). Un 400 acá, en cambio, mataría la autoguardada entera
+   * de cualquier pantalla que todavía no mande el campo, que es el camino
+   * que corre cada pocos segundos mientras ella escribe.
+   */
+  horaLeida?: number
   /** Si hay que pisar el borrador de OTRO aparato aunque sea más nuevo. Default `false`. */
   pisar?: boolean
   /**
@@ -226,20 +251,33 @@ function bytesDeContenido(contenido: string): number {
  *
  * Lo único que SÍ hace acá, porque perder trabajo en silencio es el único
  * resultado inaceptable (mismo criterio que la Tarea 2 aplicó a publicar):
- * si YA hay un borrador LEGIBLE de OTRO dispositivo y es tan nuevo o más
- * nuevo que `ahora` (`>=`, no `>` — [Ronda 1, hallazgo E4] dos guardados del
- * mismo milisegundo desde aparatos distintos también cuentan como pisada, no
- * solo el estrictamente posterior), este guardado se rechaza —sin escribir
- * nada— salvo que venga `pisar: true`. Un borrador del MISMO dispositivo
- * nunca se rechaza a sí mismo (es la autoguardada normal de la fase 6, tecla
- * tras tecla).
+ * si YA hay un borrador LEGIBLE de OTRO dispositivo y este pedido NO declara
+ * haberlo leído —`horaLeida` no es la `hora` que ese borrador tiene—, este
+ * guardado se rechaza, sin escribir nada, salvo que venga `pisar: true`.
  *
- * [Ronda 1, hallazgo E5] Un borrador SIN `hora` (o directamente ILEGIBLE)
- * nunca bloquea: se trata como más viejo que cualquier `ahora` real, así que
- * este guardado sigue adelante y lo pisa. Es la decisión correcta —mejor
+ * [Revisión final de la rama, I1] Ese «no declara haberlo leído» reemplaza
+ * al `actual.borrador.hora >= args.ahora` de antes, que era un candado
+ * MUERTO: comparaba la hora de un guardado anterior contra el `ahora` de
+ * este pedido, y como el reloj del servidor avanza, la condición era siempre
+ * falsa (ver `DatosParaGuardar.horaLeida`, arriba, con el escenario medido).
+ * La comparación correcta no es contra «ahora» —el tiempo no dice nada sobre
+ * quién leyó qué— sino contra el ESTADO que este aparato tenía a la vista,
+ * igual que el `base` de publicar. De paso, el hallazgo E4 de la Ronda 1
+ * —empatar el milisegundo también cuenta como pisada— deja de necesitar un
+ * `>=` cuidadoso: con un token de concurrencia no hay ningún borde de
+ * milisegundo que acertar.
+ *
+ * Un borrador del MISMO dispositivo nunca se rechaza a sí mismo (es la
+ * autoguardada normal de la fase 6, tecla tras tecla, y ese aparato no puede
+ * saber la `hora` que el servidor le puso a su propio guardado anterior sin
+ * volver a leer).
+ *
+ * [Ronda 1, hallazgo E5] Un borrador SIN `hora` legible (o directamente
+ * ILEGIBLE) nunca bloquea: no hay ningún token contra el cual comparar, así
+ * que este guardado sigue adelante y lo pisa. Es la decisión correcta —mejor
  * escribir encima de un estado que no se puede leer que dejarla sin poder
- * guardar nunca más— pero tiene que estar declarada acá, con su test, no ser
- * un accidente de que `undefined >= numero` dé `false` en JavaScript.
+ * guardar nunca más— y ahora está escrita como un `typeof` explícito, no
+ * apoyada en que `undefined >= numero` dé `false` en JavaScript.
  */
 export async function guarda(gh: ReturnType<typeof cliente>, args: DatosParaGuardar): Promise<ResultadoGuardado> {
   const actual = await intentaLeer(gh)
@@ -248,7 +286,8 @@ export async function guarda(gh: ReturnType<typeof cliente>, args: DatosParaGuar
     actual.estado === 'ok' &&
     !args.pisar &&
     actual.borrador.dispositivo !== args.dispositivo &&
-    actual.borrador.hora >= args.ahora
+    typeof actual.borrador.hora === 'number' &&
+    args.horaLeida !== actual.borrador.hora
   ) {
     return { ok: false, motivo: 'hay-uno-mas-nuevo', otro: { dispositivo: actual.borrador.dispositivo, hora: actual.borrador.hora } }
   }

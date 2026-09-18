@@ -2967,6 +2967,62 @@ describe('accion=borrador.guardar', () => {
     expect(pedidos).toHaveLength(2) // el chequeo no escribió nada
   })
 
+  // [Revisión final de la rama, I1] El token de concurrencia viaja en el
+  // cuerpo (`horaLeida`) y llega hasta `guarda()`. Es el campo que la fase 6
+  // tiene que empezar a mandar: sin él, el candado anti-pisada se cae
+  // siempre del lado seguro (409 con salida por `pisar: true`), pero la
+  // autoguardada de un segundo aparato pregunta de más.
+  describe('I1: el token de concurrencia del borrador llega del cuerpo a `guarda()`', () => {
+    const ONCE = Date.parse('2026-09-18T11:00:00Z')
+    const ONCE_CINCO = Date.parse('2026-09-18T11:05:00Z')
+    const deLaHermana = JSON.stringify({
+      documentos: {}, base: 'main-1', dispositivo: 'la-compu', autor: 'clienta@ejemplo.mx', hora: ONCE,
+    })
+    const elRefYElBorrador = () => [
+      { cuerpo: { object: { sha: 'refViejo' } } },
+      { cuerpo: { content: Buffer.from(deLaHermana).toString('base64'), encoding: 'base64', sha: 'b' } },
+    ]
+
+    it('sin `horaLeida`, un segundo aparato NO pisa el borrador de 11:00 aunque pida a las 11:05', async () => {
+      // Con el candado viejo esto era 200 y el trabajo del otro aparato se
+      // perdía: el orden temporal de la vida real —el guardado viejo es más
+      // viejo— hacía que la condición nunca disparara.
+      const { f, pedidos } = fetchFalso([...elRefYElBorrador()])
+      const r = await maneja(
+        'borrador.guardar',
+        { cuerpo: { base: 'main-1', documentos: {} }, cookie: cookieDeDispositivo('celu') },
+        { ...contextoBase(f), ahora: () => ONCE_CINCO },
+      )
+      expect(r.status).toBe(409)
+      expect(r.cuerpo).toMatchObject({ motivo: 'hay-uno-mas-nuevo', otro: { dispositivo: 'la-compu', hora: ONCE } })
+      expect(pedidos).toHaveLength(2) // no escribió nada
+    })
+
+    it('con `horaLeida` igual a la del borrador que hay, escribe', async () => {
+      const { f } = fetchFalso([...elRefYElBorrador(), ...respuestasDeUnaPublicacionDirecta()])
+      const r = await maneja(
+        'borrador.guardar',
+        { cuerpo: { base: 'main-1', documentos: {}, horaLeida: ONCE }, cookie: cookieDeDispositivo('celu') },
+        { ...contextoBase(f), ahora: () => ONCE_CINCO },
+      )
+      expect(r.status).toBe(200)
+    })
+
+    it('un `horaLeida` que no es número se trata como ausente — nunca se cuela como token válido', async () => {
+      // El cuerpo lo arma un navegador: que mande `"1700000000000"` (cadena)
+      // o `null` no puede convertirse en «leí el borrador que hay».
+      for (const basura of ['1700000000000', null, true, { hora: ONCE }]) {
+        const { f } = fetchFalso([...elRefYElBorrador()])
+        const r = await maneja(
+          'borrador.guardar',
+          { cuerpo: { base: 'main-1', documentos: {}, horaLeida: basura }, cookie: cookieDeDispositivo('celu') },
+          { ...contextoBase(f), ahora: () => ONCE_CINCO },
+        )
+        expect(r.status, JSON.stringify(basura)).toBe(409)
+      }
+    })
+  })
+
   // [Ronda 1, hallazgo A] `dispositivo` sale de `sesion.dispositivo` —
   // FIRMADO al entrar—, nunca de lo que mande el cuerpo. Antes, un cuerpo
   // que se olvidara de mandar `dispositivo` hacía que CUALQUIER aparato

@@ -15663,7 +15663,7 @@ function bytesDeContenido(contenido) {
 }
 async function guarda(gh, args) {
   const actual = await intentaLeer(gh);
-  if (actual.estado === "ok" && !args.pisar && actual.borrador.dispositivo !== args.dispositivo && actual.borrador.hora >= args.ahora) {
+  if (actual.estado === "ok" && !args.pisar && actual.borrador.dispositivo !== args.dispositivo && typeof actual.borrador.hora === "number" && args.horaLeida !== actual.borrador.hora) {
     return { ok: false, motivo: "hay-uno-mas-nuevo", otro: { dispositivo: actual.borrador.dispositivo, hora: actual.borrador.hora } };
   }
   const contenido = JSON.stringify({
@@ -19078,6 +19078,7 @@ async function borradorGuardarAccion(pedido, contexto) {
   }
   const documentos = comoDocumentos(cuerpo.documentos);
   const pisar = cuerpo.pisar === true;
+  const horaLeida = typeof cuerpo.horaLeida === "number" ? cuerpo.horaLeida : void 0;
   const gh = cliente({
     token: env.PANEL_GITHUB_TOKEN ?? "",
     duenio: env.GITHUB_DUENIO ?? "",
@@ -19091,6 +19092,7 @@ async function borradorGuardarAccion(pedido, contexto) {
       dispositivo: sesion.dispositivo,
       autor: sesion.correo,
       ahora: contexto.ahora(),
+      ...horaLeida !== void 0 ? { horaLeida } : {},
       pisar,
       // [Ronda 1, hallazgo D] Antes esta acción nunca pasaba esto —a
       // diferencia de `publicarAccion`/`deshacerAccion`, que sí—, así que el
