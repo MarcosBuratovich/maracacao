@@ -18717,7 +18717,7 @@ async function revierteYAvisaAMarcos(sha, autorReal, contexto) {
   });
   return { revertido, avisadoAMarcos };
 }
-async function revisaLaCabeza(contexto) {
+async function revisaLaCabeza(contexto, leeShaServido = memoizaLecturaDelCdn(contexto)) {
   try {
     if (!contexto.env.PANEL_VERCEL_TOKEN) return null;
     const gh = clienteDeGitHub(contexto);
@@ -18733,7 +18733,7 @@ async function revisaLaCabeza(contexto) {
     const vercel = clienteVercel({ token: contexto.env.PANEL_VERCEL_TOKEN, proyecto, fetch: contexto.fetch });
     const { estado } = await vercel.despliegueDe(cabeza.sha);
     if (estado !== "fall\xF3") return null;
-    const shaServido = await shaQueSirveElCdn(contexto);
+    const shaServido = await leeShaServido();
     if (shaServido === cabeza.sha) {
       console.error(
         `revisaLaCabeza: la plataforma dice que el despliegue de ${cabeza.sha} fall\xF3, pero el sitio YA lo est\xE1 sirviendo \u2014 no se revierte.`
@@ -18979,7 +18979,8 @@ async function estadoAccion(pedido, contexto) {
     return error51(400, PROBLEMA_INESPERADO);
   }
   const publicadoEn = typeof cuerpo.publicadoEn === "number" ? cuerpo.publicadoEn : contexto.ahora();
-  const shaYaAtendido = await revisaLaCabeza(contexto);
+  const leeShaServido = memoizaLecturaDelCdn(contexto);
+  const shaYaAtendido = await revisaLaCabeza(contexto, leeShaServido);
   const vercel = clienteVercel({
     token: env.PANEL_VERCEL_TOKEN,
     proyecto,
@@ -18992,7 +18993,7 @@ async function estadoAccion(pedido, contexto) {
   } catch (e) {
     porQueNoContestoLaPlataforma = e;
   }
-  const shaServido = await shaQueSirveElCdn(contexto);
+  const shaServido = await leeShaServido();
   if (despliegue === null) {
     if (shaServido === cuerpo.sha) {
       return ok({
@@ -19042,6 +19043,13 @@ async function shaQueSirveElCdn(contexto) {
     console.error("estado: no se pudo leer version.json del sitio \u2014", e);
     return null;
   }
+}
+function memoizaLecturaDelCdn(contexto) {
+  let promesa = null;
+  return () => {
+    promesa ??= shaQueSirveElCdn(contexto);
+    return promesa;
+  };
 }
 var VENTANA_DESHACER_MS = 30 * 6e4;
 var RESUMEN_DESHECHO = "Listo, lo dej\xE9 como estaba antes.";

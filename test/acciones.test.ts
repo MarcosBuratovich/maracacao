@@ -2440,7 +2440,7 @@ describe('accion=estado', () => {
   it('Ronda 2, Grupo B: cuando su propio commit es la cabeza rota, van dos correos, no cuatro', async () => {
     const cartas: Array<{ a: string[]; asunto: string; texto: string }> = []
     const sha = 'a'.repeat(40)
-    const { f } = fetchFalso([
+    const { f, pedidos } = fetchFalso([
       { cuerpo: { object: { sha } } }, // gh.ref (revisaLaCabeza)
       {
         cuerpo: {
@@ -2452,10 +2452,9 @@ describe('accion=estado', () => {
         },
       }, // gh.commit (revisaLaCabeza)
       { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // vercel (revisaLaCabeza)
-      cdnSirviendoLoViejo(), // version.json — revisaLaCabeza() también consulta al CDN antes de revertir (Ronda 3)
+      cdnSirviendoLoViejo(), // version.json — ÚNICA lectura (Ronda 4): memoizada, la comparten revisaLaCabeza() y estadoAccion()
       ...respuestasDeUnaReversionCompleta(sha), // revierte() dentro de revierteYAvisaAMarcos()
       { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // vercel (la lectura propia de estadoAccion)
-      cdnSirviendoLoViejo(), // version.json — la lectura propia de estadoAccion, SIEMPRE
     ])
     const r = await maneja(
       'estado',
@@ -2468,6 +2467,11 @@ describe('accion=estado', () => {
       }),
     )
     expect((r.cuerpo as { estado: string }).estado).toBe('falló')
+    // [Ronda 4] Los ocho pedidos programados y ni uno más: si la lectura
+    // propia de `estadoAccion` NO reusara la de `revisaLaCabeza()`, pediría
+    // un `version.json` de más que acá no se programó — y `fetchFalso`
+    // reventaría por quedarse sin respuestas.
+    expect(pedidos).toHaveLength(8)
     expect(cartas).toHaveLength(2)
     // Primero Marcos —lo avisó `revisaLaCabeza()`, con el autor real del
     // trailer— y recién después ella, sin que nadie haya vuelto a tocar
@@ -2475,6 +2479,107 @@ describe('accion=estado', () => {
     expect(cartas[0].a).toEqual(['marcos@ejemplo.mx'])
     expect(cartas[0].texto).toContain('clienta@ejemplo.mx')
     expect(cartas[1].a).toEqual(['clienta@ejemplo.mx'])
+  })
+
+  /*
+   * Ronda 4: `estadoAccion` le pregunta al CDN una sola vez por invocación
+   * —memoizada, compartida con `revisaLaCabeza()`— y no dos veces por
+   * separado. Entre una lectura y la otra hay cien a quinientos ms de red:
+   * de sobra para que la primera venga caída y la segunda sana, o al
+   * revés, y que las dos decisiones que dependen de "qué sirve el CDN
+   * ahora" terminen mirando hechos distintos. La revisión reprodujo los
+   * dos casos ejecutando el código; estos dos tests los fijan.
+   *
+   * Los dos usan el mismo truco: programan una SEGUNDA respuesta de
+   * `version.json` que sería consumida por una segunda lectura
+   * independiente (el bug), pero que el arreglo (una sola lectura,
+   * reusada) nunca llega a pedir. Que el resultado sea consistente —y que
+   * `pedidos` tenga el largo exacto, sin la respuesta de más— es la prueba
+   * de que se comparte la medición, no dos veces la misma casualidad.
+   */
+  it('Ronda 4: la lectura del CDN caída se comparte — no hay una "segunda oportunidad" sana que contradiga al revert', async () => {
+    const cartas: Carta[] = []
+    const sha = 'a'.repeat(40)
+    const { f, pedidos } = fetchFalso([
+      { cuerpo: { object: { sha } } }, // gh.ref (revisaLaCabeza)
+      {
+        cuerpo: {
+          sha,
+          tree: { sha: 't' },
+          message: 'cambia algo\n\nPanel: sí\nPanel-Autor: clienta@ejemplo.mx',
+          author: { date: '2026-09-17T12:00:00Z' },
+          parents: [{ sha: 'padre' }],
+        },
+      }, // gh.commit (revisaLaCabeza)
+      { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // vercel (revisaLaCabeza)
+      { status: 500, cuerpo: {} }, // ÚNICA lectura del CDN (memoizada): caída — por eso revisaLaCabeza() revierte
+      ...respuestasDeUnaReversionCompleta(sha), // revierte() dentro de revierteYAvisaAMarcos()
+      { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // vercel (la lectura propia de estadoAccion)
+      { cuerpo: { sha, construido: '2026-09-17T12:00:00.000Z' } }, // "segunda lectura" sana — con el arreglo, NUNCA se pide
+    ])
+    const r = await maneja(
+      'estado',
+      { cuerpo: { sha, publicadoEn: 1_000 }, cookie: cookieValida() },
+      contextoDePrueba({
+        fetch: f,
+        ahora: () => 6_000,
+        correo: async (c) => { cartas.push(c); return { ok: true } },
+        env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
+      }),
+    )
+    // NO 'listo': si hubiera dos lecturas independientes, la segunda —sana,
+    // programada arriba— le ganaría a `decide()` y contradiría el revert
+    // que YA pasó y el correo que ya salió.
+    expect((r.cuerpo as { estado: string }).estado).toBe('falló')
+    // Pantalla y correo cuentan la MISMA historia: la pantalla no promete
+    // más de lo que el correo a ella ya prometió.
+    const fraseHttp = (r.cuerpo as { frase: string }).frase
+    const aElla = cartas.find((c) => c.a.includes('clienta@ejemplo.mx'))!
+    expect(aElla.texto.startsWith(fraseHttp)).toBe(true)
+    // Ocho pedidos: la "segunda lectura sana" —la novena respuesta
+    // programada— nunca se toca.
+    expect(pedidos).toHaveLength(8)
+    expect(cartas).toHaveLength(2)
+  })
+
+  it('Ronda 4: la lectura del CDN que confirma se comparte — no hay una "segunda oportunidad" caída que dispare el revert', async () => {
+    const cartas: Carta[] = []
+    const sha = 'a'.repeat(40)
+    const { f, pedidos } = fetchFalso([
+      { cuerpo: { object: { sha } } }, // gh.ref (revisaLaCabeza)
+      {
+        cuerpo: {
+          sha,
+          tree: { sha: 't' },
+          message: 'cambia algo\n\nPanel: sí\nPanel-Autor: clienta@ejemplo.mx',
+          author: { date: '2026-09-17T12:00:00Z' },
+          parents: [{ sha: 'padre' }],
+        },
+      }, // gh.commit (revisaLaCabeza)
+      { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // vercel (revisaLaCabeza)
+      { cuerpo: { sha, construido: '2026-09-17T12:00:00.000Z' } }, // ÚNICA lectura del CDN (memoizada): confirma el sha
+      { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // vercel (la lectura propia de estadoAccion)
+      cdnSirviendoLoViejo(), // "segunda lectura" caída — con el arreglo, NUNCA se pide
+    ])
+    const r = await maneja(
+      'estado',
+      { cuerpo: { sha, publicadoEn: 1_000 }, cookie: cookieValida() },
+      contextoDePrueba({
+        fetch: f,
+        ahora: () => 6_000,
+        correo: async (c) => { cartas.push(c); return { ok: true } },
+        env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
+      }),
+    )
+    expect((r.cuerpo as { estado: string }).estado).toBe('listo')
+    expect((r.cuerpo as { frase: string }).frase).toBe('Tu cambio ya está en el sitio.')
+    // Cinco pedidos: la "segunda lectura caída" —la sexta respuesta
+    // programada— nunca se toca, y no se dispara ningún pedido de revertir
+    // (ni el autor real, ni los pasos de `revierte()`, ni ninguna carta):
+    // exactamente lo que la Ronda 3 vino a garantizar, ahora a salvo de
+    // que un segundo `fetch` independiente lo desarme.
+    expect(pedidos).toHaveLength(5)
+    expect(cartas).toHaveLength(0)
   })
 
   /*
