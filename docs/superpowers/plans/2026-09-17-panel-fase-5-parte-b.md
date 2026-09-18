@@ -4941,8 +4941,8 @@ contestó y mandarlo en cada pedido de `estado` para ese sha —
 mismo punto para sondear de verdad.
 
 `historial` (`POST /api/panel?accion=historial`, sin cuerpo) devuelve
-`{ ok: true, publicaciones: Publicada[] }` — del más nuevo al más viejo,
-`src/servidor/historial.ts`:
+`{ ok: true, base, publicaciones: Publicada[] }` — las publicaciones del más
+nuevo al más viejo, `src/servidor/historial.ts`:
 ```ts
 interface Publicada {
   sha: string
@@ -4952,6 +4952,30 @@ interface Publicada {
   revierteA: string | null // el sha al que revierte, si esta publicación ES una reversión
 }
 ```
+
+**`base` es LA FUENTE OFICIAL del `base` que `publicar` exige** (agregado en
+la ola de arreglos de la revisión final, grupo 6): el sha de la cabeza de
+`main` HOY, o `null` si el repo no tiene ningún commit. Hasta esa ola,
+`publicar` rechazaba con 400 cualquier cuerpo sin `base` y **ninguna acción
+lo entregaba** — `salud` no lo traía, `historial` filtraba por commits del
+panel (si el último es de Marcos, no está en `publicaciones`), `estado` lo
+pide como ENTRADA, y `borrador.leer` devuelve el `base` VIEJO del borrador:
+la fase 6 se iba a encontrar con un 400 obligatorio y sin fuente.
+
+El flujo para la pantalla es: `historial` al abrir el panel (que el punto 5
+de más abajo ya recomienda como primera llamada por otra razón) → guardar
+`base` → mandarlo en `publicar`. Sale de la MISMA lista de commits que ya se
+pedía, antes de filtrar, así que no cuesta un pedido más. **No sale de
+`salud`**, que es donde lo pedía el informe de la revisión: `salud` corre
+detrás del freno de cinco pedidos cada quince minutos por IP —o sea que como
+fuente del `base` se apagaría justo en una sesión de edición intensa, y sin
+`base` no se puede publicar— y además no pide sesión, así que el estado de
+`main` quedaría contestándosele a cualquiera con un `curl`.
+
+Ojo con el `null`: si `historial` devuelve `base: null` (repo vacío), la
+pantalla no tiene nada que mandar y `publicar` va a contestar 400. Es un
+estado que no puede pasar en producción —el repo tiene historia— pero la
+pantalla no debería inventar un sha para taparlo.
 
 `borrador.leer` devuelve `{ ok: true, borrador: Borrador | null }` (`null`
 = no hay ninguno guardado todavía, el estado normal de un panel recién

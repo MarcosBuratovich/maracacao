@@ -19078,7 +19078,14 @@ async function historialAccion(pedido, contexto) {
     console.error("historial: no se pudo leer la lista de commits de GitHub \u2014", e);
     return error51(502, PROBLEMA_NO_SE_PUDO_LEER);
   }
-  return ok({ ok: true, publicaciones: lee(commits, contexto.ahora()) });
+  return ok({
+    ok: true,
+    // [I9] Antes de filtrar: la cabeza de `main` puede ser un commit de
+    // Marcos, y ése es justo el caso en que el `base` de la lista filtrada
+    // estaría viejo y la publicación siguiente se rechazaría por pisada.
+    base: commits[0]?.sha ?? null,
+    publicaciones: lee(commits, contexto.ahora())
+  });
 }
 var PROBLEMA_BORRADOR_INCOMPLETO = "Falta informaci\xF3n para guardar tu borrador: vuelve a abrir el panel.";
 var PROBLEMA_NO_SE_PUDO_GUARDAR_BORRADOR = "No pudimos guardar tu borrador: prueba de nuevo en unos minutos.";

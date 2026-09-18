@@ -3275,6 +3275,48 @@ describe('accion=historial', () => {
     const r = await maneja('historial', { cuerpo: {}, cookie: cookieValida() }, contextoBase(f))
     expect(r.status).toBe(502)
   })
+
+  /*
+   * [Revisión final de la rama, I9] `publicar` rechaza con 400 cualquier
+   * cuerpo sin `base`, y NINGUNA acción entregaba la cabeza de `main`:
+   * `salud` no la traía, `historial` filtraba por commits del panel, `estado`
+   * la pide como ENTRADA y `borrador.leer` devuelve el `base` viejo del
+   * borrador. La fase 6 se iba a encontrar con un 400 obligatorio y sin
+   * fuente.
+   */
+  describe('I9: `historial` es la fuente del `base` que `publicar` exige', () => {
+    it('devuelve el sha de la cabeza de main, aunque el último commit sea de Marcos', async () => {
+      // El caso que importa, y el que la lista filtrada no puede cubrir: si
+      // se tomara el `base` de `publicaciones[0]`, ahí diría `c1` —el último
+      // del panel— y la publicación siguiente se rechazaría por pisada
+      // contra un `main` que ya estaba en `c2`.
+      const { f } = fetchFalso([
+        ...respuestasDeNingunaReversionPendiente(),
+        { cuerpo: [commitDeMarcosEnLista('c2'), commitDelPanelEnLista('c1')] },
+      ])
+      const r = await maneja('historial', { cuerpo: {}, cookie: cookieValida() }, contextoBase(f))
+
+      const cuerpo = r.cuerpo as { base: string | null; publicaciones: Array<{ sha: string }> }
+      expect(cuerpo.base).toBe('c2')
+      expect(cuerpo.publicaciones.map((p) => p.sha)).toEqual(['c1'])
+    })
+
+    it('no cuesta ni un pedido de más: sale de la misma lista', async () => {
+      const { f, pedidos } = fetchFalso([
+        ...respuestasDeNingunaReversionPendiente(),
+        { cuerpo: [commitDelPanelEnLista('c3')] },
+      ])
+      await maneja('historial', { cuerpo: {}, cookie: cookieValida() }, contextoBase(f))
+      // Los dos de `revisaLaCabeza()` más el de la lista, y nada más.
+      expect(pedidos).toHaveLength(3)
+    })
+
+    it('con la lista vacía, `base` es null — nunca un sha inventado', async () => {
+      const { f } = fetchFalso([...respuestasDeNingunaReversionPendiente(), { cuerpo: [] }])
+      const r = await maneja('historial', { cuerpo: {}, cookie: cookieValida() }, contextoBase(f))
+      expect((r.cuerpo as { base: string | null }).base).toBeNull()
+    })
+  })
 })
 
 // Tarea 11 (spec §4.3, capa 2): el borrador del servidor. La mecánica de

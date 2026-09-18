@@ -2122,6 +2122,24 @@ const CANTIDAD_HISTORIAL = 20
  * Toda la traducción —qué cuenta como "del panel", cómo se separan asunto y
  * trailers, cómo se ve una reversión— vive en `lee()` (`historial.ts`); acá
  * solo se pide la lista y se delega.
+ *
+ * [Revisión final de la rama, I9] Y devuelve `base`: el sha de la cabeza de
+ * `main` HOY. Es la fuente oficial del `base` que `publicar` exige —rechaza
+ * con 400 cualquier cuerpo que no lo traiga— y hasta acá NINGUNA acción lo
+ * entregaba: `salud` no lo traía, `historial` filtraba por commits del panel
+ * (si el último es de Marcos, no está en la lista), `estado` lo pide como
+ * ENTRADA, y `borrador.leer` devuelve el `base` VIEJO del borrador. La fase 6
+ * se iba a encontrar con un 400 obligatorio y sin fuente.
+ *
+ * Sale de `commits[0]` —lo que GitHub ya contestó, ANTES de filtrar por
+ * `Panel: sí`—, así que no cuesta ni un pedido más. Y sale de ACÁ y no de
+ * `salud` (que es donde lo pedía el informe de la revisión) por dos razones:
+ * `salud` corre detrás del freno de cinco pedidos cada quince minutos por IP,
+ * así que como fuente del `base` se apagaría justo en una sesión de edición
+ * intensa —y sin `base` no se puede publicar—, y además `salud` no pide
+ * sesión: el estado de `main` no tiene por qué contestárselo a cualquiera con
+ * un `curl`. `historial` ya es, según el cierre de esta parte, lo primero que
+ * la pantalla tiene que llamar al abrir el panel.
  */
 async function historialAccion(pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
   const env = contexto.env
@@ -2145,7 +2163,14 @@ async function historialAccion(pedido: Pedido, contexto: Contexto): Promise<Resp
     return error(502, PROBLEMA_NO_SE_PUDO_LEER)
   }
 
-  return ok({ ok: true, publicaciones: lee(commits, contexto.ahora()) })
+  return ok({
+    ok: true,
+    // [I9] Antes de filtrar: la cabeza de `main` puede ser un commit de
+    // Marcos, y ése es justo el caso en que el `base` de la lista filtrada
+    // estaría viejo y la publicación siguiente se rechazaría por pisada.
+    base: commits[0]?.sha ?? null,
+    publicaciones: lee(commits, contexto.ahora()),
+  })
 }
 
 /*
