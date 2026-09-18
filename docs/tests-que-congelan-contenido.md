@@ -304,3 +304,44 @@ barata: antes de sumar un assert que mire contenido, preguntarse si la clienta
 puede escribir ese valor desde el panel. Si puede, el assert no va en
 `pnpm verifica` — va como regla del esquema (que le avisa a ella antes de
 publicar) o no va.
+
+---
+
+## Pendiente abierto (2026-09-18, cierre de la fase 5B) — el aviso que no bloquea contra el test que sí
+
+**El servidor le promete a la clienta que un aviso de conteo NUNCA bloquea una
+publicación. El build dice que sí.** Las dos piezas son de este repo, las dos
+son defendibles por separado, y juntas producen el peor modo de falla que tiene
+el proyecto.
+
+- `src/servidor/acciones.ts` (`publicarAccion`) calcula los avisos **después**
+  de escribir, a propósito y documentado: «un aviso, por definición, no puede
+  bloquear una publicación». Hay un test dedicado a eso.
+- `test/contenido.test.ts:2199` —**preexistente**, no lo trajo la fase 5B— se
+  pone **rojo** si el contenido publicado tiene un texto cuyo conteo no coincide
+  con la lista real. Y `vercel.json` corre los tests en el deploy.
+
+O sea: si ella publica «LOS 16 SABORES» con quince en la lista, el servidor le
+contesta 200 con un aviso amable, el commit sale, **el build se cae**, la
+reversión automática le deshace el cambio, y recibe «No salió; lo dejé como
+estaba». Una edición legítima que se deshace sola, sin ninguna pista de por qué.
+
+El aviso existe porque es **su** decisión arreglarlo después —puede estar por
+dar de alta el sabor dieciséis y querer dejar el texto listo—. El test existe
+porque un sitio que miente sobre cuántos sabores tiene es un sitio roto.
+
+**Las tres salidas, para que Marcos elija una:**
+
+1. **El aviso pasa a impedir.** Coherente, pero le quita el «lo arreglo
+   después» y contradice al spec.
+2. **El test deja de ser un test y pasa a ser un correo** a Marcos — la capa 4
+   (`.github/workflows/verifica.yml`) que el spec §4.4 describe como «juez
+   posterior que le avisa a Marcos, no compuerta». El build no se cae, ella
+   publica, y alguien se entera igual.
+3. **El test se afloja a la forma y no al valor.** Coherente con el criterio de
+   este documento, pero pierde la única red que hoy atrapa un sitio que miente
+   sobre sí mismo.
+
+La lectura de quien lo encontró —y la comparto— es que la **(2)** respeta las
+dos promesas y es la que la arquitectura ya tenía prevista. Pero es una decisión
+de producto, no de implementación, y por eso queda acá y no resuelta.
