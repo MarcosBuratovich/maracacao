@@ -770,12 +770,30 @@ describe('accion=entrar-con-enlace', () => {
   })
 
   it('sin dispositivo en el cuerpo, la sesión queda con "sin-nombre" — nunca revienta', async () => {
+    // El servidor nunca falla por esto, y eso está bien. Lo que NO puede
+    // pasar es que la página de recuperación caiga siempre acá: ver el
+    // test de abajo, y el describe I7 de `test/entrar-astro.test.ts`.
     const r = await maneja('entrar-con-enlace', { cuerpo: { token: enlaceValido() }, cookie: '' }, ctx())
     expect(r.status).toBe(200)
     const valorCookie = r.cookie!.split(';')[0].split('=')[1]
     const sesion = verificaSesion(valorCookie, SECRETO)
     expect(sesion?.correo).toBe('clienta@ejemplo.mx')
     expect(sesion?.dispositivo).toBe('sin-nombre')
+  })
+
+  it('I7: el `dispositivo` del cuerpo llega FIRMADO a la cookie, normalizado', async () => {
+    // La otra punta del arreglo del grupo 4: la página manda un id propio de
+    // cada navegador, y tiene que llegar entero hasta la cookie para que
+    // `PANEL_DISPOSITIVOS_REVOCADOS` pueda revocar ESA sesión y no todas.
+    const r = await maneja(
+      'entrar-con-enlace',
+      { cuerpo: { token: enlaceValido(), dispositivo: 'aparato-7f3c, de la vecina' }, cookie: '' },
+      ctx(),
+    )
+    expect(r.status).toBe(200)
+    const sesion = verificaSesion(r.cookie!.split(';')[0].split('=')[1], SECRETO)
+    expect(sesion?.dispositivo).toBe('aparato-7f3c-de-la-vecina')
+    expect(sesion?.dispositivo).not.toBe('sin-nombre')
   })
 
   // [C, Important — Ronda 1 de revisión] Sin almacén de tokens usados, el

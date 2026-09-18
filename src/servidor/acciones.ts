@@ -669,8 +669,17 @@ async function enlaceAccion(pedido: Pedido, contexto: Contexto): Promise<Respues
  * loguea y el login sigue — avisar que alguien entró no puede ser motivo
  * para que la persona correcta se quede afuera.
  *
- * El cuerpo de este pedido es solo `{ token }` (ver `entrar.astro`, que no
- * junta ningún otro dato), así que no hay un «recuérdame» que leer.
+ * El cuerpo de este pedido es `{ token, dispositivo }` (ver `entrar.astro`),
+ * así que no hay un «recuérdame» que leer: esta vía siempre emite una sesión
+ * de un día.
+ *
+ * [Revisión final de la rama, I7] `dispositivo` es nuevo en el cuerpo. Antes
+ * la página mandaba solo `{ token }` y `idDeDispositivo(undefined)` resolvía
+ * eso como `'sin-nombre'`, FIRMADO en la cookie: revocar ese id mataba las
+ * sesiones de recuperación de todo el mundo a la vez, y el candado
+ * anti-pisada del borrador no tenía nada que comparar entre dos personas que
+ * hubieran entrado las dos por enlace. El servidor no cambió —ya leía el
+ * campo—; lo que faltaba era que alguien lo mandara.
  */
 async function entrarConEnlaceAccion(pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
   const env = contexto.env
