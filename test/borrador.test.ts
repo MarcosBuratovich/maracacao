@@ -17,6 +17,8 @@ import { describe, it, expect } from 'vitest'
 import { fetchFalso, respuestasDeUnaPublicacionDirecta, respuestasDeUnBlobArbolYCommit } from './lib/github-falso'
 import { cliente } from '../src/servidor/github'
 import { guarda, leeBorrador, RUTA_BORRADOR, REF_BORRADOR } from '../src/servidor/borrador'
+import { ASUNTO_GENERICO } from '../src/servidor/publicar'
+import { TOPE_CUERPO } from '../src/servidor/rutas-permitidas'
 
 const gh = (f: typeof globalThis.fetch) => cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
 const UN_BORRADOR = {
@@ -64,12 +66,17 @@ describe('el borrador del servidor', () => {
     expect((creado.cuerpo as { ref: string; sha: string }).ref).toBe(`refs/${REF_BORRADOR}`)
 
     const arbol = pedidos.find((p) => p.url.endsWith('/git/trees') && p.metodo === 'POST')!
-    // Sobre el árbol VACÍO, nunca sobre el de `main`: el árbol del borrador
-    // lleva SOLO su propio archivo.
-    expect((arbol.cuerpo as { base_tree: string }).base_tree).toBe('4b825dc642cb6eb9a060e54bf8d69288fbee4904')
+    // [Ronda 1, hallazgo E1] SIN `base_tree`: es la forma documentada de la
+    // Git Data API para «un árbol de cero», nunca sobre el de `main` —el
+    // árbol del borrador lleva SOLO su propio archivo—, y nunca un sha
+    // mágico que ningún mock podría verificar contra la API real.
+    expect(Object.keys(arbol.cuerpo as object)).not.toContain('base_tree')
+    expect((arbol.cuerpo as { tree: Array<{ path: string }> }).tree.map((e) => e.path)).toEqual([RUTA_BORRADOR])
 
     const commit = pedidos.find((p) => p.url.endsWith('/git/commits') && p.metodo === 'POST')!
-    // Raíz: sin padre, porque no hay ningún commit propio del que descender.
+    // Raíz: sin padre, porque no hay ningún commit propio del que descender
+    // —y, sobre todo, ningún ancestro común con `main`: es lo que hace que
+    // `git merge` se niegue en seco a mezclar este ref con `main`.
     expect((commit.cuerpo as { parents: string[] }).parents).toEqual([])
   })
 
@@ -125,5 +132,115 @@ describe('el borrador del servidor', () => {
     ])
     const r = await guarda(gh(f), { ...UN_BORRADOR, dispositivo: 'celu', ahora: 1_000 })
     expect(r.ok).toBe(true)
+  })
+
+  // [Ronda 1, hallazgo E4] Antes era `>`: dos guardados del mismo
+  // milisegundo desde aparatos DISTINTOS pasaban el chequeo igual, y el
+  // segundo pisaba al primero sin avisar. Con `>=`, empatar también cuenta
+  // como pisada.
+  it('E4: un empate exacto de milisegundo entre DOS aparatos también bloquea, no solo lo estrictamente más nuevo', async () => {
+    const yaGuardado = JSON.stringify({ ...UN_BORRADOR, dispositivo: 'la-compu', hora: 1_000 })
+    const { f } = fetchFalso([
+      { cuerpo: { object: { sha: 'refViejo' } } },
+      { cuerpo: { content: Buffer.from(yaGuardado).toString('base64'), encoding: 'base64', sha: 'b' } },
+    ])
+    const r = await guarda(gh(f), { ...UN_BORRADOR, dispositivo: 'celu', ahora: 1_000 })
+    expect(r).toEqual({ ok: false, motivo: 'hay-uno-mas-nuevo', otro: { dispositivo: 'la-compu', hora: 1_000 } })
+  })
+
+  describe('E5: un borrador que no se puede leer nunca bloquea — mejor escribir que dejarla sin poder guardar más', () => {
+    it('un borrador guardado SIN `hora` no bloquea (el trato es el correcto, y queda declarado con test)', async () => {
+      // JSON válido, pero de otro aparato y sin `hora`: `undefined >= ahora`
+      // es `false` en JavaScript, así que este guardado tiene que pasar. Sin
+      // este test, ese comportamiento es un accidente del operador, no una
+      // decisión.
+      const sinHora = JSON.stringify({ documentos: {}, base: 'x', dispositivo: 'la-compu', autor: 'otra@x.mx' })
+      const { f } = fetchFalso([
+        { cuerpo: { object: { sha: 'refViejo' } } },
+        { cuerpo: { content: Buffer.from(sinHora).toString('base64'), encoding: 'base64', sha: 'b' } },
+        ...respuestasDeUnaPublicacionDirecta(),
+      ])
+      const r = await guarda(gh(f), { ...UN_BORRADOR, dispositivo: 'celu', ahora: 1_000 })
+      expect(r.ok).toBe(true)
+    })
+
+    it('B: un borrador con el JSON roto no bloquea, y el ref se MUEVE, no se intenta crear de nuevo', async () => {
+      // Antes de este arreglo, un 404 y un JSON roto se leían igual —«no hay
+      // borrador»— así que guarda() intentaba CREAR un ref que YA existe, y
+      // GitHub contestaba «Reference already exists»: el panel quedaba en un
+      // 502 permanente, porque para escribir un borrador nuevo hacía falta
+      // leer el roto primero, y leerlo era justo lo que fallaba.
+      const { f, pedidos } = fetchFalso([
+        { cuerpo: { object: { sha: 'refViejo' } } },
+        { cuerpo: { content: Buffer.from('esto no es JSON{{{').toString('base64'), encoding: 'base64', sha: 'b' } },
+        ...respuestasDeUnaPublicacionDirecta(), // MOVER, no crear: sin este camino, tiraría "Reference already exists"
+      ])
+      const r = await guarda(gh(f), { ...UN_BORRADOR, ahora: 1_000 })
+      expect(r.ok).toBe(true)
+      // Ningún POST /git/refs (crear): todo pasa por publica(), que MUEVE con PATCH.
+      expect(pedidos.some((p) => p.url.endsWith('/git/refs') && p.metodo === 'POST')).toBe(false)
+      expect(pedidos.some((p) => p.metodo === 'PATCH')).toBe(true)
+    })
+
+    it('B: leeBorrador() con el JSON roto devuelve null, no tira', async () => {
+      const { f } = fetchFalso([
+        { cuerpo: { object: { sha: 'refViejo' } } },
+        { cuerpo: { content: Buffer.from('{ roto').toString('base64'), encoding: 'base64', sha: 'b' } },
+      ])
+      expect(await leeBorrador(gh(f))).toBeNull()
+    })
+
+    it('B: el ref existe pero perdió su archivo (404 en archivoEnRef) — se trata igual, MUEVE en vez de crear', async () => {
+      const { f, pedidos } = fetchFalso([
+        { cuerpo: { object: { sha: 'refViejo' } } },
+        { status: 404, cuerpo: { message: 'Not Found' } }, // el ref existe, pero panel/borrador.json no está
+        ...respuestasDeUnaPublicacionDirecta(),
+      ])
+      const r = await guarda(gh(f), { ...UN_BORRADOR, ahora: 1_000 })
+      expect(r.ok).toBe(true)
+      expect(pedidos.some((p) => p.url.endsWith('/git/refs') && p.metodo === 'POST')).toBe(false)
+    })
+  })
+
+  // [Ronda 1, hallazgo D] Los dos caminos —crear y mover— pasan por la MISMA
+  // barrera antes de tocar GitHub para escribir.
+  describe('D: el arranque también pasa por los topes, no solo el guardado que mueve', () => {
+    it('un `bytesDelCuerpo` que pasa el tope frena el ARRANQUE antes de crear nada', async () => {
+      const { f, pedidos } = fetchFalso([{ status: 404, cuerpo: { message: 'Not Found' } }])
+      const r = await guarda(gh(f), { ...UN_BORRADOR, ahora: 1, bytesDelCuerpo: TOPE_CUERPO + 1 })
+      expect(r).toEqual({
+        ok: false,
+        motivo: 'no-se-pudo-guardar',
+        problema: 'Es demasiado contenido para una sola publicación: manda menos fotos, o de menor tamaño.',
+      })
+      // Ni un creaBlob: el chequeo del tope frena ANTES de escribir nada.
+      expect(pedidos.some((p) => p.url.endsWith('/git/blobs'))).toBe(false)
+    })
+
+    it('un `bytesDelCuerpo` que pasa el tope también frena el guardado que MUEVE el ref', async () => {
+      const { f, pedidos } = fetchFalso([
+        { cuerpo: { object: { sha: 'refViejo' } } },
+        { cuerpo: { content: Buffer.from('{}').toString('base64'), encoding: 'base64', sha: 'b' } },
+      ])
+      const r = await guarda(gh(f), { ...UN_BORRADOR, ahora: 1, bytesDelCuerpo: TOPE_CUERPO + 1 })
+      expect(r.ok).toBe(false)
+      expect(pedidos.some((p) => p.url.endsWith('/git/blobs'))).toBe(false)
+    })
+  })
+
+  // [Ronda 1, hallazgo E6] El commit raíz del bootstrap tiene que verse
+  // IGUAL que cualquier guardado posterior (que pasa por publica(), con el
+  // asunto genérico y los trailers del panel) — no una frase distinta que,
+  // si Marcos mira el ref a mano, parezca otra cosa.
+  it('E6: el commit raíz del bootstrap usa el MISMO asunto y los mismos trailers que un guardado que mueve', async () => {
+    const { f, pedidos } = fetchFalso([
+      { status: 404, cuerpo: { message: 'Not Found' } },
+      ...respuestasDeUnBlobArbolYCommit(),
+      { cuerpo: { ref: `refs/${REF_BORRADOR}` } },
+    ])
+    await guarda(gh(f), { ...UN_BORRADOR, autor: 'ella@ejemplo.mx', ahora: 1 })
+    const commit = pedidos.find((p) => p.url.endsWith('/git/commits') && p.metodo === 'POST')!
+    const mensaje = (commit.cuerpo as { message: string }).message
+    expect(mensaje).toBe(`${ASUNTO_GENERICO}\n\nPanel: sí\nPanel-Autor: ella@ejemplo.mx`)
   })
 })

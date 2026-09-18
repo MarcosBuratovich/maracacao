@@ -1412,7 +1412,6 @@ const PROBLEMA_BORRADOR_MAS_NUEVO = 'Alguien más guardó un cambio más recient
 interface CuerpoBorradorGuardar {
   documentos?: unknown
   base?: unknown
-  dispositivo?: unknown
   /** Si hay que pisar el borrador de OTRO aparato aunque sea más nuevo (ver `guarda()`, `borrador.ts`). */
   pisar?: unknown
 }
@@ -1436,6 +1435,17 @@ interface CuerpoBorradorGuardar {
  * de lo que mande el cliente: si el aparato tiene la hora mal, el chequeo
  * de conflicto de `guarda()` tiene que seguir siendo correcto contra la
  * hora del SERVIDOR, que es la única que los dos aparatos comparten.
+ *
+ * [Ronda 1, hallazgo A] `dispositivo` sale de `sesion.dispositivo` —FIRMADO
+ * al entrar (E3, `sesion.ts`)—, nunca del cuerpo del pedido. El cuerpo ya no
+ * tiene ningún campo `dispositivo` que leer: antes lo tenía, y como
+ * `idDeDispositivo(undefined)` devuelve `'sin-nombre'` sin fallar nunca, un
+ * pedido que se olvidara de mandarlo (un bug de la fase 6, por ejemplo)
+ * hacía que CUALQUIER aparato apareciera como `'sin-nombre'` — dos aparatos
+ * distintos con el MISMO id, el candado anti-pisada de `guarda()` sin nada
+ * que comparar, y la hermana pisando el borrador de la clienta en silencio:
+ * exactamente el bug que esta tarea vino a arreglar, reintroducido por
+ * confiar en un dato que el cliente puede omitir.
  */
 async function borradorGuardarAccion(pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
   const env = contexto.env
@@ -1452,7 +1462,6 @@ async function borradorGuardarAccion(pedido: Pedido, contexto: Contexto): Promis
     return error(400, PROBLEMA_BORRADOR_INCOMPLETO)
   }
   const documentos = comoDocumentos(cuerpo.documentos)
-  const dispositivo = idDeDispositivo(cuerpo.dispositivo)
   const pisar = cuerpo.pisar === true
 
   const gh = cliente({
@@ -1466,10 +1475,16 @@ async function borradorGuardarAccion(pedido: Pedido, contexto: Contexto): Promis
     const r = await guarda(gh, {
       documentos,
       base: cuerpo.base,
-      dispositivo,
+      dispositivo: sesion.dispositivo,
       autor: sesion.correo,
       ahora: contexto.ahora(),
       pisar,
+      // [Ronda 1, hallazgo D] Antes esta acción nunca pasaba esto —a
+      // diferencia de `publicarAccion`/`deshacerAccion`, que sí—, así que el
+      // arranque y el guardado del borrador nunca podían chocar con el tope
+      // de cuerpo real, aunque el pedido HTTP que los trajo sí lo hubiera
+      // pasado.
+      bytesDelCuerpo: contexto.bytesDelCuerpo,
     })
 
     if (r.ok) return ok({ ok: true })

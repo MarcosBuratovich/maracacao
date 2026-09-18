@@ -196,12 +196,21 @@ function cliente(c) {
     /**
      * Crea un árbol sobre `base`, con las entradas dadas. `sha: null` en una
      * entrada es cómo la Git Data API borra esa ruta del árbol nuevo.
+     *
+     * [Tarea 11, Ronda 1 hallazgo E1] `base: null` OMITE `base_tree` del
+     * cuerpo del pedido en vez de mandar un sha inventado para «un árbol de
+     * cero»: es la forma documentada de la Git Data API para un árbol sin
+     * base, y evita que ese camino dependa de que un sha mágico —el árbol
+     * vacío universal de git— esté bien escrito. Con eso, el único paso del
+     * bootstrap del borrador que ningún mock de test podía verificar por sí
+     * mismo deja de existir, en vez de quedar diferido a que alguien lo
+     * revise a mano contra la API real.
      */
     async creaArbol(base2, entradas) {
       const cuerpo = await pedir("/git/trees", {
         method: "POST",
         body: {
-          base_tree: base2,
+          ...base2 !== null ? { base_tree: base2 } : {},
           tree: entradas.map((e) => ({ path: e.path, sha: e.sha, mode: "100644", type: "blob" }))
         }
       });
@@ -209,7 +218,7 @@ function cliente(c) {
     },
     /**
      * Crea un commit y devuelve su sha. Con un padre —el caso de siempre—
-     * manda `parents: [padre]`; con `padre: ''` manda `parents: []`, un
+     * manda `parents: [padre]`; con `padre: null` manda `parents: []`, un
      * commit RAÍZ (ver el comentario de `DatosCommit.padre`).
      */
     async creaCommit(datos) {
@@ -218,7 +227,7 @@ function cliente(c) {
         body: {
           message: datos.mensaje,
           tree: datos.arbol,
-          parents: datos.padre ? [datos.padre] : [],
+          parents: datos.padre !== null ? [datos.padre] : [],
           author: datos.autor
         }
       });
@@ -285,6 +294,7 @@ var RUTAS_PERMITIDAS = [
 function rutaPermitida(ruta2) {
   return RUTAS_PERMITIDAS.some((patron) => patron.test(ruta2));
 }
+var REF_BORRADOR = "panel/borrador";
 var RUTA_BORRADOR_PERMITIDA = /^panel\/borrador\.json$/;
 function rutaDeBorradorPermitida(ruta2) {
   return RUTA_BORRADOR_PERMITIDA.test(ruta2);
@@ -15414,7 +15424,15 @@ function frase(cambios) {
 // src/servidor/publicar.ts
 var AUTOR_PANEL = { name: "Panel Maracacao", email: "panel@maracacao.mx" };
 var REF_MAIN = "heads/main";
+var REFS_CONOCIDOS = {
+  [REF_MAIN]: { permiteRuta: rutaPermitida, permiteForzar: false },
+  [REF_BORRADOR]: { permiteRuta: rutaDeBorradorPermitida, permiteForzar: true }
+};
 var ASUNTO_GENERICO = "Actualiza contenido del panel";
+function mensajeDeCommit(asunto, autor, trailers) {
+  const extras = Object.entries(trailers ?? {}).map(([k, v]) => `${k}: ${v}`);
+  return [asunto, "", "Panel: s\xED", `Panel-Autor: ${autor}`, ...extras].join("\n");
+}
 var PROBLEMA_NO_SE_PUDO_PUBLICAR = "No pudimos publicar: hubo un problema para conectarnos con el sitio. Prueba de nuevo en unos minutos.";
 var CONCURRENCIA_BLOBS = 4;
 async function mapaConcurrencia(items, limite, tarea) {
@@ -15476,21 +15494,21 @@ async function intento(gh, archivos, mensaje, ref, forzar) {
 async function publica(gh, p) {
   const ref = p.ref ?? REF_MAIN;
   const forzar = p.forzar ?? false;
-  if (forzar && ref === REF_MAIN) {
-    throw new Error(
-      `publica(): forzar:true contra ${REF_MAIN} no es una opci\xF3n \u2014 es un bug de quien llama, nunca un caso leg\xEDtimo.`
-    );
+  const config2 = REFS_CONOCIDOS[ref];
+  if (!config2) {
+    throw new Error(`publica(): "${ref}" no es un ref conocido \u2014 revis\xE1 REFS_CONOCIDOS en publicar.ts.`);
+  }
+  if (forzar && !config2.permiteForzar) {
+    throw new Error(`publica(): forzar:true contra "${ref}" no es una opci\xF3n \u2014 ese ref no lo permite.`);
   }
   const rutas = p.archivos.map((a) => a.ruta);
-  const permiteRuta = ref === REF_MAIN ? rutaPermitida : rutaDeBorradorPermitida;
-  const chequeo = revisaLote(rutas, p.bytesDelCuerpo ?? bytesDelCuerpo(p.archivos), permiteRuta);
+  const chequeo = revisaLote(rutas, p.bytesDelCuerpo ?? bytesDelCuerpo(p.archivos), config2.permiteRuta);
   if (!chequeo.ok) return { ok: false, codigo: 422, problema: chequeo.problema };
   const asunto = p.cambios !== void 0 ? frase(p.cambios) : ASUNTO_GENERICO;
   if (asunto === "") {
     return { ok: true, sha: null, resumen: "No hab\xEDa nada que publicar: no cambiaste ning\xFAn dato del sitio." };
   }
-  const extras = Object.entries(p.trailers ?? {}).map(([k, v]) => `${k}: ${v}`);
-  const mensaje = [`${asunto}`, "", "Panel: s\xED", `Panel-Autor: ${p.autor}`, ...extras].join("\n");
+  const mensaje = mensajeDeCommit(asunto, p.autor, p.trailers);
   try {
     const sha = await intento(gh, p.archivos, mensaje, ref, forzar);
     return { ok: true, sha, resumen: asunto };
@@ -15537,29 +15555,45 @@ function traduceError(e, p) {
 }
 
 // src/servidor/borrador.ts
-var REF_BORRADOR = "panel/borrador";
 var RUTA_BORRADOR = "panel/borrador.json";
-var ARBOL_VACIO = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 function es404(e) {
   return e instanceof Error && /^GitHub respondió 404:/.test(e.message);
 }
 async function intentaLeer(gh) {
+  let sha;
   try {
-    const { sha } = await gh.ref(REF_BORRADOR);
-    const texto2 = await gh.archivoEnRef(RUTA_BORRADOR, sha);
-    return { sha, borrador: JSON.parse(texto2) };
+    ;
+    ({ sha } = await gh.ref(REF_BORRADOR));
   } catch (e) {
-    if (es404(e)) return null;
-    throw e;
+    if (!es404(e)) throw e;
+    console.error(`borrador: ${REF_BORRADOR} no existe (404) \u2014 se trata como "no hay borrador todav\xEDa".`);
+    return { estado: "no-existe" };
+  }
+  let texto2;
+  try {
+    texto2 = await gh.archivoEnRef(RUTA_BORRADOR, sha);
+  } catch (e) {
+    if (!es404(e)) throw e;
+    console.error(`borrador: ${REF_BORRADOR} (${sha}) existe pero no tiene ${RUTA_BORRADOR} \u2014 se trata como ilegible.`);
+    return { estado: "ilegible", sha };
+  }
+  try {
+    return { estado: "ok", sha, borrador: JSON.parse(texto2) };
+  } catch (e) {
+    console.error(`borrador: el JSON de ${RUTA_BORRADOR} en ${sha} no parsea \u2014 se trata como ilegible.`, e);
+    return { estado: "ilegible", sha };
   }
 }
 async function leeBorrador(gh) {
   const actual = await intentaLeer(gh);
-  return actual ? actual.borrador : null;
+  return actual.estado === "ok" ? actual.borrador : null;
+}
+function bytesDeContenido(contenido) {
+  return Buffer.from(contenido, "utf8").toString("base64").length;
 }
 async function guarda(gh, args) {
   const actual = await intentaLeer(gh);
-  if (actual && !args.pisar && actual.borrador.dispositivo !== args.dispositivo && actual.borrador.hora > args.ahora) {
+  if (actual.estado === "ok" && !args.pisar && actual.borrador.dispositivo !== args.dispositivo && actual.borrador.hora >= args.ahora) {
     return { ok: false, motivo: "hay-uno-mas-nuevo", otro: { dispositivo: actual.borrador.dispositivo, hora: actual.borrador.hora } };
   }
   const contenido = JSON.stringify({
@@ -15569,10 +15603,18 @@ async function guarda(gh, args) {
     autor: args.autor,
     hora: args.ahora
   });
-  if (actual === null) {
+  const bytes = args.bytesDelCuerpo ?? bytesDeContenido(contenido);
+  if (actual.estado === "no-existe") {
+    const chequeo = revisaLote([RUTA_BORRADOR], bytes, rutaDeBorradorPermitida);
+    if (!chequeo.ok) return { ok: false, motivo: "no-se-pudo-guardar", problema: chequeo.problema };
     const shaDelBlob = await gh.creaBlob(contenido);
-    const shaDelArbol = await gh.creaArbol(ARBOL_VACIO, [{ path: RUTA_BORRADOR, sha: shaDelBlob }]);
-    const shaDelCommit = await gh.creaCommit({ mensaje: "Borrador", arbol: shaDelArbol, padre: "", autor: AUTOR_PANEL });
+    const shaDelArbol = await gh.creaArbol(null, [{ path: RUTA_BORRADOR, sha: shaDelBlob }]);
+    const shaDelCommit = await gh.creaCommit({
+      mensaje: mensajeDeCommit(ASUNTO_GENERICO, args.autor),
+      arbol: shaDelArbol,
+      padre: null,
+      autor: AUTOR_PANEL
+    });
     await gh.creaRef(REF_BORRADOR, shaDelCommit);
     return { ok: true };
   }
@@ -15580,7 +15622,8 @@ async function guarda(gh, args) {
     archivos: [{ ruta: RUTA_BORRADOR, contenido }],
     autor: args.autor,
     ref: REF_BORRADOR,
-    forzar: true
+    forzar: true,
+    bytesDelCuerpo: bytes
   });
   return r.ok ? { ok: true } : { ok: false, motivo: "no-se-pudo-guardar", problema: r.problema };
 }
@@ -18666,7 +18709,6 @@ async function borradorGuardarAccion(pedido, contexto) {
     return error51(400, PROBLEMA_BORRADOR_INCOMPLETO);
   }
   const documentos = comoDocumentos(cuerpo.documentos);
-  const dispositivo = idDeDispositivo(cuerpo.dispositivo);
   const pisar = cuerpo.pisar === true;
   const gh = cliente({
     token: env.PANEL_GITHUB_TOKEN ?? "",
@@ -18678,10 +18720,16 @@ async function borradorGuardarAccion(pedido, contexto) {
     const r = await guarda(gh, {
       documentos,
       base: cuerpo.base,
-      dispositivo,
+      dispositivo: sesion.dispositivo,
       autor: sesion.correo,
       ahora: contexto.ahora(),
-      pisar
+      pisar,
+      // [Ronda 1, hallazgo D] Antes esta acción nunca pasaba esto —a
+      // diferencia de `publicarAccion`/`deshacerAccion`, que sí—, así que el
+      // arranque y el guardado del borrador nunca podían chocar con el tope
+      // de cuerpo real, aunque el pedido HTTP que los trajo sí lo hubiera
+      // pasado.
+      bytesDelCuerpo: contexto.bytesDelCuerpo
     });
     if (r.ok) return ok({ ok: true });
     if (r.motivo === "hay-uno-mas-nuevo") {

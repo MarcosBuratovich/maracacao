@@ -2163,6 +2163,87 @@ describe('accion=borrador.guardar', () => {
     expect(jergaEn((r.cuerpo as { problema: string }).problema)).toBeNull()
     expect(pedidos).toHaveLength(2) // el chequeo no escribió nada
   })
+
+  // [Ronda 1, hallazgo A] `dispositivo` sale de `sesion.dispositivo` —
+  // FIRMADO al entrar—, nunca de lo que mande el cuerpo. Antes, un cuerpo
+  // que se olvidara de mandar `dispositivo` hacía que CUALQUIER aparato
+  // apareciera como `'sin-nombre'` (`idDeDispositivo(undefined)` nunca
+  // falla), y el candado anti-pisada no tenía nada que comparar.
+  describe('A: el dispositivo sale de la sesión firmada, nunca del cuerpo', () => {
+    it('el cuerpo puede mandar `dispositivo` y se ignora: lo que se guarda es el de la cookie', async () => {
+      const { f, pedidos } = fetchFalso([
+        { status: 404, cuerpo: { message: 'Not Found' } },
+        ...respuestasDeUnBlobArbolYCommit(),
+        { cuerpo: { ref: 'refs/panel/borrador' } },
+      ])
+      await maneja(
+        'borrador.guardar',
+        {
+          cuerpo: { base: 'main-1', documentos: {}, dispositivo: 'lo-que-diga-el-cuerpo-no-cuenta' },
+          cookie: cookieDeDispositivo('celu'),
+        },
+        contextoBase(f),
+      )
+      const blob = pedidos.find((p) => p.url.endsWith('/git/blobs') && p.metodo === 'POST')!
+      const escrito = JSON.parse(Buffer.from((blob.cuerpo as { content: string }).content, 'base64').toString('utf8'))
+      expect(escrito.dispositivo).toBe('celu')
+    })
+
+    it('sin NINGÚN campo `dispositivo` en el cuerpo, el candado anti-pisada sigue disparando entre DOS aparatos reales', async () => {
+      // Es el escenario que reintroducía el bug que esta tarea vino a
+      // arreglar: si `dispositivo` viniera del cuerpo y la fase 6 se
+      // olvidara de mandarlo, los dos aparatos serían `'sin-nombre'` y este
+      // 409 nunca pasaría. Con la sesión como fuente, el cuerpo ni siquiera
+      // tiene la opción de mandarlo mal.
+      const yaGuardado = JSON.stringify({
+        documentos: {}, base: 'main-1', dispositivo: 'celu', autor: 'clienta@ejemplo.mx', hora: 5_000,
+      })
+      const { f } = fetchFalso([
+        { cuerpo: { object: { sha: 'refViejo' } } },
+        { cuerpo: { content: Buffer.from(yaGuardado).toString('base64'), encoding: 'base64', sha: 'b' } },
+      ])
+      const r = await maneja(
+        'borrador.guardar',
+        { cuerpo: { base: 'main-1', documentos: {} }, cookie: cookieDeDispositivo('la-hermana') },
+        { ...contextoBase(f), ahora: () => 1_000 },
+      )
+      expect(r.status).toBe(409)
+      expect(r.cuerpo).toMatchObject({ motivo: 'hay-uno-mas-nuevo', otro: { dispositivo: 'celu', hora: 5_000 } })
+    })
+  })
+
+  // [Ronda 1, hallazgo B] Un borrador corrupto no puede dejar el panel en un
+  // 502 permanente: `guarda()` ya lo trata como «ref existe, hay que
+  // mover», no «hay que crear» — acá se confirma que ESO llega intacto
+  // hasta la respuesta HTTP (200, no 502) a través del router.
+  it('B: un borrador con el JSON corrupto no rompe el guardado siguiente (200, no 502)', async () => {
+    const { f } = fetchFalso([
+      { cuerpo: { object: { sha: 'refViejo' } } },
+      { cuerpo: { content: Buffer.from('{{{roto').toString('base64'), encoding: 'base64', sha: 'b' } },
+      ...respuestasDeUnaPublicacionDirecta(),
+    ])
+    const r = await maneja(
+      'borrador.guardar',
+      { cuerpo: { base: 'main-1', documentos: {} }, cookie: cookieValida() },
+      contextoBase(f),
+    )
+    expect(r.status).toBe(200)
+    expect((r.cuerpo as { ok: boolean }).ok).toBe(true)
+  })
+
+  // [Ronda 1, hallazgo D] `contexto.bytesDelCuerpo` tiene que llegar hasta
+  // `guarda()` — antes esta acción nunca lo pasaba, así que el guardado del
+  // borrador no podía chocar nunca con el tope real de cuerpo.
+  it('D: un `bytesDelCuerpo` (del borde) que pasa el tope frena el guardado, sin escribir nada', async () => {
+    const { f, pedidos } = fetchFalso([{ status: 404, cuerpo: { message: 'Not Found' } }])
+    const r = await maneja(
+      'borrador.guardar',
+      { cuerpo: { base: 'main-1', documentos: {} }, cookie: cookieValida() },
+      { ...contextoBase(f), bytesDelCuerpo: TOPE_CUERPO + 1 },
+    )
+    expect(r.status).toBe(502)
+    expect(pedidos.some((p) => p.url.endsWith('/git/blobs'))).toBe(false)
+  })
 })
 
 describe('accion=borrador.leer', () => {

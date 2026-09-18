@@ -180,4 +180,50 @@ describe('el cliente de GitHub', () => {
     expect(c.padres).toEqual(['p1'])
     expect(c.message).toContain('Panel: sí')
   })
+
+  // [Tarea 11, Ronda 1 hallazgo E1] `creaArbol(null, ...)` es «un árbol de
+  // cero», la forma documentada de la Git Data API: SIN `base_tree` en el
+  // cuerpo, no un sha inventado para el árbol vacío.
+  it('creaArbol(null, ...) omite base_tree — un árbol sin base, no un sha mágico', async () => {
+    const { f, pedidos } = fetchFalso([{ cuerpo: { sha: 'arbol-nuevo' } }])
+    const sha = await cliente(creds(f)).creaArbol(null, [{ path: 'panel/borrador.json', sha: 'blob1' }])
+    expect(sha).toBe('arbol-nuevo')
+    expect(Object.keys(pedidos[0].cuerpo as object)).not.toContain('base_tree')
+  })
+
+  it('creaArbol(base, ...) sigue mandando base_tree cuando sí hay base', async () => {
+    const { f, pedidos } = fetchFalso([{ cuerpo: { sha: 'arbol-nuevo' } }])
+    await cliente(creds(f)).creaArbol('tree-viejo', [{ path: 'a.json', sha: 'blob1' }])
+    expect((pedidos[0].cuerpo as { base_tree: string }).base_tree).toBe('tree-viejo')
+  })
+
+  // [Tarea 11, Ronda 1 hallazgo E2] `padre: null` es un commit RAÍZ
+  // (`parents: []`), no `padre: ''` — el centinela viejo era el mismo valor
+  // que una variable `string` toma por accidente, así que «no tengo padre» y
+  // «perdí el padre» eran indistinguibles.
+  it('creaCommit con padre:null manda parents: [] — un commit raíz', async () => {
+    const { f, pedidos } = fetchFalso([{ cuerpo: { sha: 'commit-raiz' } }])
+    const sha = await cliente(creds(f)).creaCommit({
+      mensaje: 'Borrador', arbol: 'arbol1', padre: null, autor: { name: 'Panel Maracacao', email: 'panel@maracacao.mx' },
+    })
+    expect(sha).toBe('commit-raiz')
+    expect((pedidos[0].cuerpo as { parents: string[] }).parents).toEqual([])
+  })
+
+  it('creaCommit con un padre real sigue mandando parents: [padre]', async () => {
+    const { f, pedidos } = fetchFalso([{ cuerpo: { sha: 'commit1' } }])
+    await cliente(creds(f)).creaCommit({
+      mensaje: 'x', arbol: 'a1', padre: 'p1', autor: { name: 'Panel Maracacao', email: 'panel@maracacao.mx' },
+    })
+    expect((pedidos[0].cuerpo as { parents: string[] }).parents).toEqual(['p1'])
+  })
+
+  it('creaRef crea un ref nuevo con refs/<nombre> y el sha dado', async () => {
+    const { f, pedidos } = fetchFalso([{ cuerpo: { ref: 'refs/panel/borrador' } }])
+    await cliente(creds(f)).creaRef('panel/borrador', 'sha1')
+    expect(pedidos[0].metodo).toBe('POST')
+    expect(pedidos[0].url).toContain('/git/refs')
+    expect(pedidos[0].url).not.toContain('/git/refs/') // sin el nombre en la URL: va en el cuerpo
+    expect(pedidos[0].cuerpo).toEqual({ ref: 'refs/panel/borrador', sha: 'sha1' })
+  })
 })

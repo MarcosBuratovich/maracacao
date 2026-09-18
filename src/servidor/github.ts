@@ -37,14 +37,22 @@ export interface DatosCommit {
   mensaje: string
   arbol: string
   /**
-   * [Tarea 11] `''` es el commit RAÍZ, sin padre: el ÚNICO caso que lo pide
-   * es el primer commit del ref del borrador, que no desciende de nada —ni
-   * de `main`, ni de un commit anterior propio, porque no existe— y por eso
-   * `creaCommit` manda `parents: []` en vez de `[padre]` cuando esto llega
-   * vacío. Todo lo demás del repo (`main`, cada reversión) siempre pasa un
-   * sha real acá, así que ese camino queda exactamente como estaba.
+   * [Tarea 11, Ronda 1 hallazgo E2] `null` es el commit RAÍZ, sin padre: el
+   * ÚNICO caso que lo pide es el primer commit del ref del borrador, que no
+   * desciende de nada —ni de `main`, ni de un commit anterior propio, porque
+   * no existe— y por eso `creaCommit` manda `parents: []` en vez de
+   * `[padre]` cuando esto es `null`. Todo lo demás del repo (`main`, cada
+   * reversión) siempre pasa un sha real acá, así que ese camino queda
+   * exactamente como estaba.
+   *
+   * Es `string | null`, no `string` con `''` de centinela: `''` es
+   * justamente el valor que una variable `string` cualquiera toma por
+   * accidente (`padre: sha ?? ''`, un `padre` que se perdió en el camino), y
+   * con eso «no tengo padre» (a propósito) y «perdí el padre» (un bug) serían
+   * el mismo valor — un commit raíz armado por error, en silencio. `null`
+   * exige que quien llama lo haya pensado.
    */
-  padre: string
+  padre: string | null
   autor: { name: string; email: string }
 }
 
@@ -207,12 +215,21 @@ export function cliente(c: Credenciales) {
     /**
      * Crea un árbol sobre `base`, con las entradas dadas. `sha: null` en una
      * entrada es cómo la Git Data API borra esa ruta del árbol nuevo.
+     *
+     * [Tarea 11, Ronda 1 hallazgo E1] `base: null` OMITE `base_tree` del
+     * cuerpo del pedido en vez de mandar un sha inventado para «un árbol de
+     * cero»: es la forma documentada de la Git Data API para un árbol sin
+     * base, y evita que ese camino dependa de que un sha mágico —el árbol
+     * vacío universal de git— esté bien escrito. Con eso, el único paso del
+     * bootstrap del borrador que ningún mock de test podía verificar por sí
+     * mismo deja de existir, en vez de quedar diferido a que alguien lo
+     * revise a mano contra la API real.
      */
-    async creaArbol(base: string, entradas: EntradaArbol[]): Promise<string> {
+    async creaArbol(base: string | null, entradas: EntradaArbol[]): Promise<string> {
       const cuerpo = await pedir('/git/trees', {
         method: 'POST',
         body: {
-          base_tree: base,
+          ...(base !== null ? { base_tree: base } : {}),
           tree: entradas.map((e) => ({ path: e.path, sha: e.sha, mode: '100644', type: 'blob' })),
         },
       }) as { sha: string }
@@ -221,7 +238,7 @@ export function cliente(c: Credenciales) {
 
     /**
      * Crea un commit y devuelve su sha. Con un padre —el caso de siempre—
-     * manda `parents: [padre]`; con `padre: ''` manda `parents: []`, un
+     * manda `parents: [padre]`; con `padre: null` manda `parents: []`, un
      * commit RAÍZ (ver el comentario de `DatosCommit.padre`).
      */
     async creaCommit(datos: DatosCommit): Promise<string> {
@@ -230,7 +247,7 @@ export function cliente(c: Credenciales) {
         body: {
           message: datos.mensaje,
           tree: datos.arbol,
-          parents: datos.padre ? [datos.padre] : [],
+          parents: datos.padre !== null ? [datos.padre] : [],
           author: datos.autor,
         },
       }) as { sha: string }

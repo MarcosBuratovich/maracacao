@@ -294,5 +294,59 @@ describe('publicar', () => {
       expect(patch.url).toContain('/git/refs/heads/main')
       expect((patch.cuerpo as { force: boolean }).force).toBe(false)
     })
+
+    // [Ronda 1, hallazgo C] La guardia vieja era «todo lo que no sea
+    // heads/main» — así que CUALQUIER ref desconocido con `forzar: true`
+    // pasaba. Medido: un typo como `'heads/borrador'` —un nombre que cae
+    // DENTRO de `refs/heads/`, no el ref del borrador de verdad— también
+    // pasaba, y el borrador a medio escribir habría aterrizado en una RAMA
+    // que la plataforma sí despliega. Ahora es un mapa explícito: un ref
+    // fuera de él truena, forcé o no.
+    describe('C: un mapa explícito de refs conocidos, no una prohibición sobre un único valor', () => {
+      it('un ref de TERCEROS con forzar:true YA NO pasa: tira', async () => {
+        const { f, pedidos } = fetchFalso([])
+        const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+        await expect(
+          publica(gh, {
+            archivos: [{ ruta: 'panel/borrador.json', contenido: '{}' }],
+            autor: 'a@b.mx',
+            ref: 'refs/algo-inventado',
+            forzar: true,
+          }),
+        ).rejects.toThrow()
+        expect(pedidos).toHaveLength(0)
+      })
+
+      it('el caso que de verdad importa: un typo DENTRO de refs/heads/ (una rama real) también tira', async () => {
+        // Es justo la pregunta que el ref del borrador, fuera de
+        // refs/heads/, vino a cerrar (decisión B5): si esto NO tirara, el
+        // borrador a medio escribir se publicaría en una rama de verdad, que
+        // la plataforma SÍ mira y despliega.
+        const { f, pedidos } = fetchFalso([])
+        const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+        await expect(
+          publica(gh, {
+            archivos: [{ ruta: 'panel/borrador.json', contenido: '{}' }],
+            autor: 'a@b.mx',
+            ref: 'heads/borrador',
+            forzar: true,
+          }),
+        ).rejects.toThrow()
+        expect(pedidos).toHaveLength(0)
+      })
+
+      it('un ref desconocido tira aunque NO pida forzar: no es "probablemente el del borrador"', async () => {
+        const { f, pedidos } = fetchFalso([])
+        const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+        await expect(
+          publica(gh, {
+            archivos: [{ ruta: 'panel/borrador.json', contenido: '{}' }],
+            autor: 'a@b.mx',
+            ref: 'heads/borrador',
+          }),
+        ).rejects.toThrow()
+        expect(pedidos).toHaveLength(0)
+      })
+    })
   })
 })

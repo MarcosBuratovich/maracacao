@@ -35,6 +35,20 @@ export function rutaPermitida(ruta: string): boolean {
 }
 
 /**
+ * [Tarea 11] El ref del borrador, sin el prefijo `refs/` —la misma forma que
+ * usa todo `github.ts` (`heads/main`, nunca `refs/heads/main`).
+ *
+ * Vive ACÁ y no en `borrador.ts` —donde el brief original lo ubicaba— porque
+ * `publicar.ts` necesita esta MISMA constante para el mapa de refs conocidos
+ * de la Ronda 1 (hallazgo C), y `publicar.ts` ↔ `borrador.ts` ya se importan
+ * mutuamente en el otro sentido (`borrador.ts` llama a `publica()`): si esta
+ * constante viviera en `borrador.ts`, `publicar.ts` importándola cerraría un
+ * ciclo. `borrador.ts` la re-exporta, así que `import { REF_BORRADOR } from
+ * './borrador'` —el contrato que pide el brief— sigue funcionando igual.
+ */
+export const REF_BORRADOR = 'panel/borrador'
+
+/**
  * [Tarea 11] La lista blanca del ref del borrador —OTRA lista, separada a
  * propósito de `RUTAS_PERMITIDAS` de arriba, no una entrada más ahí adentro.
  *

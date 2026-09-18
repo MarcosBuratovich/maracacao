@@ -12,7 +12,7 @@
  * toca `globalThis.fetch`.
  */
 import { cliente, type EntradaArbol } from './github'
-import { revisaLote, rutaPermitida, rutaDeBorradorPermitida } from './rutas-permitidas'
+import { revisaLote, rutaPermitida, rutaDeBorradorPermitida, REF_BORRADOR } from './rutas-permitidas'
 import { frase, type Cambio } from '../contenido/diff'
 
 export interface Archivo {
@@ -75,11 +75,17 @@ export interface Publicacion {
    * es la única forma de que un choque avise en vez de pisar en silencio, y
    * eso no puede cambiar por accidente. La ÚNICA razón legítima para pedir
    * `true` es el ref del borrador (`borrador.ts`), que no tiene historia que
-   * preservar —es «lo último que ella escribió», no una serie de commits—;
-   * por eso `publica()` TIRA si `forzar: true` llega junto con el `ref` de
-   * `main` (ver más abajo): esa combinación no es una opción de negocio, es
-   * un bug de quien llama, y tiene que reventar fuerte, no colarse como un
-   * 409 cualquiera.
+   * preservar —es «lo último que ella escribió», no una serie de commits—.
+   *
+   * [Ronda 1, hallazgo C] `publica()` no acepta esto sobre CUALQUIER ref que
+   * no sea `main`: lo valida contra un mapa explícito de refs conocidos (ver
+   * `REFS_CONOCIDOS`, más abajo) y TIRA si `ref` no está en ese mapa, o si
+   * `forzar: true` llega para un ref que el mapa no marca como forzable. Eso
+   * significa dos cosas, no una: esta combinación no es una opción de
+   * negocio, es un bug de quien llama, y por eso truena en vez de colarse
+   * como un 409 cualquiera; y un ref DESCONOCIDO truena igual, aunque no
+   * pida forzar — un ref que nadie declaró no es "probablemente el del
+   * borrador", es un error.
    */
   forzar?: boolean
 }
@@ -98,16 +104,58 @@ export type Resultado =
 export const AUTOR_PANEL = { name: 'Panel Maracacao', email: 'panel@maracacao.mx' }
 
 /**
- * [Tarea 11] El default de `p.ref`, y el único valor contra el que
- * `forzar: true` está prohibido (ver `Publicacion.forzar`). Ya no es «la
- * única rama que este código toca» —desde esta tarea, `publica()` también
- * escribe el ref del borrador— pero sigue siendo la única que se mueve SIN
- * forzar nunca.
+ * [Tarea 11] El default de `p.ref`. Ya no es «la única rama que este código
+ * toca» —desde esta tarea, `publica()` también escribe el ref del
+ * borrador— pero sigue siendo la única que se mueve SIN forzar nunca (ver
+ * `REFS_CONOCIDOS`).
  */
 const REF_MAIN = 'heads/main'
 
-/** Se usa cuando `publica()` no recibió `cambios`: no hay diff para nombrar, pero sí algo que publicar. */
-const ASUNTO_GENERICO = 'Actualiza contenido del panel'
+/**
+ * [Tarea 11, Ronda 1 hallazgo C] El mapa EXPLÍCITO de todo ref que
+ * `publica()` sabe escribir, con qué lista blanca le corresponde y si
+ * puede forzarse. Antes de este mapa, la regla era "`main` no forza, TODO
+ * lo demás sí" —una prohibición sobre un único valor conocido, no una
+ * lista de permitidos— y eso dejaba pasar cualquier ref DESCONOCIDO con
+ * `forzar: true` (medido). El riesgo real: un typo como `'heads/borrador'`
+ * —un nombre que cae DENTRO de `refs/heads/`, no el ref del borrador de
+ * verdad— pasaba el chequeo viejo igual (no es `'heads/main'`, así que
+ * "no main" alcanzaba), y el borrador a medio escribir aterrizaba en una
+ * RAMA de verdad, que la plataforma sí mira y despliega: exactamente la
+ * pregunta que el ref del borrador, fuera de `refs/heads/`, vino a cerrar
+ * (decisión B5). Con esta lista, un ref que no está acá es un `throw`,
+ * nunca un "probablemente el del borrador".
+ */
+const REFS_CONOCIDOS: Record<string, { permiteRuta: (ruta: string) => boolean; permiteForzar: boolean }> = {
+  [REF_MAIN]: { permiteRuta: rutaPermitida, permiteForzar: false },
+  [REF_BORRADOR]: { permiteRuta: rutaDeBorradorPermitida, permiteForzar: true },
+}
+
+/**
+ * Se usa cuando `publica()` no recibió `cambios`: no hay diff para nombrar,
+ * pero sí algo que publicar. Exportada desde la Ronda 1 de la Tarea 11:
+ * `borrador.ts` la reusa para que el commit raíz del bootstrap del borrador
+ * tenga el MISMO asunto que cualquier guardado posterior —que sí pasa por
+ * `publica()` y cae en este mismo default, porque nunca manda `cambios`—.
+ * Sin esto, el primer commit de ese ref decía algo distinto de todos los
+ * que le siguen, y si Marcos mira el ref a mano vería dos formatos que no
+ * deberían existir (hallazgo E6).
+ */
+export const ASUNTO_GENERICO = 'Actualiza contenido del panel'
+
+/**
+ * Arma el cuerpo de un commit del panel: el asunto, la línea en blanco y
+ * los trailers —los dos de siempre (`Panel: sí`, `Panel-Autor:`) más los
+ * que traiga `trailers`—. Exportada desde la Ronda 1 de la Tarea 11:
+ * `borrador.ts` la reusa para el commit raíz del bootstrap, así los dos
+ * caminos de escritura del ref del borrador (crear y mover) arman el
+ * mensaje con la MISMA función, en vez de que uno lo escriba a mano y se
+ * desincronice del otro en cuanto alguien toque solo uno de los dos.
+ */
+export function mensajeDeCommit(asunto: string, autor: string, trailers?: Record<string, string>): string {
+  const extras = Object.entries(trailers ?? {}).map(([k, v]) => `${k}: ${v}`)
+  return [asunto, '', 'Panel: sí', `Panel-Autor: ${autor}`, ...extras].join('\n')
+}
 
 /**
  * [Tarea 9, Ronda 1] La frase para cualquier error fuerte del lado de
@@ -253,9 +301,9 @@ async function intento(
  * (`heads/main` si no lo pasa), o no publica nada.
  *
  * Orden, y por qué es ESE orden (regla del controlador): [Tarea 11] primero
- * la guardia de `forzar` contra `main` —un `throw`, no un `Resultado`,
- * porque es un bug de quien llama, no un dato malo—, después la lista
- * blanca —una ruta prohibida no gasta ni un pedido—, después leer el ref y
+ * la guardia del ref/`forzar` contra `REFS_CONOCIDOS` —un `throw`, no un
+ * `Resultado`, porque es un bug de quien llama, no un dato malo—, después la
+ * lista blanca —una ruta prohibida no gasta ni un pedido—, después leer el ref y
  * su commit, después los blobs en paralelo, después el árbol, después el
  * commit, y el `PATCH` del ref AL FINAL. Si cualquier paso anterior al
  * `PATCH` tira, el repo queda exactamente como estaba: nada apunta a los
@@ -274,21 +322,22 @@ export async function publica(gh: ReturnType<typeof cliente>, p: Publicacion): P
   const ref = p.ref ?? REF_MAIN
   const forzar = p.forzar ?? false
 
-  // [Tarea 11, decisión B5] Esta combinación no es un caso de negocio: es un
-  // bug de quien llama `publica()`. Por eso truena acá mismo, ANTES de
-  // cualquier otra cosa —ni siquiera gasta el chequeo de la lista blanca—,
-  // en vez de devolver un `Resultado` que alguien podría capturar y tratar
-  // como un 409 más. `main` se mueve SIN forzar siempre: es la única forma
-  // de que un choque avise en vez de pisar en silencio.
-  if (forzar && ref === REF_MAIN) {
-    throw new Error(
-      `publica(): forzar:true contra ${REF_MAIN} no es una opción — es un bug de quien llama, nunca un caso legítimo.`,
-    )
+  // [Tarea 11, Ronda 1 hallazgo C] Regla POSITIVA: el ref tiene que estar en
+  // el mapa, y no cualquier valor "distinto de main" alcanza. Un ref
+  // desconocido truena ACÁ, ANTES de la lista blanca —ni siquiera importa
+  // qué archivos traiga—, y es un `throw` (no un `Resultado`) por la misma
+  // razón que el `forzar` mal puesto: es un bug de quien llama `publica()`,
+  // nunca un dato malo que la clienta pueda haber mandado.
+  const config = REFS_CONOCIDOS[ref]
+  if (!config) {
+    throw new Error(`publica(): "${ref}" no es un ref conocido — revisá REFS_CONOCIDOS en publicar.ts.`)
+  }
+  if (forzar && !config.permiteForzar) {
+    throw new Error(`publica(): forzar:true contra "${ref}" no es una opción — ese ref no lo permite.`)
   }
 
   const rutas = p.archivos.map((a) => a.ruta)
-  const permiteRuta = ref === REF_MAIN ? rutaPermitida : rutaDeBorradorPermitida
-  const chequeo = revisaLote(rutas, p.bytesDelCuerpo ?? bytesDelCuerpo(p.archivos), permiteRuta)
+  const chequeo = revisaLote(rutas, p.bytesDelCuerpo ?? bytesDelCuerpo(p.archivos), config.permiteRuta)
   if (!chequeo.ok) return { ok: false, codigo: 422, problema: chequeo.problema }
 
   const asunto = p.cambios !== undefined ? frase(p.cambios) : ASUNTO_GENERICO
@@ -298,8 +347,7 @@ export async function publica(gh: ReturnType<typeof cliente>, p: Publicacion): P
     return { ok: true, sha: null, resumen: 'No había nada que publicar: no cambiaste ningún dato del sitio.' }
   }
 
-  const extras = Object.entries(p.trailers ?? {}).map(([k, v]) => `${k}: ${v}`)
-  const mensaje = [`${asunto}`, '', 'Panel: sí', `Panel-Autor: ${p.autor}`, ...extras].join('\n')
+  const mensaje = mensajeDeCommit(asunto, p.autor, p.trailers)
 
   try {
     const sha = await intento(gh, p.archivos, mensaje, ref, forzar)
