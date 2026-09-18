@@ -1,10 +1,15 @@
 /*
  * ¿Terminó el deploy de este commit?
  *
- * Es la primera de las dos fuentes que deciden «ya está en el sitio»
- * (spec §4.5). La segunda es `version.json`, que dice qué commit está
- * sirviendo el CDN. Las dos tienen que coincidir para cantar «listo»: esta
- * sola diría que sí cuando el borde de la red todavía entrega lo viejo.
+ * Una de las dos fuentes que deciden «ya está en el sitio» (spec §4.5). La
+ * otra es `version.json`, que dice qué commit está sirviendo el CDN — y
+ * desde la inversión de precedencia (estado.ts), esa sola alcanza para
+ * cantar «listo» cuando ya sirve el sha publicado: es el hecho observable,
+ * esto es un reporte sobre ese hecho, y el reporte puede estar mal (medido
+ * en producción). Lo que SIGUE haciendo falta de acá es la otra mitad de
+ * la pregunta: cuando el CDN todavía no sirve el sha publicado, distinguir
+ * «falló» de «todavía va», algo que `version.json` no puede contestar
+ * porque en los dos casos sigue mostrando lo viejo.
  *
  * Puro e inyectable (regla de `src/servidor/**`): el token, el proyecto y el
  * `fetch` llegan por parámetro. Nada acá lee `process.env`.

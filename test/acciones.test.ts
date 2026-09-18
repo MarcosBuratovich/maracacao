@@ -195,6 +195,19 @@ const SHA_MAIN = 'facade01'.repeat(5)
 const SHA_VIEJO = 'de1e7ed0'.repeat(5)
 const SHA_QUE_ELLA_LEYO = '0cea0bad'.repeat(5)
 
+/**
+ * [Inversión de precedencia] `estadoAccion` consulta `version.json` SIEMPRE
+ * ahora, ya no solo cuando la plataforma dice `'listo'` — así que todo test
+ * de `accion=estado` cuyo despliegue llega a `'falló'` tiene que programarle
+ * a `fetchFalso` una respuesta más, o le roba la que le tocaba al siguiente
+ * pedido real (el autor del commit, el primer paso de la reversión) y la
+ * suite se desalinea en silencio. Acá el CDN sigue sirviendo `SHA_VIEJO`, no
+ * el sha que se está probando: ni entra en el «listo» ni contradice el
+ * «falló» — exactamente lo que pasa de verdad cuando un despliegue falla y
+ * el borde de la red se queda con lo de antes.
+ */
+const cdnSirviendoLoViejo = () => ({ cuerpo: { sha: SHA_VIEJO, construido: '2026-09-17T12:00:00.000Z' } })
+
 const contextoBase = (fetch: typeof globalThis.fetch) => ({
   env: {
     PANEL_CLAVE_HASH: hashDeClave(CLAVE),
@@ -2190,10 +2203,13 @@ describe('las acciones que todavía no existen', () => {
 })
 
 // Tarea 7: «¿ya está en el sitio?» (spec §4.5). Cruza dos fuentes — la
-// plataforma dice que el despliegue TERMINÓ, `version.json` dice qué commit
-// está sirviendo el CDN AHORA — y por eso el `fetchFalso` de cada test que
-// llega a tocar red programa DOS respuestas, en ese orden. El cálculo del
-// veredicto en sí (las once combinaciones) lo cubre `test/estado.test.ts`;
+// plataforma dice qué pasó con el despliegue, `version.json` dice qué
+// commit está sirviendo el CDN AHORA — y desde la inversión de precedencia
+// las dos se leen SIEMPRE, no una condicionada a la otra: el `fetchFalso`
+// de cada test que llega a tocar red programa DOS respuestas para esa
+// acción, en ese orden, sin importar qué haya contestado la primera (ver
+// `cdnSirviendoLoViejo()`, arriba, para los que ejercitan un despliegue
+// `'falló'`). El cálculo del veredicto en sí lo cubre `test/estado.test.ts`;
 // acá solo se prueba que el router lee las dos fuentes correctas, en el
 // orden correcto, y con las mismas cuatro capas (secreto, sesión, luego lo
 // suyo) que ya tienen `entrar` y `publicarAccion`.
@@ -2370,6 +2386,7 @@ describe('accion=estado', () => {
     const { f } = fetchFalso([
       ...respuestasDeNingunaReversionPendiente(), // revisaLaCabeza(), primero que nada
       { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } },
+      cdnSirviendoLoViejo(), // version.json — SIEMPRE, ya no solo si el despliegue da 'listo'
       respuestaDelCommitParaElAutor(sha), // revierteYAvisa() lee el autor real ANTES de revierte()
       ...respuestasDeUnaReversionCompleta(sha),
     ])
@@ -2401,6 +2418,7 @@ describe('accion=estado', () => {
     const { f } = fetchFalso([
       ...respuestasDeNingunaReversionPendiente(),
       { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } },
+      cdnSirviendoLoViejo(), // version.json — SIEMPRE, ya no solo si el despliegue da 'listo'
       respuestaDelCommitParaElAutor(sha),
       ...respuestasDeUnaReversionCompleta(sha),
     ])
@@ -2436,6 +2454,7 @@ describe('accion=estado', () => {
       { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // vercel (revisaLaCabeza)
       ...respuestasDeUnaReversionCompleta(sha), // revierte() dentro de revierteYAvisaAMarcos()
       { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // vercel (la lectura propia de estadoAccion)
+      cdnSirviendoLoViejo(), // version.json — la lectura propia de estadoAccion, SIEMPRE
     ])
     const r = await maneja(
       'estado',
@@ -2495,6 +2514,7 @@ describe('accion=estado', () => {
       { cuerpo: { object: { sha: shaRevert } } }, // revisaLaCabeza: gh.ref — la cabeza YA es la reversión
       { cuerpo: commitRevert }, // revisaLaCabeza: gh.commit → es una reversión, se va sin tocar nada
       { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // el deploy VIEJO sigue marcado como fallido
+      cdnSirviendoLoViejo(), // version.json — SIEMPRE, ya no solo si el despliegue da 'listo'
       { cuerpo: commitRoto }, // revierteYAvisa: el autor real
       { cuerpo: { object: { sha: shaRevert } } }, // revierte(): gh.ref
       { cuerpo: commitRevert }, // revierte(): la cabeza ya revierte este sha → `ya-revertido`
@@ -2550,6 +2570,7 @@ describe('accion=estado', () => {
     const respuestas = () => [
       ...respuestasDeNingunaReversionPendiente(),
       { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } },
+      cdnSirviendoLoViejo(), // version.json — SIEMPRE, ya no solo si el despliegue da 'listo'
       respuestaDelCommitParaElAutor(sha),
       ...respuestasDeUnaReversionCompleta(sha),
     ]
@@ -2603,6 +2624,7 @@ describe('accion=estado', () => {
     const { f } = fetchFalso([
       ...respuestasDeNingunaReversionPendiente(),
       { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } },
+      cdnSirviendoLoViejo(), // version.json — SIEMPRE, ya no solo si el despliegue da 'listo'
       respuestaDelCommitParaElAutor(sha),
       ...respuestasDeUnaReversionCompleta(sha),
     ])
@@ -2628,6 +2650,7 @@ describe('accion=estado', () => {
     const { f } = fetchFalso([
       ...respuestasDeNingunaReversionPendiente(),
       { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } },
+      cdnSirviendoLoViejo(), // version.json — SIEMPRE, ya no solo si el despliegue da 'listo'
       respuestaDelCommitParaElAutor(sha),
       ...respuestasDeUnaReversionCompleta(sha),
     ])

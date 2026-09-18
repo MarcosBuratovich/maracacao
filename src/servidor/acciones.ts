@@ -1829,13 +1829,20 @@ async function salud(_pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
  * es lo mismo desde donde ella lo mira, es que cada respuesta traiga su
  * `reintentarEn`.
  *
- * Las dos lecturas van en este orden porque la primera es la que puede
- * ahorrar la segunda: si el despliegue falló, no hace falta preguntarle nada
- * al CDN.
+ * [Inversión de precedencia] Las dos lecturas van SIEMPRE, ya no una
+ * condicionada a la otra. Antes, `version.json` (el CDN, barato y confiable)
+ * solo se consultaba si la plataforma YA había dicho `'listo'` — y medido en
+ * producción, un despliegue que SÍ había terminado y SÍ se estaba sirviendo
+ * contestó «en curso» 31 sondeos seguidos porque esa otra lectura, la que
+ * puede fallar, no encontraba el despliegue. `decide()` (estado.ts) le da
+ * ahora la última palabra al CDN: si ya sirve el sha publicado, alcanza
+ * solo. La plataforma sigue haciendo falta para la otra pregunta —«falló» o
+ * «todavía va»—, que `version.json` no puede contestar por sí sola.
  *
  * Si `version.json` no contesta, NO se asume nada: se sigue con
- * `shaServido: null`, que nunca coincide, así que el veredicto es «en curso».
- * Una de las dos fuentes caída no puede volverse un «sí» por omisión.
+ * `shaServido: null`, que nunca coincide, así que el veredicto depende de lo
+ * que diga la plataforma. Una de las dos fuentes caída no puede volverse un
+ * «sí» por omisión.
  */
 async function estadoAccion(pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
   const env = contexto.env
@@ -1896,7 +1903,13 @@ async function estadoAccion(pedido: Pedido, contexto: Contexto): Promise<Respues
     return error(502, PROBLEMA_NO_SE_PUDO_LEER)
   }
 
-  const shaServido = despliegue.estado === 'listo' ? await shaQueSirveElCdn(contexto) : null
+  // [Inversión de precedencia] SIEMPRE, ya no solo cuando `despliegue.estado
+  // === 'listo'`. Medido en producción: el despliegue había terminado bien,
+  // el CDN ya servía el sha nuevo, y esta lectura ni se hacía porque la de
+  // arriba decía otra cosa — 31 sondeos seguidos de «en curso» con el
+  // cambio YA publicado. `decide()` (estado.ts) es quien ahora sabe que el
+  // CDN alcanza solo; acá no hay que adivinarlo, solo preguntarle siempre.
+  const shaServido = await shaQueSirveElCdn(contexto)
 
   // [B1] La reversión automática la hace la invocación que VE el fracaso. No
   // hay ningún proceso sondeando: una función de la plataforma muere a los

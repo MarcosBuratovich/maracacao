@@ -18419,11 +18419,11 @@ function fraseDeFracaso(f) {
   return "No sali\xF3 y no pude dejarlo como estaba. Av\xEDsale a Marcos para que lo revise.";
 }
 function decide(e) {
+  if (e.shaServido === e.shaPublicado) {
+    return { estado: "listo", frase: FRASE_LISTO, reintentarEn: null, url: e.url };
+  }
   if (e.despliegue === "fall\xF3") {
     return { estado: "fall\xF3", frase: fraseDeFracaso(e.fracaso), reintentarEn: null, url: e.url };
-  }
-  if (e.despliegue === "listo" && e.shaServido === e.shaPublicado) {
-    return { estado: "listo", frase: FRASE_LISTO, reintentarEn: null, url: e.url };
   }
   if (e.desdeHaceMs > DEJA_DE_PREGUNTAR_MS) {
     return { estado: "enCurso", frase: FRASE_TARDA, reintentarEn: null, url: e.url };
@@ -18985,7 +18985,7 @@ async function estadoAccion(pedido, contexto) {
     console.error("estado: la plataforma no contest\xF3 por el despliegue \u2014", e);
     return error51(502, PROBLEMA_NO_SE_PUDO_LEER);
   }
-  const shaServido = despliegue.estado === "listo" ? await shaQueSirveElCdn(contexto) : null;
+  const shaServido = await shaQueSirveElCdn(contexto);
   let fracaso;
   if (despliegue.estado === "fall\xF3") {
     if (shaYaAtendido?.sha === cuerpo.sha) {

@@ -1,11 +1,16 @@
 /*
- * «¿Ya está en el sitio?» son DOS preguntas, no una (spec §4.5): la
- * plataforma dice que el deploy TERMINÓ, y `version.json` dice qué commit
- * está sirviendo el CDN. Cantar «listo» con la primera sola es mandarla a
- * mirar un sitio que todavía entrega lo viejo.
+ * «¿Ya está en el sitio?» (spec §4.5). Desde la inversión de precedencia
+ * —medida en producción: el despliegue había terminado, el CDN ya servía
+ * el sha nuevo, y la plataforma igual contestaba «en curso» 31 sondeos
+ * seguidos porque esa lectura, la que puede fallar, no encontraba el
+ * despliegue— `version.json` (el CDN) alcanza solo para «listo»: es un
+ * hecho observable, no un reporte sobre el hecho. La plataforma sigue
+ * haciendo falta para la otra pregunta, la que `version.json` no puede
+ * contestar sola: «falló» o «todavía va», cuando el CDN todavía muestra lo
+ * viejo en los dos casos.
  *
  * Este módulo no tiene red: recibe las dos respuestas ya leídas y decide.
- * Por eso las once combinaciones se prueban acá, en milisegundos.
+ * Por eso las combinaciones se prueban acá, en milisegundos.
  */
 import { describe, it, expect } from 'vitest'
 import { decide, fraseDeFracaso, jergaEn } from '../src/servidor/estado'
@@ -14,14 +19,31 @@ const SHA = 'a'.repeat(40)
 const base = { despliegue: 'enCurso' as const, url: null, shaServido: null, shaPublicado: SHA, desdeHaceMs: 5_000 }
 
 describe('el veredicto', () => {
-  it('B2: listo exige las DOS fuentes — la plataforma terminó Y el CDN ya sirve ese commit', () => {
-    const v = decide({ ...base, despliegue: 'listo', url: 'https://x.vercel.app', shaServido: SHA })
-    expect(v.estado).toBe('listo')
-    expect(v.reintentarEn).toBeNull()
-    expect(v.frase).toBe('Tu cambio ya está en el sitio.')
-  })
+  /*
+   * [Inversión de precedencia] El CDN sirviendo el sha publicado alcanza
+   * para «listo» solo, pase lo que pase con `despliegue`. Tres de estas
+   * cuatro celdas CAMBIARON de resultado con el arreglo:
+   *   - `'listo'`: ya daba `'listo'` antes también — el caso fácil, el
+   *     único que no cambia, y se deja acá para que la fila quede completa.
+   *   - `'enCurso'` y `'desconocido'`: daban `'enCurso'` antes — el
+   *     escenario medido en producción, 31 sondeos seguidos mintiendo que
+   *     todavía faltaba.
+   *   - `'falló'`: daba `'falló'` antes. Es la combinación contradictoria
+   *     que discute el comentario de `decide()` — un reporte de fracaso
+   *     sobre un sha que el CDN ya está sirviendo—, y acá se deja escrito
+   *     que gana el hecho observable, no el reporte.
+   */
+  it.each(['listo', 'enCurso', 'desconocido', 'falló'] as const)(
+    'el CDN sirviendo el sha publicado alcanza para "listo" solo, sin importar qué diga el despliegue (%s)',
+    (despliegue) => {
+      const v = decide({ ...base, despliegue, url: 'https://x.vercel.app', shaServido: SHA })
+      expect(v.estado).toBe('listo')
+      expect(v.reintentarEn).toBeNull()
+      expect(v.frase).toBe('Tu cambio ya está en el sitio.')
+    },
+  )
 
-  it('B2: la plataforma terminó pero el CDN sigue con lo viejo: todavía NO está listo', () => {
+  it('el CDN sigue con lo viejo: un despliegue reportado "listo" todavía NO alcanza', () => {
     // Es la ventana exacta en la que el panel mentía si mirara una sola
     // fuente. Dura segundos, y en esos segundos ella abre el sitio y ve el
     // precio de antes.
