@@ -202,6 +202,50 @@ describe('el borrador del servidor', () => {
     })
   })
 
+  // [Ronda 2, hallazgo 1] `JSON.parse` no falla con `null`, `[]`, `42` ni
+  // `"hola"` —los cuatro son JSON válido— así que un `try/catch` alrededor
+  // de `JSON.parse` (lo que había hasta la Ronda 1) NO alcanza para B: hacía
+  // falta además mirar la FORMA de lo que salió. El caso grave era `null`:
+  // sin este chequeo, `guarda()` reventaba leyendo `null.dispositivo` (un
+  // TypeError, no un 502 franco) y `leeBorrador()` le mentía a la fase 6
+  // diciendo «no hay borrador» — sin salida por la interfaz, que es
+  // exactamente lo que el tipo de tres estados de B vino a evitar.
+  describe('Ronda 2, hallazgo 1: JSON.parse no valida FORMA — null, [], 42, "hola" y true son JSON válido pero no un Borrador', () => {
+    const CASOS_SIN_FORMA = ['null', '[]', '42', '"hola"', 'true']
+
+    it('leeBorrador() da null para los cinco casos, nunca un borrador de forma rara que la fase 6 crea de confianza', async () => {
+      for (const contenido of CASOS_SIN_FORMA) {
+        const { f } = fetchFalso([
+          { cuerpo: { object: { sha: 'refViejo' } } },
+          { cuerpo: { content: Buffer.from(contenido).toString('base64'), encoding: 'base64', sha: 'b' } },
+        ])
+        expect(await leeBorrador(gh(f)), contenido).toBeNull()
+      }
+    })
+
+    it('guarda() con cualquiera de los cinco MUEVE el ref — nunca intenta crear uno que ya existe', async () => {
+      for (const contenido of CASOS_SIN_FORMA) {
+        const { f, pedidos } = fetchFalso([
+          { cuerpo: { object: { sha: 'refViejo' } } },
+          { cuerpo: { content: Buffer.from(contenido).toString('base64'), encoding: 'base64', sha: 'b' } },
+          ...respuestasDeUnaPublicacionDirecta(),
+        ])
+        const r = await guarda(gh(f), { ...UN_BORRADOR, ahora: 1_000 })
+        expect(r.ok, contenido).toBe(true)
+        expect(pedidos.some((p) => p.url.endsWith('/git/refs') && p.metodo === 'POST'), contenido).toBe(false)
+      }
+    })
+
+    it('el caso grave: `null` ya no deja "sin salida" — guarda() no revienta leyendo `null.dispositivo`', async () => {
+      const { f } = fetchFalso([
+        { cuerpo: { object: { sha: 'refViejo' } } },
+        { cuerpo: { content: Buffer.from('null').toString('base64'), encoding: 'base64', sha: 'b' } },
+        ...respuestasDeUnaPublicacionDirecta(),
+      ])
+      await expect(guarda(gh(f), { ...UN_BORRADOR, ahora: 1_000 })).resolves.toEqual({ ok: true })
+    })
+  })
+
   // [Ronda 1, hallazgo D] Los dos caminos —crear y mover— pasan por la MISMA
   // barrera antes de tocar GitHub para escribir.
   describe('D: el arranque también pasa por los topes, no solo el guardado que mueve', () => {

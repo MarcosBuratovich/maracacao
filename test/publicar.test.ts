@@ -347,6 +347,27 @@ describe('publicar', () => {
         ).rejects.toThrow()
         expect(pedidos).toHaveLength(0)
       })
+
+      // [Ronda 2, hallazgo 2] `REFS_CONOCIDOS[ref]` a secas —antes de este
+      // arreglo— indexa una propiedad HEREDADA de `Object.prototype` para
+      // estos cuatro nombres, y esa propiedad heredada es truthy: la
+      // guardia `!config` no disparaba, `config.permiteRuta` salía
+      // `undefined`, y `revisaLote()` caía en SU propio default
+      // (`rutaPermitida`, la lista de MAIN) — publicando de verdad con la
+      // lista equivocada, en vez de tirar. No alcanzable hoy por HTTP (el
+      // ref nunca sale de un dato de la clienta), pero contradecía la
+      // invariante que este mismo hallazgo C fijó por escrito.
+      it('Ronda 2, hallazgo 2: una clave heredada del prototipo (__proto__, constructor, toString, valueOf) también tira', async () => {
+        const { f, pedidos } = fetchFalso([])
+        const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+        for (const ref of ['__proto__', 'constructor', 'toString', 'valueOf', 'hasOwnProperty']) {
+          await expect(
+            publica(gh, { archivos: [{ ruta: 'panel/borrador.json', contenido: '{}' }], autor: 'a@b.mx', ref }),
+            ref,
+          ).rejects.toThrow()
+        }
+        expect(pedidos).toHaveLength(0)
+      })
     })
   })
 })

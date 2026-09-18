@@ -328,10 +328,23 @@ export async function publica(gh: ReturnType<typeof cliente>, p: Publicacion): P
   // qué archivos traiga—, y es un `throw` (no un `Resultado`) por la misma
   // razón que el `forzar` mal puesto: es un bug de quien llama `publica()`,
   // nunca un dato malo que la clienta pueda haber mandado.
-  const config = REFS_CONOCIDOS[ref]
-  if (!config) {
+  //
+  // [Ronda 2, hallazgo 2] `Object.hasOwn()`, no `REFS_CONOCIDOS[ref]` a
+  // secas: `REFS_CONOCIDOS` es un objeto literal, y `ref` con un valor como
+  // `'__proto__'`, `'constructor'` o `'toString'` indexa una propiedad
+  // HEREDADA (de `Object.prototype`), no ausente — `!config` da `false`
+  // porque esa propiedad heredada es truthy, así que la guardia de arriba no
+  // dispara. Con eso, `config.permiteRuta` seguía adelante como `undefined`
+  // y `revisaLote()` caía en SU propio default (`rutaPermitida`, la lista de
+  // `main`) — publicando de verdad con la lista equivocada. Hoy `ref` nunca
+  // sale de un dato que la clienta mande —así que no es explotable por
+  // HTTP— pero contradecía por escrito la invariante que este mismo hallazgo
+  // C fijó: un ref fuera del mapa truena, siempre. `Object.hasOwn()` cierra
+  // la puerta trasera del prototipo sin importar qué tan disponible esté hoy.
+  if (!Object.hasOwn(REFS_CONOCIDOS, ref)) {
     throw new Error(`publica(): "${ref}" no es un ref conocido — revisá REFS_CONOCIDOS en publicar.ts.`)
   }
+  const config = REFS_CONOCIDOS[ref]
   if (forzar && !config.permiteForzar) {
     throw new Error(`publica(): forzar:true contra "${ref}" no es una opción — ese ref no lo permite.`)
   }

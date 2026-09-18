@@ -15494,10 +15494,10 @@ async function intento(gh, archivos, mensaje, ref, forzar) {
 async function publica(gh, p) {
   const ref = p.ref ?? REF_MAIN;
   const forzar = p.forzar ?? false;
-  const config2 = REFS_CONOCIDOS[ref];
-  if (!config2) {
+  if (!Object.hasOwn(REFS_CONOCIDOS, ref)) {
     throw new Error(`publica(): "${ref}" no es un ref conocido \u2014 revis\xE1 REFS_CONOCIDOS en publicar.ts.`);
   }
+  const config2 = REFS_CONOCIDOS[ref];
   if (forzar && !config2.permiteForzar) {
     throw new Error(`publica(): forzar:true contra "${ref}" no es una opci\xF3n \u2014 ese ref no lo permite.`);
   }
@@ -15566,7 +15566,9 @@ async function intentaLeer(gh) {
     ({ sha } = await gh.ref(REF_BORRADOR));
   } catch (e) {
     if (!es404(e)) throw e;
-    console.error(`borrador: ${REF_BORRADOR} no existe (404) \u2014 se trata como "no hay borrador todav\xEDa".`);
+    console.warn(
+      `borrador: ${REF_BORRADOR} no existe (404) \u2014 normal si todav\xEDa no se guard\xF3 ning\xFAn borrador; si esto persiste despu\xE9s de guardar, revis\xE1 el token/repo.`
+    );
     return { estado: "no-existe" };
   }
   let texto2;
@@ -15578,7 +15580,14 @@ async function intentaLeer(gh) {
     return { estado: "ilegible", sha };
   }
   try {
-    return { estado: "ok", sha, borrador: JSON.parse(texto2) };
+    const crudo = JSON.parse(texto2);
+    if (typeof crudo !== "object" || crudo === null || Array.isArray(crudo)) {
+      console.error(
+        `borrador: el JSON de ${RUTA_BORRADOR} en ${sha} no tiene forma de borrador (${crudo === null ? "null" : Array.isArray(crudo) ? "array" : typeof crudo}) \u2014 se trata como ilegible.`
+      );
+      return { estado: "ilegible", sha };
+    }
+    return { estado: "ok", sha, borrador: crudo };
   } catch (e) {
     console.error(`borrador: el JSON de ${RUTA_BORRADOR} en ${sha} no parsea \u2014 se trata como ilegible.`, e);
     return { estado: "ilegible", sha };

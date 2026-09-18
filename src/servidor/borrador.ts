@@ -98,6 +98,17 @@ function es404(e: unknown): boolean {
  * JSON corrupto es el mismo estado desde su lado, así que se trata igual
  * (mejor escribir encima y arreglarlo que bloquearla), pero SIN perder de
  * vista que el ref ya existe.
+ *
+ * [Ronda 2, hallazgo 1] «El JSON parsea» no es lo mismo que «tiene forma de
+ * `Borrador`»: `null`, `[]`, `42` y `"hola"` son los cuatro JSON válidos que
+ * `JSON.parse` deja pasar sin tirar. `intentaLeer()` los rechaza con un
+ * chequeo de forma explícito (no solo un `try/catch` alrededor de
+ * `JSON.parse`) y también caen acá, en `'ilegible'` — el caso grave era
+ * `null`: sin este chequeo, `guarda()` reventaba al mirarle `dispositivo` (un
+ * 502), y como `leeBorrador()` le decía a la fase 6 «no hay borrador», la
+ * pantalla nunca iba a mandar el `pisar: true` que lo hubiera destrabado —
+ * sin salida por la interfaz, que es justo lo que este tipo de tres estados
+ * vino a evitar.
  */
 type LecturaBorrador =
   | { estado: 'no-existe' }
@@ -117,15 +128,21 @@ async function intentaLeer(gh: ReturnType<typeof cliente>): Promise<LecturaBorra
     ;({ sha } = await gh.ref(REF_BORRADOR))
   } catch (e) {
     if (!es404(e)) throw e
-    // [Ronda 1, hallazgo E3] Es el estado normal de un panel recién
-    // estrenado, o de cualquier sesión antes del primer guardado — pero
-    // GitHub también contesta 404 (nunca 403) cuando el TOKEN no tiene
-    // permiso o el repo está mal escrito, por seguridad: no distingue «no
-    // existe» de «no podés verlo». No se puede diferenciar desde acá, así
-    // que esto queda como el estado normal para ELLA (ver `null` en
-    // `leeBorrador`), pero el log es la única pista que le queda a Marcos
-    // si en realidad es lo segundo.
-    console.error(`borrador: ${REF_BORRADOR} no existe (404) — se trata como "no hay borrador todavía".`)
+    // [Ronda 1, hallazgo E3 · Ronda 2, hallazgo 3] Es el estado NORMAL de un
+    // panel recién estrenado, o de cualquier sesión antes del primer
+    // guardado —dispara en CADA lectura y CADA guardado hasta que exista un
+    // borrador, así que no puede ser `console.error`: llenaría los logs de
+    // «error» por el camino más común que hay—. Pero GitHub también contesta
+    // 404 (nunca 403) cuando el TOKEN no tiene permiso o el repo está mal
+    // escrito, por seguridad: no distingue «no existe» de «no podés verlo».
+    // No se puede diferenciar desde acá, así que esto queda como el estado
+    // normal para ELLA (ver `null` en `leeBorrador`); el texto nombra las
+    // DOS posibilidades para que Marcos no lo confunda con el 404 de un
+    // token vencido si es lo segundo.
+    console.warn(
+      `borrador: ${REF_BORRADOR} no existe (404) — normal si todavía no se guardó ningún borrador; ` +
+        'si esto persiste después de guardar, revisá el token/repo.',
+    )
     return { estado: 'no-existe' }
   }
 
@@ -143,7 +160,26 @@ async function intentaLeer(gh: ReturnType<typeof cliente>): Promise<LecturaBorra
   }
 
   try {
-    return { estado: 'ok', sha, borrador: JSON.parse(texto) as Borrador }
+    const crudo: unknown = JSON.parse(texto)
+    // [Ronda 2, hallazgo 1] `JSON.parse` no falla con `null`, `[]`, `42` ni
+    // `"hola"`: los cuatro son JSON válido. Sin este chequeo, `null` en
+    // particular dejaba el panel SIN SALIDA: `estado: 'ok'` con un
+    // `borrador: null`, `leeBorrador()` le mentía a la fase 6 diciendo «no
+    // hay borrador» (el `as Borrador` no valida nada), `guarda()` reventaba
+    // al mirar `null.dispositivo` (502), y como la pantalla creía que no
+    // había nada que pisar, nunca iba a mandar el `pisar: true` que lo
+    // hubiera destrabado. `as Borrador` es una promesa que este archivo no
+    // tiene por qué cumplir —lo escribe el panel, pero también lo puede
+    // tocar una mano—, así que la forma se mira de verdad antes de confiar
+    // en ella.
+    if (typeof crudo !== 'object' || crudo === null || Array.isArray(crudo)) {
+      console.error(
+        `borrador: el JSON de ${RUTA_BORRADOR} en ${sha} no tiene forma de borrador ` +
+          `(${crudo === null ? 'null' : Array.isArray(crudo) ? 'array' : typeof crudo}) — se trata como ilegible.`,
+      )
+      return { estado: 'ilegible', sha }
+    }
+    return { estado: 'ok', sha, borrador: crudo as Borrador }
   } catch (e) {
     console.error(`borrador: el JSON de ${RUTA_BORRADOR} en ${sha} no parsea — se trata como ilegible.`, e)
     return { estado: 'ilegible', sha }
