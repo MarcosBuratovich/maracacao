@@ -1320,6 +1320,90 @@ const VARIABLES_REQUERIDAS = [
 const PROBLEMA_SALUD_OMITIDA =
   'Las variables están, pero no revisamos la conexión con GitHub: hubo demasiados pedidos seguidos. Intenta de nuevo en unos minutos.'
 
+/*
+ * ---------------------------------------------------------------------
+ * [Tarea 13] la vigilancia del vencimiento del PAT — spec §4.1: el modo de
+ * falla sin esto es «la clienta publica y recibe un 401 incomprensible», sin
+ * que nada haya cambiado. `salud` ya pide `gh.ref('heads/main')` detrás del
+ * freno por IP de I-6; esa MISMA respuesta trae la cabecera del vencimiento
+ * (`gh.vencimientoDelToken()`, github.ts), así que avisar con treinta días
+ * de anticipación no le cuesta a la vigilancia ni un pedido más al PAT.
+ * ---------------------------------------------------------------------
+ */
+
+/** A cuántos días o menos de vencer se manda el aviso a Marcos. */
+const DIAS_AVISO_VENCIMIENTO_TOKEN = 30
+
+/**
+ * Días completos que faltan para `tokenVence`, o `null` si no hay nada que
+ * calcular: ni cuando la cabecera no vino (`tokenVence === null`, nunca una
+ * fecha inventada — ver `vencimientoDelToken()` en github.ts) ni cuando lo
+ * que vino no se puede leer como fecha (una cabecera con otra forma un día
+ * que GitHub cambie algo no puede convertirse en un aviso con un número
+ * inventado adentro).
+ */
+function diasHastaVencimiento(tokenVence: string | null, ahora: number): number | null {
+  if (tokenVence === null) return null
+  const vence = Date.parse(tokenVence)
+  if (!Number.isFinite(vence)) return null
+  return Math.floor((vence - ahora) / 86_400_000)
+}
+
+// [Tarea 13] Cuántas veces se avisó que el token está por vencer, en la
+// ventana de las últimas 24 h — mismo TIPO de `Map` en memoria que
+// `intentoPermitido` (`INTENTOS`, sesion.ts), pero con su propia ventana:
+// acá no hay quince minutos que reusar, porque esto protege otra cosa. `I-6`
+// (arriba) ya frena el PEDIDO a GitHub por IP; esto frena el CORREO —y
+// `salud` se puede llamar SIN sesión, así que sin este freno cualquiera con
+// una línea de comandos le manda a Marcos un correo por segundo. Una sola
+// clave fija, no una por IP ni por lo que sea: lo que hay que limitar es
+// CUÁNTOS avisos salen en total, no cuántos pide cada quien.
+//
+// [Honesto sobre lo que puede — mismo criterio, letra por letra, que el
+// comentario de `INTENTOS` en sesion.ts] Esto vive en la memoria de ESTE
+// proceso: las funciones serverless son efímeras y concurrentes, cada
+// instancia tiene su propio `Map`, así que el tope real es «como mucho un
+// aviso cada 24 h POR INSTANCIA VIVA», no «como mucho un aviso cada 24 h» a
+// secas — dos instancias corriendo a la vez, o Vercel reciclando una,
+// pueden mandar dos avisos el mismo día. Acá el costo de estar mal es un
+// correo de más para Marcos, no una brecha de seguridad, así que alcanza.
+const AVISOS_VENCIMIENTO_TOKEN = new Map<string, number[]>()
+const VENTANA_AVISO_VENCIMIENTO_MS = 24 * 60 * 60_000
+const CLAVE_AVISO_VENCIMIENTO_TOKEN = 'token-github'
+
+/** ¿Se puede mandar otro aviso de vencimiento ahora, o ya se mandó uno en las últimas 24 h? */
+function avisoDeVencimientoPermitido(ahora: number): boolean {
+  const marcas = (AVISOS_VENCIMIENTO_TOKEN.get(CLAVE_AVISO_VENCIMIENTO_TOKEN) ?? [])
+    .filter((t) => ahora - t < VENTANA_AVISO_VENCIMIENTO_MS)
+
+  if (marcas.length >= 1) {
+    AVISOS_VENCIMIENTO_TOKEN.set(CLAVE_AVISO_VENCIMIENTO_TOKEN, marcas)
+    return false
+  }
+
+  marcas.push(ahora)
+  AVISOS_VENCIMIENTO_TOKEN.set(CLAVE_AVISO_VENCIMIENTO_TOKEN, marcas)
+  return true
+}
+
+const ASUNTO_AVISO_VENCIMIENTO = (dias: number): string =>
+  `[panel] El token de GitHub vence en ${dias} día${dias === 1 ? '' : 's'}`
+
+// [E7 — para Marcos, no para la clienta] Este correo SÍ puede ser técnico:
+// nombra la variable de entorno y el archivo del runbook, porque quien lo
+// lee es Marcos, no ella. Contraste a propósito con `TEXTO_PARA_ELLA`, más
+// arriba en este archivo, que nunca nombra una variable ni un archivo.
+function textoAvisoVencimiento(tokenVence: string, dias: number): string {
+  const cuandoFalta = dias > 0 ? `faltan ${dias} día${dias === 1 ? '' : 's'}` : 'ya venció, o vence hoy'
+  return [
+    `El token de GitHub (\`PANEL_GITHUB_TOKEN\`) vence el ${tokenVence} — ${cuandoFalta}.`,
+    '',
+    'Generá uno nuevo con los mismos permisos (Contents: Read and write, sin Workflows), cargalo en Vercel y redesplegá — las variables se leen al arrancar la función, así que sin el redeploy el token nuevo no sirve de nada.',
+    '',
+    'Los pasos exactos: docs/panel-operacion.md, sección «Renovar el token de GitHub».',
+  ].join('\n')
+}
+
 /**
  * `salud`: ¿están las variables?, ¿responde GitHub? (E8).
  *
@@ -1342,6 +1426,15 @@ const PROBLEMA_SALUD_OMITIDA =
  * que usa `entrar` (E4): si ya se gastaron los cinco pedidos de la
  * ventana, se contesta con las variables (que están bien) y se avisa que
  * la conexión no se revisó, en vez de gastar un pedido más del PAT.
+ *
+ * [Tarea 13] El cuerpo también suma `tokenVence`/`diasParaVencer`, leídos
+ * de la MISMA respuesta de `gh.ref('heads/main')` que ya se pedía para
+ * `github` —nunca un pedido aparte— y si faltan treinta días o menos, se le
+ * manda un correo a `PANEL_AVISOS_A` (con su propio freno de una vez cada
+ * 24 h por instancia, `avisoDeVencimientoPermitido()` arriba). Se calculan
+ * incluso si GitHub contestó mal: `vencimientoDelToken()` guarda la cabecera
+ * de CUALQUIER respuesta, y el día que el token YA venció es, con
+ * diferencia, el día en que más hace falta que este aviso salga.
  */
 async function salud(_pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
   const faltan = VARIABLES_REQUERIDAS.filter((v) => !contexto.env[v])
@@ -1355,7 +1448,10 @@ async function salud(_pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
   // arriba. [Ronda 1, Tarea 12, hallazgo E] Presupuesto propio de `salud`
   // (`claveFreno`), no compartido con `entrar`/`enlace`.
   if (!intentoPermitido(claveFreno('salud', contexto.ip), contexto.ahora())) {
-    return { status: 200, cuerpo: { ok: true, faltan: [], github: null, problema: PROBLEMA_SALUD_OMITIDA } }
+    return {
+      status: 200,
+      cuerpo: { ok: true, faltan: [], github: null, tokenVence: null, diasParaVencer: null, problema: PROBLEMA_SALUD_OMITIDA },
+    }
   }
 
   const gh = cliente({
@@ -1364,14 +1460,37 @@ async function salud(_pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
     repo: contexto.env.GITHUB_REPO!,
     fetch: contexto.fetch,
   })
+
+  let githubOk: boolean
   try {
     await gh.ref('heads/main')
-    return { status: 200, cuerpo: { ok: true, faltan: [], github: true } }
+    githubOk = true
   } catch (e) {
     // El detalle técnico es para Marcos, no para el JSON de salud.
     console.error('salud: GitHub no contestó', e)
-    return { status: 503, cuerpo: { ok: false, faltan: [], github: false } }
+    githubOk = false
   }
+
+  // [Tarea 13] `vencimientoDelToken()` no pide nada: lee lo que la respuesta
+  // de ARRIBA ya trajo, le haya ido bien o mal a `gh.ref`.
+  const ahora = contexto.ahora()
+  const tokenVence = gh.vencimientoDelToken()
+  const diasParaVencer = diasHastaVencimiento(tokenVence, ahora)
+
+  if (tokenVence !== null && diasParaVencer !== null && diasParaVencer <= DIAS_AVISO_VENCIMIENTO_TOKEN) {
+    const paraMarcos = contexto.env.PANEL_AVISOS_A
+    if (paraMarcos && avisoDeVencimientoPermitido(ahora)) {
+      await mandaProtegido(contexto, {
+        a: [paraMarcos],
+        asunto: ASUNTO_AVISO_VENCIMIENTO(diasParaVencer),
+        texto: textoAvisoVencimiento(tokenVence, diasParaVencer),
+      })
+    }
+  }
+
+  return githubOk
+    ? { status: 200, cuerpo: { ok: true, faltan: [], github: true, tokenVence, diasParaVencer } }
+    : { status: 503, cuerpo: { ok: false, faltan: [], github: false, tokenVence, diasParaVencer } }
 }
 
 /*

@@ -132,6 +132,7 @@ var VERSION_API = "2022-11-28";
 var codificaRuta = (ruta2) => ruta2.split("/").map(encodeURIComponent).join("/");
 function cliente(c) {
   const base = `https://api.github.com/repos/${c.duenio}/${c.repo}`;
+  let vencimientoToken = null;
   async function pedir(ruta2, init) {
     const respuesta = await c.fetch(`${base}${ruta2}`, {
       method: init?.method ?? "GET",
@@ -144,6 +145,7 @@ function cliente(c) {
       },
       ...init?.body !== void 0 ? { body: JSON.stringify(init.body) } : {}
     });
+    vencimientoToken = respuesta.headers.get("github-authentication-token-expiration");
     const cuerpo = await respuesta.json().catch(() => void 0);
     if (!respuesta.ok) {
       const mensaje = cuerpo?.message;
@@ -152,6 +154,27 @@ function cliente(c) {
     return cuerpo;
   }
   return {
+    /**
+     * [Tarea 13] La fecha de vencimiento del PAT, tal cual la mandó GitHub en
+     * la cabecera `github-authentication-token-expiration` del ÚLTIMO pedido
+     * que hizo este cliente — o `null` si esa cabecera no vino (un token
+     * clásico, por ejemplo, no la manda).
+     *
+     * SINCRÓNICA y sin pedido propio, a propósito: la cabecera llega arriba
+     * de CUALQUIER respuesta autenticada, así que no hace falta —ni se
+     * permite acá— salir a pedirle nada a GitHub solo para mirar esto. Si
+     * esta función disparara su propio pedido, la vigilancia le costaría al
+     * PAT una llamada cada vez que alguien llama a `salud`, que es
+     * exactamente lo que el freno por IP de la Parte A (I-6) existe para
+     * evitar.
+     *
+     * Nunca inventa una fecha: si la cabecera no vino, `null` — decir «vence
+     * en un año» sería peor que no saber, porque callaría la vigilancia
+     * justo el día en que no puede ver.
+     */
+    vencimientoDelToken() {
+      return vencimientoToken;
+    },
     /** El sha que apunta un ref (`heads/main`, por ejemplo). */
     async ref(nombre) {
       const cuerpo = await pedir(`/git/ref/${codificaRuta(nombre)}`);
@@ -18652,13 +18675,47 @@ var VARIABLES_REQUERIDAS = [
   "PANEL_VERCEL_TOKEN"
 ];
 var PROBLEMA_SALUD_OMITIDA = "Las variables est\xE1n, pero no revisamos la conexi\xF3n con GitHub: hubo demasiados pedidos seguidos. Intenta de nuevo en unos minutos.";
+var DIAS_AVISO_VENCIMIENTO_TOKEN = 30;
+function diasHastaVencimiento(tokenVence, ahora) {
+  if (tokenVence === null) return null;
+  const vence = Date.parse(tokenVence);
+  if (!Number.isFinite(vence)) return null;
+  return Math.floor((vence - ahora) / 864e5);
+}
+var AVISOS_VENCIMIENTO_TOKEN = /* @__PURE__ */ new Map();
+var VENTANA_AVISO_VENCIMIENTO_MS = 24 * 60 * 6e4;
+var CLAVE_AVISO_VENCIMIENTO_TOKEN = "token-github";
+function avisoDeVencimientoPermitido(ahora) {
+  const marcas = (AVISOS_VENCIMIENTO_TOKEN.get(CLAVE_AVISO_VENCIMIENTO_TOKEN) ?? []).filter((t) => ahora - t < VENTANA_AVISO_VENCIMIENTO_MS);
+  if (marcas.length >= 1) {
+    AVISOS_VENCIMIENTO_TOKEN.set(CLAVE_AVISO_VENCIMIENTO_TOKEN, marcas);
+    return false;
+  }
+  marcas.push(ahora);
+  AVISOS_VENCIMIENTO_TOKEN.set(CLAVE_AVISO_VENCIMIENTO_TOKEN, marcas);
+  return true;
+}
+var ASUNTO_AVISO_VENCIMIENTO = (dias) => `[panel] El token de GitHub vence en ${dias} d\xEDa${dias === 1 ? "" : "s"}`;
+function textoAvisoVencimiento(tokenVence, dias) {
+  const cuandoFalta = dias > 0 ? `faltan ${dias} d\xEDa${dias === 1 ? "" : "s"}` : "ya venci\xF3, o vence hoy";
+  return [
+    `El token de GitHub (\`PANEL_GITHUB_TOKEN\`) vence el ${tokenVence} \u2014 ${cuandoFalta}.`,
+    "",
+    "Gener\xE1 uno nuevo con los mismos permisos (Contents: Read and write, sin Workflows), cargalo en Vercel y redespleg\xE1 \u2014 las variables se leen al arrancar la funci\xF3n, as\xED que sin el redeploy el token nuevo no sirve de nada.",
+    "",
+    "Los pasos exactos: docs/panel-operacion.md, secci\xF3n \xABRenovar el token de GitHub\xBB."
+  ].join("\n");
+}
 async function salud(_pedido, contexto) {
   const faltan = VARIABLES_REQUERIDAS.filter((v) => !contexto.env[v]);
   if (faltan.length > 0) {
     return { status: 503, cuerpo: { ok: false, faltan, github: null } };
   }
   if (!intentoPermitido(claveFreno("salud", contexto.ip), contexto.ahora())) {
-    return { status: 200, cuerpo: { ok: true, faltan: [], github: null, problema: PROBLEMA_SALUD_OMITIDA } };
+    return {
+      status: 200,
+      cuerpo: { ok: true, faltan: [], github: null, tokenVence: null, diasParaVencer: null, problema: PROBLEMA_SALUD_OMITIDA }
+    };
   }
   const gh = cliente({
     token: contexto.env.PANEL_GITHUB_TOKEN,
@@ -18666,13 +18723,28 @@ async function salud(_pedido, contexto) {
     repo: contexto.env.GITHUB_REPO,
     fetch: contexto.fetch
   });
+  let githubOk;
   try {
     await gh.ref("heads/main");
-    return { status: 200, cuerpo: { ok: true, faltan: [], github: true } };
+    githubOk = true;
   } catch (e) {
     console.error("salud: GitHub no contest\xF3", e);
-    return { status: 503, cuerpo: { ok: false, faltan: [], github: false } };
+    githubOk = false;
   }
+  const ahora = contexto.ahora();
+  const tokenVence = gh.vencimientoDelToken();
+  const diasParaVencer = diasHastaVencimiento(tokenVence, ahora);
+  if (tokenVence !== null && diasParaVencer !== null && diasParaVencer <= DIAS_AVISO_VENCIMIENTO_TOKEN) {
+    const paraMarcos = contexto.env.PANEL_AVISOS_A;
+    if (paraMarcos && avisoDeVencimientoPermitido(ahora)) {
+      await mandaProtegido(contexto, {
+        a: [paraMarcos],
+        asunto: ASUNTO_AVISO_VENCIMIENTO(diasParaVencer),
+        texto: textoAvisoVencimiento(tokenVence, diasParaVencer)
+      });
+    }
+  }
+  return githubOk ? { status: 200, cuerpo: { ok: true, faltan: [], github: true, tokenVence, diasParaVencer } } : { status: 503, cuerpo: { ok: false, faltan: [], github: false, tokenVence, diasParaVencer } };
 }
 async function estadoAccion(pedido, contexto) {
   const env = contexto.env;

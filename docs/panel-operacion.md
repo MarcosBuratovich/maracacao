@@ -76,7 +76,7 @@ curl -s https://www.maracacao.mx/api/panel?accion=salud
 | `PANEL_CORREOS` | La lista de correos con acceso, separados por comas. Se vuelve a leer en CADA `entrar` y en CADA `publicar` (I-4) — nunca queda una cookie vieja publicando en nombre de alguien que ya no está en la lista. | Nadie entra: ningún correo matchea una lista vacía. |
 | `PANEL_SESIONES_DESDE` | Opcional, ISO 8601. Toda sesión firmada ANTES de esta fecha deja de valer — el botón de pánico para cerrar sesión en todos lados sin rotar `PANEL_SECRETO`. Ver «Cómo cortar una sesión», abajo. | No es una de las siete obligatorias: `salud` no la pide. Ausente, no hay revocación por fecha (el estado normal). Si trae un valor que no se puede leer como fecha, el efecto es el contrario del de las otras filas: en vez de «no hay revocación», se rechaza TODA sesión hasta que se corrija — a propósito, ver la sección de abajo. |
 | `PANEL_DISPOSITIVOS_REVOCADOS` | Opcional, ids de dispositivo separados por comas. La revocación quirúrgica de un aparato puntual — el celular perdido de alguien que sigue teniendo acceso. Ver «Cómo cortar una sesión», abajo. | No es una de las siete obligatorias: `salud` no la pide. Ausente, ningún dispositivo está revocado (el estado normal). |
-| `PANEL_GITHUB_TOKEN` | El fine-grained PAT de GitHub, acotado al repo `maracacao`, con un solo permiso (`Contents: Read and write`, sin `Workflows`). Es lo que le permite al panel escribir commits. | `publicar` no puede leer ni escribir nada: 502. `salud` contesta `"github":false`. |
+| `PANEL_GITHUB_TOKEN` | El fine-grained PAT de GitHub, acotado al repo `maracacao`, con un solo permiso (`Contents: Read and write`, sin `Workflows`). Es lo que le permite al panel escribir commits. Vence solo — GitHub lo exige (ver «Renovar el token de GitHub», abajo) — y `salud` avisa a `PANEL_AVISOS_A` treinta días antes. | `publicar` no puede leer ni escribir nada: 502. `salud` contesta `"github":false`. |
 | `PANEL_VERCEL_TOKEN` | Token de la API de la plataforma, con lectura de despliegues del proyecto. | El panel no puede decir si un cambio llegó al sitio ni revertir solo un deploy fallido — y la fase 6 apaga el botón Publicar. Es una de las obligatorias: sin ella, `salud` contesta 503. |
 | `PANEL_VERCEL_PROYECTO` | El nombre del proyecto. Por defecto sale del repo (`maracacao`). | No es una de las obligatorias: `salud` no la pide. Solo hace falta cargarla si algún día el proyecto se llama distinto del repo. |
 | `GITHUB_DUENIO` | El dueño del repo (`MarcosBuratovich`). Tiene default: si falta, se completa solo con `VERCEL_GIT_REPO_OWNER` (que Vercel ya inyecta en todo deploy conectado a Git) o, si ni eso está, con el literal `MarcosBuratovich` (`src/servidor/entradas/panel.ts`, función `entorno()`). | En la práctica, nunca falta — por eso no hace falta cargarla a mano en Vercel. |
@@ -339,6 +339,77 @@ que el panel intente escribir ahí — es cinturón y tirantes, no uno solo).
 Cinco pasos que importan, cinco minutos reales si ya sabés dónde hacer clic:
 revocar (paso 4), generar (pasos 5 a 10), pegar (paso 11), redeploy (paso
 12), confirmar (paso 13).
+
+## Renovar el token de GitHub (Tarea 13: el aviso de los treinta días)
+
+Un fine-grained PAT tiene fecha de vencimiento OBLIGATORIA — GitHub no deja
+crear uno sin ella (como mucho, «No expiration», si la organización lo
+permite; ver el paso 6 de la sección de arriba). El día que vence, el panel
+deja de poder escribir en GitHub sin que nada haya cambiado del lado del
+código: `publicar` empieza a contestar 502 y `salud` dice `"github":false` —
+el modo de falla que esta tarea existe para que Marcos nunca vea de
+sorpresa (spec §4.1).
+
+**Por eso `salud` avisa solo, con anticipación.** Cada vez que alguien la
+llama —vos a mano, o `scripts/humo-panel.sh`— lee la fecha de vencimiento de
+la MISMA respuesta que ya le pedía a GitHub para el chequeo de `"github"`
+(no hace un pedido aparte: no le cuesta cuota al PAT). Si faltan **treinta
+días o menos**, te manda un correo a `PANEL_AVISOS_A` con la fecha exacta y
+cuántos días quedan. Ese correo es la señal de que hay que hacer lo de
+abajo — no hace falta esperar a que el token venza solo ni a acordarse de
+mirar el calendario.
+
+Dos cosas a tener presentes sobre ese aviso, por si alguna vez hace falta
+depurarlo:
+
+- **Es «como mucho una vez cada 24 h», pero por INSTANCIA VIVA del panel,
+  no una vez cada 24 h a secas.** El freno vive en la memoria de la función
+  serverless (mismo límite, y misma razón, que el freno de intentos de
+  `entrar` — ver «Lo que todavía NO está cubierto», más abajo): si Vercel
+  tiene dos instancias corriendo a la vez, o recicla una, en teoría podrían
+  llegar dos correos el mismo día. Inofensivo — el costo es un correo de
+  más, no un agujero de seguridad — pero si alguna vez ves dos avisos el
+  mismo día, es por eso, no por un bug.
+- **Si la respuesta de GitHub no trae la cabecera de vencimiento —un token
+  CLÁSICO en vez de fine-grained, por ejemplo—, `salud` nunca inventa una
+  fecha.** `tokenVence` y `diasParaVencer` quedan en `null` y no sale ningún
+  correo. Poner «vence en un año» a ojo sería peor que no saber: apagaría la
+  vigilancia justo el día que más hace falta que esté prendida.
+
+**Un fine-grained PAT no se «renueva» en el sentido de extenderle la fecha
+al mismo token: GitHub no tiene ese botón.** Lo que hay que hacer es generar
+uno NUEVO, con los mismos permisos, y reemplazar el viejo — los mismos pasos
+5 a 13 de «Cómo rotar el PAT de GitHub en cinco minutos», arriba, con dos
+diferencias respecto de un token filtrado:
+
+1. **No hace falta revocar el viejo primero** (paso 4 de arriba): no está
+   comprometido, solo está por vencer, así que podés generar el nuevo con
+   calma, confirmarlo funcionando, y recién ahí borrar el viejo (o dejar que
+   venza solo — cualquiera de las dos formas está bien).
+2. **Los permisos, exactos:** `Contents` → **Read and write**, y `Metadata`
+   → **Read-only** — GitHub marca `Metadata: Read-only` solo en cuanto
+   elegís cualquier otro permiso del repositorio, así que no hay que
+   buscarlo aparte, alcanza con confirmar que quedó tildado. Nunca
+   `Workflows`: sin ese permiso, el token no puede tocar
+   `.github/workflows/**` aunque el código del panel se lo pidiera (y la
+   lista blanca de `src/servidor/rutas-permitidas.ts` tampoco lo dejaría
+   intentarlo — cinturón y tirantes).
+
+**La parte que no se puede saltear:** generar el token nuevo y pegarlo en
+`PANEL_GITHUB_TOKEN` en Vercel NO alcanza por sí solo. Las variables de
+entorno se leen al ARRANCAR la función — no en cada pedido — así que las
+funciones ya desplegadas siguen usando el token viejo (el que está por
+vencer, o el que ya venció) hasta que algo las redespliega. El paso 12 de
+arriba (**Deployments** → Production → los tres puntos → **Redeploy**) es
+tan parte de «renovar el token» como generarlo: sin ese clic, guardar la
+variable nueva no cambió nada todavía. Confirmá con
+
+```bash
+curl -s https://www.maracacao.mx/api/panel?accion=salud
+```
+
+— tiene que volver a decir `"github":true`, y `"tokenVence"` con la fecha
+del token NUEVO, bien lejos otra vez.
 
 ## Cómo rotar `PANEL_SECRETO` (último recurso: el secreto se filtró)
 

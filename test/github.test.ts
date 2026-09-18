@@ -226,4 +226,29 @@ describe('el cliente de GitHub', () => {
     expect(pedidos[0].url).not.toContain('/git/refs/') // sin el nombre en la URL: va en el cuerpo
     expect(pedidos[0].cuerpo).toEqual({ ref: 'refs/panel/borrador', sha: 'sha1' })
   })
+
+  // [Tarea 13] `vencimientoDelToken()` es la vigilancia del PAT: GitHub manda
+  // la fecha en que vence en una cabecera de CUALQUIER respuesta autenticada
+  // con un token fine-grained, así que leerla no cuesta un pedido propio.
+  it('lee la fecha de vencimiento del token de la cabecera que GitHub manda', async () => {
+    const { f } = fetchFalso([
+      {
+        cuerpo: { object: { sha: 'abc' } },
+        cabeceras: { 'github-authentication-token-expiration': '2026-12-01 00:00:00 UTC' },
+      },
+    ])
+    const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+    await gh.ref('heads/main')
+    expect(gh.vencimientoDelToken()).toBe('2026-12-01 00:00:00 UTC')
+  })
+
+  it('si la cabecera no vino, devuelve null — no inventa una fecha', async () => {
+    // Un token clásico, o una configuración distinta, no la manda. Inventar
+    // «vence en un año» sería peor que no saber: haría que la vigilancia
+    // callara justo cuando no puede ver.
+    const { f } = fetchFalso([{ cuerpo: { object: { sha: 'abc' } } }])
+    const gh = cliente({ token: 't', duenio: 'd', repo: 'r', fetch: f })
+    await gh.ref('heads/main')
+    expect(gh.vencimientoDelToken()).toBeNull()
+  })
 })

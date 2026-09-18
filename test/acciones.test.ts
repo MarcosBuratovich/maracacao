@@ -1496,6 +1496,129 @@ describe('salud', () => {
     expect(r.status).toBe(503)
     expect((r.cuerpo as { faltan: string[] }).faltan).toContain('GITHUB_REPO')
   })
+
+  // [Tarea 13] La vigilancia del vencimiento del PAT: la MISMA respuesta de
+  // `gh.ref('heads/main')` que ya pedía `github` trae la cabecera del
+  // vencimiento (github.ts), así que avisar no cuesta un pedido más. Como
+  // `salud` no tiene sesión, el aviso lleva su PROPIO freno —una vez cada
+  // 24 h por instancia—, aparte del freno por IP de I-6 que protege el
+  // pedido a GitHub en sí.
+  describe('Tarea 13: el aviso de vencimiento del token', () => {
+    /** La cabecera de GitHub para un token que vence dentro de `dias` días desde `ahora`. */
+    const cabeceraVence = (dias: number, ahora: number) => ({
+      'github-authentication-token-expiration': new Date(ahora + dias * 86_400_000).toISOString(),
+    })
+
+    it('a treinta días o menos, avisa a PANEL_AVISOS_A con la fecha y los días que faltan', async () => {
+      const cartas: Carta[] = []
+      // Lejos (en la escala de `ahora()`, no de reloj real) de cualquier
+      // otro test de este describe: el freno del aviso es una sola clave
+      // GLOBAL (Tarea 13, `AVISOS_VENCIMIENTO_TOKEN`), así que dos tests que
+      // manden un correo con un `ahora()` a menos de 24 h uno del otro se
+      // pisarían sin importar el orden en que corran.
+      const ahora = 5_000_000_000_000
+      const { f } = fetchFalso([{ cuerpo: { object: { sha: 'x' } }, cabeceras: cabeceraVence(30, ahora) }])
+      const ctx = {
+        ...contextoDePrueba({
+          fetch: f,
+          ahora: () => ahora,
+          correo: correoQueAnota(cartas),
+          env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
+        }),
+        ip: `t13-avisa-30-${Math.random()}`,
+      }
+
+      const r = await maneja('salud', { cuerpo: {}, cookie: '' }, ctx)
+
+      expect(r.status).toBe(200)
+      const cuerpo = r.cuerpo as { tokenVence: string | null; diasParaVencer: number | null }
+      expect(cuerpo.diasParaVencer).toBe(30)
+      expect(cuerpo.tokenVence).toBeTruthy()
+      expect(cartas).toHaveLength(1)
+      expect(cartas[0].a).toEqual(['marcos@ejemplo.mx'])
+      expect(cartas[0].asunto).toContain('30')
+    })
+
+    it('a treinta y un días, NO avisa', async () => {
+      const cartas: Carta[] = []
+      const ahora = 5_500_000_000_000 // más de 24 h del test anterior
+      const { f } = fetchFalso([{ cuerpo: { object: { sha: 'x' } }, cabeceras: cabeceraVence(31, ahora) }])
+      const ctx = {
+        ...contextoDePrueba({
+          fetch: f,
+          ahora: () => ahora,
+          correo: correoQueAnota(cartas),
+          env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
+        }),
+        ip: `t13-no-avisa-31-${Math.random()}`,
+      }
+
+      const r = await maneja('salud', { cuerpo: {}, cookie: '' }, ctx)
+
+      expect((r.cuerpo as { diasParaVencer: number | null }).diasParaVencer).toBe(31)
+      expect(cartas).toHaveLength(0)
+    })
+
+    it('no avisa dos veces seguidas: una vez cada 24 h por instancia', async () => {
+      const cartas: Carta[] = []
+      const ahora = 9_000_000_000_000 // más de 24 h de los dos tests anteriores
+      const ip = `t13-no-doble-${Math.random()}`
+
+      const { f: f1 } = fetchFalso([{ cuerpo: { object: { sha: 'x' } }, cabeceras: cabeceraVence(10, ahora) }])
+      await maneja(
+        'salud',
+        { cuerpo: {}, cookie: '' },
+        {
+          ...contextoDePrueba({
+            fetch: f1,
+            ahora: () => ahora,
+            correo: correoQueAnota(cartas),
+            env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
+          }),
+          ip,
+        },
+      )
+      expect(cartas).toHaveLength(1)
+
+      // Un minuto después, mismo `ip` (bien lejos de gastar el freno de I-6,
+      // que es de cinco): el pedido a GitHub SÍ vuelve a salir —esto prueba
+      // el freno del AVISO, no el de I-6— pero el correo no se repite.
+      const masTarde = ahora + 60_000
+      const { f: f2 } = fetchFalso([{ cuerpo: { object: { sha: 'x' } }, cabeceras: cabeceraVence(10, masTarde) }])
+      await maneja(
+        'salud',
+        { cuerpo: {}, cookie: '' },
+        {
+          ...contextoDePrueba({
+            fetch: f2,
+            ahora: () => masTarde,
+            correo: correoQueAnota(cartas),
+            env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
+          }),
+          ip,
+        },
+      )
+      expect(cartas).toHaveLength(1) // sigue en uno: el freno de 24 h lo bloqueó
+    })
+
+    it('tokenVence: null (la cabecera no vino) no dispara ningún correo', async () => {
+      const { f } = fetchFalso([{ cuerpo: { object: { sha: 'x' } } }]) // sin `cabeceras`
+      const ctx = {
+        ...contextoDePrueba({
+          fetch: f,
+          correo: correoQueNoSeUsa(),
+          env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
+        }),
+        ip: `t13-sin-cabecera-${Math.random()}`,
+      }
+
+      const r = await maneja('salud', { cuerpo: {}, cookie: '' }, ctx)
+
+      const cuerpo = r.cuerpo as { tokenVence: string | null; diasParaVencer: number | null }
+      expect(cuerpo.tokenVence).toBeNull()
+      expect(cuerpo.diasParaVencer).toBeNull()
+    })
+  })
 })
 
 // C-1: hoy, en producción, el token de GitHub está cargado y

@@ -18,6 +18,12 @@
  * el router — acá no hay prosa para ella, porque este archivo no sabe
  * distinguir un 404 de "el token venció" de un 404 de "el archivo no
  * existe": esa lectura la hace quien llama, con el contexto de qué pidió.
+ *
+ * [Tarea 13] También guarda la fecha de vencimiento del PAT, leída de una
+ * cabecera que GitHub manda arriba de cualquier respuesta autenticada
+ * (`vencimientoDelToken()`, más abajo) — así `salud` puede avisar treinta
+ * días antes de que el panel se caiga con un 401 que no dice nada, sin que
+ * esa vigilancia le cueste un pedido propio al PAT.
  */
 
 export interface Credenciales {
@@ -81,6 +87,17 @@ export function cliente(c: Credenciales) {
   const base = `https://api.github.com/repos/${c.duenio}/${c.repo}`
 
   /**
+   * [Tarea 13] Lo que trajo la cabecera `github-authentication-token-expiration`
+   * del ÚLTIMO pedido hecho con este cliente, o `null` si ese pedido no la
+   * trajo. Se actualiza en CADA pedido —tanto si GitHub contestó 2xx como si
+   * no— porque la cabecera viaja arriba de la respuesta, antes de que
+   * `pedir()` mire el status: el día que el token ya venció y GitHub
+   * contesta 401, esa MISMA respuesta puede seguir trayendo la fecha, que es
+   * justo el día en que más hace falta poder leerla.
+   */
+  let vencimientoToken: string | null = null
+
+  /**
    * El pedido interno: arma la URL contra la API, pone las cabeceras que
    * toda esta API exige y, si GitHub no contesta 2xx, tira un `Error` con
    * el status y el `message` del cuerpo — ese mensaje es de GitHub, no
@@ -100,6 +117,13 @@ export function cliente(c: Credenciales) {
       ...(init?.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
     })
 
+    // [Tarea 13] Se lee ACÁ, antes del `if (!respuesta.ok)` de abajo: es una
+    // cabecera de la respuesta, no del cuerpo, así que está disponible tanto
+    // en el camino feliz como en el de error, y capturarla antes de decidir
+    // si tirar deja que la vigilancia vea el vencimiento aunque este pedido
+    // en particular haya fallado.
+    vencimientoToken = respuesta.headers.get('github-authentication-token-expiration')
+
     const cuerpo: unknown = await respuesta.json().catch(() => undefined)
 
     if (!respuesta.ok) {
@@ -111,6 +135,28 @@ export function cliente(c: Credenciales) {
   }
 
   return {
+    /**
+     * [Tarea 13] La fecha de vencimiento del PAT, tal cual la mandó GitHub en
+     * la cabecera `github-authentication-token-expiration` del ÚLTIMO pedido
+     * que hizo este cliente — o `null` si esa cabecera no vino (un token
+     * clásico, por ejemplo, no la manda).
+     *
+     * SINCRÓNICA y sin pedido propio, a propósito: la cabecera llega arriba
+     * de CUALQUIER respuesta autenticada, así que no hace falta —ni se
+     * permite acá— salir a pedirle nada a GitHub solo para mirar esto. Si
+     * esta función disparara su propio pedido, la vigilancia le costaría al
+     * PAT una llamada cada vez que alguien llama a `salud`, que es
+     * exactamente lo que el freno por IP de la Parte A (I-6) existe para
+     * evitar.
+     *
+     * Nunca inventa una fecha: si la cabecera no vino, `null` — decir «vence
+     * en un año» sería peor que no saber, porque callaría la vigilancia
+     * justo el día en que no puede ver.
+     */
+    vencimientoDelToken(): string | null {
+      return vencimientoToken
+    },
+
     /** El sha que apunta un ref (`heads/main`, por ejemplo). */
     async ref(nombre: string): Promise<{ sha: string }> {
       const cuerpo = await pedir(`/git/ref/${codificaRuta(nombre)}`) as { object: { sha: string } }

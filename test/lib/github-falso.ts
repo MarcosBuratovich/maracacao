@@ -20,7 +20,9 @@ import { esquemaSabores } from '../../src/contenido/esquema/sabores'
  * que pide más respuestas de las que programó falla ruidoso, en vez de
  * pasar en silencio por la razón equivocada.
  */
-export function fetchFalso(respuestas: Array<{ status?: number; cuerpo: unknown }>) {
+export function fetchFalso(
+  respuestas: Array<{ status?: number; cuerpo: unknown; cabeceras?: Record<string, string> }>,
+) {
   const pedidos: Array<{ url: string; metodo: string; cuerpo: unknown; cabeceras: Record<string, string> }> = []
   let i = 0
   const f = async (url: string | URL, init?: RequestInit) => {
@@ -43,7 +45,11 @@ export function fetchFalso(respuestas: Array<{ status?: number; cuerpo: unknown 
       )
     }
     const r = respuestas[i++]
-    return new Response(JSON.stringify(r.cuerpo), { status: r.status ?? 200 })
+    // [Tarea 13] `cabeceras` es opcional: la mayoría de los tests no le
+    // programa ninguna, y `Response` acepta `headers: undefined` sin quejarse
+    // — así que este campo nuevo no cambia ni un byte de lo que ya devolvía
+    // para los cientos de llamados existentes que no lo usan.
+    return new Response(JSON.stringify(r.cuerpo), { status: r.status ?? 200, headers: r.cabeceras })
   }
   return { f: f as unknown as typeof globalThis.fetch, pedidos }
 }
