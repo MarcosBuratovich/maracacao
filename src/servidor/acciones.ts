@@ -165,6 +165,20 @@ function secretoUtilizable(env: Entorno): env is Entorno & { PANEL_SECRETO: stri
   return typeof env.PANEL_SECRETO === 'string' && env.PANEL_SECRETO.length >= LARGO_MIN_SECRETO
 }
 
+/**
+ * [Ronda 1, Tarea 12, hallazgo E] La clave que le da a `intentoPermitido`
+ * su propio presupuesto POR ACCIÓN. Antes, `entrar`, `salud`, `enlace` y
+ * `entrar-con-enlace` compartían un único contador por IP —así lo armaba
+ * cada llamador, a mano, pasando `contexto.ip` sin más— y eso se volvía en
+ * contra el día que más importaba: la clienta que pide el enlace cinco
+ * veces porque no le llega se quedaba, de paso, sin poder usar su
+ * contraseña por quince minutos. Con esto, cada acción tiene su propio
+ * balde de cinco intentos cada quince minutos, y de paso desarma la
+ * contradicción del hallazgo D (el freno de `enlace` ya no le puede comer
+ * el presupuesto a `entrar`, ni viceversa).
+ */
+const claveFreno = (accion: string, ip: string): string => `${accion}:${ip}`
+
 /*
  * ---------------------------------------------------------------------
  * entrar
@@ -295,7 +309,7 @@ function entrar(pedido: Pedido, contexto: Contexto): Respuesta {
   const correo = typeof cuerpo.correo === 'string' ? cuerpo.correo.trim() : ''
   const clave = typeof cuerpo.clave === 'string' ? cuerpo.clave : ''
 
-  if (!intentoPermitido(contexto.ip, contexto.ahora())) {
+  if (!intentoPermitido(claveFreno('entrar', contexto.ip), contexto.ahora())) {
     return error(429, PROBLEMA_DEMASIADOS_INTENTOS)
   }
 
@@ -363,9 +377,25 @@ const PROBLEMA_ENLACE_SIN_CORREO = 'Ahora mismo no puedo mandarte el enlace. Esc
 // tokens al azar una forma de diferenciar «vencido» de «nunca existió».
 const PROBLEMA_ENLACE_INVALIDO = 'Ese enlace ya no sirve: pide uno nuevo.'
 
-interface CuerpoEnlace {
-  correo?: unknown
-}
+// [F, Minor — Ronda 1 de revisión] El freno de arriba (`enlace`, por IP)
+// no protege SU bandeja: veinte IPs distintas pueden mandarle a la MISMA
+// dirección cien correos desde nuestro remitente (medido). Un tope más
+// chico, por destinatario en vez de por IP, cierra eso sin infraestructura
+// nueva — misma mecánica (`intentoPermitido`), otro número.
+const TOPE_ENLACES_POR_DESTINO = 3
+
+// [B, Critical — Ronda 1 de revisión] Un destinatario que no es la
+// casilla de nadie, para que el envío corra con el MISMO costo exista o
+// no la dirección real en `PANEL_CORREOS` — ver el comentario largo en
+// `enlaceAccion()`, más abajo. Mismo criterio que `HASH_SENUELO` (I-3, en
+// `entrar()`): ahí el señuelo es un hash: acá es un destinatario.
+const CORREO_SENUELO = 'senuelo@descarte.maracacao.mx'
+
+// [C, Important — Ronda 1 de revisión] Un día, no treinta: esta vía es
+// una puerta de RECUPERACIÓN, sirve para volver a entrar, no para
+// quedarse. La fase 6 va a poder ofrecer «recordar este aparato» desde
+// adentro del panel, una vez que ya se entró.
+const DIAS_SESION_ENLACE = 1
 
 const ASUNTO_ENLACE = 'Tu enlace para entrar al panel'
 
@@ -379,6 +409,34 @@ const textoEnlace = (url: string): string =>
     'Vale por quince minutos. Si tú no lo pediste, ignora este correo: nadie puede entrar sin darle clic.',
   ].join('\n')
 
+// [C, Important — Ronda 1 de revisión] Cada vez que se consume un enlace,
+// esto le llega A ELLA: es la única señal que puede tener de que alguien
+// más entró con su enlace, ya que el token no queda invalidado al usarse
+// (ver el docstring de `entrarConEnlaceAccion`, más abajo).
+const ASUNTO_AVISO_CONSUMO = 'Alguien entró al panel con tu enlace'
+const TEXTO_AVISO_CONSUMO =
+  'Alguien acaba de entrar al panel usando tu enlace de recuperación. Si fuiste tú, no hay nada que hacer. ' +
+  'Si no fuiste tú, avísale a Marcos.'
+
+interface CuerpoEnlace {
+  correo?: unknown
+}
+
+/**
+ * [H, Minor — Ronda 1 de revisión] La forma EXACTA en que `correo` aparece
+ * en `PANEL_CORREOS` (comparando sin importar mayúsculas, igual que
+ * `correoEnLista`), o el original si no está ahí. Sin esto, un enlace
+ * pedido como «Clienta@Ejemplo.MX» firma la sesión con esas mayúsculas —y
+ * esa forma cruda termina como autor de cada commit que se publique desde
+ * ahí— en vez de la forma que Marcos escribió en la lista.
+ */
+function correoCanonico(correo: string, lista: string | undefined): string {
+  if (!lista) return correo
+  const normalizado = correo.trim().toLowerCase()
+  const entrada = lista.split(',').map((c) => c.trim()).find((c) => c.toLowerCase() === normalizado)
+  return entrada ?? correo
+}
+
 /**
  * `enlace`: pedir el enlace mágico de recuperación (spec §4.1).
  *
@@ -387,26 +445,35 @@ const textoEnlace = (url: string): string =>
  * pedirlo. Eso es justo lo que hace no negociables las capas de abajo, en
  * este orden:
  *
- * 1. El freno de intentos por IP (E4, `intentoPermitido`) — el MISMO
- *    contador que ya comparten `entrar` y `salud`. Sin esto, este endpoint
- *    sería una forma de mandarle correo a cualquiera desde nuestro
- *    remitente, todas las veces que uno quiera.
+ * 1. El freno de intentos por IP (E4, `intentoPermitido` con clave
+ *    `claveFreno('enlace', ip)`) — [Ronda 1] su PROPIO presupuesto, no el
+ *    de `entrar`/`salud` (hallazgo E): compartirlo hacía que pedir el
+ *    enlace cinco veces gastara también el de `entrar`, dejándola sin
+ *    poder usar la contraseña el día que más la necesita.
  * 2. [C-1] `PANEL_SECRETO` tiene que servir para firmar de verdad — mismo
  *    candado y mismo 503 franco que `entrar`.
  * 3. [B3] El correo tiene que estar configurado (ver `PROBLEMA_ENLACE_SIN_CORREO`
  *    arriba). Este chequeo puede ir ANTES de mirar si la dirección está en
  *    la lista porque es un estado del SERVIDOR, no un dato de la clienta:
  *    contestarlo igual para cualquiera no delata nada de nadie.
- * 4. Recién acá, si el correo está en `PANEL_CORREOS`, se firma un token de
- *    quince minutos y se manda. Si NO está, no se firma ni se manda nada —
- *    pero la respuesta (paso 5) es LA MISMA: eso es lo que hace que este
- *    endpoint no sirva para averiguar qué direcciones tienen acceso.
- * 5. 200, siempre, con `FRASE_ENLACE`.
+ * 4. [F] El tope por DESTINATARIO (`TOPE_ENLACES_POR_DESTINO`), corrido
+ *    SIEMPRE con la dirección tal cual llegó —exista o no en la lista—
+ *    así que tampoco este freno distingue una dirección real de una
+ *    inventada por su resultado.
+ * 5. [B, Critical] El envío corre SIEMPRE, como sentencia propia — NUNCA
+ *    adentro de un `if (correoOk)` que la rama sin acceso pueda saltear.
+ *    Antes, la rama con acceso llamaba de verdad al proveedor de correo
+ *    (~150 ms medidos) y la rama sin acceso no llamaba a nada (~0.03 ms):
+ *    un endpoint público, sin sesión, con un oráculo de ~5000× por el
+ *    reloj. Mismo criterio que I-3 en `entrar()` (`claveCorrecta` corre
+ *    siempre, contra un hash señuelo si el correo no está en la lista):
+ *    acá el señuelo es el DESTINATARIO (`CORREO_SENUELO`), no el contenido.
+ * 6. 200, siempre, con `FRASE_ENLACE`.
  */
 async function enlaceAccion(pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
   const env = contexto.env
 
-  if (!intentoPermitido(contexto.ip, contexto.ahora())) {
+  if (!intentoPermitido(claveFreno('enlace', contexto.ip), contexto.ahora())) {
     return error(429, PROBLEMA_DEMASIADOS_INTENTOS)
   }
 
@@ -423,17 +490,27 @@ async function enlaceAccion(pedido: Pedido, contexto: Contexto): Promise<Respues
   const cuerpo = (pedido.cuerpo ?? {}) as CuerpoEnlace
   const correo = typeof cuerpo.correo === 'string' ? cuerpo.correo.trim() : ''
 
-  if (correoEnLista(correo, env.PANEL_CORREOS)) {
-    const vence = contexto.ahora() + DURACION_ENLACE_MS
-    const token = firmaEnlace(correo, vence, env.PANEL_SECRETO)
-    const url = `${SITIO}/panel/entrar?token=${encodeURIComponent(token)}`
-    const r = await contexto.correo({ a: [correo], asunto: ASUNTO_ENLACE, texto: textoEnlace(url) })
-    if (!r.ok) {
-      console.error(`enlace: no se pudo mandar el enlace a ${correo} — ${r.motivo}`)
-    }
+  const claveDestino = `enlace-destino:${correo.toLowerCase()}`
+  if (!intentoPermitido(claveDestino, contexto.ahora(), TOPE_ENLACES_POR_DESTINO)) {
+    return error(429, PROBLEMA_DEMASIADOS_INTENTOS)
   }
-  // Si `correo` no está en la lista, no se firma ni se manda nada — la
-  // respuesta de abajo es EXACTAMENTE la misma que si hubiera mandado.
+
+  // [I-3, aplicado acá — B] `correoOk` se calcula, pero el ENVÍO no lo mira
+  // para decidir si correr: corre siempre, y solo el DESTINATARIO cambia.
+  const correoOk = correoEnLista(correo, env.PANEL_CORREOS)
+  const correoParaFirmar = correoOk ? correoCanonico(correo, env.PANEL_CORREOS) : correo
+  const vence = contexto.ahora() + DURACION_ENLACE_MS
+  const token = firmaEnlace(correoParaFirmar, vence, env.PANEL_SECRETO)
+  const url = `${SITIO}/panel/entrar?token=${encodeURIComponent(token)}`
+
+  const r = await contexto.correo({
+    a: [correoOk ? correoParaFirmar : CORREO_SENUELO],
+    asunto: ASUNTO_ENLACE,
+    texto: textoEnlace(url),
+  })
+  if (correoOk && !r.ok) {
+    console.error(`enlace: no se pudo mandar el enlace a ${correoParaFirmar} — ${r.motivo}`)
+  }
 
   return ok({ ok: true, mensaje: FRASE_ENLACE })
 }
@@ -443,22 +520,39 @@ async function enlaceAccion(pedido: Pedido, contexto: Contexto): Promise<Respues
  * sesión (spec §4.1) — el mismo destino al que llega `entrar`, por una
  * puerta distinta.
  *
- * Sin el freno de intentos de `entrar`: un token HMAC de este largo no se
- * puede adivinar probando, así que no hay nada que un freno por IP proteja
- * acá que `verificaEnlace` no proteja ya (la firma, tiempo constante). [I-4]
- * Sí se vuelve a chequear `PANEL_CORREOS` de HOY, no del momento en que se
- * pidió el enlace — mismo criterio que ya aplican `publicarAccion` y
+ * [D, Important — Ronda 1 de revisión] SÍ lleva freno de intentos, con su
+ * propio presupuesto (`claveFreno('entrar-con-enlace', ip)`, hallazgo E).
+ * La premisa de la Ronda 0 —que un HMAC de este largo no se adivina
+ * probando— sigue siendo cierta, pero el freno acá no protegía contra
+ * ESO: protegía contra REUSAR un token ya válido, que no tenía ningún
+ * techo (medido: el mismo token, ocho veces en paralelo desde ocho IPs,
+ * ocho sesiones).
+ *
+ * [I-4] Se vuelve a chequear `PANEL_CORREOS` de HOY, no del momento en que
+ * se pidió el enlace — mismo criterio que ya aplican `publicarAccion` y
  * compañía a la cookie de sesión: un enlace firmado hace diez minutos no
  * puede seguir sirviendo si en el medio se sacó a esa persona de la lista.
  *
- * La sesión que emite es siempre de treinta días (`DIAS_SESION_CORTA`): el
- * cuerpo de este pedido es solo `{ token }` (ver `entrar.astro`, que no
- * junta ningún otro dato), así que no hay un «recuérdame» que leer — quien
- * entra por acá y quiere una sesión de un año puede, ya adentro, volver a
- * entrar con su contraseña y marcarlo.
+ * [C, Important] Sin almacén de tokens usados —los quince minutos siguen
+ * siendo el único vencimiento del token en sí—, dos cosas acotan el riesgo
+ * de reuso sin infraestructura nueva: la sesión que emite dura un día
+ * (`DIAS_SESION_ENLACE`), no treinta, y cada consumo le manda un correo A
+ * ELLA (`ASUNTO_AVISO_CONSUMO`) — la única señal que puede tener de que
+ * alguien más entró. Ese aviso es mejor esfuerzo (`mandaProtegido`, más
+ * abajo en este archivo): si el correo no está configurado o falla, se
+ * loguea y el login sigue — avisar que alguien entró no puede ser motivo
+ * para que la persona correcta se quede afuera.
+ *
+ * El cuerpo de este pedido es solo `{ token }` (ver `entrar.astro`, que no
+ * junta ningún otro dato), así que no hay un «recuérdame» que leer.
  */
 async function entrarConEnlaceAccion(pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
   const env = contexto.env
+
+  if (!intentoPermitido(claveFreno('entrar-con-enlace', contexto.ip), contexto.ahora())) {
+    return error(429, PROBLEMA_DEMASIADOS_INTENTOS)
+  }
+
   if (!secretoUtilizable(env)) {
     console.error('entrar-con-enlace: PANEL_SECRETO falta o mide menos de 32 caracteres.')
     return error(503, PROBLEMA_INESPERADO)
@@ -472,13 +566,21 @@ async function entrarConEnlaceAccion(pedido: Pedido, contexto: Contexto): Promis
     return error(401, PROBLEMA_ENLACE_INVALIDO)
   }
 
-  const dias = DIAS_SESION_CORTA
+  const dias = DIAS_SESION_ENLACE
   const dispositivo = idDeDispositivo(cuerpo.dispositivo)
   const vence = contexto.ahora() + dias * 86_400_000
   const sesionToken = firmaSesion(
     { correo: verificado.correo, vence, dispositivo, emitida: contexto.ahora() },
     env.PANEL_SECRETO,
   )
+
+  // [C] Mejor esfuerzo, nunca bloquea el login — ver el docstring de
+  // arriba. `mandaProtegido` está definida más abajo en este archivo (la
+  // usan también `revierteYAvisa*`); la referencia hacia adelante es
+  // segura porque es una `function` declarada, no una `const` — JS la
+  // levanta (hoisting) antes de correr cualquier línea de este módulo.
+  await mandaProtegido(contexto, { a: [verificado.correo], asunto: ASUNTO_AVISO_CONSUMO, texto: TEXTO_AVISO_CONSUMO })
+
   return ok({ ok: true }, cookieDeSesion(sesionToken, dias))
 }
 
@@ -1173,8 +1275,9 @@ async function salud(_pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
 
   // Las siete están: falta ver si GitHub de verdad contesta con ellas — y
   // ESE paso es el que va detrás del freno, no el chequeo de variables de
-  // arriba.
-  if (!intentoPermitido(contexto.ip, contexto.ahora())) {
+  // arriba. [Ronda 1, Tarea 12, hallazgo E] Presupuesto propio de `salud`
+  // (`claveFreno`), no compartido con `entrar`/`enlace`.
+  if (!intentoPermitido(claveFreno('salud', contexto.ip), contexto.ahora())) {
     return { status: 200, cuerpo: { ok: true, faltan: [], github: null, problema: PROBLEMA_SALUD_OMITIDA } }
   }
 

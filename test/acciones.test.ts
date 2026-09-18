@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs'
 import { maneja, idDeDispositivo, VENTANA_DESHACER_MS, type Entorno } from '../src/servidor/acciones'
 import type { Carta, ResultadoCorreo } from '../src/servidor/correo'
 import { hashDeClave, firmaSesion, verificaSesion } from '../src/servidor/sesion'
-import { firmaEnlace } from '../src/servidor/enlace'
+import { firmaEnlace, verificaEnlace } from '../src/servidor/enlace'
 import { cliente } from '../src/servidor/github'
 import { publica } from '../src/servidor/publicar'
 import { serializa } from '../src/contenido/carga'
@@ -371,7 +371,18 @@ describe('entrar', () => {
 // estado «correo sin configurar» — el único 503 que esta acción, a
 // diferencia de todas las demás, no puede evitar (B3). Los tests del
 // camino feliz usan `contextoDePrueba()` con esas dos variables sumadas.
+//
+// [Ronda 1 de revisión] Cada test que llega a mandar un correo usa su
+// PROPIO correo listado (`env.PANEL_CORREOS` sobreescrito) además de su
+// propia IP: desde esta ronda, `enlace` frena por DESTINATARIO además de
+// por IP (hallazgo F, tope 3 cada 15 minutos) — compartir 'clienta@ejemplo.mx'
+// entre muchos tests haría que unos le comieran el presupuesto a otros.
+// `CORREO_REMITENTE` vive a nivel de archivo porque lo usan los dos
+// describes de esta tarea, no solo este.
+const CORREO_REMITENTE = { RESEND_API_KEY: 'clave-de-prueba', PANEL_REMITENTE: 'Panel <panel@ejemplo.mx>' }
+
 describe('accion=enlace', () => {
+
   it('B3: sin RESEND_API_KEY/PANEL_REMITENTE, 503 con la frase para Marcos — ni siquiera mira si el correo está en la lista', async () => {
     const r = await maneja(
       'enlace',
@@ -385,15 +396,16 @@ describe('accion=enlace', () => {
   })
 
   it('con un correo que SÍ está en la lista: manda el enlace y contesta la frase única', async () => {
+    const correo = `listado-${Math.random()}@ejemplo.mx`
     const cartas: Carta[] = []
     const r = await maneja(
       'enlace',
-      { cuerpo: { correo: 'clienta@ejemplo.mx' }, cookie: '' },
+      { cuerpo: { correo }, cookie: '' },
       {
         ...contextoDePrueba({
           fetch: fetchQueNoSeUsa(),
           correo: correoQueAnota(cartas),
-          env: { RESEND_API_KEY: 'clave-de-prueba', PANEL_REMITENTE: 'Panel <panel@ejemplo.mx>' },
+          env: { ...CORREO_REMITENTE, PANEL_CORREOS: correo },
         }),
         ip: `enlace-listado-${Math.random()}`,
       },
@@ -403,45 +415,108 @@ describe('accion=enlace', () => {
       'Si esa dirección tiene acceso, te llegó un correo con el enlace.',
     )
     expect(cartas).toHaveLength(1)
-    expect(cartas[0].a).toEqual(['clienta@ejemplo.mx'])
+    expect(cartas[0].a).toEqual([correo])
     expect(cartas[0].texto).toMatch(/panel\/entrar\?token=/)
   })
 
-  it('con un correo que NO está en la lista: la MISMA respuesta, byte a byte, y no manda nada', async () => {
+  it('con un correo que NO está en la lista: la MISMA respuesta, byte a byte', async () => {
+    const correoListado = `cmp-listado-${Math.random()}@ejemplo.mx`
+    const correoAjeno = `cmp-ajeno-${Math.random()}@fuera.mx`
     const cartasListado: Carta[] = []
     const cartasNoListado: Carta[] = []
-    const base = { RESEND_API_KEY: 'clave-de-prueba', PANEL_REMITENTE: 'Panel <panel@ejemplo.mx>' }
+    const env = { ...CORREO_REMITENTE, PANEL_CORREOS: correoListado }
 
     const conListado = await maneja(
       'enlace',
-      { cuerpo: { correo: 'clienta@ejemplo.mx' }, cookie: '' },
-      { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoQueAnota(cartasListado), env: base }), ip: `enlace-cmp-listado-${Math.random()}` },
+      { cuerpo: { correo: correoListado }, cookie: '' },
+      { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoQueAnota(cartasListado), env }), ip: `enlace-cmp-listado-${Math.random()}` },
     )
     const sinListado = await maneja(
       'enlace',
-      { cuerpo: { correo: 'nunca-tuvo-acceso@ajeno.mx' }, cookie: '' },
-      { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoQueAnota(cartasNoListado), env: base }), ip: `enlace-cmp-nolistado-${Math.random()}` },
+      { cuerpo: { correo: correoAjeno }, cookie: '' },
+      { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoQueAnota(cartasNoListado), env }), ip: `enlace-cmp-nolistado-${Math.random()}` },
     )
 
     expect(conListado.status).toBe(sinListado.status)
     expect(JSON.stringify(conListado.cuerpo)).toBe(JSON.stringify(sinListado.cuerpo))
-    expect(cartasListado).toHaveLength(1) // sí mandó
-    expect(cartasNoListado).toHaveLength(0) // no mandó nada — pero contestó IGUAL
+  })
+
+  // [B, Critical — Ronda 1 de revisión] Antes, la rama con acceso llamaba
+  // de verdad al proveedor de correo (~150 ms medidos) y la rama sin
+  // acceso no llamaba a nada (~0.03 ms) — una diferencia de ~5000× que
+  // convertía un endpoint público y sin sesión en un oráculo perfecto para
+  // probar direcciones una por una. El arreglo: el envío corre SIEMPRE,
+  // nunca adentro de un `if` que la rama sin acceso pueda saltear — este
+  // test prueba la SIMETRÍA (mismo llamado, en las dos ramas), que es lo
+  // que hace que el costo sea el mismo del otro lado del reloj.
+  it('B: el envío a `contexto.correo` corre SIEMPRE, listado o no — nunca a la dirección que lo pidió si no tiene acceso', async () => {
+    const correoListado = `simetria-listado-${Math.random()}@ejemplo.mx`
+    const correoAjeno = `simetria-ajeno-${Math.random()}@fuera.mx`
+    const env = { ...CORREO_REMITENTE, PANEL_CORREOS: correoListado }
+    const cartasListado: Carta[] = []
+    const cartasNoListado: Carta[] = []
+
+    await maneja(
+      'enlace',
+      { cuerpo: { correo: correoListado }, cookie: '' },
+      { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoQueAnota(cartasListado), env }), ip: `enlace-b-listado-${Math.random()}` },
+    )
+    await maneja(
+      'enlace',
+      { cuerpo: { correo: correoAjeno }, cookie: '' },
+      { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoQueAnota(cartasNoListado), env }), ip: `enlace-b-nolistado-${Math.random()}` },
+    )
+
+    // Las DOS ramas llaman a `contexto.correo` exactamente una vez: ni cero
+    // (que era el bug) ni dos.
+    expect(cartasListado).toHaveLength(1)
+    expect(cartasNoListado).toHaveLength(1)
+    // Mismo asunto en las dos — mismo "shape" de pedido, mismo costo.
+    expect(cartasListado[0].asunto).toBe(cartasNoListado[0].asunto)
+    // Pero la dirección sin acceso NUNCA recibe nada: el destinatario real
+    // de esa rama es un señuelo, no lo que pidió.
+    expect(cartasNoListado[0].a).not.toEqual([correoAjeno])
   })
 
   it('E4: el freno por IP se aplica igual que en `entrar` — el sexto pedido seguido es 429', async () => {
-    const ip = `enlace-freno-${Math.random()}`
-    const base = { RESEND_API_KEY: 'clave-de-prueba', PANEL_REMITENTE: 'Panel <panel@ejemplo.mx>' }
+    // Un correo DISTINTO en cada intento: así se ejercita el freno por IP
+    // (E4) sin chocar con el freno por destinatario (F, tope 3) que
+    // pisaría este test antes de llegar al sexto pedido.
+    const ip = `enlace-freno-ip-${Math.random()}`
+    const env = { ...CORREO_REMITENTE, PANEL_CORREOS: Array.from({ length: 6 }, (_, i) => `freno-ip-${i}-${Math.random()}@ejemplo.mx`).join(',') }
+    const correos = env.PANEL_CORREOS.split(',')
     const cartas: Carta[] = []
-    const ctx = { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoQueAnota(cartas), env: base }), ip }
+    const ctx = { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoQueAnota(cartas), env }), ip }
 
     for (let i = 0; i < 5; i++) {
-      await maneja('enlace', { cuerpo: { correo: 'clienta@ejemplo.mx' }, cookie: '' }, ctx)
+      const r = await maneja('enlace', { cuerpo: { correo: correos[i] }, cookie: '' }, ctx)
+      expect(r.status).toBe(200)
     }
-    const r = await maneja('enlace', { cuerpo: { correo: 'clienta@ejemplo.mx' }, cookie: '' }, ctx)
+    const r = await maneja('enlace', { cuerpo: { correo: correos[5] }, cookie: '' }, ctx)
 
     expect(r.status).toBe(429)
     expect(cartas).toHaveLength(5) // los primeros cinco sí mandaron; el sexto, frenado, no
+  })
+
+  // [F, Minor — Ronda 1 de revisión] El freno de arriba es por IP; este es
+  // por DESTINATARIO, con un tope más chico (tres) — sin él, veinte IPs
+  // distintas pueden mandarle a la MISMA dirección cien correos desde
+  // nuestro remitente (medido). IPs distintas en cada intento para
+  // aislarlo del freno por IP (E4), que necesita seis para dispararse.
+  it('F: tope por destinatario — el cuarto pedido para el MISMO correo, desde IPs distintas, es 429', async () => {
+    const correo = `destino-${Math.random()}@ejemplo.mx`
+    const env = { ...CORREO_REMITENTE, PANEL_CORREOS: correo }
+    const cartas: Carta[] = []
+    const ctxDesde = (ip: string) => ({ ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoQueAnota(cartas), env }), ip })
+
+    for (let i = 0; i < 3; i++) {
+      const r = await maneja('enlace', { cuerpo: { correo }, cookie: '' }, ctxDesde(`enlace-f-${i}-${Math.random()}`))
+      expect(r.status).toBe(200)
+    }
+    const r4 = await maneja('enlace', { cuerpo: { correo }, cookie: '' }, ctxDesde(`enlace-f-3-${Math.random()}`))
+
+    expect(r4.status).toBe(429)
+    expect(cartas).toHaveLength(3) // el cuarto no mandó nada, ni siquiera al señuelo
   })
 
   it('C-1: PANEL_SECRETO ausente o corto, 503 antes de tocar nada — ni siquiera el correo', async () => {
@@ -450,11 +525,7 @@ describe('accion=enlace', () => {
         ...contextoDePrueba({
           fetch: fetchQueNoSeUsa(),
           correo: correoQueNoSeUsa(),
-          env: {
-            PANEL_SECRETO: secreto,
-            RESEND_API_KEY: 'clave-de-prueba',
-            PANEL_REMITENTE: 'Panel <panel@ejemplo.mx>',
-          },
+          env: { PANEL_SECRETO: secreto, ...CORREO_REMITENTE },
         }),
         ip: `enlace-c1-${Math.random()}`,
       }
@@ -464,12 +535,13 @@ describe('accion=enlace', () => {
   })
 
   it('ninguna de sus frases usa jerga técnica', async () => {
+    const correo = `jerga-${Math.random()}@ejemplo.mx`
     const cartas: Carta[] = []
-    const base = { RESEND_API_KEY: 'clave-de-prueba', PANEL_REMITENTE: 'Panel <panel@ejemplo.mx>' }
+    const env = { ...CORREO_REMITENTE, PANEL_CORREOS: correo }
     const r = await maneja(
       'enlace',
-      { cuerpo: { correo: 'clienta@ejemplo.mx' }, cookie: '' },
-      { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoQueAnota(cartas), env: base }), ip: `enlace-jerga-${Math.random()}` },
+      { cuerpo: { correo }, cookie: '' },
+      { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoQueAnota(cartas), env }), ip: `enlace-jerga-${Math.random()}` },
     )
     expect(jergaEn((r.cuerpo as { mensaje: string }).mensaje)).toBeNull()
     expect(cartas).toHaveLength(1)
@@ -482,18 +554,41 @@ describe('accion=enlace', () => {
     )
     expect(jergaEn((sinCorreo.cuerpo as { problema: string }).problema)).toBeNull()
   })
+
+  // [H, Minor — Ronda 1 de revisión] Sin esto, alguien que escribe su
+  // propio correo con otras mayúsculas termina con una sesión —y después
+  // commits— a nombre de esa forma cruda en vez de la que Marcos escribió
+  // en `PANEL_CORREOS`.
+  it('H: firma la forma CANÓNICA de PANEL_CORREOS, no la que tipeó quien pidió el enlace', async () => {
+    const correoCanonico = `Clienta.Canonica.${Math.floor(Math.random() * 1e9)}@Ejemplo.MX`
+    const cartas: Carta[] = []
+    const env = { ...CORREO_REMITENTE, PANEL_CORREOS: correoCanonico }
+    const r = await maneja(
+      'enlace',
+      { cuerpo: { correo: correoCanonico.toLowerCase() } , cookie: '' },
+      { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoQueAnota(cartas), env }), ip: `enlace-h-${Math.random()}` },
+    )
+    expect(r.status).toBe(200)
+    expect(cartas).toHaveLength(1)
+    const token = decodeURIComponent(cartas[0].texto.match(/token=(\S+)/)![1])
+    const verificado = verificaEnlace(token, SECRETO, Date.now())
+    expect(verificado?.correo).toBe(correoCanonico) // no `correoCanonico.toLowerCase()`
+  })
 })
 
 describe('accion=entrar-con-enlace', () => {
   const enlaceValido = (correo = 'clienta@ejemplo.mx', vence = Date.now() + 10 * 60_000) =>
     firmaEnlace(correo, vence, SECRETO)
 
+  // [Ronda 1 de revisión, hallazgo D] `entrar-con-enlace` ahora frena por
+  // IP, así que —a diferencia de la ronda anterior— cada test necesita su
+  // propia IP: `contextoBase()` por sí sola siempre trae la misma
+  // ('1.2.3.4'), y compartirla entre los ocho tests de este describe
+  // agotaría el freno bastante antes del test que lo prueba a propósito.
+  const ctx = (ip = `entrar-con-enlace-${Math.random()}`) => ({ ...contextoBase(fetchQueNoSeUsa()), ip })
+
   it('con un enlace válido, entra: la misma cookie firmada que `entrar`', async () => {
-    const r = await maneja(
-      'entrar-con-enlace',
-      { cuerpo: { token: enlaceValido() }, cookie: '' },
-      contextoBase(fetchQueNoSeUsa()),
-    )
+    const r = await maneja('entrar-con-enlace', { cuerpo: { token: enlaceValido() }, cookie: '' }, ctx())
     expect(r.status).toBe(200)
     expect(r.cookie).toMatch(/HttpOnly/)
     expect(r.cookie).toMatch(/panel_sesion=/)
@@ -501,56 +596,138 @@ describe('accion=entrar-con-enlace', () => {
 
   it('un token vencido no entra', async () => {
     const vencido = firmaEnlace('clienta@ejemplo.mx', Date.now() - 1_000, SECRETO)
-    const r = await maneja('entrar-con-enlace', { cuerpo: { token: vencido }, cookie: '' }, contextoBase(fetchQueNoSeUsa()))
+    const r = await maneja('entrar-con-enlace', { cuerpo: { token: vencido }, cookie: '' }, ctx())
     expect(r.status).toBe(401)
     expect(r.cookie).toBeUndefined()
   })
 
   it('un token con la firma cambiada no entra', async () => {
     const [cuerpo] = enlaceValido().split('.')
-    const r = await maneja(
-      'entrar-con-enlace',
-      { cuerpo: { token: `${cuerpo}.firmaInventada` }, cookie: '' },
-      contextoBase(fetchQueNoSeUsa()),
-    )
+    const r = await maneja('entrar-con-enlace', { cuerpo: { token: `${cuerpo}.firmaInventada` }, cookie: '' }, ctx())
     expect(r.status).toBe(401)
   })
 
   it('sin token en el cuerpo, 401 — no revienta', async () => {
-    const r = await maneja('entrar-con-enlace', { cuerpo: {}, cookie: '' }, contextoBase(fetchQueNoSeUsa()))
+    const r = await maneja('entrar-con-enlace', { cuerpo: {}, cookie: '' }, ctx())
     expect(r.status).toBe(401)
   })
 
   it('I-4: un correo que ya no está en PANEL_CORREOS no entra, aunque el enlace en sí sea válido', async () => {
     const t = firmaEnlace('salio-de-la-lista@ejemplo.mx', Date.now() + 10 * 60_000, SECRETO)
-    const r = await maneja('entrar-con-enlace', { cuerpo: { token: t }, cookie: '' }, contextoBase(fetchQueNoSeUsa()))
+    const r = await maneja('entrar-con-enlace', { cuerpo: { token: t }, cookie: '' }, ctx())
     expect(r.status).toBe(401)
   })
 
   it('B7: una cookie de sesión normal no sirve como enlace tampoco desde el router', async () => {
     const cookie = cookieValida()
-    const r = await maneja('entrar-con-enlace', { cuerpo: { token: cookie }, cookie: '' }, contextoBase(fetchQueNoSeUsa()))
+    const r = await maneja('entrar-con-enlace', { cuerpo: { token: cookie }, cookie: '' }, ctx())
     expect(r.status).toBe(401)
   })
 
   it('C-1: PANEL_SECRETO ausente o corto, 503', async () => {
-    const ctx = contextoBase(fetchQueNoSeUsa())
-    delete (ctx.env as Record<string, string | undefined>).PANEL_SECRETO
-    const r = await maneja('entrar-con-enlace', { cuerpo: { token: enlaceValido() }, cookie: '' }, ctx)
+    const c = ctx()
+    delete (c.env as Record<string, string | undefined>).PANEL_SECRETO
+    const r = await maneja('entrar-con-enlace', { cuerpo: { token: enlaceValido() }, cookie: '' }, c)
     expect(r.status).toBe(503)
   })
 
   it('sin dispositivo en el cuerpo, la sesión queda con "sin-nombre" — nunca revienta', async () => {
-    const r = await maneja(
-      'entrar-con-enlace',
-      { cuerpo: { token: enlaceValido() }, cookie: '' },
-      contextoBase(fetchQueNoSeUsa()),
-    )
+    const r = await maneja('entrar-con-enlace', { cuerpo: { token: enlaceValido() }, cookie: '' }, ctx())
     expect(r.status).toBe(200)
     const valorCookie = r.cookie!.split(';')[0].split('=')[1]
     const sesion = verificaSesion(valorCookie, SECRETO)
     expect(sesion?.correo).toBe('clienta@ejemplo.mx')
     expect(sesion?.dispositivo).toBe('sin-nombre')
+  })
+
+  // [C, Important — Ronda 1 de revisión] Sin almacén de tokens usados, el
+  // reuso dentro de los quince minutos no tiene ningún techo — así que la
+  // sesión que emite esta vía dura un día, no treinta: acota cuánto vale
+  // el "pie adentro" que deja un token reusado.
+  it('C: la sesión que emite dura UN DÍA (24 horas), no treinta', async () => {
+    const ahora = 1_000_000
+    const r = await maneja(
+      'entrar-con-enlace',
+      { cuerpo: { token: enlaceValido() }, cookie: '' },
+      { ...ctx(), ahora: () => ahora },
+    )
+    expect(r.status).toBe(200)
+    const valorCookie = r.cookie!.split(';')[0].split('=')[1]
+    const sesion = verificaSesion(valorCookie, SECRETO, ahora)
+    expect(sesion).not.toBeNull()
+    expect(sesion!.vence - sesion!.emitida).toBe(86_400_000) // exactamente un día, ni treinta
+  })
+
+  it('C: cada consumo le manda un correo A ELLA — la única señal de que alguien más entró', async () => {
+    const cartas: Carta[] = []
+    const r = await maneja(
+      'entrar-con-enlace',
+      { cuerpo: { token: enlaceValido() }, cookie: '' },
+      { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoQueAnota(cartas) }), ip: `entrar-con-enlace-c-${Math.random()}` },
+    )
+    expect(r.status).toBe(200)
+    expect(cartas).toHaveLength(1)
+    expect(cartas[0].a).toEqual(['clienta@ejemplo.mx'])
+    expect(jergaEn(`${cartas[0].asunto} ${cartas[0].texto}`)).toBeNull()
+  })
+
+  it('C: si el aviso de consumo falla o no está configurado, el login NO se cae — es mejor esfuerzo', async () => {
+    const r = await maneja(
+      'entrar-con-enlace',
+      { cuerpo: { token: enlaceValido() }, cookie: '' },
+      {
+        ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: async () => ({ ok: false, motivo: 'sin-configurar' }) }),
+        ip: `entrar-con-enlace-c-degradado-${Math.random()}`,
+      },
+    )
+    expect(r.status).toBe(200)
+    expect(r.cookie).toMatch(/HttpOnly/)
+  })
+
+  // [D, Important — Ronda 1 de revisión] El freno acá NO protege contra
+  // adivinar la firma (un HMAC de este largo no se adivina probando, y
+  // eso sigue siendo cierto) — protege contra REUSAR un token válido, que
+  // no tenía ningún techo: medido, el mismo token cambiado por sesión ocho
+  // veces en paralelo desde ocho IPs dio ocho sesiones. Acá, veinte
+  // tokens basura seguidos desde la MISMA IP daban veinte 401 y ni un
+  // 429 — el freno tiene que aparecer igual, sea cual sea el token.
+  it('D: el freno de intentos se aplica en el consumo — el sexto pedido seguido desde la misma IP es 429', async () => {
+    const ip = `entrar-con-enlace-freno-${Math.random()}`
+    const c = ctx(ip)
+    for (let i = 0; i < 5; i++) {
+      const r = await maneja('entrar-con-enlace', { cuerpo: { token: 'token-basura-que-no-vale' }, cookie: '' }, c)
+      expect(r.status).toBe(401) // ninguno de los cinco es 429 todavía
+    }
+    const r = await maneja('entrar-con-enlace', { cuerpo: { token: 'token-basura-que-no-vale' }, cookie: '' }, c)
+    expect(r.status).toBe(429)
+  })
+
+  // [E, Minor — Ronda 1 de revisión] Y el motivo por el que hace falta: el
+  // presupuesto es POR ACCIÓN, no compartido. Antes, agotar el freno
+  // pidiendo `enlace` cinco veces desde una IP dejaba a esa misma IP sin
+  // poder `entrar` con la contraseña —justo el día que más hace falta,
+  // porque el enlace no le llegó—. Ahora, agotar `enlace` no le toca ni un
+  // intento a `entrar` ni a `entrar-con-enlace` en la misma IP.
+  it('E: el presupuesto de `enlace` no le come el de `entrar` ni el de `entrar-con-enlace`, en la misma IP', async () => {
+    const ip = `e-independencia-${Math.random()}`
+    const env = { ...CORREO_REMITENTE, PANEL_CORREOS: `e-correo-${Math.random()}@ejemplo.mx` }
+    const cCorreo = { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoQueAnota([]), env }), ip }
+
+    // Agota el freno de `enlace` en esta IP: cinco pedidos.
+    for (let i = 0; i < 5; i++) {
+      await maneja('enlace', { cuerpo: { correo: env.PANEL_CORREOS }, cookie: '' }, cCorreo)
+    }
+    const enlaceFrenado = await maneja('enlace', { cuerpo: { correo: env.PANEL_CORREOS }, cookie: '' }, cCorreo)
+    expect(enlaceFrenado.status).toBe(429) // confirma que SÍ se agotó
+
+    // `entrar`, en la MISMA ip, con la contraseña correcta: nada que ver.
+    const cEntrar = { ...contextoBase(fetchQueNoSeUsa()), ip }
+    const entrarOk = await maneja('entrar', { cuerpo: { clave: CLAVE, correo: 'clienta@ejemplo.mx' }, cookie: '' }, cEntrar)
+    expect(entrarOk.status).toBe(200)
+
+    // `entrar-con-enlace`, en la MISMA ip, con un token válido: tampoco.
+    const consumoOk = await maneja('entrar-con-enlace', { cuerpo: { token: enlaceValido() }, cookie: '' }, { ...contextoBase(fetchQueNoSeUsa()), ip })
+    expect(consumoOk.status).toBe(200)
   })
 })
 
@@ -1222,12 +1399,14 @@ describe('salud', () => {
     expect(cuerpo.problema).toMatch(/no revisamos la conexión/i)
   })
 
-  it('I-6: la mitad de variables sigue abierta y anónima aunque el freno de esa IP ya esté gastado', async () => {
+  it('I-6: la mitad de variables sigue abierta y anónima aunque el freno de `salud` en esa IP ya esté gastado', async () => {
     const ip = `i6-salud-vars-${Math.random()}`
-    // Gasta el freno con intentos de "entrar" fallidos, desde la MISMA IP
-    // — el freno es compartido por IP, no por acción.
+    // Gasta el freno de `salud` (no el de `entrar`): [Ronda 1, Tarea 12,
+    // hallazgo E] los contadores pasan a ser por ACCIÓN, así que desde
+    // esta ronda ya no alcanza con gastarlo desde `entrar` — cada uno
+    // tiene su propio presupuesto de cinco cada quince minutos.
     for (let i = 0; i < 5; i++) {
-      await maneja('entrar', { cuerpo: { clave: 'mala', correo: 'clienta@ejemplo.mx' }, cookie: '' }, { ...contextoBase(fetchQueNoSeUsa()), ip })
+      await maneja('salud', { cuerpo: {}, cookie: '' }, { ...contextoBase(fetchQueNoSeUsa()), ip })
     }
 
     const ctx = { ...contextoBase(fetchQueNoSeUsa()), ip }

@@ -78,14 +78,14 @@ function cookieDeSesion(valor, dias) {
 var INTENTOS = /* @__PURE__ */ new Map();
 var VENTANA_MS = 15 * 6e4;
 var TOPE_INTENTOS = 5;
-function intentoPermitido(ip, ahora = Date.now()) {
-  const marcas = (INTENTOS.get(ip) ?? []).filter((t) => ahora - t < VENTANA_MS);
-  if (marcas.length >= TOPE_INTENTOS) {
-    INTENTOS.set(ip, marcas);
+function intentoPermitido(clave, ahora = Date.now(), tope = TOPE_INTENTOS) {
+  const marcas = (INTENTOS.get(clave) ?? []).filter((t) => ahora - t < VENTANA_MS);
+  if (marcas.length >= tope) {
+    INTENTOS.set(clave, marcas);
     return false;
   }
   marcas.push(ahora);
-  INTENTOS.set(ip, marcas);
+  INTENTOS.set(clave, marcas);
   return true;
 }
 
@@ -18255,6 +18255,7 @@ var PROBLEMA_INESPERADO = "Algo sali\xF3 mal de nuestro lado. Intenta de nuevo e
 function secretoUtilizable(env) {
   return typeof env.PANEL_SECRETO === "string" && env.PANEL_SECRETO.length >= LARGO_MIN_SECRETO;
 }
+var claveFreno = (accion, ip) => `${accion}:${ip}`;
 var PROBLEMA_ENTRAR = "No se pudo entrar: revisa tus datos y vuelve a intentar.";
 var PROBLEMA_DEMASIADOS_INTENTOS = "Demasiados intentos. Espera 15 minutos y vuelve a probar.";
 var DIAS_SESION_LARGA = 365;
@@ -18273,7 +18274,7 @@ function entrar(pedido, contexto) {
   const cuerpo = pedido.cuerpo ?? {};
   const correo2 = typeof cuerpo.correo === "string" ? cuerpo.correo.trim() : "";
   const clave = typeof cuerpo.clave === "string" ? cuerpo.clave : "";
-  if (!intentoPermitido(contexto.ip, contexto.ahora())) {
+  if (!intentoPermitido(claveFreno("entrar", contexto.ip), contexto.ahora())) {
     return error51(429, PROBLEMA_DEMASIADOS_INTENTOS);
   }
   const env = contexto.env;
@@ -18295,6 +18296,9 @@ function entrar(pedido, contexto) {
 var FRASE_ENLACE = "Si esa direcci\xF3n tiene acceso, te lleg\xF3 un correo con el enlace.";
 var PROBLEMA_ENLACE_SIN_CORREO = "Ahora mismo no puedo mandarte el enlace. Escr\xEDbele a Marcos.";
 var PROBLEMA_ENLACE_INVALIDO = "Ese enlace ya no sirve: pide uno nuevo.";
+var TOPE_ENLACES_POR_DESTINO = 3;
+var CORREO_SENUELO = "senuelo@descarte.maracacao.mx";
+var DIAS_SESION_ENLACE = 1;
 var ASUNTO_ENLACE = "Tu enlace para entrar al panel";
 var textoEnlace = (url3) => [
   "Este es tu enlace para entrar al panel, sin necesitar la contrase\xF1a:",
@@ -18303,9 +18307,17 @@ var textoEnlace = (url3) => [
   "",
   "Vale por quince minutos. Si t\xFA no lo pediste, ignora este correo: nadie puede entrar sin darle clic."
 ].join("\n");
+var ASUNTO_AVISO_CONSUMO = "Alguien entr\xF3 al panel con tu enlace";
+var TEXTO_AVISO_CONSUMO = "Alguien acaba de entrar al panel usando tu enlace de recuperaci\xF3n. Si fuiste t\xFA, no hay nada que hacer. Si no fuiste t\xFA, av\xEDsale a Marcos.";
+function correoCanonico(correo2, lista2) {
+  if (!lista2) return correo2;
+  const normalizado = correo2.trim().toLowerCase();
+  const entrada = lista2.split(",").map((c) => c.trim()).find((c) => c.toLowerCase() === normalizado);
+  return entrada ?? correo2;
+}
 async function enlaceAccion(pedido, contexto) {
   const env = contexto.env;
-  if (!intentoPermitido(contexto.ip, contexto.ahora())) {
+  if (!intentoPermitido(claveFreno("enlace", contexto.ip), contexto.ahora())) {
     return error51(429, PROBLEMA_DEMASIADOS_INTENTOS);
   }
   if (!secretoUtilizable(env)) {
@@ -18318,19 +18330,30 @@ async function enlaceAccion(pedido, contexto) {
   }
   const cuerpo = pedido.cuerpo ?? {};
   const correo2 = typeof cuerpo.correo === "string" ? cuerpo.correo.trim() : "";
-  if (correoEnLista(correo2, env.PANEL_CORREOS)) {
-    const vence = contexto.ahora() + DURACION_ENLACE_MS;
-    const token = firmaEnlace(correo2, vence, env.PANEL_SECRETO);
-    const url3 = `${SITIO}/panel/entrar?token=${encodeURIComponent(token)}`;
-    const r = await contexto.correo({ a: [correo2], asunto: ASUNTO_ENLACE, texto: textoEnlace(url3) });
-    if (!r.ok) {
-      console.error(`enlace: no se pudo mandar el enlace a ${correo2} \u2014 ${r.motivo}`);
-    }
+  const claveDestino = `enlace-destino:${correo2.toLowerCase()}`;
+  if (!intentoPermitido(claveDestino, contexto.ahora(), TOPE_ENLACES_POR_DESTINO)) {
+    return error51(429, PROBLEMA_DEMASIADOS_INTENTOS);
+  }
+  const correoOk = correoEnLista(correo2, env.PANEL_CORREOS);
+  const correoParaFirmar = correoOk ? correoCanonico(correo2, env.PANEL_CORREOS) : correo2;
+  const vence = contexto.ahora() + DURACION_ENLACE_MS;
+  const token = firmaEnlace(correoParaFirmar, vence, env.PANEL_SECRETO);
+  const url3 = `${SITIO}/panel/entrar?token=${encodeURIComponent(token)}`;
+  const r = await contexto.correo({
+    a: [correoOk ? correoParaFirmar : CORREO_SENUELO],
+    asunto: ASUNTO_ENLACE,
+    texto: textoEnlace(url3)
+  });
+  if (correoOk && !r.ok) {
+    console.error(`enlace: no se pudo mandar el enlace a ${correoParaFirmar} \u2014 ${r.motivo}`);
   }
   return ok({ ok: true, mensaje: FRASE_ENLACE });
 }
 async function entrarConEnlaceAccion(pedido, contexto) {
   const env = contexto.env;
+  if (!intentoPermitido(claveFreno("entrar-con-enlace", contexto.ip), contexto.ahora())) {
+    return error51(429, PROBLEMA_DEMASIADOS_INTENTOS);
+  }
   if (!secretoUtilizable(env)) {
     console.error("entrar-con-enlace: PANEL_SECRETO falta o mide menos de 32 caracteres.");
     return error51(503, PROBLEMA_INESPERADO);
@@ -18341,13 +18364,14 @@ async function entrarConEnlaceAccion(pedido, contexto) {
   if (!verificado || !correoEnLista(verificado.correo, env.PANEL_CORREOS)) {
     return error51(401, PROBLEMA_ENLACE_INVALIDO);
   }
-  const dias = DIAS_SESION_CORTA;
+  const dias = DIAS_SESION_ENLACE;
   const dispositivo = idDeDispositivo(cuerpo.dispositivo);
   const vence = contexto.ahora() + dias * 864e5;
   const sesionToken = firmaSesion(
     { correo: verificado.correo, vence, dispositivo, emitida: contexto.ahora() },
     env.PANEL_SECRETO
   );
+  await mandaProtegido(contexto, { a: [verificado.correo], asunto: ASUNTO_AVISO_CONSUMO, texto: TEXTO_AVISO_CONSUMO });
   return ok({ ok: true }, cookieDeSesion(sesionToken, dias));
 }
 var PROBLEMA_SESION = "Tu sesi\xF3n no es v\xE1lida: vuelve a entrar.";
@@ -18625,7 +18649,7 @@ async function salud(_pedido, contexto) {
   if (faltan.length > 0) {
     return { status: 503, cuerpo: { ok: false, faltan, github: null } };
   }
-  if (!intentoPermitido(contexto.ip, contexto.ahora())) {
+  if (!intentoPermitido(claveFreno("salud", contexto.ip), contexto.ahora())) {
     return { status: 200, cuerpo: { ok: true, faltan: [], github: null, problema: PROBLEMA_SALUD_OMITIDA } };
   }
   const gh = cliente({

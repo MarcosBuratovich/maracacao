@@ -218,12 +218,31 @@ decir «te lo mandé» y no mandar nada. Es la misma fila de la tabla de
 variables, arriba: mientras `maracacao.mx` no esté verificado en el
 proveedor, el enlace mágico no está disponible para nadie.
 
-**El freno de intentos (E4) se aplica igual que en `entrar`, y comparten el
-mismo contador por IP** (`intentoPermitido`, `sesion.ts`): sin él, pedir el
-enlace sería una forma de mandarle correo a cualquiera desde nuestro
-remitente, todas las veces que uno quiera. Mismo límite de siempre: vive en
-la memoria de una función en ejecución, no en un almacén compartido (ver
-«Lo que todavía NO está cubierto», al final de este documento).
+**El freno de intentos (E4) se aplica en las tres puertas de esta sección**
+(pedir el enlace, y consumirlo) **y en `entrar`/`salud`, pero — desde la
+Ronda 1 de revisión de esta tarea — cada acción tiene su PROPIO
+presupuesto de cinco cada quince minutos**, no uno compartido por IP.
+Antes lo compartían, y eso se volvía en contra el día que más importaba:
+la clienta que pide el enlace cinco veces porque no le llega se quedaba,
+de paso, sin poder usar su contraseña por quince minutos — justo el día de
+la recuperación. `enlace` suma un segundo freno, por DESTINATARIO (tres
+cada quince minutos, no cinco): sin él, veinte IPs distintas podrían
+mandarle a la MISMA dirección cien correos desde nuestro remitente.
+
+**Por qué la sesión que deja `entrar-con-enlace` dura solo UN DÍA, no
+treinta:** como el enlace no es de un solo uso (arriba), nada impide
+reusar uno válido más de una vez dentro de los quince minutos — el único
+techo real es cuánto dura la sesión que deja. Dos cosas lo acotan, sin
+ningún almacén nuevo: la sesión dura 24 horas (es una puerta de
+RECUPERACIÓN, sirve para volver a entrar, no para quedarse — la fase 6 va
+a poder ofrecer «recordar este aparato» desde adentro del panel), y **cada
+vez que se consume un enlace, le llega un correo a ELLA** —nunca a
+Marcos—, avisándole que alguien entró con su enlace de recuperación. Es la
+única señal que puede tener de que no fue ella. Ese correo es mejor
+esfuerzo (igual que los avisos de un deploy fallido): si el envío falla o
+el correo no está configurado, se loguea y el login sigue — avisar que
+alguien entró no puede ser motivo para que la persona correcta se quede
+afuera.
 
 ## Cómo rotar el PAT de GitHub en cinco minutos
 
@@ -410,14 +429,16 @@ de esta parte, son límites conocidos de lo que se construyó hasta acá:
   simplemente tenga paciencia y espere a que Vercel recicle una instancia,
   se salta el freno sin mucho esfuerzo. No es la defensa principal —esa es
   tener una contraseña larga (E2)— sino el freno al intento casual y al
-  script tonto. Por la misma razón, `scripts/humo-panel.sh` prueba el
-  freno AL FINAL (paso 6) y sin asumir un número fijo de intentos: `salud`
-  y `entrar` comparten el mismo contador por IP, así que para cuando el
-  script llega a probar el freno a propósito, `salud` y los dos logins de
-  antes ya gastaron parte del mismo presupuesto de cinco cada quince
-  minutos — cuántos intentos hacen falta para ver el 429 depende de eso,
-  no es una cuenta que se pueda fijar de antemano. No es una falla del
-  script, es este mismo límite, y por eso el script lo dice en su salida
-  en vez de asumir un número. Si algún día hace falta un freno de verdad,
-  contra un atacante de verdad, hace falta un almacén compartido entre
-  instancias (Redis, o algo así) — hoy no existe.
+  script tonto. **[Actualizado, Ronda 1 de la Tarea 12]** Cada acción
+  (`entrar`, `salud`, `enlace`, `entrar-con-enlace`) tiene su PROPIO
+  presupuesto de cinco cada quince minutos —antes compartían uno solo por
+  IP, y eso dejaba a la clienta sin poder usar la contraseña si había
+  pedido el enlace de recuperación varias veces seguidas—, así que
+  `scripts/humo-panel.sh` (paso 6) hoy gasta el freno de `entrar`
+  específicamente: los dos logins de los pasos 2 y 3 ya usan dos de los
+  cinco, y el script sigue sin asumir un número fijo (prueba hasta ocho
+  veces y para en el primer 429) por las dudas de que alguna corrida
+  anterior haya dejado algo pendiente en la misma ventana de quince
+  minutos. Si algún día hace falta un freno de verdad, contra un atacante
+  de verdad, hace falta un almacén compartido entre instancias (Redis, o
+  algo así) — hoy no existe.

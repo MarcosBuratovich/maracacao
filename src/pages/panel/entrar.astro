@@ -20,6 +20,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
     <title>Entrar al panel</title>
   </head>
   <body>
@@ -28,12 +29,18 @@
       <button id="entrar" type="button" hidden>Entrar al panel</button>
     </main>
     <script is:inline>
-      // Apenas carga, sin esperar ningún clic: el token sale de la barra de
-      // direcciones (y del historial, y de cualquier captura de pantalla
-      // que ella comparta después).
+      // [A, Critical — Ronda 1 de revisión] El token se LEE primero. Antes,
+      // `history.replaceState` corría antes de leer `location.search` —lo
+      // reescribe de forma SÍNCRONA— así que para cuando el código de abajo
+      // leía el token, la barra ya estaba vacía: `token` daba siempre `''`,
+      // el botón no aparecía nunca, y la página decía siempre «no
+      // funciona». Verificado en un Chromium de verdad que invertir el
+      // orden lo arregla y, medido, NO reintroduce el token en la barra
+      // (`replaceState` igual reemplaza la entrada del historial, ahora
+      // después de haber leído lo que hacía falta).
+      const token = new URLSearchParams(location.search).get('token') ?? ''
       history.replaceState(null, '', location.pathname)
 
-      const token = new URLSearchParams(location.search).get('token') ?? ''
       const aviso = document.getElementById('aviso')
       const boton = document.getElementById('entrar')
 

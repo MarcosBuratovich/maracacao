@@ -240,7 +240,18 @@ export function cookieDeSesion(valor: string, dias: number): string {
 }
 
 // Freno a la fuerza bruta: marcas de tiempo de los últimos quince minutos
-// por IP, en memoria del proceso.
+// por CLAVE, en memoria del proceso.
+//
+// [Ronda 1, Tarea 12, hallazgo E] La clave ya no es solo la IP. Antes,
+// `entrar` y `salud` (y ahora `enlace`/`entrar-con-enlace`) compartían un
+// único contador por IP — y eso se volvía en contra el día que más
+// importaba: la clienta que pide el enlace cinco veces porque no le llega
+// se quedaba, de paso, sin poder usar su contraseña por quince minutos.
+// Cada llamador arma su propia clave (`<acción>:<ip>` en `acciones.ts`) para
+// que el presupuesto de una acción no le coma el de otra. La misma función
+// también frena por DESTINATARIO (hallazgo F: `enlace-destino:<correo>`,
+// con su propio tope, más chico) — el mecanismo no sabe ni le importa qué
+// representa la clave, solo cuenta cuántas veces se la vio en la ventana.
 //
 // [E4] Esto NO es la defensa principal, y hay que decirlo cada vez que
 // alguien lo lea: las funciones serverless son efímeras y concurrentes —
@@ -255,20 +266,22 @@ const VENTANA_MS = 15 * 60_000
 const TOPE_INTENTOS = 5
 
 /**
- * ¿Esta IP puede intentar entrar de nuevo? Cuenta los intentos de los
- * últimos quince minutos y, si ya hubo cinco, frena — este llamado en sí
- * también cuenta como intento cuando se permite, así que "cinco intentos
- * permitidos, el sexto frena" es exacto.
+ * ¿Esta clave puede intentar de nuevo? Cuenta los intentos de los últimos
+ * quince minutos y, si ya hubo `tope` (cinco por defecto), frena — este
+ * llamado en sí también cuenta como intento cuando se permite, así que
+ * "cinco intentos permitidos, el sexto frena" es exacto. `tope` es
+ * configurable para el freno por destinatario (hallazgo F), que protege
+ * otra cosa (su bandeja, no nuestra cuota de intentos) con otro número.
  */
-export function intentoPermitido(ip: string, ahora: number = Date.now()): boolean {
-  const marcas = (INTENTOS.get(ip) ?? []).filter((t) => ahora - t < VENTANA_MS)
+export function intentoPermitido(clave: string, ahora: number = Date.now(), tope: number = TOPE_INTENTOS): boolean {
+  const marcas = (INTENTOS.get(clave) ?? []).filter((t) => ahora - t < VENTANA_MS)
 
-  if (marcas.length >= TOPE_INTENTOS) {
-    INTENTOS.set(ip, marcas)
+  if (marcas.length >= tope) {
+    INTENTOS.set(clave, marcas)
     return false
   }
 
   marcas.push(ahora)
-  INTENTOS.set(ip, marcas)
+  INTENTOS.set(clave, marcas)
   return true
 }

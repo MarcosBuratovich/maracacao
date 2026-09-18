@@ -187,10 +187,34 @@ describe('el freno a la fuerza bruta', () => {
     expect(intentoPermitido(ip, t0 + 15 * 60_000 + 1)).toBe(true)
   })
 
-  it('cuenta por IP, no en total', () => {
+  it('cuenta por clave, no en total', () => {
     const a = `a-${Math.random()}`, b = `b-${Math.random()}`
     for (let i = 0; i < 5; i++) intentoPermitido(a)
     expect(intentoPermitido(a)).toBe(false)
     expect(intentoPermitido(b)).toBe(true)
+  })
+
+  // [Ronda 1, Tarea 12, hallazgo E] La clave ya no es solo la IP: cada
+  // llamador arma la suya (`<acción>:<ip>` en acciones.ts) para que el
+  // presupuesto de una acción no le coma el de otra — acá, con dos claves
+  // que comparten la misma IP pero un prefijo distinto, para probar que
+  // la función no le presta ninguna atención a lo que la clave signifique.
+  it('[Ronda 1, hallazgo E] dos claves con la misma IP pero prefijo distinto no comparten presupuesto', () => {
+    const ip = `${Math.random()}`
+    const claveA = `entrar:${ip}`
+    const claveB = `enlace:${ip}`
+    for (let i = 0; i < 5; i++) expect(intentoPermitido(claveA)).toBe(true)
+    expect(intentoPermitido(claveA)).toBe(false)
+    expect(intentoPermitido(claveB)).toBe(true) // otro prefijo, mismo "ip": presupuesto propio
+  })
+
+  // [Ronda 1, hallazgo F] `tope` es configurable para el freno por
+  // destinatario, que protege otra cosa (la bandeja de ella) con otro
+  // número (tres, no cinco).
+  it('[Ronda 1, hallazgo F] `tope` configurable: dos intentos permitidos, el tercero frena', () => {
+    const clave = `tope-chico-${Math.random()}`
+    expect(intentoPermitido(clave, Date.now(), 2)).toBe(true)
+    expect(intentoPermitido(clave, Date.now(), 2)).toBe(true)
+    expect(intentoPermitido(clave, Date.now(), 2)).toBe(false)
   })
 })

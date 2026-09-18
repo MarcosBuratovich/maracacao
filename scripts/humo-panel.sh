@@ -332,12 +332,14 @@ fi
 # ---------------------------------------------------------------------
 
 # 1) Salud — ¿están las seis variables, y responde GitHub?
-# Sin sesión (E8: `salud` es la única acción que no la pide). OJO: si las
-# variables están, este pedido SÍ gasta un lugar del freno de intentos del
-# paso 6 — `salud` y `entrar` comparten el mismo contador por IP
-# (src/servidor/sesion.ts, `intentoPermitido`). Es justo por esto que el
-# paso 6 no asume un número fijo de intentos: para cuando llega ahí, salud
-# y los dos logins de abajo ya gastaron parte del mismo presupuesto.
+# Sin sesión (E8: `salud` es la única acción que no la pide). Desde la
+# Ronda 1 de la Tarea 12, cada acción tiene su PROPIO freno de intentos
+# (src/servidor/sesion.ts, `intentoPermitido`, con clave `<acción>:<ip>`) —
+# antes `salud` y `entrar` compartían un único contador por IP, y este
+# pedido gastaba un lugar del presupuesto que el paso 6 iba a necesitar.
+# Ya no: este pedido a `salud` no le toca nada al de `entrar`. El paso 6
+# sigue sin asumir un número fijo de todos modos (prueba hasta ocho veces),
+# por si una corrida anterior dejó algo pendiente en la misma ventana.
 
 paso '1) Salud'
 salud_cuerpo="$(curl -s "$BASE/api/panel?accion=salud")"
@@ -497,11 +499,12 @@ fi
 # que no hace falta probarlo antes de lo que sí importa mirar en vivo
 # (RULING T7-b). Se manda contraseña mala hasta que UNA conteste 429, con
 # margen (hasta 8 intentos) en vez de asumir que va a ser exactamente la
-# sexta: salud (paso 1) y los dos logins (pasos 2 y 3) ya gastaron parte
-# del mismo presupuesto de 5 cada 15 minutos —el freno es un único
-# contador por IP, compartido entre `salud` y `entrar` (E4, sesion.ts)—
-# así que cuántos intentos hacen falta ACÁ depende de cuánto quedaba, no
-# de un número fijo.
+# sexta: los dos logins de los pasos 2 y 3 (acción `entrar`) ya gastaron
+# dos de los 5 cada 15 minutos de SU PROPIO presupuesto — desde la Ronda 1
+# de la Tarea 12 cada acción tiene el suyo (`<acción>:<ip>`,
+# `intentoPermitido`, sesion.ts), así que `salud` (paso 1) ya no cuenta
+# acá. El margen es por si una corrida anterior en la misma ventana de 15
+# minutos dejó algo pendiente, no porque el número sea impredecible hoy.
 
 paso '6) El freno de intentos: mandar contraseñas malas hasta que una dé 429'
 TOPE_INTENTOS_FRENO=8
@@ -521,17 +524,19 @@ done
 
 if [ "$freno_saltado" -ne 1 ]; then
   echo "Corto en «$PASO_ACTUAL»: mandé $intentos_hechos contraseñas malas seguidas y el freno" \
-    'nunca contestó 429. Con TOPE_INTENTOS=5 en sesion.ts, y el presupuesto ya gastado por' \
-    'salud y los dos logins de arriba, tendría que haber saltado bastante antes. O el freno' \
-    'no está funcionando, o cada pedido cayó en una instancia serverless distinta con su' \
-    'propia memoria (E4: el freno vive en memoria de proceso, no en un almacén compartido) —' \
-    'cualquiera de las dos vale la pena mirarla, no es un simple «reintentá».' >&2
+    'nunca contestó 429. Con TOPE_INTENTOS=5 en sesion.ts, y dos lugares ya gastados por los' \
+    'logins de los pasos 2 y 3 (mismo presupuesto de `entrar`), tendría que haber saltado en' \
+    'el intento 4 de esta tanda. O el freno no está funcionando, o cada pedido cayó en una' \
+    'instancia serverless distinta con su propia memoria (E4: el freno vive en memoria de' \
+    'proceso, no en un almacén compartido) — cualquiera de las dos vale la pena mirarla, no' \
+    'es un simple «reintentá».' >&2
   exit 1
 fi
-echo "  el freno saltó en el intento $intentos_hechos de esta tanda — no es un número fijo:" \
-  'salud y los dos logins de arriba ya habían gastado parte del mismo presupuesto de 5' \
-  'cada 15 minutos (freno compartido, E4), así que cuánto tarda acá depende de cuánto' \
-  'quedaba, no de una cuenta que se pueda fijar de antemano.'
+echo "  el freno saltó en el intento $intentos_hechos de esta tanda: los dos logins de los" \
+  'pasos 2 y 3 ya habían gastado dos de los 5 cada 15 minutos del presupuesto de `entrar`' \
+  '(cada acción tiene el suyo desde la Ronda 1 de la Tarea 12), así que el margen es por si' \
+  'una corrida anterior en la misma ventana dejó algo pendiente, no porque el número sea' \
+  'impredecible hoy.'
 
 echo
 echo '=== Prueba de humo completa ==='
@@ -542,7 +547,9 @@ echo '  3. Publicar contra una base vieja se rechaza, sin pisar en silencio lo q
 echo '  4. Cada commit queda a nombre del panel («Panel Maracacao»), nunca al tuyo (paso 4d).'
 echo '  5. Deshacer un cambio funciona por el mismo canal que publicarlo, sin Git ni computadora (paso 5).'
 echo
-echo 'IMPORTANTE: el freno de intentos (paso 6) quedó gastado para esta IP durante los' \
+echo 'IMPORTANTE: el freno de `entrar` (paso 6) quedó gastado para esta IP durante los' \
   'próximos 15 minutos — a propósito, es la prueba que hicimos recién. Si corrés' \
-  '`entrar` o `salud` de nuevo antes de que se vacíe la ventana, vas a ver 429: es' \
-  'exactamente lo que tiene que pasar, no es que algo se rompió.'
+  '`entrar` de nuevo antes de que se vacíe la ventana, vas a ver 429: es exactamente lo' \
+  'que tiene que pasar, no es que algo se rompió. `salud` tiene su PROPIO freno (cada' \
+  'acción tiene el suyo desde la Ronda 1 de la Tarea 12) y sigue con margen — no hace' \
+  'falta esperar para volver a correr este mismo script.'
