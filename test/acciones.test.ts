@@ -8,7 +8,8 @@ import { createHmac } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { maneja, idDeDispositivo, VENTANA_DESHACER_MS, type Entorno } from '../src/servidor/acciones'
 import type { Carta, ResultadoCorreo } from '../src/servidor/correo'
-import { hashDeClave, firmaSesion } from '../src/servidor/sesion'
+import { hashDeClave, firmaSesion, verificaSesion } from '../src/servidor/sesion'
+import { firmaEnlace } from '../src/servidor/enlace'
 import { cliente } from '../src/servidor/github'
 import { publica } from '../src/servidor/publicar'
 import { serializa } from '../src/contenido/carga'
@@ -129,6 +130,21 @@ function contando(usos: { n: number }): typeof fetch {
     usos.n++
     return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })
   }) as unknown as typeof fetch
+}
+
+/** Un `contexto.correo` que tira si alguien lo llama: para los caminos que no tienen que mandar nada. */
+function correoQueNoSeUsa(): (carta: Carta) => Promise<ResultadoCorreo> {
+  return async () => {
+    throw new Error('correoQueNoSeUsa(): no se esperaba que esto mandara ningún correo.')
+  }
+}
+
+/** Un `contexto.correo` que anota cada carta en `cartas` y siempre contesta `{ ok: true }`. */
+function correoQueAnota(cartas: Carta[]): (carta: Carta) => Promise<ResultadoCorreo> {
+  return async (c) => {
+    cartas.push(c)
+    return { ok: true }
+  }
 }
 
 const contextoBase = (fetch: typeof globalThis.fetch) => ({
@@ -346,6 +362,195 @@ describe('entrar', () => {
 
     expect(duracionListado).toBeGreaterThan(PISO_MS)
     expect(duracionNoListado).toBeGreaterThan(PISO_MS)
+  })
+})
+
+// Tarea 12 (spec §4.1): el enlace mágico de recuperación. `contextoBase()`
+// NO carga `RESEND_API_KEY`/`PANEL_REMITENTE` a propósito (ningún test de
+// las otras acciones los necesita), así que acá representa exactamente el
+// estado «correo sin configurar» — el único 503 que esta acción, a
+// diferencia de todas las demás, no puede evitar (B3). Los tests del
+// camino feliz usan `contextoDePrueba()` con esas dos variables sumadas.
+describe('accion=enlace', () => {
+  it('B3: sin RESEND_API_KEY/PANEL_REMITENTE, 503 con la frase para Marcos — ni siquiera mira si el correo está en la lista', async () => {
+    const r = await maneja(
+      'enlace',
+      { cuerpo: { correo: 'clienta@ejemplo.mx' }, cookie: '' },
+      { ...contextoBase(fetchQueNoSeUsa()), correo: correoQueNoSeUsa(), ip: `enlace-sin-correo-${Math.random()}` },
+    )
+    expect(r.status).toBe(503)
+    expect((r.cuerpo as { problema: string }).problema).toBe(
+      'Ahora mismo no puedo mandarte el enlace. Escríbele a Marcos.',
+    )
+  })
+
+  it('con un correo que SÍ está en la lista: manda el enlace y contesta la frase única', async () => {
+    const cartas: Carta[] = []
+    const r = await maneja(
+      'enlace',
+      { cuerpo: { correo: 'clienta@ejemplo.mx' }, cookie: '' },
+      {
+        ...contextoDePrueba({
+          fetch: fetchQueNoSeUsa(),
+          correo: correoQueAnota(cartas),
+          env: { RESEND_API_KEY: 'clave-de-prueba', PANEL_REMITENTE: 'Panel <panel@ejemplo.mx>' },
+        }),
+        ip: `enlace-listado-${Math.random()}`,
+      },
+    )
+    expect(r.status).toBe(200)
+    expect((r.cuerpo as { mensaje: string }).mensaje).toBe(
+      'Si esa dirección tiene acceso, te llegó un correo con el enlace.',
+    )
+    expect(cartas).toHaveLength(1)
+    expect(cartas[0].a).toEqual(['clienta@ejemplo.mx'])
+    expect(cartas[0].texto).toMatch(/panel\/entrar\?token=/)
+  })
+
+  it('con un correo que NO está en la lista: la MISMA respuesta, byte a byte, y no manda nada', async () => {
+    const cartasListado: Carta[] = []
+    const cartasNoListado: Carta[] = []
+    const base = { RESEND_API_KEY: 'clave-de-prueba', PANEL_REMITENTE: 'Panel <panel@ejemplo.mx>' }
+
+    const conListado = await maneja(
+      'enlace',
+      { cuerpo: { correo: 'clienta@ejemplo.mx' }, cookie: '' },
+      { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoQueAnota(cartasListado), env: base }), ip: `enlace-cmp-listado-${Math.random()}` },
+    )
+    const sinListado = await maneja(
+      'enlace',
+      { cuerpo: { correo: 'nunca-tuvo-acceso@ajeno.mx' }, cookie: '' },
+      { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoQueAnota(cartasNoListado), env: base }), ip: `enlace-cmp-nolistado-${Math.random()}` },
+    )
+
+    expect(conListado.status).toBe(sinListado.status)
+    expect(JSON.stringify(conListado.cuerpo)).toBe(JSON.stringify(sinListado.cuerpo))
+    expect(cartasListado).toHaveLength(1) // sí mandó
+    expect(cartasNoListado).toHaveLength(0) // no mandó nada — pero contestó IGUAL
+  })
+
+  it('E4: el freno por IP se aplica igual que en `entrar` — el sexto pedido seguido es 429', async () => {
+    const ip = `enlace-freno-${Math.random()}`
+    const base = { RESEND_API_KEY: 'clave-de-prueba', PANEL_REMITENTE: 'Panel <panel@ejemplo.mx>' }
+    const cartas: Carta[] = []
+    const ctx = { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoQueAnota(cartas), env: base }), ip }
+
+    for (let i = 0; i < 5; i++) {
+      await maneja('enlace', { cuerpo: { correo: 'clienta@ejemplo.mx' }, cookie: '' }, ctx)
+    }
+    const r = await maneja('enlace', { cuerpo: { correo: 'clienta@ejemplo.mx' }, cookie: '' }, ctx)
+
+    expect(r.status).toBe(429)
+    expect(cartas).toHaveLength(5) // los primeros cinco sí mandaron; el sexto, frenado, no
+  })
+
+  it('C-1: PANEL_SECRETO ausente o corto, 503 antes de tocar nada — ni siquiera el correo', async () => {
+    for (const secreto of [undefined, 'corto']) {
+      const ctx = {
+        ...contextoDePrueba({
+          fetch: fetchQueNoSeUsa(),
+          correo: correoQueNoSeUsa(),
+          env: {
+            PANEL_SECRETO: secreto,
+            RESEND_API_KEY: 'clave-de-prueba',
+            PANEL_REMITENTE: 'Panel <panel@ejemplo.mx>',
+          },
+        }),
+        ip: `enlace-c1-${Math.random()}`,
+      }
+      const r = await maneja('enlace', { cuerpo: { correo: 'clienta@ejemplo.mx' }, cookie: '' }, ctx)
+      expect(r.status).toBe(503)
+    }
+  })
+
+  it('ninguna de sus frases usa jerga técnica', async () => {
+    const cartas: Carta[] = []
+    const base = { RESEND_API_KEY: 'clave-de-prueba', PANEL_REMITENTE: 'Panel <panel@ejemplo.mx>' }
+    const r = await maneja(
+      'enlace',
+      { cuerpo: { correo: 'clienta@ejemplo.mx' }, cookie: '' },
+      { ...contextoDePrueba({ fetch: fetchQueNoSeUsa(), correo: correoQueAnota(cartas), env: base }), ip: `enlace-jerga-${Math.random()}` },
+    )
+    expect(jergaEn((r.cuerpo as { mensaje: string }).mensaje)).toBeNull()
+    expect(cartas).toHaveLength(1)
+    expect(jergaEn(`${cartas[0].asunto} ${cartas[0].texto}`)).toBeNull()
+
+    const sinCorreo = await maneja(
+      'enlace',
+      { cuerpo: { correo: 'clienta@ejemplo.mx' }, cookie: '' },
+      { ...contextoBase(fetchQueNoSeUsa()), correo: correoQueNoSeUsa(), ip: `enlace-jerga-sincorreo-${Math.random()}` },
+    )
+    expect(jergaEn((sinCorreo.cuerpo as { problema: string }).problema)).toBeNull()
+  })
+})
+
+describe('accion=entrar-con-enlace', () => {
+  const enlaceValido = (correo = 'clienta@ejemplo.mx', vence = Date.now() + 10 * 60_000) =>
+    firmaEnlace(correo, vence, SECRETO)
+
+  it('con un enlace válido, entra: la misma cookie firmada que `entrar`', async () => {
+    const r = await maneja(
+      'entrar-con-enlace',
+      { cuerpo: { token: enlaceValido() }, cookie: '' },
+      contextoBase(fetchQueNoSeUsa()),
+    )
+    expect(r.status).toBe(200)
+    expect(r.cookie).toMatch(/HttpOnly/)
+    expect(r.cookie).toMatch(/panel_sesion=/)
+  })
+
+  it('un token vencido no entra', async () => {
+    const vencido = firmaEnlace('clienta@ejemplo.mx', Date.now() - 1_000, SECRETO)
+    const r = await maneja('entrar-con-enlace', { cuerpo: { token: vencido }, cookie: '' }, contextoBase(fetchQueNoSeUsa()))
+    expect(r.status).toBe(401)
+    expect(r.cookie).toBeUndefined()
+  })
+
+  it('un token con la firma cambiada no entra', async () => {
+    const [cuerpo] = enlaceValido().split('.')
+    const r = await maneja(
+      'entrar-con-enlace',
+      { cuerpo: { token: `${cuerpo}.firmaInventada` }, cookie: '' },
+      contextoBase(fetchQueNoSeUsa()),
+    )
+    expect(r.status).toBe(401)
+  })
+
+  it('sin token en el cuerpo, 401 — no revienta', async () => {
+    const r = await maneja('entrar-con-enlace', { cuerpo: {}, cookie: '' }, contextoBase(fetchQueNoSeUsa()))
+    expect(r.status).toBe(401)
+  })
+
+  it('I-4: un correo que ya no está en PANEL_CORREOS no entra, aunque el enlace en sí sea válido', async () => {
+    const t = firmaEnlace('salio-de-la-lista@ejemplo.mx', Date.now() + 10 * 60_000, SECRETO)
+    const r = await maneja('entrar-con-enlace', { cuerpo: { token: t }, cookie: '' }, contextoBase(fetchQueNoSeUsa()))
+    expect(r.status).toBe(401)
+  })
+
+  it('B7: una cookie de sesión normal no sirve como enlace tampoco desde el router', async () => {
+    const cookie = cookieValida()
+    const r = await maneja('entrar-con-enlace', { cuerpo: { token: cookie }, cookie: '' }, contextoBase(fetchQueNoSeUsa()))
+    expect(r.status).toBe(401)
+  })
+
+  it('C-1: PANEL_SECRETO ausente o corto, 503', async () => {
+    const ctx = contextoBase(fetchQueNoSeUsa())
+    delete (ctx.env as Record<string, string | undefined>).PANEL_SECRETO
+    const r = await maneja('entrar-con-enlace', { cuerpo: { token: enlaceValido() }, cookie: '' }, ctx)
+    expect(r.status).toBe(503)
+  })
+
+  it('sin dispositivo en el cuerpo, la sesión queda con "sin-nombre" — nunca revienta', async () => {
+    const r = await maneja(
+      'entrar-con-enlace',
+      { cuerpo: { token: enlaceValido() }, cookie: '' },
+      contextoBase(fetchQueNoSeUsa()),
+    )
+    expect(r.status).toBe(200)
+    const valorCookie = r.cookie!.split(';')[0].split('=')[1]
+    const sesion = verificaSesion(valorCookie, SECRETO)
+    expect(sesion?.correo).toBe('clienta@ejemplo.mx')
+    expect(sesion?.dispositivo).toBe('sin-nombre')
   })
 })
 

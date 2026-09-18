@@ -201,7 +201,13 @@ describe('rastreo: robots.txt, sitemap y vercel.json', () => {
     expect(config).toContain(`site: '${ORIGEN}'`)
     // Ningún sitemap estático en public/ que pise al generado.
     expect(existsSync('public/sitemap.xml')).toBe(false)
-    const urls = urlsDelSitemap(`${ORIGEN}/`, ['', '404', 'presentacion', 'manual', 'manual/color/', '/sabores/', 'sabores'])
+    const urls = urlsDelSitemap(`${ORIGEN}/`, [
+      '', '404', 'presentacion', 'manual', 'manual/color/', '/sabores/', 'sabores',
+      // Tarea 12: /panel/entrar existe desde ahora — nunca al sitemap. Su
+      // `noindex` sale de la cabecera de vercel.json, no de un candado; el
+      // criterio para no listarla es el mismo que el de presentacion/manual.
+      'panel/entrar',
+    ])
     expect(urls).toEqual([`${ORIGEN}/`, `${ORIGEN}/sabores`])
     expect(xmlDelSitemap(urls)).toContain(`<loc>${ORIGEN}/</loc>`)
     expect(xmlDelSitemap(urls)).toMatch(/^<\?xml version="1.0" encoding="UTF-8"\?>\n<urlset xmlns="http:\/\/www.sitemaps.org\/schemas\/sitemap\/0.9">/)

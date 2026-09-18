@@ -1,0 +1,69 @@
+---
+/*
+ * El enlace mágico de recuperación (spec §4.1): la puerta de emergencia,
+ * la que tiene que andar el día que no queda sesión ni panel (la fase
+ * siguiente) con que entrar. HTML estático, sin React ni islas: nada acá
+ * adentro necesita hidratarse.
+ *
+ * A PROPÓSITO no usa el `candado` de `Base.astro`. Ese candado compara un
+ * SHA-256 EN EL NAVEGADOR, y su propio comentario lo dice con todas las
+ * letras: es «una tranca para que nadie llegue de casualidad, NO
+ * seguridad real» (el sitio es estático, el HTML viaja igual). La
+ * seguridad de VERDAD acá es el token HMAC de quince minutos que firma y
+ * verifica `src/servidor/enlace.ts`, en el servidor — ponerle el candado
+ * ENCIMA no protege nada más, solo le suma una contraseña de más a
+ * escribir el día que ella ya perdió la suya.
+ */
+---
+<!doctype html>
+<html lang="es-MX">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Entrar al panel</title>
+  </head>
+  <body>
+    <main>
+      <p id="aviso" aria-live="polite">Un momento…</p>
+      <button id="entrar" type="button" hidden>Entrar al panel</button>
+    </main>
+    <script is:inline>
+      // Apenas carga, sin esperar ningún clic: el token sale de la barra de
+      // direcciones (y del historial, y de cualquier captura de pantalla
+      // que ella comparta después).
+      history.replaceState(null, '', location.pathname)
+
+      const token = new URLSearchParams(location.search).get('token') ?? ''
+      const aviso = document.getElementById('aviso')
+      const boton = document.getElementById('entrar')
+
+      if (!token) {
+        aviso.textContent = 'Este enlace no funciona. Pide uno nuevo.'
+      } else {
+        aviso.hidden = true
+        boton.hidden = false
+      }
+
+      boton.addEventListener('click', async () => {
+        boton.disabled = true
+        aviso.hidden = false
+        aviso.textContent = 'Entrando…'
+        try {
+          // POST, nunca GET: así Gmail, Outlook y los antivirus pueden abrir
+          // ESTA página para escanearla sin gastar el enlace — solo un clic
+          // de verdad manda el pedido que lo consume.
+          const r = await fetch('/api/panel?accion=entrar-con-enlace', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token }),
+          })
+          boton.hidden = true
+          aviso.textContent = r.ok ? 'Listo, ya entraste.' : 'Ese enlace ya no sirve: pide uno nuevo.'
+        } catch {
+          boton.disabled = false
+          aviso.textContent = 'No se pudo conectar. Intenta de nuevo.'
+        }
+      })
+    </script>
+  </body>
+</html>

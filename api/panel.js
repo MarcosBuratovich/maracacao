@@ -89,6 +89,44 @@ function intentoPermitido(ip, ahora = Date.now()) {
   return true;
 }
 
+// src/servidor/enlace.ts
+import { createHmac as createHmac2, timingSafeEqual as timingSafeEqual2 } from "node:crypto";
+var DOMINIO_ENLACE = "entrar";
+var DURACION_ENLACE_MS = 15 * 6e4;
+function esCuerpoEnlace(v) {
+  return v !== null && typeof v === "object" && typeof v.correo === "string" && typeof v.vence === "number";
+}
+function firmaEnlace(correo2, vence, secreto) {
+  if (secreto.length < LARGO_MIN_SECRETO) {
+    throw new Error(
+      `firmaEnlace(): el secreto mide menos de ${LARGO_MIN_SECRETO} caracteres \u2014 una clave as\xED de corta es, para HMAC, lo mismo que no tener firma.`
+    );
+  }
+  const cuerpo = Buffer.from(JSON.stringify({ correo: correo2, vence })).toString("base64url");
+  const firma = createHmac2("sha256", secreto).update(mensajeFirmado(DOMINIO_ENLACE, cuerpo)).digest("base64url");
+  return `${cuerpo}.${firma}`;
+}
+function verificaEnlace(token, secreto, ahora = Date.now()) {
+  if (secreto.length < LARGO_MIN_SECRETO) return null;
+  try {
+    const punto = token.indexOf(".");
+    if (punto <= 0 || punto === token.length - 1) return null;
+    const cuerpo = token.slice(0, punto);
+    const firma = token.slice(punto + 1);
+    if (token.indexOf(".", punto + 1) !== -1) return null;
+    const firmaEsperada = createHmac2("sha256", secreto).update(mensajeFirmado(DOMINIO_ENLACE, cuerpo)).digest();
+    const firmaRecibida = Buffer.from(firma, "base64url");
+    if (firmaRecibida.length !== firmaEsperada.length) return null;
+    if (!timingSafeEqual2(firmaRecibida, firmaEsperada)) return null;
+    const datos = JSON.parse(Buffer.from(cuerpo, "base64url").toString("utf8"));
+    if (!esCuerpoEnlace(datos)) return null;
+    if (datos.vence <= ahora) return null;
+    return { correo: datos.correo };
+  } catch {
+    return null;
+  }
+}
+
 // src/servidor/github.ts
 var VERSION_API = "2022-11-28";
 var codificaRuta = (ruta2) => ruta2.split("/").map(encodeURIComponent).join("/");
@@ -18254,6 +18292,64 @@ function entrar(pedido, contexto) {
   const token = firmaSesion({ correo: correo2, vence, dispositivo, emitida: contexto.ahora() }, env.PANEL_SECRETO);
   return ok({ ok: true }, cookieDeSesion(token, dias));
 }
+var FRASE_ENLACE = "Si esa direcci\xF3n tiene acceso, te lleg\xF3 un correo con el enlace.";
+var PROBLEMA_ENLACE_SIN_CORREO = "Ahora mismo no puedo mandarte el enlace. Escr\xEDbele a Marcos.";
+var PROBLEMA_ENLACE_INVALIDO = "Ese enlace ya no sirve: pide uno nuevo.";
+var ASUNTO_ENLACE = "Tu enlace para entrar al panel";
+var textoEnlace = (url3) => [
+  "Este es tu enlace para entrar al panel, sin necesitar la contrase\xF1a:",
+  "",
+  url3,
+  "",
+  "Vale por quince minutos. Si t\xFA no lo pediste, ignora este correo: nadie puede entrar sin darle clic."
+].join("\n");
+async function enlaceAccion(pedido, contexto) {
+  const env = contexto.env;
+  if (!intentoPermitido(contexto.ip, contexto.ahora())) {
+    return error51(429, PROBLEMA_DEMASIADOS_INTENTOS);
+  }
+  if (!secretoUtilizable(env)) {
+    console.error("enlace: PANEL_SECRETO falta o mide menos de 32 caracteres \u2014 no se puede firmar ning\xFAn enlace.");
+    return error51(503, PROBLEMA_INESPERADO);
+  }
+  if (!env.RESEND_API_KEY || !env.PANEL_REMITENTE) {
+    console.error("enlace: RESEND_API_KEY o PANEL_REMITENTE no est\xE1n cargadas \u2014 no hay forma de mandar el enlace.");
+    return error51(503, PROBLEMA_ENLACE_SIN_CORREO);
+  }
+  const cuerpo = pedido.cuerpo ?? {};
+  const correo2 = typeof cuerpo.correo === "string" ? cuerpo.correo.trim() : "";
+  if (correoEnLista(correo2, env.PANEL_CORREOS)) {
+    const vence = contexto.ahora() + DURACION_ENLACE_MS;
+    const token = firmaEnlace(correo2, vence, env.PANEL_SECRETO);
+    const url3 = `${SITIO}/panel/entrar?token=${encodeURIComponent(token)}`;
+    const r = await contexto.correo({ a: [correo2], asunto: ASUNTO_ENLACE, texto: textoEnlace(url3) });
+    if (!r.ok) {
+      console.error(`enlace: no se pudo mandar el enlace a ${correo2} \u2014 ${r.motivo}`);
+    }
+  }
+  return ok({ ok: true, mensaje: FRASE_ENLACE });
+}
+async function entrarConEnlaceAccion(pedido, contexto) {
+  const env = contexto.env;
+  if (!secretoUtilizable(env)) {
+    console.error("entrar-con-enlace: PANEL_SECRETO falta o mide menos de 32 caracteres.");
+    return error51(503, PROBLEMA_INESPERADO);
+  }
+  const cuerpo = pedido.cuerpo ?? {};
+  const token = typeof cuerpo.token === "string" ? cuerpo.token : "";
+  const verificado = token !== "" ? verificaEnlace(token, env.PANEL_SECRETO, contexto.ahora()) : null;
+  if (!verificado || !correoEnLista(verificado.correo, env.PANEL_CORREOS)) {
+    return error51(401, PROBLEMA_ENLACE_INVALIDO);
+  }
+  const dias = DIAS_SESION_CORTA;
+  const dispositivo = idDeDispositivo(cuerpo.dispositivo);
+  const vence = contexto.ahora() + dias * 864e5;
+  const sesionToken = firmaSesion(
+    { correo: verificado.correo, vence, dispositivo, emitida: contexto.ahora() },
+    env.PANEL_SECRETO
+  );
+  return ok({ ok: true }, cookieDeSesion(sesionToken, dias));
+}
 var PROBLEMA_SESION = "Tu sesi\xF3n no es v\xE1lida: vuelve a entrar.";
 var PROBLEMA_SIN_DOCUMENTOS = "No mandaste ning\xFAn documento para publicar.";
 var PROBLEMA_NO_SE_PUDO_LEER = "No pudimos revisar el contenido actual del sitio: prueba de nuevo en unos minutos.";
@@ -18782,6 +18878,10 @@ async function maneja(accion, pedido, contexto) {
     switch (accion) {
       case "entrar":
         return entrar(pedido, contexto);
+      case "enlace":
+        return await enlaceAccion(pedido, contexto);
+      case "entrar-con-enlace":
+        return await entrarConEnlaceAccion(pedido, contexto);
       case "publicar":
         return await publicarAccion(pedido, contexto);
       case "salud":

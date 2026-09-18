@@ -165,6 +165,66 @@ Los clics para dejar el hash nuevo funcionando, en Vercel:
    seguir diciendo `"ok":true`. Recién ahí la contraseña vieja dejó de
    servir y la nueva ya sirve.
 
+## El enlace mágico de recuperación (Tarea 12)
+
+La puerta de emergencia — no la principal, que es la contraseña larga
+guardada en el llavero del teléfono (arriba). Esta es la que hay que poder
+usar el día que ese teléfono se perdió: en `www.maracacao.mx/panel/entrar`,
+sin sesión, sin candado, sin necesitar que exista ningún panel (la fase
+siguiente).
+
+**Cómo se pide:** `POST /api/panel?accion=enlace` con `{ "correo": "…" }`.
+**Siempre** contesta 200 con la misma frase —«Si esa dirección tiene
+acceso, te llegó un correo con el enlace.»—, exista o no esa dirección en
+`PANEL_CORREOS`. Es a propósito (spec §4.1): este endpoint es público, sin
+sesión, así que una respuesta distinta según exista o no la dirección
+serviría para probar direcciones una por una hasta encontrar cuáles tienen
+acceso al panel — el mismo criterio por el que `entrar` no dice si falló el
+correo o la contraseña.
+
+**Cómo se consume:** el correo trae un enlace a
+`/panel/entrar?token=…`, una página sin JavaScript de más (sin React, sin
+candado) que, con un clic, manda `POST /api/panel?accion=entrar-con-enlace`
+con `{ "token": "…" }` y vuelve con la misma cookie de sesión que deja
+`entrar`. **Nunca se consume con un `GET`**: Gmail, Outlook y los
+antivirus abren los enlaces de un correo para escanearlos, y con un `GET`
+el enlace se gastaría en ese escaneo antes de que ella lo toque —por eso el
+correo apunta a una PÁGINA, que no hace nada sola, y no directo al
+endpoint. La cabecera `Referrer-Policy: no-referrer` de `/panel/:camino*`
+(`vercel.json`) es la otra mitad de esa misma protección: sin ella, el
+token viajaría en la cabecera `Referer` de la primera navegación que
+saliera de esa página.
+
+**Cuánto vale:** quince minutos desde que se pide (`DURACION_ENLACE_MS`,
+`src/servidor/enlace.ts`), sin excepción, y solo para el correo que lo
+pidió — el propósito (`entrar`) va adentro de la firma HMAC, así que ni un
+enlace sirve como cookie de sesión ni una cookie sirve como enlace, aunque
+las firme el mismo `PANEL_SECRETO` (mismo mecanismo que la cookie, Tarea
+3). **No es de un solo uso:** no hay ningún almacén de enlaces ya usados
+—el panel no tiene base de datos, y un almacén así necesitaría uno
+compartido entre instancias que hoy no existe (mismo límite que el freno
+de intentos, más abajo)—, así que un enlace vale para CUALQUIER pedido
+dentro de esos quince minutos, no solo el primero. Rotar `PANEL_SECRETO`
+(más abajo) invalida cualquier enlace que esté en vuelo, además de cerrar
+todas las sesiones.
+
+**El correo ES el producto acá — a diferencia de todo el resto del panel,
+esta acción NO degrada sin `RESEND_API_KEY`/`PANEL_REMITENTE`.** En
+cualquier otra acción, si el correo no está configurado se pierde un
+aviso y el panel sigue publicando igual; acá, sin esas dos variables no
+hay NINGUNA forma de que el enlace llegue, así que pedirlo contesta 503
+—«Ahora mismo no puedo mandarte el enlace. Escríbele a Marcos.»— en vez de
+decir «te lo mandé» y no mandar nada. Es la misma fila de la tabla de
+variables, arriba: mientras `maracacao.mx` no esté verificado en el
+proveedor, el enlace mágico no está disponible para nadie.
+
+**El freno de intentos (E4) se aplica igual que en `entrar`, y comparten el
+mismo contador por IP** (`intentoPermitido`, `sesion.ts`): sin él, pedir el
+enlace sería una forma de mandarle correo a cualquiera desde nuestro
+remitente, todas las veces que uno quiera. Mismo límite de siempre: vive en
+la memoria de una función en ejecución, no en un almacén compartido (ver
+«Lo que todavía NO está cubierto», al final de este documento).
+
 ## Cómo rotar el PAT de GitHub en cinco minutos
 
 Esto es lo que hay que hacer el día que el token de GitHub (el que vive en

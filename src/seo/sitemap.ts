@@ -7,8 +7,16 @@ import type { AstroIntegration } from 'astro'
 import { writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 
-/** Rutas con candado + noindex: nunca van al sitemap. */
-export const RUTAS_PRIVADAS = /^(presentacion|manual)(\/|$)/
+/**
+ * Rutas privadas: nunca van al sitemap. `presentacion`/`manual` llevan el
+ * candado de cortesía de `Base.astro`; `panel` es distinta —su seguridad es
+ * el token HMAC de `src/servidor/enlace.ts`, no el candado— pero el mismo
+ * criterio aplica igual: son rutas con `noindex` (acá, por la cabecera
+ * `X-Robots-Tag` de `vercel.json`, Tarea 12) y ponerlas en el sitemap sería
+ * invitar a los rastreadores a una URL que existe solo para quien ya tiene
+ * un enlace en la mano.
+ */
+export const RUTAS_PRIVADAS = /^(presentacion|manual|panel)(\/|$)/
 
 /**
  * Las URL indexables a partir de los pathnames que Astro reporta al

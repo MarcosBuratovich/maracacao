@@ -23,6 +23,7 @@ import {
   claveCorrecta, hashDeClave, firmaSesion, verificaSesion, cookieDeSesion, intentoPermitido, LARGO_MIN_SECRETO,
   type Sesion,
 } from './sesion'
+import { firmaEnlace, verificaEnlace, DURACION_ENLACE_MS } from './enlace'
 import { cliente } from './github'
 import { publica, PROBLEMA_NO_SE_PUDO_PUBLICAR, type Archivo } from './publicar'
 import { guarda, leeBorrador } from './borrador'
@@ -322,6 +323,163 @@ function entrar(pedido: Pedido, contexto: Contexto): Respuesta {
 
   const token = firmaSesion({ correo, vence, dispositivo, emitida: contexto.ahora() }, env.PANEL_SECRETO)
   return ok({ ok: true }, cookieDeSesion(token, dias))
+}
+
+/*
+ * ---------------------------------------------------------------------
+ * el enlace mágico de recuperación (Tarea 12, spec §4.1)
+ * ---------------------------------------------------------------------
+ *
+ * No es la puerta principal — esa es `entrar`, arriba, contraseña contra
+ * `PANEL_CLAVE_HASH`. Esta es la de emergencia: la que hay que poder usar
+ * el día que el llavero del teléfono se perdió, antes de que exista
+ * ningún panel (la fase siguiente) que la muestre. Dos acciones:
+ * `enlace` (pedirlo) y `entrar-con-enlace` (cambiarlo por una sesión).
+ */
+
+// [B3, no negociable] La ÚNICA frase de un pedido de enlace, byte a byte,
+// exista o no esa dirección en `PANEL_CORREOS`. Mismo criterio que
+// `PROBLEMA_ENTRAR`, un poco más arriba: este endpoint es público, sin
+// sesión, así que una respuesta distinta según exista o no la dirección
+// sería una forma de probarlas una por una hasta encontrar cuáles tienen
+// acceso al panel.
+const FRASE_ENLACE = 'Si esa dirección tiene acceso, te llegó un correo con el enlace.'
+
+// [B3, no negociable] La ÚNICA acción de todo el panel que NO puede
+// degradar sin correo configurado. En el resto —los avisos de
+// `revierteYAvisa*`, más abajo— el correo es un acompañante: si falla o no
+// está configurado, se loguea y el flujo principal sigue igual. Acá el
+// correo ES el producto: sin `RESEND_API_KEY` ni `PANEL_REMITENTE` no hay
+// NINGUNA forma de que el enlace llegue, así que contestar `FRASE_ENLACE`
+// igual sería decirle «te lo mandé» sobre el único canal de recuperación
+// que tiene.
+const PROBLEMA_ENLACE_SIN_CORREO = 'Ahora mismo no puedo mandarte el enlace. Escríbele a Marcos.'
+
+// Para `entrar-con-enlace`: un token vencido, mal formado, con la firma
+// cambiada, o de un correo que ya no está en `PANEL_CORREOS` (I-4, mismo
+// criterio que la cookie de sesión) son, desde donde ella lo mira, la
+// misma cosa — «este enlace ya no sirve» — y piden la misma acción: volver
+// a pedir uno. Distinguirlas no la ayudaría, y sí le daría a quien prueba
+// tokens al azar una forma de diferenciar «vencido» de «nunca existió».
+const PROBLEMA_ENLACE_INVALIDO = 'Ese enlace ya no sirve: pide uno nuevo.'
+
+interface CuerpoEnlace {
+  correo?: unknown
+}
+
+const ASUNTO_ENLACE = 'Tu enlace para entrar al panel'
+
+/** El texto del correo. Función y no constante: la URL lleva el token de ESTE pedido. */
+const textoEnlace = (url: string): string =>
+  [
+    'Este es tu enlace para entrar al panel, sin necesitar la contraseña:',
+    '',
+    url,
+    '',
+    'Vale por quince minutos. Si tú no lo pediste, ignora este correo: nadie puede entrar sin darle clic.',
+  ].join('\n')
+
+/**
+ * `enlace`: pedir el enlace mágico de recuperación (spec §4.1).
+ *
+ * Sin sesión a propósito —es la puerta que hay que poder usar el día que no
+ * queda ninguna sesión con la que entrar—, así que cualquiera puede
+ * pedirlo. Eso es justo lo que hace no negociables las capas de abajo, en
+ * este orden:
+ *
+ * 1. El freno de intentos por IP (E4, `intentoPermitido`) — el MISMO
+ *    contador que ya comparten `entrar` y `salud`. Sin esto, este endpoint
+ *    sería una forma de mandarle correo a cualquiera desde nuestro
+ *    remitente, todas las veces que uno quiera.
+ * 2. [C-1] `PANEL_SECRETO` tiene que servir para firmar de verdad — mismo
+ *    candado y mismo 503 franco que `entrar`.
+ * 3. [B3] El correo tiene que estar configurado (ver `PROBLEMA_ENLACE_SIN_CORREO`
+ *    arriba). Este chequeo puede ir ANTES de mirar si la dirección está en
+ *    la lista porque es un estado del SERVIDOR, no un dato de la clienta:
+ *    contestarlo igual para cualquiera no delata nada de nadie.
+ * 4. Recién acá, si el correo está en `PANEL_CORREOS`, se firma un token de
+ *    quince minutos y se manda. Si NO está, no se firma ni se manda nada —
+ *    pero la respuesta (paso 5) es LA MISMA: eso es lo que hace que este
+ *    endpoint no sirva para averiguar qué direcciones tienen acceso.
+ * 5. 200, siempre, con `FRASE_ENLACE`.
+ */
+async function enlaceAccion(pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
+  const env = contexto.env
+
+  if (!intentoPermitido(contexto.ip, contexto.ahora())) {
+    return error(429, PROBLEMA_DEMASIADOS_INTENTOS)
+  }
+
+  if (!secretoUtilizable(env)) {
+    console.error('enlace: PANEL_SECRETO falta o mide menos de 32 caracteres — no se puede firmar ningún enlace.')
+    return error(503, PROBLEMA_INESPERADO)
+  }
+
+  if (!env.RESEND_API_KEY || !env.PANEL_REMITENTE) {
+    console.error('enlace: RESEND_API_KEY o PANEL_REMITENTE no están cargadas — no hay forma de mandar el enlace.')
+    return error(503, PROBLEMA_ENLACE_SIN_CORREO)
+  }
+
+  const cuerpo = (pedido.cuerpo ?? {}) as CuerpoEnlace
+  const correo = typeof cuerpo.correo === 'string' ? cuerpo.correo.trim() : ''
+
+  if (correoEnLista(correo, env.PANEL_CORREOS)) {
+    const vence = contexto.ahora() + DURACION_ENLACE_MS
+    const token = firmaEnlace(correo, vence, env.PANEL_SECRETO)
+    const url = `${SITIO}/panel/entrar?token=${encodeURIComponent(token)}`
+    const r = await contexto.correo({ a: [correo], asunto: ASUNTO_ENLACE, texto: textoEnlace(url) })
+    if (!r.ok) {
+      console.error(`enlace: no se pudo mandar el enlace a ${correo} — ${r.motivo}`)
+    }
+  }
+  // Si `correo` no está en la lista, no se firma ni se manda nada — la
+  // respuesta de abajo es EXACTAMENTE la misma que si hubiera mandado.
+
+  return ok({ ok: true, mensaje: FRASE_ENLACE })
+}
+
+/**
+ * `entrar-con-enlace`: cambia un enlace mágico válido por una cookie de
+ * sesión (spec §4.1) — el mismo destino al que llega `entrar`, por una
+ * puerta distinta.
+ *
+ * Sin el freno de intentos de `entrar`: un token HMAC de este largo no se
+ * puede adivinar probando, así que no hay nada que un freno por IP proteja
+ * acá que `verificaEnlace` no proteja ya (la firma, tiempo constante). [I-4]
+ * Sí se vuelve a chequear `PANEL_CORREOS` de HOY, no del momento en que se
+ * pidió el enlace — mismo criterio que ya aplican `publicarAccion` y
+ * compañía a la cookie de sesión: un enlace firmado hace diez minutos no
+ * puede seguir sirviendo si en el medio se sacó a esa persona de la lista.
+ *
+ * La sesión que emite es siempre de treinta días (`DIAS_SESION_CORTA`): el
+ * cuerpo de este pedido es solo `{ token }` (ver `entrar.astro`, que no
+ * junta ningún otro dato), así que no hay un «recuérdame» que leer — quien
+ * entra por acá y quiere una sesión de un año puede, ya adentro, volver a
+ * entrar con su contraseña y marcarlo.
+ */
+async function entrarConEnlaceAccion(pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
+  const env = contexto.env
+  if (!secretoUtilizable(env)) {
+    console.error('entrar-con-enlace: PANEL_SECRETO falta o mide menos de 32 caracteres.')
+    return error(503, PROBLEMA_INESPERADO)
+  }
+
+  const cuerpo = (pedido.cuerpo ?? {}) as { token?: unknown; dispositivo?: unknown }
+  const token = typeof cuerpo.token === 'string' ? cuerpo.token : ''
+
+  const verificado = token !== '' ? verificaEnlace(token, env.PANEL_SECRETO, contexto.ahora()) : null
+  if (!verificado || !correoEnLista(verificado.correo, env.PANEL_CORREOS)) {
+    return error(401, PROBLEMA_ENLACE_INVALIDO)
+  }
+
+  const dias = DIAS_SESION_CORTA
+  const dispositivo = idDeDispositivo(cuerpo.dispositivo)
+  const vence = contexto.ahora() + dias * 86_400_000
+  const sesionToken = firmaSesion(
+    { correo: verificado.correo, vence, dispositivo, emitida: contexto.ahora() },
+    env.PANEL_SECRETO,
+  )
+  return ok({ ok: true }, cookieDeSesion(sesionToken, dias))
 }
 
 /*
@@ -1568,6 +1726,10 @@ export async function maneja(accion: string, pedido: Pedido, contexto: Contexto)
     switch (accion) {
       case 'entrar':
         return entrar(pedido, contexto)
+      case 'enlace':
+        return await enlaceAccion(pedido, contexto)
+      case 'entrar-con-enlace':
+        return await entrarConEnlaceAccion(pedido, contexto)
       case 'publicar':
         return await publicarAccion(pedido, contexto)
       case 'salud':
