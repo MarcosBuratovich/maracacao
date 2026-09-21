@@ -20,7 +20,7 @@ import {
   type ResultadoEntrar, type ResultadoEnlace, type ResultadoHistorial, type Publicada,
 } from './api'
 import { idDeAparato } from './aparato'
-import Editor from './Editor'
+import Sesion from './Sesion'
 
 /*
  * ---------------------------------------------------------------------
@@ -115,7 +115,7 @@ export default function App() {
         />
       )}
       {estado.modo === 'entrar' && <PantallaEntrar onEntro={setEstado} />}
-      {estado.modo === 'editar' && <PantallaEditando publicaciones={estado.publicaciones} />}
+      {estado.modo === 'editar' && <PantallaEditando base={estado.base} publicaciones={estado.publicaciones} />}
     </div>
   )
 }
@@ -237,13 +237,13 @@ export function textoPublicaciones(n: number): string {
   return `Tienes ${n} ${n === 1 ? 'publicación' : 'publicaciones'} en tu historial.`
 }
 
-function PantallaEditando({ publicaciones }: { publicaciones: Publicada[] }) {
+function PantallaEditando({ base, publicaciones }: { base: string | null; publicaciones: Publicada[] }) {
   return (
     <>
       <h1 className="panel-titulo">Tu panel</h1>
       <p>Ya entraste. Aquí vas a poder editar el contenido de tu sitio.</p>
       <p className="panel-aviso">{textoPublicaciones(publicaciones.length)}</p>
-      <Editor />
+      <Sesion base={base} />
     </>
   )
 }
