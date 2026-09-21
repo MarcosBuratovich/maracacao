@@ -8,18 +8,31 @@
  * forma de éxito, sus fracasos con `campo`, etc.), hay un bloque de
  * «torturas» compartido que corre las mismas formas patológicas de fallar
  * contra las ocho — reusando `fetchFalso` de `test/lib/github-falso.ts`,
- * como pide la tarea, más dos fakes propios para lo que ese helper no
- * cubre: la red caída (un `fetch` que RECHAZA) y un cuerpo que no es JSON
- * (`fetchFalso` siempre contesta JSON válido).
+ * como pide la tarea, más fakes propios para lo que ese helper no cubre:
+ * la red caída (un `fetch` que RECHAZA), un cuerpo que no es JSON
+ * (`fetchFalso` siempre contesta JSON válido), y un `fetch` que se CUELGA
+ * (ni resuelve ni rechaza — el wifi de mercado que no cae, tarda) para
+ * probar el timeout de `AbortController` sin esperar el tiempo real:
+ * `vi.useFakeTimers()` + `vi.advanceTimersByTimeAsync()`.
+ *
+ * [Ronda de arreglo] Las tres frases propias de `api.ts`
+ * (`PROBLEMA_SIN_RED`/`PROBLEMA_TARDO`/`PROBLEMA_RESPUESTA_INESPERADA`) no
+ * están importadas — no hace falta duplicarlas acá: las torturas ya
+ * producen el `problema` de VERDAD que sale de cada una, y `jergaEn()` se
+ * corre sobre ESE resultado. Es más honesto que reimportar/reescribir las
+ * constantes en el test (eso solo probaría que el test está de acuerdo
+ * consigo mismo).
  */
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { fetchFalso } from './lib/github-falso'
+import { jergaEn } from '@/servidor/estado'
 import {
   entrar, enlace, publicar, estado, deshacer, historial, borradorGuardar, borradorLeer,
 } from '@/panel/api'
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.useRealTimers()
 })
 
 /** Un `fetch` que jamás contesta: la red se cayó antes de que hubiera cualquier respuesta. */
@@ -35,6 +48,21 @@ function fetchConCuerpoIlegible(status = 200): { f: typeof fetch; pedidos: Array
     return new Response('esto no es JSON', { status })
   }) as unknown as typeof fetch
   return { f, pedidos }
+}
+
+/**
+ * Un `fetch` que nunca contesta —ni éxito ni error— salvo que se aborte:
+ * el wifi que se CUELGA, no el que se cae. Sigue el contrato real de
+ * `fetch` + `AbortController` (MDN): si el `signal` que se le pasó se
+ * aborta, la promesa RECHAZA con un `AbortError` — sin esto, el fake no
+ * probaría nada del `AbortController` de `llama()`, solo un `fetch` lento
+ * cualquiera.
+ */
+function fetchQueSeCuelga(): typeof fetch {
+  return ((_url: string, init?: RequestInit) =>
+    new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new DOMException('canceled', 'AbortError')))
+    })) as unknown as typeof fetch
 }
 
 /** Instala `respuestas` como el `fetch` global y devuelve los pedidos que se registraron. */
@@ -380,6 +408,11 @@ describe('ninguna de las ocho tira, ante ninguna forma de fallar', () => {
         expect(r.ok).toBe(false)
         expect(r.status).toBe(0)
         expect(r.problema).toBe('No se pudo conectar. Intenta de nuevo.')
+        // [Ronda de arreglo, hallazgo 2] Esta frase es propia de api.ts —
+        // no la escribió el servidor—, así que nadie más la vigila. La
+        // corre `jergaEn()` sobre el `problema` de VERDAD que devolvió la
+        // función, no sobre una copia de la constante.
+        expect(jergaEn(r.problema)).toBeNull()
       })
     }
   })
@@ -393,6 +426,7 @@ describe('ninguna de las ocho tira, ante ninguna forma de fallar', () => {
         expect(r.ok).toBe(false)
         expect(r.status).toBe(200)
         expect(r.problema).toBe('Algo salió mal de nuestro lado. Intenta de nuevo en unos minutos.')
+        expect(jergaEn(r.problema)).toBeNull()
       })
     }
   })
@@ -405,7 +439,103 @@ describe('ninguna de las ocho tira, ante ninguna forma de fallar', () => {
         expect(r.ok).toBe(false)
         expect(r.status).toBe(500)
         expect(r.problema).toBe('Algo salió mal de nuestro lado. Intenta de nuevo en unos minutos.')
+        expect(jergaEn(r.problema)).toBeNull()
       })
     }
+  })
+
+  /*
+   * [Ronda de arreglo, hallazgo 1] Un `fetch` que ni resuelve ni rechaza
+   * —el wifi de mercado que se CUELGA, no el que se cae— antes de este
+   * arreglo dejaba la promesa sin resolver PARA SIEMPRE: no tiraba (la
+   * promesa de este archivo se cumplía) pero tampoco volvía nunca (la
+   * rompía igual, de otra forma). `vi.useFakeTimers()` +
+   * `vi.advanceTimersByTimeAsync()` adelantan el reloj sin esperar el
+   * tiempo real — sin esto, cada test de acá abajo tardaría de verdad los
+   * 15 o 45 segundos del timeout.
+   */
+  describe('un fetch que se cuelga (ni resuelve ni rechaza) vuelve como resultado después del tiempo de espera — nunca se queda esperando para siempre', () => {
+    for (const [nombre, llama] of Object.entries(llamados)) {
+      it(nombre, async () => {
+        vi.useFakeTimers()
+        vi.stubGlobal('fetch', fetchQueSeCuelga())
+        const promesa = llama()
+        // 46s cubre las dos franjas (15s de lectura, 45s de escritura):
+        // no hace falta saber acá cuál le toca a cada acción, alcanza con
+        // que NINGUNA quede sin resolver más allá de la más larga.
+        await vi.advanceTimersByTimeAsync(46_000)
+        const r = (await promesa) as { ok: boolean; status: number; problema: string }
+        expect(r.ok).toBe(false)
+        expect(r.status).toBe(0)
+        expect(r.problema).toBe('Esto está tardando demasiado. Revisa tu conexión e intenta de nuevo.')
+        expect(jergaEn(r.problema)).toBeNull()
+      })
+    }
+  })
+})
+
+/*
+ * ---------------------------------------------------------------------
+ * El timeout en sí: los dos presupuestos (lectura vs. escritura), al
+ * milisegundo — el bloque de arriba prueba que las ocho SE CORTAN; esto
+ * prueba CUÁNDO, con `historial` (lectura) y `publicar` (escritura) como
+ * representantes de cada franja.
+ * ---------------------------------------------------------------------
+ */
+describe('el tiempo de espera tiene dos presupuestos: quince segundos para leer, cuarenta y cinco para escribir', () => {
+  it('una lectura, un instante ANTES de los 15s: todavía no cortó — no se corta antes de tiempo', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', fetchQueSeCuelga())
+    let resuelto = false
+    void historial().then(() => {
+      resuelto = true
+    })
+    await vi.advanceTimersByTimeAsync(14_999)
+    expect(resuelto).toBe(false)
+  })
+
+  it('una lectura, a los 15s exactos: corta y vuelve como resultado', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', fetchQueSeCuelga())
+    const promesa = historial()
+    await vi.advanceTimersByTimeAsync(15_000)
+    const r = await promesa
+    expect(r).toEqual({ ok: false, status: 0, problema: 'Esto está tardando demasiado. Revisa tu conexión e intenta de nuevo.' })
+  })
+
+  it('una escritura (publicar): a los 15s —lo que ya cortó una lectura— TODAVÍA no cortó', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', fetchQueSeCuelga())
+    let resuelto = false
+    void publicar({ documentos: {}, base: 'b'.repeat(40) }).then(() => {
+      resuelto = true
+    })
+    await vi.advanceTimersByTimeAsync(15_000)
+    expect(resuelto).toBe(false)
+  })
+
+  // Sin este par (instante antes / exacto), «a los 45s corta» solo prueba
+  // que corta A MÁS TARDAR a los 45s — un timeout de escritura MÁS CORTO
+  // (20s, por ejemplo) pasaría este test igual, porque para cuando el
+  // reloj llega a 45s la promesa YA se resolvió. El par de abajo es lo que
+  // de verdad fija el número, igual que el de la lectura, arriba.
+  it('una escritura (publicar), un instante ANTES de los 45s: todavía no cortó', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', fetchQueSeCuelga())
+    let resuelto = false
+    void publicar({ documentos: {}, base: 'b'.repeat(40) }).then(() => {
+      resuelto = true
+    })
+    await vi.advanceTimersByTimeAsync(44_999)
+    expect(resuelto).toBe(false)
+  })
+
+  it('una escritura (publicar), a los 45s exactos: corta y vuelve como resultado', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', fetchQueSeCuelga())
+    const promesa = publicar({ documentos: {}, base: 'b'.repeat(40) })
+    await vi.advanceTimersByTimeAsync(45_000)
+    const r = await promesa
+    expect(r).toEqual({ ok: false, status: 0, problema: 'Esto está tardando demasiado. Revisa tu conexión e intenta de nuevo.' })
   })
 })

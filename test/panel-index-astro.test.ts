@@ -15,6 +15,7 @@
  * documenta.
  */
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { experimental_AstroContainer as AstroContainer } from 'astro/container'
 import { loadRenderers } from 'astro:container'
 import { getContainerRenderer } from '@astrojs/react/container-renderer'
@@ -72,5 +73,24 @@ describe('/panel — la cáscara', () => {
     const titulo = html.match(/<title>([^<]+)<\/title>/)?.[1] ?? ''
     expect(titulo).not.toBe('')
     expect(jergaEn(titulo)).toBeNull()
+  })
+})
+
+/*
+ * [Ronda de arreglo, hallazgo 3] `src/styles/panel.css` dice, en su propio
+ * comentario, que «todo color... sale de las custom properties de
+ * tokens.generated.css» — y tenía dos `#fff` a mano que lo contradecían.
+ * Se resolvió sumando `marca.blanco` (`src/tokens/color.ts`, ya un par
+ * aprobado y medido: blanco sobre `marca.rojo`/`marca.oscuro`) en vez de
+ * acercarse a un tono cálido no medido para este uso. Este test es el
+ * candado para que la próxima vez que alguien necesite un color acá,
+ * tenga que sumarlo al sistema en vez de escribirlo a mano — igual que
+ * `marca.css`/`landing.css`.
+ */
+describe('src/styles/panel.css — no se contradice a sí mismo', () => {
+  it('ningún color a mano: nada de `#RGB`/`#RRGGBB`, todo sale de `--mrc-*`', () => {
+    const css = readFileSync('src/styles/panel.css', 'utf8')
+    const hallados = css.match(/#[0-9A-Fa-f]{3,8}\b/g) ?? []
+    expect(hallados, `hex a mano encontrados: ${hallados.join(', ')}`).toHaveLength(0)
   })
 })

@@ -24,7 +24,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import App, { cargaInicial, intentaEntrar, pideEnlace } from '@/panel/App'
+import App, { cargaInicial, intentaEntrar, pideEnlace, textoPublicaciones } from '@/panel/App'
 import type { ResultadoEntrar, ResultadoEnlace } from '@/panel/api'
 import { jergaEn } from '@/servidor/estado'
 
@@ -119,6 +119,35 @@ const TEXTOS_VISIBLES = [
   'Ya entraste. Aquí vas a poder editar el contenido de tu sitio.',
   'Todavía no hay ninguna publicación tuya.',
 ]
+
+/*
+ * [Ronda de arreglo, hallazgo 2] `textoPublicaciones` arma su resultado
+ * con una interpolación (`Tienes ${n} publicación(es)…`): NINGUNA de esas
+ * cadenas completas aparece literal en el código fuente, así que el
+ * guardián de arriba —que mira `TEXTOS_VISIBLES` contra el fuente— no las
+ * puede cubrir. Acá se llama a la función de verdad, con `n` real, y se
+ * corre `jergaEn()` sobre el resultado ARMADO.
+ */
+describe('textoPublicaciones', () => {
+  it('sin publicaciones: la frase fija', () => {
+    expect(textoPublicaciones(0)).toBe('Todavía no hay ninguna publicación tuya.')
+  })
+
+  it('una publicación: singular', () => {
+    expect(textoPublicaciones(1)).toBe('Tienes 1 publicación en tu historial.')
+  })
+
+  it('varias publicaciones: plural', () => {
+    expect(textoPublicaciones(5)).toBe('Tienes 5 publicaciones en tu historial.')
+  })
+
+  it('ningún resultado interpolado usa jerga técnica, para ningún número', () => {
+    for (const n of [0, 1, 2, 5, 20]) {
+      const texto = textoPublicaciones(n)
+      expect(jergaEn(texto), texto).toBeNull()
+    }
+  })
+})
 
 describe('App — textos visibles', () => {
   it('ninguno usa jerga técnica (nombres de tecnologías, "commit", "deploy"...)', () => {

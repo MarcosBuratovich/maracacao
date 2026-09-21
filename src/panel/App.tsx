@@ -221,16 +221,27 @@ function PantallaEntrar({ onEntro }: { onEntro: (estado: EstadoInicial) => void 
   )
 }
 
+/**
+ * El texto sobre cuántas publicaciones tiene, para la pantalla de editar.
+ * Extraída de la plantilla a propósito [Ronda de arreglo, hallazgo 2]: el
+ * guardián de jerga (`test/panel-app.test.ts`) miraba los LITERALES del
+ * código fuente, y esta era la única frase que no aparece completa en
+ * ninguna parte del archivo — se arma con una interpolación (`Tienes ${n}
+ * publicación(es)…`). Como función pura, el test la llama con `n` real y
+ * corre `jergaEn()` sobre el resultado ARMADO, no sobre un pedazo de
+ * plantilla.
+ */
+export function textoPublicaciones(n: number): string {
+  if (n === 0) return 'Todavía no hay ninguna publicación tuya.'
+  return `Tienes ${n} ${n === 1 ? 'publicación' : 'publicaciones'} en tu historial.`
+}
+
 function PantallaEditando({ publicaciones }: { publicaciones: Publicada[] }) {
   return (
     <>
       <h1 className="panel-titulo">Tu panel</h1>
       <p>Ya entraste. Aquí vas a poder editar el contenido de tu sitio.</p>
-      <p className="panel-aviso">
-        {publicaciones.length === 0
-          ? 'Todavía no hay ninguna publicación tuya.'
-          : `Tienes ${publicaciones.length} ${publicaciones.length === 1 ? 'publicación' : 'publicaciones'} en tu historial.`}
-      </p>
+      <p className="panel-aviso">{textoPublicaciones(publicaciones.length)}</p>
     </>
   )
 }

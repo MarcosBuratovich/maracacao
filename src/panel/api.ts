@@ -21,18 +21,46 @@
  * Los textos que la clienta lee (`problema`, `frase`, `mensaje`) los
  * escribe el SERVIDOR, en español mexicano — hay tests ahí (`jergaEn()`,
  * `src/servidor/estado.ts`) que los vigilan letra por letra. Acá adentro
- * se muestran TAL CUAL, nunca reescritos. Las dos únicas frases propias de
- * este archivo (`PROBLEMA_SIN_RED`, `PROBLEMA_RESPUESTA_INESPERADA`) son
- * para cuando el servidor nunca llegó a contestar nada — ahí no hay ningún
- * texto suyo que mostrar, y `/panel/entrar.astro` ya sienta el mismo
- * precedente para el primer caso («No se pudo conectar. Intenta de
- * nuevo.»).
+ * se muestran TAL CUAL, nunca reescritos. Las tres únicas frases propias
+ * de este archivo (`PROBLEMA_SIN_RED`, `PROBLEMA_TARDO`,
+ * `PROBLEMA_RESPUESTA_INESPERADA`) son para cuando el servidor nunca llegó
+ * a contestar nada — ahí no hay ningún texto suyo que mostrar, y
+ * `/panel/entrar.astro` ya sienta el mismo precedente para la primera
+ * («No se pudo conectar. Intenta de nuevo.»).
+ *
+ * [Ronda de arreglo] `llama()` corta con `AbortController` a los
+ * `TIMEOUT_LECTURA_MS`/`TIMEOUT_ESCRITURA_MS`: ella está parada en un
+ * mercado, con la señal que haya, y un `fetch` que ni resuelve ni rechaza
+ * —el wifi que se CUELGA, no el que se cae— antes de esto dejaba la
+ * pantalla en «Cargando…»/«Entrando…» PARA SIEMPRE, sin tirar (cumplía la
+ * promesa de este archivo) pero también sin volver nunca (la rompía
+ * igual, de otra forma: un resultado que nunca llega no es un resultado).
+ * Verificado con un test que simula exactamente eso — un `fetch` que
+ * nunca se resuelve salvo que se aborte — con el reloj de `vitest`
+ * adelantado a mano, no esperando el tiempo real.
  */
 
 const URL_BASE = '/api/panel'
 
+/**
+ * Quince segundos para leer, cuarenta y cinco para escribir — dos
+ * presupuestos, no uno. `publicar`/`deshacer`/`borrador.guardar` escriben
+ * en GitHub (blob, árbol, commit, mover un ref: varios viajes de red, no
+ * uno) y la función serverless que los atiende tiene, ella misma, hasta
+ * sesenta segundos (`vercel.json`, `maxDuration`) — cuarenta y cinco deja
+ * margen real sin quedar corto contra una red lenta de verdad. El resto
+ * (`entrar`, `enlace`, `estado`, `historial`, `borrador.leer`) es una
+ * lectura o, cuando mucho, un correo: quince segundos alcanza y sobra, y
+ * es corto como para no dejarla mirando una pantalla muerta.
+ */
+const TIMEOUT_LECTURA_MS = 15_000
+const TIMEOUT_ESCRITURA_MS = 45_000
+
 /** Cuando la red se cae antes de que el servidor conteste nada en absoluto. */
 const PROBLEMA_SIN_RED = 'No se pudo conectar. Intenta de nuevo.'
+
+/** Cuando pasó el tiempo de espera sin que el servidor contestara nada — el wifi que se cuelga, no el que se cae. */
+const PROBLEMA_TARDO = 'Esto está tardando demasiado. Revisa tu conexión e intenta de nuevo.'
 
 /** Cuando el servidor sí contestó, pero el cuerpo no es JSON legible o le falta lo mínimo para confiar en él. */
 const PROBLEMA_RESPUESTA_INESPERADA = 'Algo salió mal de nuestro lado. Intenta de nuevo en unos minutos.'
@@ -42,7 +70,7 @@ export interface Falla {
   ok: false
   /** El status HTTP, o `0` cuando ni siquiera hubo respuesta (red caída). */
   status: number
-  /** Tal cual lo escribió el servidor — o una de las dos frases de arriba, cuando el servidor no llegó a escribir nada. */
+  /** Tal cual lo escribió el servidor — o una de las frases de arriba, cuando el servidor no llegó a escribir nada. */
   problema: string
   /** Solo en `publicar`, cuando el problema señala un campo puntual. */
   campo?: string
@@ -66,25 +94,41 @@ function falla(status: number, cuerpo: unknown): Falla {
 
 type Crudo =
   | { tipo: 'red-caida' }
+  | { tipo: 'tardó' }
   | { tipo: 'cuerpo-ilegible'; status: number }
   | { tipo: 'ok'; status: number; cuerpo: unknown }
 
 /**
  * El único punto que toca `fetch` de verdad. Nunca tira: toda forma de
- * fallar —la red caída, un cuerpo que no parsea— vuelve en el tipo de
- * retorno, nunca como una excepción.
+ * fallar —la red caída, el tiempo agotado, un cuerpo que no parsea— vuelve
+ * en el tipo de retorno, nunca como una excepción.
+ *
+ * El `AbortController` es lo que separa «se cayó» de «se colgó»: sin él,
+ * un `fetch` contra un wifi que ni conecta ni desconecta —el caso normal
+ * en un mercado, no el raro— no tiene ningún motivo para rechazar nunca, y
+ * el `try/catch` de acá abajo, por más prolijo que sea, no lo salva: nunca
+ * lo alcanza. El temporizador se limpia siempre (`finally`), pase lo que
+ * pase, para no dejar un `setTimeout` colgado abortando una señal de un
+ * pedido que ya terminó.
  */
-async function llama(accion: string, cuerpoPedido: unknown): Promise<Crudo> {
+async function llama(accion: string, cuerpoPedido: unknown, timeoutMs: number = TIMEOUT_LECTURA_MS): Promise<Crudo> {
+  const control = new AbortController()
+  const reloj = setTimeout(() => control.abort(), timeoutMs)
   let r: Response
   try {
-    r = await fetch(`${URL_BASE}?accion=${accion}`, {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(cuerpoPedido ?? {}),
-    })
-  } catch {
-    return { tipo: 'red-caida' }
+    try {
+      r = await fetch(`${URL_BASE}?accion=${accion}`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cuerpoPedido ?? {}),
+        signal: control.signal,
+      })
+    } catch {
+      return control.signal.aborted ? { tipo: 'tardó' } : { tipo: 'red-caida' }
+    }
+  } finally {
+    clearTimeout(reloj)
   }
   try {
     const json: unknown = await r.json()
@@ -106,9 +150,11 @@ async function pide<T extends object>(
   accion: string,
   cuerpoPedido: unknown,
   comoExito: (crudo: unknown) => T | null,
+  timeoutMs: number = TIMEOUT_LECTURA_MS,
 ): Promise<({ ok: true } & T) | Falla> {
-  const r = await llama(accion, cuerpoPedido)
+  const r = await llama(accion, cuerpoPedido, timeoutMs)
   if (r.tipo === 'red-caida') return { ok: false, status: 0, problema: PROBLEMA_SIN_RED }
+  if (r.tipo === 'tardó') return { ok: false, status: 0, problema: PROBLEMA_TARDO }
   if (r.tipo === 'cuerpo-ilegible') return { ok: false, status: r.status, problema: PROBLEMA_RESPUESTA_INESPERADA }
   if (r.status < 200 || r.status >= 300) return falla(r.status, r.cuerpo)
   const exito = comoExito(r.cuerpo)
@@ -183,13 +229,18 @@ function comoAvisos(v: unknown): AvisoPublicado[] {
 }
 
 export function publicar(cuerpo: { documentos: Record<string, unknown>; base: string }): Promise<ResultadoPublicar> {
-  return pide('publicar', cuerpo, (crudo) => {
-    const c = (crudo ?? {}) as { sha?: unknown; resumen?: unknown; avisos?: unknown }
-    const resumen = comoTexto(c.resumen)
-    if (resumen === undefined) return null
-    const sha = typeof c.sha === 'string' ? c.sha : null
-    return { sha, resumen, avisos: comoAvisos(c.avisos) }
-  })
+  return pide(
+    'publicar',
+    cuerpo,
+    (crudo) => {
+      const c = (crudo ?? {}) as { sha?: unknown; resumen?: unknown; avisos?: unknown }
+      const resumen = comoTexto(c.resumen)
+      if (resumen === undefined) return null
+      const sha = typeof c.sha === 'string' ? c.sha : null
+      return { sha, resumen, avisos: comoAvisos(c.avisos) }
+    },
+    TIMEOUT_ESCRITURA_MS,
+  )
 }
 
 /*
@@ -229,13 +280,18 @@ export function estado(cuerpo: { sha: string; publicadoEn?: number }): Promise<R
 export type ResultadoDeshacer = { ok: true; sha: string | null; resumen: string } | Falla
 
 export function deshacer(cuerpo: { sha: string }): Promise<ResultadoDeshacer> {
-  return pide('deshacer', cuerpo, (crudo) => {
-    const c = (crudo ?? {}) as { sha?: unknown; resumen?: unknown }
-    const resumen = comoTexto(c.resumen)
-    if (resumen === undefined) return null
-    const sha = typeof c.sha === 'string' ? c.sha : null
-    return { sha, resumen }
-  })
+  return pide(
+    'deshacer',
+    cuerpo,
+    (crudo) => {
+      const c = (crudo ?? {}) as { sha?: unknown; resumen?: unknown }
+      const resumen = comoTexto(c.resumen)
+      if (resumen === undefined) return null
+      const sha = typeof c.sha === 'string' ? c.sha : null
+      return { sha, resumen }
+    },
+    TIMEOUT_ESCRITURA_MS,
+  )
 }
 
 /*
@@ -314,8 +370,9 @@ export interface CuerpoBorradorGuardar {
 // `problema`, un `motivo` y un `otro` que ninguna otra acción tiene — no
 // entra en el molde de `falla()`/`pide()`, así que se arma a mano.
 export async function borradorGuardar(cuerpo: CuerpoBorradorGuardar): Promise<ResultadoBorradorGuardar> {
-  const r = await llama('borrador.guardar', cuerpo)
+  const r = await llama('borrador.guardar', cuerpo, TIMEOUT_ESCRITURA_MS)
   if (r.tipo === 'red-caida') return { ok: false, status: 0, problema: PROBLEMA_SIN_RED }
+  if (r.tipo === 'tardó') return { ok: false, status: 0, problema: PROBLEMA_TARDO }
   if (r.tipo === 'cuerpo-ilegible') return { ok: false, status: r.status, problema: PROBLEMA_RESPUESTA_INESPERADA }
   if (r.status >= 200 && r.status < 300) return { ok: true }
 

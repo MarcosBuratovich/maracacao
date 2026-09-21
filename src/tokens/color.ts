@@ -150,6 +150,14 @@ export const marca = {
   bandaClara: '#FFF9EE',
   oscuro: '#33190A',
   textoSuave: '#7A604A',
+  /**
+   * Blanco puro — no un tono cálido de la paleta. `paresAprobados` (abajo)
+   * ya lo usaba como literal `'#FFFFFF'` para «texto en botón rojo» y
+   * «texto sobre banda oscura»: acá se nombra, para que cualquier CSS
+   * —el panel, `src/styles/panel.css`— lo pueda pedir como
+   * `--mrc-marca-blanco` en vez de escribir el hex a mano.
+   */
+  blanco: '#FFFFFF',
 } as const
 
 /**
