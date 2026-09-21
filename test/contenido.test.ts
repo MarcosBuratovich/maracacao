@@ -2269,13 +2269,42 @@ describe('los candados del sistema de contenido', () => {
     }
   })
 
-  it('4 · el contenido publicado no tiene ni un problema, avisos incluidos', () => {
-    // El candado de conteos (Ruling F). `cargar()` no cruza conteos porque
-    // un aviso no impide publicar; acá sí se exige que no haya ninguno,
-    // porque este test corre adentro de `pnpm build` y el contenido que se
-    // publica no tiene por qué tener textos viejos.
+  it('4 · el contenido publicado no tiene nada que IMPIDA publicar', () => {
+    // [2026-09-21, fase 6] Antes este test exigía cero problemas «avisos
+    // incluidos», y eso era una contradicción con el resto del sistema:
+    // `validar()` distingue `gravedad: 'impide'` de `'avisa'`, el servidor
+    // deja publicar con avisos a propósito, y el panel se los muestra a
+    // ella con todas las letras («Para revisar cuando puedas (esto no
+    // bloquea nada)»). Pero este test corre adentro de `pnpm build`, que
+    // es el `buildCommand` de `vercel.json` — así que un aviso SÍ tumbaba
+    // la publicación.
+    //
+    // El camino real: ella edita un texto que menciona un número («15
+    // sabores»), el número deja de coincidir con la lista, el panel le
+    // dice que puede publicar, publica, y el build se cae. La red de
+    // seguridad lo revierte sola y le manda el correo a Marcos, así que no
+    // queda el sitio roto — pero es un «algo salió mal» por algo que el
+    // propio sistema le había aprobado, y ella no tiene cómo entenderlo.
+    //
+    // Entre «el panel miente» y «el portón es más estricto que el panel»,
+    // gana el panel: es quien habla con ella. El aviso no se pierde, lo
+    // sigue viendo mientras edita, que es cuando puede arreglarlo.
     for (const id of Object.keys(DOCUMENTOS) as IdDocumento[]) {
-      expect(validar(DOCUMENTOS[id], CRUDO[id], CONTEOS), id).toEqual([])
+      const impiden = validar(DOCUMENTOS[id], CRUDO[id], CONTEOS).filter((p) => p.gravedad === 'impide')
+      expect(impiden, id).toEqual([])
+    }
+  })
+
+  it('4b · los avisos del contenido publicado se ven, pero no tumban el build', () => {
+    // El contrapeso del cambio de arriba: los avisos no desaparecen del
+    // radar, quedan impresos en el log del build. Este test no puede
+    // fallar por un aviso —ese es justamente el punto— pero sí falla si
+    // alguien rompe `gravedad` y los avisos dejan de ser distinguibles.
+    for (const id of Object.keys(DOCUMENTOS) as IdDocumento[]) {
+      for (const p of validar(DOCUMENTOS[id], CRUDO[id], CONTEOS)) {
+        expect(['impide', 'avisa'], `${id} · ${p.campo}`).toContain(p.gravedad)
+        if (p.gravedad === 'avisa') console.warn(`aviso de contenido — ${id} · ${p.campo}: ${p.titulo}`)
+      }
     }
   })
 
