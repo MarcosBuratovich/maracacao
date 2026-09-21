@@ -207,7 +207,7 @@ function porInstancia(items: readonly CampoEditable[]): CampoEditable[] {
     // Un campo sin grupo es su propia instancia de uno: una clave única
     // (el contador, no la ruta) evita que dos campos sueltos de distinta
     // sección se mezclen si alguna vez compartieran ruta por casualidad.
-    const clave = item.grupo ? `${item.documento} ${item.grupo.ruta}` : ` suelto ${sueltos++}`
+    const clave = item.grupo ? `${item.documento} ${item.grupo.ruta}` : ` suelto ${sueltos++}`
     const balde = baldes.get(clave)
     if (balde) balde.push(item)
     else baldes.set(clave, [item])

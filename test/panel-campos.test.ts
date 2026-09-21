@@ -247,7 +247,7 @@ describe('la validación muestra el mensaje del esquema, no uno inventado acá',
     const problemas = campo?.validar('70 g') ?? []
     expect(problemas[0]?.titulo).toBe('Entre el número y la unidad va un espacio que no parte el renglón.')
     expect(problemas[0]?.arreglo?.etiqueta).toBe('Poner el espacio que no parte el renglón')
-    expect(problemas[0]?.arreglo?.valor).toBe('70 g')
+    expect(problemas[0]?.arreglo?.valor).toBe('70\u00a0g')
   })
 
   it('un precio en cero: el mensaje de `precio()`', () => {
