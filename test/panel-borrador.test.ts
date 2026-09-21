@@ -14,7 +14,7 @@ import { contenidoPublicado, type Documentos } from '@/panel/campos'
 import type { Borrador, OtroBorrador, ResultadoBorradorGuardar, ResultadoBorradorLeer } from '@/panel/api'
 import {
   cuentaCambios, haceCuanto, resumenBorradorAjeno, resumenOtroBorrador,
-  trasLeerBorrador, resuelveConflicto, trasGuardar, Autoguardado,
+  trasLeerBorrador, resuelveConflicto, trasGuardar, Autoguardado, cuerpoParaBeacon,
   RETARDO_GUARDADO_MS, PISO_GUARDADO_MS,
 } from '@/panel/borrador'
 
@@ -331,5 +331,132 @@ describe('Autoguardado', () => {
     await vi.advanceTimersByTimeAsync(PISO_GUARDADO_MS + 1_000)
     expect(llamados).toHaveLength(0)
     vi.useRealTimers()
+  })
+
+  /*
+   * [H3, ronda de arreglo] Reproduce el escenario exacto que encontró la
+   * revisión, con el reloj inyectado (nunca tiempo real):
+   *
+   *   t=0s   anota          -> retardo@10s, piso@30s
+   *   t=10s  retardo dispara-> guardado #1 EN VUELO (no contesta todavía)
+   *   t=10s  anota          -> retardo@20s, piso@40s
+   *   (silencio: nada anota entre 10s y 50s — el retardo Y el piso de
+   *    arriba disparan SOLOS, los dos con el guardado #1 todavía en
+   *    vuelo, que es justo la condición que rompía el piso)
+   *   t=50s  el guardado #1 contesta
+   *   de ahí en más, escribe cada 5s sin parar (más rápido que el
+   *   retardo de 10s: el RETARDO NUNCA vuelve a disparar solo en el
+   *   resto de la prueba) — así que un segundo guardado, si aparece,
+   *   solo pudo salir del PISO.
+   *
+   * Antes de este arreglo: a los 20s y a los 40s, `ejecuta()` salía por
+   * el `return` temprano (`guardando` en verdadero) SIN limpiar
+   * `this.retardo`/`this.piso`. El retardo se recupera solo (`anota()` lo
+   * reprograma sin condición), pero el piso solo se rearma
+   * `if (this.piso === undefined)` — y como quedó con el id de un
+   * temporizador ya disparado, esa condición nunca volvía a ser cierta:
+   * el piso quedaba MUERTO para el resto de la sesión. Con el bug
+   * presente, esta prueba da `llamados.length === 1` para siempre —
+   * ESTA prueba, revertido el arreglo a mano, cae en rojo (confirmado).
+   */
+  it('el piso sobrevive a un guardado más lento que él mismo — H3, ronda de arreglo', async () => {
+    vi.useFakeTimers()
+    const llamados: Documentos[] = []
+    const resolvers: Array<(r: ResultadoBorradorGuardar) => void> = []
+    const a = new Autoguardado({
+      guardar: (docs) => {
+        llamados.push(docs)
+        return new Promise((resolve) => resolvers.push(resolve))
+      },
+      onResultado: () => {},
+    })
+
+    a.anota(doc(0)) // t=0s: retardo@10s, piso@30s
+    await vi.advanceTimersByTimeAsync(10_000) // t=10s: retardo dispara -> guardado #1 en vuelo
+    expect(llamados).toHaveLength(1)
+
+    a.anota(doc(1)) // t=10s: retardo@20s, piso@40s
+
+    // Silencio: nada anota durante 40s — tiempo de sobra para que el
+    // retardo (20s) Y el piso (40s) disparen SOLOS con el guardado #1
+    // todavía sin contestar.
+    await vi.advanceTimersByTimeAsync(40_000) // t=50s
+
+    resolvers[0]?.({ ok: true }) // recién ACÁ contesta el guardado #1
+    await vi.advanceTimersByTimeAsync(0) // deja correr la continuación (re-anota lo pendiente)
+
+    // De acá en más, escribe cada 5s sin parar — más rápido que el
+    // retardo (10s), así que de acá al final el retardo NUNCA vuelve a
+    // disparar solo: cualquier guardado nuevo tuvo que salir del piso.
+    let n = 2
+    for (let i = 0; i < 200; i++) {
+      await vi.advanceTimersByTimeAsync(5_000)
+      a.anota(doc(n++))
+    }
+
+    expect(llamados.length).toBeGreaterThanOrEqual(2)
+    a.destruye()
+    vi.useRealTimers()
+  })
+})
+
+/*
+ * ---------------------------------------------------------------------
+ * datosPendientes() / cuerpoParaBeacon() — el guardado de emergencia al
+ * cerrar la pestaña (H4, ronda de arreglo)
+ * ---------------------------------------------------------------------
+ */
+
+describe('Autoguardado.datosPendientes', () => {
+  it('sin nada anotado: null — no hay nada que mandar por beacon', () => {
+    const a = new Autoguardado({ guardar: async () => ({ ok: true }), onResultado: () => {} })
+    expect(a.datosPendientes()).toBeNull()
+    a.destruye()
+  })
+
+  it('con algo anotado (todavía sin guardar): los documentos, la horaLeida fijada y si toca pisar', () => {
+    const a = new Autoguardado({ guardar: async () => ({ ok: true }), onResultado: () => {} })
+    a.fijaHoraLeida(555)
+    a.fuerzaProximoGuardado()
+    a.anota(doc(1))
+    expect(a.datosPendientes()).toEqual({ documentos: doc(1), horaLeida: 555, pisar: true })
+    a.destruye()
+  })
+
+  it('no dispara ningún guardado por sí sola — es una lectura pura', async () => {
+    vi.useFakeTimers()
+    const llamados: Documentos[] = []
+    const a = new Autoguardado({ guardar: async (d) => { llamados.push(d); return { ok: true } }, onResultado: () => {} })
+    a.anota(doc(1))
+    a.datosPendientes()
+    a.datosPendientes()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(llamados).toHaveLength(0) // ni con el retardo (10s) ni con el piso (30s) vencidos
+    a.destruye()
+    vi.useRealTimers()
+  })
+})
+
+describe('cuerpoParaBeacon', () => {
+  it('con algo pendiente y `base`: el cuerpo completo para `borrador.guardar`', () => {
+    const pendiente = { documentos: doc(1), horaLeida: 42, pisar: false }
+    expect(cuerpoParaBeacon(pendiente, 'a'.repeat(40))).toEqual({
+      documentos: doc(1), base: 'a'.repeat(40), horaLeida: 42, pisar: false,
+    })
+  })
+
+  it('sin `horaLeida` (nunca leyó ningún borrador): el campo queda AUSENTE, no `undefined` a mano', () => {
+    const pendiente = { documentos: doc(1), horaLeida: undefined, pisar: false }
+    const cuerpo = cuerpoParaBeacon(pendiente, 'a'.repeat(40))
+    expect(cuerpo).toEqual({ documentos: doc(1), base: 'a'.repeat(40), pisar: false })
+    expect(cuerpo && 'horaLeida' in cuerpo).toBe(false)
+  })
+
+  it('sin nada pendiente: null — no manda un beacon vacío', () => {
+    expect(cuerpoParaBeacon(null, 'a'.repeat(40))).toBeNull()
+  })
+
+  it('sin `base` (historial no pudo leer nada): null — no hay contra qué guardar', () => {
+    expect(cuerpoParaBeacon({ documentos: doc(1), horaLeida: 1, pisar: false }, null)).toBeNull()
   })
 })

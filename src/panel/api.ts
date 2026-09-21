@@ -40,7 +40,11 @@
  * adelantado a mano, no esperando el tiempo real.
  */
 
-const URL_BASE = '/api/panel'
+// [H4, ronda de arreglo] Exportada: el guardado de emergencia al cerrar la
+// pestaña (`Sesion.tsx`, `pagehide`) no puede pasar por `llama()` —usa
+// `navigator.sendBeacon`, no `fetch`— pero necesita la MISMA URL, para no
+// mantener un literal duplicado que se puede desincronizar en silencio.
+export const URL_BASE = '/api/panel'
 
 /**
  * Quince segundos para leer, cuarenta y cinco para escribir — dos

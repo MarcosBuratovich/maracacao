@@ -19,16 +19,16 @@ import { contenidoPublicado, type Documentos } from './campos'
 import { idDeAparato } from './aparato'
 import {
   borradorLeer, borradorGuardar, publicar as publicarApi, estado as estadoApi, deshacer as deshacerApi,
-  historial as historialApi,
+  URL_BASE,
   type AvisoPublicado, type ResultadoBorradorLeer,
 } from './api'
 import {
-  trasLeerBorrador, resuelveConflicto, resumenBorradorAjeno, resumenOtroBorrador,
+  trasLeerBorrador, resuelveConflicto, resumenBorradorAjeno, resumenOtroBorrador, cuerpoParaBeacon,
   Autoguardado, type EstadoBorrador, type EleccionConflicto, type ResultadoGuardadoTraducido,
 } from './borrador'
 import {
   preparaRevision, trasPublicar, trasEstado, trasDeshacer, sondea, puedeDeshacer, hrefVerSitio,
-  siguienteBase, etiquetaDeCambio, FRASE_PUBLICANDO,
+  siguienteBase, etiquetaDeCambio, puedeConfirmarPublicar, FRASE_PUBLICANDO,
   type EstadoPublicacion, type DatosSondeo, type ControladorSondeo,
 } from './publicacion'
 
@@ -86,6 +86,40 @@ export default function Sesion({ base }: { base: string | null }) {
       autoguardadoRef.current?.destruye()
       sondeoRef.current?.detente()
     }
+  }, [])
+
+  /**
+   * [H4, ronda de arreglo] El guardado de emergencia al cerrar la pestaña.
+   * Sin esto, cerrar antes de que el retardo (10 s) o el piso (30 s)
+   * dispararan perdía lo escrito en silencio — `destruye()` (el cleanup
+   * de arriba) descarta `this.pendiente` sin avisar, a propósito, porque
+   * ahí el motivo normal es que ELLA navegó dentro del panel, no que se
+   * fue del todo.
+   *
+   * `pagehide`, no `beforeunload`: `beforeunload` no dispara confiable en
+   * navegadores de celular (la plataforma más importante para este
+   * panel), y además interrumpe la navegación con un diálogo que acá no
+   * hace falta. `navigator.sendBeacon` en vez de `fetch`: la página puede
+   * desaparecer a mitad de un `await` y la respuesta no importa —esto es
+   * mejor esfuerzo por diseño—, y a diferencia de `fetch`, el navegador
+   * garantiza que el pedido SALE aunque el documento ya se esté
+   * descargando. Las cookies del origen (la sesión) viajan solas, igual
+   * que en cualquier pedido normal a la misma URL.
+   *
+   * La DECISIÓN de qué mandar —o si hay algo que mandar— es
+   * `cuerpoParaBeacon()`, pura y probada sin `navigator` ni ningún DOM
+   * (`test/panel-borrador.test.ts`); acá solo se llama.
+   */
+  useEffect(() => {
+    function alCerrarLaPestana() {
+      const cuerpo = cuerpoParaBeacon(autoguardadoRef.current?.datosPendientes() ?? null, baseRef.current)
+      if (cuerpo === null) return
+      if (typeof navigator === 'undefined' || typeof navigator.sendBeacon !== 'function') return
+      const blob = new Blob([JSON.stringify(cuerpo)], { type: 'application/json' })
+      navigator.sendBeacon(`${URL_BASE}?accion=borrador.guardar`, blob)
+    }
+    window.addEventListener('pagehide', alCerrarLaPestana)
+    return () => window.removeEventListener('pagehide', alCerrarLaPestana)
   }, [])
 
   function procesaLecturaBorrador(r: ResultadoBorradorLeer) {
@@ -176,7 +210,29 @@ export default function Sesion({ base }: { base: string | null }) {
   }
 
   async function alConfirmarPublicar() {
-    if (publicacion === null || publicacion.fase !== 'revisando' || baseActual === null) return
+    // [H1, ronda de arreglo] `puedeConfirmarPublicar` acepta 'revisando'
+    // (el botón «Confirmar y publicar») Y 'error-publicar' (el botón
+    // «Reintentar» de la pantalla de error) — antes esta guarda solo
+    // dejaba pasar 'revisando', así que «Reintentar» llamaba a esta MISMA
+    // función y salía sin hacer nada: un botón muerto, justo en el error
+    // más probable (el 409 de pisada, «Marcos cambió algo del sitio
+    // mientras editabas: vuelve a intentar la publicación.»).
+    //
+    // A propósito NO se refresca `baseActual` antes de reintentar. Un 409
+    // pasa porque, en el medio, Marcos cambió alguno de los documentos que
+    // ella también está publicando — y el documento que ella tiene en
+    // memoria arrancó de ANTES de ese cambio, así que no lo conoce. Pedir
+    // un `base` fresco acá y publicar directo arriba de él arriesgaría
+    // pisar el cambio de Marcos EN SILENCIO —el mismo tipo de pérdida de
+    // trabajo que el hallazgo H5 de esta misma ronda, y exactamente lo que
+    // el chequeo de `base` existe para evitar—, porque nada en este código
+    // vuelve a mirar qué cambió antes de reintentar. Reintentar con el
+    // MISMO `base` es seguro: si el choque sigue, sale el mismo 409 de
+    // nuevo (nunca escribe nada raro); si ya no hay choque, el reintento
+    // simplemente funciona. Si el 409 persiste, la salida real es volver a
+    // abrir el panel (ahí sí se refrescan `base` Y el borrador) — no un
+    // reintento ciego contra un estado que este código no volvió a mirar.
+    if (!puedeConfirmarPublicar(publicacion) || baseActual === null) return
     const previo = { cambios: publicacion.cambios, fraseCorta: publicacion.fraseCorta }
     setPublicacion({ fase: 'publicando', ...previo })
     const publicadoEn = Date.now()
@@ -206,13 +262,30 @@ export default function Sesion({ base }: { base: string | null }) {
     setPublicacion(trasDeshacer(r, datos))
   }
 
-  async function alVolverAEditarTrasDeshacer() {
-    setPublicacion(null)
-    const fresco = contenidoPublicado()
-    setDocumentos(fresco)
-    setOriginales(fresco)
-    const r = await historialApi()
-    if (r.ok) setBaseActual(r.base)
+  /**
+   * [H5, ronda de arreglo] Recarga el panel ENTERO en vez de resetear
+   * `documentos`/`originales` en memoria. Antes, `setOriginales(contenidoPublicado())`
+   * volvía al paquete COMPILADO del panel —no a lo que está vivo
+   * después del deshacer—, así que con dos publicaciones en la misma
+   * sesión (publica A, publica B, deshace B) la bandeja de revisión
+   * comparaba dos copias igual de viejas, mostraba «1 cambio», y la
+   * publicación siguiente escribía ese cambio MÁS la reversión en
+   * silencio de A — trabajo suyo que desaparecía sin que la pantalla que
+   * existe para evitar exactamente eso se diera cuenta.
+   *
+   * Ninguna de las ocho acciones del servidor devuelve el contenido vivo
+   * de los tres documentos (`historial()` da el `base`, no el contenido;
+   * arreglar eso de raíz tocaría `src/servidor/**`, fuera del alcance de
+   * hoy), así que no hay forma de armar un `originales` fresco a mano.
+   * Una recarga fuerza a `historial()` a pedir un `base` de verdad Y a
+   * que `contenidoPublicado()` salga del paquete que HOY está
+   * desplegado — no es perfecto (si el despliegue del deshacer todavía
+   * no terminó, sigue mostrando el estado anterior un rato más), pero
+   * nunca es PEOR que abrir el panel de cero, que es la única garantía
+   * que se puede dar sin una acción nueva del servidor.
+   */
+  function alVolverAEditarTrasDeshacer() {
+    window.location.reload()
   }
 
   if (estadoBorrador.fase === 'leyendo') {
@@ -316,7 +389,7 @@ export default function Sesion({ base }: { base: string | null }) {
           onReintentarSondeo={alReintentarSondeo}
           onDeshacer={() => void alConfirmarDeshacer()}
           onSeguirEditando={alCancelarPublicacion}
-          onVolverTrasDeshacer={() => void alVolverAEditarTrasDeshacer()}
+          onVolverTrasDeshacer={alVolverAEditarTrasDeshacer}
         />
       )}
     </div>
@@ -329,7 +402,7 @@ export default function Sesion({ base }: { base: string | null }) {
  * ---------------------------------------------------------------------
  */
 
-function ListaAvisos({ avisos }: { avisos: AvisoPublicado[] }) {
+export function ListaAvisos({ avisos }: { avisos: AvisoPublicado[] }) {
   if (avisos.length === 0) return null
   return (
     <div className="panel-avisos">
@@ -346,7 +419,7 @@ function ListaAvisos({ avisos }: { avisos: AvisoPublicado[] }) {
   )
 }
 
-function BotonesDeSalida({
+export function BotonesDeSalida({
   datos, ahora, onDeshacer, onSeguirEditando,
 }: {
   datos: DatosSondeo
@@ -356,7 +429,20 @@ function BotonesDeSalida({
 }) {
   return (
     <>
-      <a className="panel-boton" href={hrefVerSitio(ahora)}>
+      {/*
+       * [H2, ronda de arreglo] `target="_blank"` a propósito: `/panel/*`
+       * va con `Cache-Control: no-store` (`vercel.json`), y esa cabecera
+       * es una de las causas documentadas por las que Chrome/Firefox
+       * dejan una página fuera del bfcache — así que sin esto, la acción
+       * MÁS natural después de publicar («voy a ver cómo quedó») era
+       * justo la que remontaba el panel entero al volver con «atrás» y
+       * le sacaba el botón «Deshacer», con 29 de los 30 minutos todavía
+       * disponibles. Abrir en pestaña nueva deja ESTA pantalla intacta.
+       * `rel="noopener noreferrer"`: la pestaña nueva no puede tocar
+       * `window.opener` de esta (seguridad estándar para un enlace que
+       * abre algo del mismo sitio en una pestaña aparte).
+       */}
+      <a className="panel-boton" href={hrefVerSitio(ahora)} target="_blank" rel="noopener noreferrer">
         Ver mi sitio
       </a>
       {puedeDeshacer(datos.publicadoEn, ahora) && (
@@ -371,7 +457,16 @@ function BotonesDeSalida({
   )
 }
 
-function PantallaPublicacion({
+/**
+ * [H2/H8, ronda de arreglo] Exportada a propósito: es puramente
+ * presentacional (`estado` entra por prop, nada de `useEffect` ni de
+ * `fetch` acá adentro), así que se puede montar de verdad con
+ * `renderToStaticMarkup` y afirmar sobre el HTML real —mismo patrón que
+ * la Tarea 5 usa para `Historial`/`PantallaEditando`
+ * (`test/panel-historial.test.ts`)— sin necesitar jsdom ni esperar a que
+ * `Sesion.tsx` termine de leer un borrador para llegar hasta acá.
+ */
+export function PantallaPublicacion({
   estado, ahora, onConfirmar, onCancelar, onReintentarPublicar, onReintentarSondeo, onDeshacer, onSeguirEditando,
   onVolverTrasDeshacer,
 }: {

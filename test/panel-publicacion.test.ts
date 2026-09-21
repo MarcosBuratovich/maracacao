@@ -15,8 +15,8 @@ import { contenidoPublicado, type Documentos } from '@/panel/campos'
 import type { ResultadoPublicar, ResultadoEstado, ResultadoDeshacer } from '@/panel/api'
 import {
   preparaRevision, etiquetaDeCambio, trasPublicar, trasEstado, trasDeshacer, siguienteBase,
-  puedeDeshacer, hrefVerSitio, sondea, VENTANA_DESHACER_MS, FRASE_PUBLICANDO,
-  type DatosSondeo,
+  puedeDeshacer, hrefVerSitio, sondea, puedeConfirmarPublicar, VENTANA_DESHACER_MS, FRASE_PUBLICANDO,
+  type EstadoPublicacion, type DatosSondeo,
 } from '@/panel/publicacion'
 
 const clon = <T,>(v: T): T => JSON.parse(JSON.stringify(v))
@@ -92,6 +92,38 @@ describe('etiquetaDeCambio', () => {
 describe('FRASE_PUBLICANDO', () => {
   it('sin jerga', () => {
     expect(jergaEn(FRASE_PUBLICANDO)).toBeNull()
+  })
+})
+
+/*
+ * [H1, ronda de arreglo] `Sesion.tsx:422` llamaba a `alConfirmarPublicar()`
+ * desde el botón «Reintentar» de la pantalla de error, pero esa función
+ * exigía `fase === 'revisando'` — en `'error-publicar'` salía por el
+ * primer `if` sin hacer nada, un botón muerto justo en el 409, el error
+ * más probable. Cada caso de acá abajo, roto a mano uno por uno (sacar
+ * `'error-publicar'` del `||`, no aceptar `null`), tumba un test propio.
+ */
+describe('puedeConfirmarPublicar', () => {
+  const cambios: EstadoPublicacion = { fase: 'revisando', cambios: [], fraseCorta: 'cambia 1 texto' }
+  const errorPublicar: EstadoPublicacion = { fase: 'error-publicar', problema: 'x', cambios: [], fraseCorta: 'y' }
+  const publicando: EstadoPublicacion = { fase: 'publicando', cambios: [], fraseCorta: 'y' }
+  const sinCambios: EstadoPublicacion = { fase: 'sin-cambios', frase: 'x' }
+
+  it('"revisando": sí — el botón «Confirmar y publicar»', () => {
+    expect(puedeConfirmarPublicar(cambios)).toBe(true)
+  })
+
+  it('"error-publicar": sí — el botón «Reintentar» (el hallazgo H1: antes esto daba `false`)', () => {
+    expect(puedeConfirmarPublicar(errorPublicar)).toBe(true)
+  })
+
+  it('`null`: no', () => {
+    expect(puedeConfirmarPublicar(null)).toBe(false)
+  })
+
+  it('cualquier otra fase: no — nunca se publica dos veces por accidente', () => {
+    expect(puedeConfirmarPublicar(publicando)).toBe(false)
+    expect(puedeConfirmarPublicar(sinCambios)).toBe(false)
   })
 })
 

@@ -17,8 +17,22 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import Sesion from '@/panel/Sesion'
+import Sesion, { PantallaPublicacion, BotonesDeSalida, ListaAvisos } from '@/panel/Sesion'
 import { jergaEn } from '@/servidor/estado'
+import { VENTANA_DESHACER_MS, type DatosSondeo } from '@/panel/publicacion'
+
+/** Los ocho manejadores de `PantallaPublicacion`/`BotonesDeSalida`: en estas pruebas no importa QUÉ hacen (eso se prueba aparte, en `./panel-publicacion.test.ts` y `./panel-borrador.test.ts`), solo que el componente los reciba y renderice sin ellos tirar. */
+function manejadoresDeMentira() {
+  return {
+    onConfirmar: () => {},
+    onCancelar: () => {},
+    onReintentarPublicar: () => {},
+    onReintentarSondeo: () => {},
+    onDeshacer: () => {},
+    onSeguirEditando: () => {},
+    onVolverTrasDeshacer: () => {},
+  }
+}
 
 /*
  * Los textos propios de `Sesion.tsx` — ni etiqueta de campo, ni mensaje de
@@ -76,5 +90,146 @@ describe('Sesion — el primer render no revienta (sin DOM: `renderToStaticMarku
   it('con `base: null` renderiza igual, sin tirar', () => {
     const html = renderToStaticMarkup(createElement(Sesion, { base: null }))
     expect(html).toContain('Buscando si tienes cambios guardados en otro aparato…')
+  })
+})
+
+/*
+ * ---------------------------------------------------------------------
+ * `PantallaPublicacion`/`BotonesDeSalida`/`ListaAvisos`: puramente
+ * presentacionales (el `estado` entra por prop, sin `useEffect` ni
+ * `fetch`), así que acá SÍ se puede montar de verdad con
+ * `renderToStaticMarkup` y afirmar sobre el HTML real — mismo patrón
+ * aprobado que usa la Tarea 5 para `Historial`/`PantallaEditando`
+ * (`test/panel-historial.test.ts`), no el texto del archivo fuente.
+ * ---------------------------------------------------------------------
+ */
+
+const datosDeEjemplo: DatosSondeo = { sha: 'a'.repeat(40), publicadoEn: 1_000_000, avisos: [] }
+
+describe('BotonesDeSalida — «Ver mi sitio» (H2, ronda de arreglo)', () => {
+  it('el enlace abre en una pestaña NUEVA, con `rel="noopener noreferrer"` — antes navegaba en la misma pestaña y se llevaba puesto el botón «Deshacer» al volver (bfcache roto por `Cache-Control: no-store`)', () => {
+    const html = renderToStaticMarkup(
+      createElement(BotonesDeSalida, {
+        datos: datosDeEjemplo,
+        ahora: datosDeEjemplo.publicadoEn,
+        onDeshacer: () => {},
+        onSeguirEditando: () => {},
+      }),
+    )
+    expect(html).toMatch(/<a[^>]*href="\/\?t=1000000"[^>]*target="_blank"/)
+    expect(html).toMatch(/<a[^>]*rel="noopener noreferrer"/)
+  })
+
+  it('el botón «Deshacer esta publicación» está a los 30:00.000 exactos', () => {
+    const html = renderToStaticMarkup(
+      createElement(BotonesDeSalida, {
+        datos: datosDeEjemplo,
+        ahora: datosDeEjemplo.publicadoEn + VENTANA_DESHACER_MS,
+        onDeshacer: () => {},
+        onSeguirEditando: () => {},
+      }),
+    )
+    expect(html).toContain('Deshacer esta publicación')
+  })
+
+  it('un milisegundo después de los 30 minutos, el botón «Deshacer» YA NO está — desaparece de verdad, no solo en la lógica pura', () => {
+    const html = renderToStaticMarkup(
+      createElement(BotonesDeSalida, {
+        datos: datosDeEjemplo,
+        ahora: datosDeEjemplo.publicadoEn + VENTANA_DESHACER_MS + 1,
+        onDeshacer: () => {},
+        onSeguirEditando: () => {},
+      }),
+    )
+    expect(html).not.toContain('Deshacer esta publicación')
+    // El resto de la pantalla sigue con salida: «Ver mi sitio» y «Seguir editando».
+    expect(html).toContain('Ver mi sitio')
+    expect(html).toContain('Seguir editando')
+  })
+})
+
+describe('ListaAvisos — no bloquean', () => {
+  it('sin avisos: no pinta nada', () => {
+    const html = renderToStaticMarkup(createElement(ListaAvisos, { avisos: [] }))
+    expect(html).toBe('')
+  })
+
+  it('con avisos: título y detalle se ven, nunca con `role="alert"` (no son un error)', () => {
+    const html = renderToStaticMarkup(
+      createElement(ListaAvisos, {
+        avisos: [{ campo: 'sitio.anaquel.titulo', titulo: 'Dice «15 sabores»', detalle: 'Hoy hay 14.' }],
+      }),
+    )
+    expect(html).toContain('Dice «15 sabores»')
+    expect(html).toContain('Hoy hay 14.')
+    expect(html).not.toContain('role="alert"')
+  })
+})
+
+describe('PantallaPublicacion — cada fase renderiza con salida', () => {
+  it('"revisando": lista los cambios con etiqueta, y los dos botones', () => {
+    const html = renderToStaticMarkup(
+      createElement(PantallaPublicacion, {
+        estado: {
+          fase: 'revisando',
+          cambios: [{ campo: 'anaquel.titulo', etiqueta: 'Título del anaquel', antes: 'a', despues: 'b', tipo: 'cambio' }],
+          fraseCorta: 'cambia 1 texto',
+        },
+        ahora: 0,
+        ...manejadoresDeMentira(),
+      }),
+    )
+    expect(html).toContain('Título del anaquel')
+    expect(html).toContain('cambia 1 texto')
+    expect(html).toContain('Confirmar y publicar')
+    expect(html).toContain('Cancelar')
+  })
+
+  it('"error-publicar": el botón dice «Reintentar» — el hallazgo H1 era que, al tocarlo, `alConfirmarPublicar()` salía sin hacer nada; ESE cableado (`puedeConfirmarPublicar`) se prueba en `panel-publicacion.test.ts`, acá solo se confirma que el botón sigue ahí', () => {
+    const html = renderToStaticMarkup(
+      createElement(PantallaPublicacion, {
+        estado: {
+          fase: 'error-publicar',
+          problema: 'Marcos cambió algo del sitio mientras editabas: vuelve a intentar la publicación.',
+          cambios: [],
+          fraseCorta: 'cambia 1 texto',
+        },
+        ahora: 0,
+        ...manejadoresDeMentira(),
+      }),
+    )
+    expect(html).toContain('Marcos cambió algo del sitio mientras editabas: vuelve a intentar la publicación.')
+    expect(html).toContain('Reintentar')
+  })
+
+  it('"sondeando"/"terminado": los avisos y los botones de salida están, sea o no `estado: listo` — nunca una pantalla colgada', () => {
+    for (const fase of ['sondeando', 'terminado'] as const) {
+      const html = renderToStaticMarkup(
+        createElement(PantallaPublicacion, {
+          estado: {
+            fase,
+            frase: 'Tu cambio está tardando más de lo normal. Vuelve a abrir el panel en un rato para ver cómo quedó.',
+            datos: { ...datosDeEjemplo, avisos: [{ campo: 'x', titulo: 'Un aviso' }] },
+          },
+          ahora: datosDeEjemplo.publicadoEn,
+          ...manejadoresDeMentira(),
+        }),
+      )
+      expect(html, fase).toContain('Un aviso')
+      expect(html, fase).toContain('Ver mi sitio')
+      expect(html, fase).toContain('Deshacer esta publicación')
+    }
+  })
+
+  it('"deshecho": el resumen del servidor y «Volver a editar»', () => {
+    const html = renderToStaticMarkup(
+      createElement(PantallaPublicacion, {
+        estado: { fase: 'deshecho', resumen: 'Listo, lo dejé como estaba antes.' },
+        ahora: 0,
+        ...manejadoresDeMentira(),
+      }),
+    )
+    expect(html).toContain('Listo, lo dejé como estaba antes.')
+    expect(html).toContain('Volver a editar')
   })
 })

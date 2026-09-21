@@ -260,11 +260,30 @@ export class Autoguardado {
   }
 
   private async ejecuta(): Promise<void> {
+    // [H3, ronda de arreglo] Los dos temporizadores que pudieron haber
+    // disparado ESTA llamada (el retardo o el piso — `ejecuta()` es el
+    // callback de los dos) ya se consumieron: dispararon una vez y no
+    // vuelven a hacerlo solos. Por eso se limpian ACÁ ARRIBA, ANTES de
+    // cualquier `return` temprano — no adentro del `if` de más abajo, que
+    // solo corre cuando el guardado sigue de pie.
+    //
+    // Antes, la limpieza vivía DESPUÉS de la guarda de `guardando`: un
+    // guardado en vuelo (`borrador.guardar` tiene hasta
+    // `TIMEOUT_ESCRITURA_MS` = 45 s, más que el piso de 30 s — no es un
+    // caso raro, es el caso para el que existe el piso) hacía que la
+    // guarda cortara ACÁ, salteándose la limpieza. `this.piso` se quedaba
+    // con el id de un temporizador YA disparado (no `undefined`), y como
+    // `anota()` solo rearma el piso `if (this.piso === undefined)`, el
+    // piso quedaba MUERTO para el resto de la sesión — medido: veinte
+    // minutos escribiendo sin pausas, CERO guardados. `test/panel-borrador.test.ts`,
+    // «el piso sobrevive a un guardado más largo que él mismo», reproduce
+    // exactamente este escenario con relojes inyectados.
+    if (this.retardo !== undefined) { this.limpia(this.retardo); this.retardo = undefined }
+    if (this.piso !== undefined) { this.limpia(this.piso); this.piso = undefined }
+
     if (this.destruido || this.pendiente === undefined || this.guardando) return
     const documentos = this.pendiente
     this.pendiente = undefined
-    if (this.retardo !== undefined) { this.limpia(this.retardo); this.retardo = undefined }
-    if (this.piso !== undefined) { this.limpia(this.piso); this.piso = undefined }
 
     this.guardando = true
     const pisar = this.forzarProximo
@@ -280,9 +299,47 @@ export class Autoguardado {
     if (this.pendiente !== undefined) this.anota(this.pendiente)
   }
 
+  /**
+   * [H4, ronda de arreglo] Lo que se mandaría si se guardara AHORA MISMO,
+   * o `null` si no hay nada pendiente — lectura pura, no dispara ningún
+   * guardado. Existe para el guardado de emergencia al cerrar la pestaña
+   * (`pagehide` en `Sesion.tsx`, con `cuerpoParaBeacon()` más abajo):
+   * `destruye()` (el cleanup normal de React) descarta `this.pendiente`
+   * en silencio a propósito —es lo correcto cuando el componente se
+   * desmonta porque ella navegó DENTRO del panel—, pero cerrar la
+   * pestaña entera es un caso distinto, donde perder hasta 30 s de
+   * trabajo (el piso) sin avisar no es aceptable.
+   */
+  datosPendientes(): { documentos: Documentos; horaLeida: number | undefined; pisar: boolean } | null {
+    if (this.pendiente === undefined) return null
+    return { documentos: this.pendiente, horaLeida: this.horaLeida, pisar: this.forzarProximo }
+  }
+
   destruye(): void {
     this.destruido = true
     if (this.retardo !== undefined) this.limpia(this.retardo)
     if (this.piso !== undefined) this.limpia(this.piso)
+  }
+}
+
+/**
+ * [H4, ronda de arreglo] El cuerpo exacto para el guardado de emergencia
+ * al cerrar la pestaña — `null` si no hay nada que mandar: ni con
+ * `pendiente: null` (nada sin guardar) ni con `base: null` (el caso raro
+ * de `historial()` sin poder leer nada; sin `base` el servidor rechaza
+ * con 400 de todos modos, mismo criterio que el resto del autoguardado).
+ * Función pura y separada de `Sesion.tsx` para poder probarla sin
+ * `navigator.sendBeacon` ni ningún DOM.
+ */
+export function cuerpoParaBeacon(
+  pendiente: { documentos: Documentos; horaLeida: number | undefined; pisar: boolean } | null,
+  base: string | null,
+): { documentos: Documentos; base: string; horaLeida?: number; pisar: boolean } | null {
+  if (pendiente === null || base === null) return null
+  return {
+    documentos: pendiente.documentos,
+    base,
+    ...(pendiente.horaLeida !== undefined ? { horaLeida: pendiente.horaLeida } : {}),
+    pisar: pendiente.pisar,
   }
 }

@@ -91,6 +91,25 @@ export type EstadoPublicacion =
   | { fase: 'error-deshacer'; problema: string; datos: DatosSondeo }
   | { fase: 'deshecho'; resumen: string }
 
+/**
+ * [H1, ronda de arreglo] ¿Desde esta fase se puede publicar de verdad?
+ * Antes solo `'revisando'` (el botón «Confirmar y publicar») pasaba, así
+ * que «Reintentar» en `'error-publicar'` llamaba a la MISMA función de
+ * publicar y salía sin hacer nada — un botón muerto, justo en el error
+ * más probable (el 409 de pisada, cuyo propio texto le dice «vuelve a
+ * intentar la publicación»). Las dos fases llevan `cambios`/`fraseCorta`
+ * con la misma forma, así que aceptar las dos es seguro de tipos.
+ *
+ * A propósito NO decide acá si conviene refrescar `base` antes de
+ * reintentar — eso lo decide `Sesion.tsx`, en el llamador (ver el
+ * comentario ahí): esta función solo contesta «¿hay algo que confirmar?».
+ */
+export function puedeConfirmarPublicar(
+  estado: EstadoPublicacion | null,
+): estado is Extract<EstadoPublicacion, { fase: 'revisando' | 'error-publicar' }> {
+  return estado !== null && (estado.fase === 'revisando' || estado.fase === 'error-publicar')
+}
+
 /** Tras `publicar()`: el 400/409/422/502 se muestra tal cual —nunca se traga—, y `avisos` viaja intacto hacia la pantalla siguiente, nunca como un bloqueo. */
 export function trasPublicar(
   r: ResultadoPublicar,
