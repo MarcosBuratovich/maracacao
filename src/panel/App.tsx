@@ -21,6 +21,7 @@ import {
 } from './api'
 import { idDeAparato } from './aparato'
 import Sesion from './Sesion'
+import Historial from './Historial'
 
 /*
  * ---------------------------------------------------------------------
@@ -237,12 +238,25 @@ export function textoPublicaciones(n: number): string {
   return `Tienes ${n} ${n === 1 ? 'publicación' : 'publicaciones'} en tu historial.`
 }
 
-function PantallaEditando({ base, publicaciones }: { base: string | null; publicaciones: Publicada[] }) {
+/*
+ * La primera vez legítima (spec §4.5: nunca un hueco ni un cartel de
+ * error) sigue con el mismo aviso fijo de siempre, ANTES de esta tarea. En
+ * cuanto hay al menos una publicación, `Historial` reemplaza esa línea por
+ * el resultado de la más reciente —arriba de todo, sin un clic de más— y
+ * la lista completa, debajo, colapsada.
+ */
+export function PantallaEditando({ base, publicaciones }: { base: string | null; publicaciones: Publicada[] }) {
   return (
     <>
       <h1 className="panel-titulo">Tu panel</h1>
-      <p>Ya entraste. Aquí vas a poder editar el contenido de tu sitio.</p>
-      <p className="panel-aviso">{textoPublicaciones(publicaciones.length)}</p>
+      {publicaciones.length === 0 ? (
+        <>
+          <p>Ya entraste. Aquí vas a poder editar el contenido de tu sitio.</p>
+          <p className="panel-aviso">{textoPublicaciones(0)}</p>
+        </>
+      ) : (
+        <Historial publicaciones={publicaciones} />
+      )}
       <Sesion base={base} />
     </>
   )

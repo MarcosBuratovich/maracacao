@@ -382,3 +382,68 @@
   outline: 3px solid var(--mrc-marca-rojo);
   outline-offset: 2px;
 }
+
+/* El historial (Tarea 5): la frase de arriba de todo usa `.panel-aviso`
+   tal cual, centrada como cualquier otro aviso de esta pantalla. La lista
+   completa va colapsada en un `<details>` nativo —cero JS propio, cero
+   estado que probar— con el mismo ancho y alineación a la izquierda que
+   `.panel-editor`/`.panel-sesion`. */
+
+.panel-historial {
+  width: min(560px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  align-items: stretch;
+}
+
+.panel-historial-caja {
+  text-align: left;
+}
+
+.panel-historial-resumen {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0.6rem 0.25rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.panel-historial-resumen:focus-visible {
+  outline: 3px solid var(--mrc-marca-rojo);
+  outline-offset: 2px;
+}
+
+.panel-historial-lista {
+  margin: 0.25rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.panel-historial-fila {
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  background: var(--mrc-marca-blanco);
+}
+
+/* Una reversión no es "un cambio más": el acento a la izquierda es el
+   mismo que ya usa `.panel-campo-en-grupo` para marcar un agrupamiento —
+   mismo vocabulario visual, no uno nuevo. */
+.panel-historial-fila-deshace {
+  border-left: 3px solid var(--mrc-marca-bandaCalida);
+}
+
+.panel-historial-titulo {
+  margin: 0;
+  font-weight: 600;
+}
+
+.panel-historial-meta {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  color: var(--mrc-marca-textoSuave);
+}
