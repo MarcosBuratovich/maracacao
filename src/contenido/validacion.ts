@@ -159,7 +159,17 @@ const une = (a: string, b: string | number): string => (a === '' ? String(b) : `
  */
 const PARTE = /^([^<[]*)((?:\[\])*)(?:<([^=>]+)=([^>]+)>)?$/
 
-const enRutas = (dato: unknown, ruta: string): { ruta: string; valor: unknown }[] => {
+/**
+ * Exportada porque el panel la necesita para lo mismo que este archivo:
+ * instanciar una ruta de esquema ('recetas.lista[].titulo') contra el
+ * contenido real y sacar las rutas concretas con su valor
+ * ('recetas.lista.2.titulo'). Escribirla dos veces —una acá y otra en
+ * `src/panel/campos.ts`— es exactamente la clase de bug que esta capa
+ * existe para no tener: las dos tendrían que interpretar `[]` y
+ * `<clave=valor>` de la MISMA manera, y nada las mantendría alineadas el
+ * día que una cambie.
+ */
+export const enRutas = (dato: unknown, ruta: string): { ruta: string; valor: unknown }[] => {
   let actuales: { ruta: string; valor: unknown }[] = [{ ruta: '', valor: dato }]
   for (const parte of ruta.split('.')) {
     const m = PARTE.exec(parte)

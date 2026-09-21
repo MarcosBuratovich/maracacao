@@ -175,9 +175,33 @@ const discriminanteDe = (quien: string, def: Def, donde: string): string => {
 }
 
 /**
+ * La instancia contable más cercana a una hoja: la LISTA (o la variante de
+ * unión dentro de una lista) de la que esa hoja es un campo. `ruta` es la
+ * ruta de ESQUEMA hasta ahí ('recetas.lista[]', 'secciones[].bloques[]<tipo=parrafo>');
+ * `meta` es el metadato registrado del ELEMENTO —el mismo que trae `nombra`,
+ * cuando lo declara.
+ *
+ * Existe porque `recorre()` visita HOJAS y nunca contenedores: el `nombra`
+ * de un `grupo` usado como elemento de una `lista` queda, si no, invisible
+ * para cualquier cosa que consuma `recorre()` (ver el candado «9 · `nombra`
+ * vive en el grupo del elemento» de `test/contenido.test.ts`, que probó
+ * exactamente eso desde el lado del esquema). El panel necesita lo mismo
+ * desde el lado de un VALOR concreto —nombrar la receta 3 con su propio
+ * título, no con «Receta 3»— así que este campo extra de `visita()` completa
+ * el mismo hueco sin abrir un segundo camino a `_zod.def`: sigue siendo
+ * SOLO este archivo el que lo toca.
+ */
+export interface InstanciaDeLista {
+  ruta: string
+  meta: MetaCampo
+}
+
+/**
  * Recorre el árbol del esquema y llama a `visita` en cada HOJA, con su
- * ruta punteada ('hero.titular.1'), el metadato del panel y el esquema
- * que de verdad hay que usar para validar ese valor.
+ * ruta punteada ('hero.titular.1'), el metadato del panel, el esquema
+ * que de verdad hay que usar para validar ese valor, y —si la hoja vive
+ * dentro de una lista— la instancia contable más cercana (ver
+ * `InstanciaDeLista`).
  *
  * Los contenedores (object, array, tuple) no son hojas: se atraviesan.
  * `optional`/`nullable` son transparentes SOLO cuando envuelven un
@@ -188,8 +212,14 @@ const discriminanteDe = (quien: string, def: Def, donde: string): string => {
  */
 export function recorre(
   esquema: z.ZodType,
-  visita: (ruta: string, meta: MetaCampo | undefined, hoja: z.ZodType) => void,
+  visita: (
+    ruta: string,
+    meta: MetaCampo | undefined,
+    hoja: z.ZodType,
+    instancia: InstanciaDeLista | undefined,
+  ) => void,
   prefijo = '',
+  instancia: InstanciaDeLista | undefined = undefined,
 ): void {
   const def = definicion(esquema)
 
@@ -204,27 +234,36 @@ export function recorre(
       // vuelve—, así que el chequeo va también acá.
       exigeEnvolturaConocida('recorre', dentro, prefijo)
       if (esContenedor(dentro.type)) {
-        recorre(fondo, visita, prefijo)
+        recorre(fondo, visita, prefijo, instancia)
       } else {
-        visita(prefijo, meta, esquema)
+        visita(prefijo, meta, esquema, instancia)
       }
       return
     }
     case 'object': {
       const shape = def.shape as Record<string, z.ZodType>
-      for (const clave of Object.keys(shape)) recorre(shape[clave], visita, con(prefijo, clave))
+      for (const clave of Object.keys(shape)) recorre(shape[clave], visita, con(prefijo, clave), instancia)
       return
     }
     case 'tuple': {
       const items = def.items as z.ZodType[]
-      items.forEach((item, i) => recorre(item, visita, con(prefijo, i)))
+      items.forEach((item, i) => recorre(item, visita, con(prefijo, i), instancia))
       return
     }
-    case 'array':
+    case 'array': {
       // La ruta del elemento lleva `[]`: el panel la instancia por índice
-      // cuando pinta la lista, y el dato real dice cuántos hay.
-      recorre(def.element as z.ZodType, visita, `${prefijo}[]`)
+      // cuando pinta la lista, y el dato real dice cuántos hay. Si el
+      // elemento está registrado (un `grupo`, casi siempre), ESA es la
+      // instancia contable más cercana de aquí para abajo —pisa la que
+      // venía de más afuera—; si no lo está (un elemento suelto, como
+      // `texto`, o una unión sin anotar propia, como `bloque` en
+      // fichas.ts), se sigue arrastrando la de más afuera, sin perderla.
+      const elemento = def.element as z.ZodType
+      const rutaLista = `${prefijo}[]`
+      const metaElemento = panel.get(elemento) as MetaCampo | undefined
+      recorre(elemento, visita, rutaLista, metaElemento ? { ruta: rutaLista, meta: metaElemento } : instancia)
       return
+    }
     case 'union': {
       // `z.discriminatedUnion` reporta `def.type === 'union'`, así que sin
       // este caso caería en `default` y se emitiría como HOJA: todos los
@@ -233,13 +272,19 @@ export function recorre(
       const discriminante = discriminanteDe('recorre', def, prefijo)
       for (const opcion of def.options as z.ZodType[]) {
         const variante = marcaDeVariante(discriminante, varianteDe(opcion, discriminante, prefijo))
-        recorre(opcion, visita, `${prefijo}${variante}`)
+        const rutaVariante = `${prefijo}${variante}`
+        // Misma idea que en 'array': cada variante de una unión discriminada
+        // dentro de una lista (los tres bloques de una ficha) es SU PROPIA
+        // instancia contable, con su propio `nombra` —el candado 9b del
+        // canario existe justamente porque las variantes se saltaban antes.
+        const metaOpcion = panel.get(opcion) as MetaCampo | undefined
+        recorre(opcion, visita, rutaVariante, metaOpcion ? { ruta: rutaVariante, meta: metaOpcion } : instancia)
       }
       return
     }
     default:
       exigeEnvolturaConocida('recorre', def, prefijo)
-      visita(prefijo, panel.get(esquema), esquema)
+      visita(prefijo, panel.get(esquema), esquema, instancia)
   }
 }
 

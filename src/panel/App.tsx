@@ -20,6 +20,7 @@ import {
   type ResultadoEntrar, type ResultadoEnlace, type ResultadoHistorial, type Publicada,
 } from './api'
 import { idDeAparato } from './aparato'
+import Editor from './Editor'
 
 /*
  * ---------------------------------------------------------------------
@@ -242,6 +243,7 @@ function PantallaEditando({ publicaciones }: { publicaciones: Publicada[] }) {
       <h1 className="panel-titulo">Tu panel</h1>
       <p>Ya entraste. Aquí vas a poder editar el contenido de tu sitio.</p>
       <p className="panel-aviso">{textoPublicaciones(publicaciones.length)}</p>
+      <Editor />
     </>
   )
 }

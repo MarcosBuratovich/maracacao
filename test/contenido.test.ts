@@ -646,6 +646,85 @@ describe('la capa de contenido', () => {
     ])
   })
 
+  describe('recorre() expone la instancia de lista más cercana (el panel la usa para `nombra`)', () => {
+    // `nombra` vive en el grupo del ELEMENTO de una lista, y `recorre()`
+    // nunca visita ese grupo como hoja —salta directo a sus campos—, así
+    // que sin este cuarto argumento el panel no tiene forma de nombrar la
+    // receta 3 con su propio título en vez de con «Receta 3». Ver el
+    // docstring de `InstanciaDeLista` en carga.ts.
+    const paso = grupo({
+      etiqueta: 'Paso', seccion: 'catar', ayuda: 'x',
+      nombra: (v) => `Paso: ${(v as { nombre?: string }).nombre ?? ''}`,
+      campos: {
+        nombre: texto({ etiqueta: 'Nombre', seccion: 'catar', ayuda: 'y', maxCaracteres: 20 }),
+      },
+    })
+    const conLista = grupo({
+      etiqueta: 'Prueba', seccion: 'catar', ayuda: 'x',
+      campos: {
+        pasos: lista({ etiqueta: 'Pasos', seccion: 'catar', ayuda: 'x', minItems: 1, maxItems: 5, elemento: paso }),
+      },
+    })
+
+    it('la hoja dentro de un elemento con `nombra` recibe esa instancia', () => {
+      const vistas: { ruta: string; instancia: string | undefined }[] = []
+      recorre(conLista, (ruta, _meta, _hoja, instancia) => {
+        vistas.push({ ruta, instancia: instancia?.ruta })
+      })
+      expect(vistas).toEqual([{ ruta: 'pasos[].nombre', instancia: 'pasos[]' }])
+    })
+
+    it('la instancia trae el `nombra` de verdad, no solo la ruta', () => {
+      let capturada: MetaCampo | undefined
+      recorre(conLista, (_ruta, _meta, _hoja, instancia) => {
+        capturada = instancia?.meta
+      })
+      expect(capturada?.nombra?.({ nombre: 'Mira' })).toBe('Paso: Mira')
+    })
+
+    it('sin ninguna lista de por medio, no hay instancia', () => {
+      const suelto = grupo({
+        etiqueta: 'Prueba', seccion: 'catar', ayuda: 'x',
+        campos: { titulo: texto({ etiqueta: 'Título', seccion: 'catar', ayuda: 'y', maxCaracteres: 20 }) },
+      })
+      let capturada: unknown = 'sin tocar'
+      recorre(suelto, (_ruta, _meta, _hoja, instancia) => {
+        capturada = instancia
+      })
+      expect(capturada).toBeUndefined()
+    })
+
+    it('la lista MÁS CERCANA gana: una lista anidada pisa la de más afuera', () => {
+      const interno = grupo({
+        etiqueta: 'Interno', seccion: 'catar', ayuda: 'x',
+        nombra: (v) => `Interno: ${(v as { n?: string }).n ?? ''}`,
+        campos: { n: texto({ etiqueta: 'N', seccion: 'catar', ayuda: 'y', maxCaracteres: 10 }) },
+      })
+      const externo = grupo({
+        etiqueta: 'Externo', seccion: 'catar', ayuda: 'x',
+        nombra: () => 'Externo',
+        campos: {
+          internos: lista({
+            etiqueta: 'Internos', seccion: 'catar', ayuda: 'x', minItems: 1, maxItems: 5, elemento: interno,
+          }),
+        },
+      })
+      const raiz = grupo({
+        etiqueta: 'Raíz', seccion: 'catar', ayuda: 'x',
+        campos: {
+          externos: lista({
+            etiqueta: 'Externos', seccion: 'catar', ayuda: 'x', minItems: 1, maxItems: 5, elemento: externo,
+          }),
+        },
+      })
+      let capturada: string | undefined
+      recorre(raiz, (ruta, _meta, _hoja, instancia) => {
+        if (ruta === 'externos[].internos[].n') capturada = instancia?.ruta
+      })
+      expect(capturada).toBe('externos[].internos[]')
+    })
+  })
+
   it('recorre() no trata una unión SIN discriminante como hoja: truena y dice qué falta', () => {
     // Silencio es el peor resultado acá: una unión emitida como hoja deja
     // todos los campos de sus variantes invisibles para el panel, sin error.

@@ -141,3 +141,155 @@
   margin: 0;
   text-align: center;
 }
+
+/* El editor (Tarea 2, fase 6): navegación por sección y, debajo, los
+   campos de esa sección. `.panel-shell` centra horizontalmente con
+   `align-items: center`, así que el editor necesita su propio ancho —
+   más generoso que el formulario de entrada porque acá hay párrafos y
+   contadores, pero acotado igual para no volverse un renglón larguísimo
+   en pantallas anchas. */
+
+.panel-editor {
+  width: min(560px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  align-items: stretch;
+  text-align: left;
+}
+
+.panel-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  background: var(--mrc-marca-crema);
+  padding-block: 0.5rem;
+  z-index: 1;
+}
+
+.panel-selector-control {
+  font-size: 1.0625rem;
+  min-height: 52px;
+  padding: 0.75rem 0.9rem;
+  border: 2px solid var(--mrc-marca-textoSuave);
+  border-radius: 10px;
+  background: var(--mrc-marca-blanco);
+  color: var(--mrc-marca-tinta);
+  font-family: var(--mrc-font-texto);
+  width: 100%;
+}
+
+.panel-selector-control:focus-visible {
+  outline: 3px solid var(--mrc-marca-rojo);
+  outline-offset: 1px;
+}
+
+.panel-campos {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.panel-grupo-titulo {
+  font-family: var(--mrc-font-titular);
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin: 0;
+  padding-top: 0.5rem;
+  border-top: 2px solid var(--mrc-marca-bandaCalida);
+}
+
+.panel-campo-en-grupo {
+  padding-left: 0.85rem;
+  border-left: 3px solid var(--mrc-marca-bandaCalida);
+}
+
+.panel-campo-editable {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding-block: 0.25rem;
+}
+
+.panel-campo-etiqueta {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.panel-campo-sufijo {
+  font-weight: 400;
+  color: var(--mrc-marca-textoSuave);
+}
+
+.panel-campo-ayuda {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--mrc-marca-textoSuave);
+}
+
+.panel-campo-input,
+.panel-campo-textarea {
+  font-size: 1.0625rem;
+  min-height: 52px;
+  padding: 0.75rem 0.9rem;
+  border: 2px solid var(--mrc-marca-textoSuave);
+  border-radius: 10px;
+  background: var(--mrc-marca-blanco);
+  color: var(--mrc-marca-tinta);
+  font-family: var(--mrc-font-texto);
+  width: 100%;
+}
+
+.panel-campo-textarea {
+  resize: vertical;
+}
+
+.panel-campo-input:focus-visible,
+.panel-campo-textarea:focus-visible {
+  outline: 3px solid var(--mrc-marca-rojo);
+  outline-offset: 1px;
+}
+
+.panel-campo-input[aria-invalid='true'],
+.panel-campo-textarea[aria-invalid='true'] {
+  border-color: var(--mrc-marca-rojoHondo);
+}
+
+.panel-campo-contador {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--mrc-marca-textoSuave);
+  text-align: right;
+}
+
+.panel-campo-error {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--mrc-marca-rojoHondo);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.panel-campo-arreglo {
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: var(--mrc-font-texto);
+  color: var(--mrc-marca-tinta);
+  background: var(--mrc-marca-blanco);
+  border: 2px solid var(--mrc-marca-rojoHondo);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.panel-campo-arreglo:focus-visible {
+  outline: 3px solid var(--mrc-marca-rojoHondo);
+  outline-offset: 1px;
+}
