@@ -544,12 +544,17 @@ export function PantallaPublicacion({
          * única salida de verdad («volver a abrir el panel») no estaba
          * escrita en ningún lado de esta pantalla.
          */}
-        <p className="panel-aviso">
-          Esto trae lo más reciente del sitio, así tu cambio sí se puede publicar. No perdiste nada: lo que escribiste sigue guardado.
-        </p>
         <button type="button" className="panel-boton" onClick={onVolverAAbrirElPanel}>
           Volver a abrir el panel
         </button>
+        {/*
+         * El texto va DEBAJO de su botón, no arriba: arriba quedaba pegado
+         * a «Reintentar» y «Esto trae lo más reciente del sitio» se leía
+         * como si describiera a ese otro botón.
+         */}
+        <p className="panel-aviso">
+          Esto trae lo más reciente del sitio, así tu cambio sí se puede publicar. No perdiste nada: lo que escribiste sigue guardado.
+        </p>
         <button type="button" className="panel-enlace-discreto" onClick={onCancelar}>
           Cancelar
         </button>
