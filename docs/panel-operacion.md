@@ -346,6 +346,42 @@ revocar (paso 4), generar (pasos 5 a 10), pegar (paso 11), redeploy (paso
 
 ## Renovar el token de GitHub (Tarea 13: el aviso de los treinta días)
 
+> ### ⚠️ ESTADO REAL HOY (decidido el 2026-09-18, Marcos): el token NO vence
+>
+> El PAT que usa el panel es **fine-grained, sin fecha de vencimiento**
+> («Never»). Eso significa que **`salud` va a mostrar siempre
+> `"tokenVence": null` y `"diasParaVencer": null`, y eso está BIEN**: el panel
+> no está ciego ni roto, es que no hay nada que vigilar. GitHub solo manda la
+> cabecera del vencimiento cuando el token tiene uno.
+>
+> **Si alguna vez ves esos dos campos en `null` y te asusta, no busques un bug
+> acá: mirá primero si el token tiene fecha.** Esta nota existe porque, sin
+> ella, dentro de seis meses alguien —vos mismo— va a leer `tokenVence: null`
+> y va a salir a arreglar una vigilancia que funciona perfecto.
+>
+> **Qué se ganó y qué se perdió con esa decisión, para que se pueda revisar
+> con la cabeza fría:**
+>
+> - **Se ganó** que el modo de falla que toda esta sección describe —el día que
+>   vence, ella publica y recibe un 502 sin que nada haya cambiado— **hoy no
+>   puede ocurrir**. No hay fecha que llegue.
+> - **Se perdió** la única cosa que acotaba una filtración. Un token sin
+>   vencimiento que se escape en un log, en una captura de pantalla o en un
+>   `printenv` en la ventana equivocada **sirve para siempre**. No caduca solo:
+>   hay que acordarse de revocarlo.
+>
+> **Cuándo hay que revisar esta decisión.** Si alguna vez sospechás que el
+> token se vio —aunque sea una sospecha floja—, no alcanza con esperar: andá
+> derecho a «Cómo rotar el PAT de GitHub en cinco minutos», más arriba. Con un
+> token que vence, el daño de una filtración tiene techo; con éste, el techo lo
+> ponés vos.
+>
+> Y si algún día le ponés fecha, **todo lo que sigue en esta sección se activa
+> solo**: la maquinaria del aviso de los treinta días ya está construida,
+> probada y colgada de cada acción del panel que habla con GitHub. No hay nada
+> que programar — empieza a avisar el día que la cabecera aparezca.
+
+
 Un fine-grained PAT tiene fecha de vencimiento OBLIGATORIA — GitHub no deja
 crear uno sin ella (como mucho, «No expiration», si la organización lo
 permite; ver el paso 6 de la sección de arriba). El día que vence, el panel
@@ -386,8 +422,8 @@ depurarlo:
   más, no un agujero de seguridad — pero si alguna vez ves dos avisos el
   mismo día, es por eso, no por un bug.
 - **Si la respuesta de GitHub no trae la cabecera de vencimiento —un token
-  CLÁSICO en vez de fine-grained, por ejemplo—, el panel nunca inventa una
-  fecha.** `tokenVence` y `diasParaVencer` quedan en `null` y no sale ningún
+  clásico, o uno fine-grained SIN fecha, que es el caso de hoy (ver el recuadro
+  al principio de esta sección)—, el panel nunca inventa una fecha.** `tokenVence` y `diasParaVencer` quedan en `null` y no sale ningún
   correo. Poner «vence en un año» a ojo sería peor que no saber: apagaría la
   vigilancia justo el día que más hace falta que esté prendida.
 
