@@ -263,28 +263,44 @@ export default function Sesion({ base }: { base: string | null }) {
   }
 
   /**
-   * [H5, ronda de arreglo] Recarga el panel ENTERO en vez de resetear
-   * `documentos`/`originales` en memoria. Antes, `setOriginales(contenidoPublicado())`
-   * volvía al paquete COMPILADO del panel —no a lo que está vivo
-   * después del deshacer—, así que con dos publicaciones en la misma
-   * sesión (publica A, publica B, deshace B) la bandeja de revisión
-   * comparaba dos copias igual de viejas, mostraba «1 cambio», y la
-   * publicación siguiente escribía ese cambio MÁS la reversión en
-   * silencio de A — trabajo suyo que desaparecía sin que la pantalla que
-   * existe para evitar exactamente eso se diera cuenta.
+   * Recarga el panel ENTERO — la única salida de verdad en DOS pantallas
+   * distintas, por la MISMA razón de fondo: ninguna de las ocho acciones
+   * del servidor devuelve el contenido vivo de los tres documentos
+   * (`historial()` da el `base`, no el contenido; arreglar eso de raíz
+   * tocaría `src/servidor/**`, fuera del alcance de hoy), así que no hay
+   * forma de armar un `originales`/`baseActual` frescos a mano. Una
+   * recarga fuerza a `historial()` a pedir un `base` de verdad Y a que
+   * `contenidoPublicado()` salga del paquete que HOY está desplegado —
+   * no es perfecta (si un despliegue en curso todavía no terminó, sigue
+   * mostrando el estado anterior un rato más), pero nunca es PEOR que
+   * abrir el panel de cero, que es la única garantía que se puede dar
+   * sin una acción nueva del servidor.
    *
-   * Ninguna de las ocho acciones del servidor devuelve el contenido vivo
-   * de los tres documentos (`historial()` da el `base`, no el contenido;
-   * arreglar eso de raíz tocaría `src/servidor/**`, fuera del alcance de
-   * hoy), así que no hay forma de armar un `originales` fresco a mano.
-   * Una recarga fuerza a `historial()` a pedir un `base` de verdad Y a
-   * que `contenidoPublicado()` salga del paquete que HOY está
-   * desplegado — no es perfecto (si el despliegue del deshacer todavía
-   * no terminó, sigue mostrando el estado anterior un rato más), pero
-   * nunca es PEOR que abrir el panel de cero, que es la única garantía
-   * que se puede dar sin una acción nueva del servidor.
+   * [H5, ronda de arreglo] La primera pantalla que la necesitó: «Volver a
+   * editar» tras deshacer. Antes, `setOriginales(contenidoPublicado())`
+   * volvía al paquete COMPILADO del panel —no a lo que está vivo después
+   * del deshacer—, así que con dos publicaciones en la misma sesión
+   * (publica A, publica B, deshace B) la bandeja de revisión comparaba
+   * dos copias igual de viejas, mostraba «1 cambio», y la publicación
+   * siguiente escribía ese cambio MÁS la reversión en silencio de A —
+   * trabajo suyo que desaparecía sin que la pantalla que existe para
+   * evitar exactamente eso se diera cuenta.
+   *
+   * [Última ronda] La segunda: el 409 de pisada en `error-publicar`. La
+   * ronda anterior aceptó «Reintentar» en esa fase (H1) razonando que
+   * reintentar con el MISMO `base` era seguro —lo sigue siendo— «porque o
+   * sale el mismo 409, o ya no hay choque» —eso es lo que estaba mal—.
+   * Un 409 de pisada es DETERMINISTA: el servidor compara el `base` VIEJO
+   * de ella contra la cabeza actual (`comparaRefs`, `acciones.ts`), y si
+   * Marcos tocó alguno de los tres documentos que el panel manda siempre
+   * juntos, ESE archivo sigue apareciendo en esa comparación contra
+   * CUALQUIER cabeza posterior — nunca se «despisa» solo. Como
+   * `baseActual` únicamente avanza con un ÉXITO, «Reintentar» nunca deja
+   * de chocar, y «Cancelar» y volver a publicar da exactamente lo mismo:
+   * un botón vivo que jamás puede tener éxito es, para ella, indistinguible
+   * de uno muerto. La única salida real es esta misma recarga.
    */
-  function alVolverAEditarTrasDeshacer() {
+  function recargaElPanel() {
     window.location.reload()
   }
 
@@ -389,7 +405,8 @@ export default function Sesion({ base }: { base: string | null }) {
           onReintentarSondeo={alReintentarSondeo}
           onDeshacer={() => void alConfirmarDeshacer()}
           onSeguirEditando={alCancelarPublicacion}
-          onVolverTrasDeshacer={alVolverAEditarTrasDeshacer}
+          onVolverTrasDeshacer={recargaElPanel}
+          onVolverAAbrirElPanel={recargaElPanel}
         />
       )}
     </div>
@@ -468,7 +485,7 @@ export function BotonesDeSalida({
  */
 export function PantallaPublicacion({
   estado, ahora, onConfirmar, onCancelar, onReintentarPublicar, onReintentarSondeo, onDeshacer, onSeguirEditando,
-  onVolverTrasDeshacer,
+  onVolverTrasDeshacer, onVolverAAbrirElPanel,
 }: {
   estado: EstadoPublicacion
   ahora: number
@@ -479,6 +496,7 @@ export function PantallaPublicacion({
   onDeshacer: () => void
   onSeguirEditando: () => void
   onVolverTrasDeshacer: () => void
+  onVolverAAbrirElPanel: () => void
 }) {
   if (estado.fase === 'revisando') {
     return (
@@ -516,6 +534,21 @@ export function PantallaPublicacion({
         </p>
         <button type="button" className="panel-boton" onClick={onReintentarPublicar}>
           Reintentar
+        </button>
+        {/*
+         * [Última ronda] «Reintentar» sigue sirviendo para un error de
+         * verdad transitorio (una mala conexión, un 502) — pero un 409 de
+         * pisada es DETERMINISTA (ver el docstring de `recargaElPanel`,
+         * más arriba en `Sesion.tsx`): con el MISMO `base` que ya chocó,
+         * reintentar nunca va a poder tener éxito. Sin este botón, la
+         * única salida de verdad («volver a abrir el panel») no estaba
+         * escrita en ningún lado de esta pantalla.
+         */}
+        <p className="panel-aviso">
+          Esto trae lo más reciente del sitio, así tu cambio sí se puede publicar. No perdiste nada: lo que escribiste sigue guardado.
+        </p>
+        <button type="button" className="panel-boton" onClick={onVolverAAbrirElPanel}>
+          Volver a abrir el panel
         </button>
         <button type="button" className="panel-enlace-discreto" onClick={onCancelar}>
           Cancelar

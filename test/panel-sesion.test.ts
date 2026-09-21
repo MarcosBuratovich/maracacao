@@ -31,6 +31,7 @@ function manejadoresDeMentira() {
     onDeshacer: () => {},
     onSeguirEditando: () => {},
     onVolverTrasDeshacer: () => {},
+    onVolverAAbrirElPanel: () => {},
   }
 }
 
@@ -62,6 +63,8 @@ const TEXTOS_VISIBLES = [
   'Cancelar',
   'Volver a editar',
   'Deshaciendo…',
+  'Volver a abrir el panel',
+  'Esto trae lo más reciente del sitio, así tu cambio sí se puede publicar. No perdiste nada: lo que escribiste sigue guardado.',
 ]
 
 describe('Sesion — textos propios', () => {
@@ -200,6 +203,39 @@ describe('PantallaPublicacion — cada fase renderiza con salida', () => {
     )
     expect(html).toContain('Marcos cambió algo del sitio mientras editabas: vuelve a intentar la publicación.')
     expect(html).toContain('Reintentar')
+  })
+
+  /*
+   * [Última ronda] Un 409 de pisada es DETERMINISTA (el servidor compara
+   * el `base` VIEJO de ella contra la cabeza actual — ver el docstring de
+   * `recargaElPanel` en `Sesion.tsx`): con el MISMO `base`, «Reintentar»
+   * nunca puede tener éxito. Este test verifica las DOS salidas que
+   * `'error-publicar'` tiene que ofrecer — «Reintentar» (sigue sirviendo
+   * para un error transitorio) Y «Volver a abrir el panel» (la única
+   * salida de verdad para el 409 que no se va a ir solo) —, con el texto
+   * que la tranquiliza: no perdió nada.
+   */
+  it('"error-publicar": trae TAMBIÉN «Volver a abrir el panel», con el texto que la tranquiliza — no perdió nada', () => {
+    const html = renderToStaticMarkup(
+      createElement(PantallaPublicacion, {
+        estado: {
+          fase: 'error-publicar',
+          problema: 'Marcos cambió algo del sitio mientras editabas: vuelve a intentar la publicación.',
+          cambios: [],
+          fraseCorta: 'cambia 1 texto',
+        },
+        ahora: 0,
+        ...manejadoresDeMentira(),
+      }),
+    )
+    // Las DOS salidas, juntas — nunca una sola.
+    expect(html).toContain('Reintentar')
+    expect(html).toContain('Volver a abrir el panel')
+    // El texto que le explica por qué, sin nombrar un `base` que ella no conoce.
+    expect(html).toContain(
+      'Esto trae lo más reciente del sitio, así tu cambio sí se puede publicar. No perdiste nada: lo que escribiste sigue guardado.',
+    )
+    expect(jergaEn(html)).toBeNull()
   })
 
   it('"sondeando"/"terminado": los avisos y los botones de salida están, sea o no `estado: listo` — nunca una pantalla colgada', () => {
