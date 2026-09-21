@@ -80,7 +80,14 @@
   flex: none;
 }
 
+/* `.panel-boton` viste tanto a `<button>` como a un `<a>` («Ver mi
+   sitio», Tarea 4): el `display: inline-flex` centra el texto en los dos
+   por igual, y `text-decoration: none` saca el subrayado que un enlace
+   trae de fábrica. */
 .panel-boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 52px;
   font-size: 1.0625rem;
   font-weight: 700;
@@ -91,6 +98,8 @@
   border-radius: 10px;
   padding: 0.75rem 1.25rem;
   cursor: pointer;
+  text-decoration: none;
+  text-align: center;
   width: 100%;
 }
 
@@ -294,11 +303,10 @@
   outline-offset: 1px;
 }
 
-/* El borrador (Tarea 3, fase 6): comparte pantalla con el editor, así que
-   comparte también su ancho y su gramática visual — nada nuevo, los mismos
-   `.panel-boton`/`.panel-aviso`/`.panel-error` de arriba, más un
-   contenedor para agrupar la pantalla de conflicto y los avisos de
-   guardado. */
+/* El borrador y publicar/saber/deshacer (Tareas 3 y 4, fase 6): comparten
+   pantalla con el editor, así que comparten también su ancho y su gramática
+   visual — nada nuevo, los mismos `.panel-boton`/`.panel-aviso`/`.panel-error`
+   de arriba, más un puñado de contenedores para agruparlos. */
 
 .panel-sesion {
   width: min(560px, 100%);
@@ -317,4 +325,60 @@
   border: 2px solid var(--mrc-marca-rojoHondo);
   border-radius: 10px;
   background: var(--mrc-marca-blanco);
+}
+
+.panel-revision,
+.panel-resultado {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: stretch;
+  text-align: left;
+}
+
+.panel-revision-lista {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.panel-avisos {
+  padding: 0.85rem;
+  border: 2px solid var(--mrc-marca-amarillo);
+  border-radius: 10px;
+  background: var(--mrc-marca-blanco);
+}
+
+.panel-avisos-titulo {
+  margin: 0 0 0.5rem;
+  font-weight: 700;
+}
+
+.panel-avisos-lista {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.panel-boton-deshacer {
+  min-height: 52px;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  font-family: var(--mrc-font-titular);
+  color: var(--mrc-marca-blanco);
+  background: var(--mrc-marca-oscuro);
+  border: none;
+  border-radius: 10px;
+  padding: 0.75rem 1.25rem;
+  cursor: pointer;
+  width: 100%;
+}
+
+.panel-boton-deshacer:focus-visible {
+  outline: 3px solid var(--mrc-marca-rojo);
+  outline-offset: 2px;
 }

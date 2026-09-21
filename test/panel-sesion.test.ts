@@ -1,18 +1,17 @@
 /*
- * `src/panel/Sesion.tsx` (Tarea 3, fase 6): la pantalla del borrador —
- * autoguardado y el conflicto con otro aparato. La Tarea 4 (publicar,
- * saber, deshacer) se suma acá mismo en el próximo commit, porque comparte
- * esta pantalla.
+ * `src/panel/Sesion.tsx` (Tareas 3 y 4, fase 6): la pantalla que comparte el
+ * borrador y publicar/saber/deshacer.
  *
- * Toda la lógica de VERDAD —las transiciones de estado, el auto-guardado—
- * vive en `./borrador.ts` y ya se prueba ahí, directo, sin React
- * (`test/panel-borrador.test.ts`). Acá, sin DOM en el harness (misma razón
- * que documentan `test/panel-app.test.ts`/`test/panel-editor.test.ts`: este
- * proyecto no tiene jsdom/happy-dom), lo que se puede probar es que el
+ * Toda la lógica de VERDAD —las transiciones de estado, el sondeo, el
+ * auto-guardado— vive en `./borrador.ts` y `./publicacion.ts`, y ya se
+ * prueba ahí, directo, sin React (`test/panel-borrador.test.ts`,
+ * `test/panel-publicacion.test.ts`). Acá, sin DOM en el harness (misma
+ * razón que documentan `test/panel-app.test.ts`/`test/panel-editor.test.ts`:
+ * este proyecto no tiene jsdom/happy-dom), lo que se puede probar es que el
  * primer render —antes de que corra ningún efecto, que en SSR nunca
  * corren— no revienta, y que ninguno de los textos PROPIOS de este
- * componente (los que no vienen de `src/contenido/**` ni del servidor)
- * trae jerga.
+ * componente (los que no vienen de `src/contenido/**` ni del servidor) trae
+ * jerga.
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -38,6 +37,17 @@ const TEXTOS_VISIBLES = [
   'Guardar mis cambios de todos modos',
   'Ver ese borrador',
   'No pudimos preparar la publicación: recarga el panel.',
+  'Todavía no cambiaste nada que publicar.',
+  'Publicar',
+  'Para revisar cuando puedas (esto no bloquea nada):',
+  'Ver mi sitio',
+  'Deshacer esta publicación',
+  'Seguir editando',
+  'Revisa lo que vas a publicar',
+  'Confirmar y publicar',
+  'Cancelar',
+  'Volver a editar',
+  'Deshaciendo…',
 ]
 
 describe('Sesion — textos propios', () => {
@@ -56,9 +66,11 @@ describe('Sesion — textos propios', () => {
 })
 
 describe('Sesion — el primer render no revienta (sin DOM: `renderToStaticMarkup`)', () => {
-  it('antes de que corra ningún efecto (SSR nunca los corre), muestra que está buscando un borrador — nunca el editor', () => {
+  it('antes de que corra ningún efecto (SSR nunca los corre), muestra que está buscando un borrador — nunca el editor ni el resultado de una publicación', () => {
     const html = renderToStaticMarkup(createElement(Sesion, { base: 'a'.repeat(40) }))
-    expect(html).toBe('<p class="panel-aviso" role="status">Buscando si tienes cambios guardados en otro aparato…</p>')
+    expect(html).toContain('Buscando si tienes cambios guardados en otro aparato…')
+    expect(html).not.toContain('Publicar')
+    expect(html).not.toContain('Revisa lo que vas a publicar')
   })
 
   it('con `base: null` renderiza igual, sin tirar', () => {
