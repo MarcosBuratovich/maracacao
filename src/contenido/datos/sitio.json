@@ -114,15 +114,15 @@
     "notaPrecio": "Jengibre y naranja"
   },
   "polvoCard": {
-    "titulo": "En polvo · 250\u00a0g",
-    "chip": "PRÓXIMAMENTE",
+    "titulo": "En polvo · 250\u00a0g y 1\u00a0kg",
+    "chip": "PARA CAFETERÍAS",
     "cuerpo": "Para beber frío o caliente, con espuma, aroma y tradición."
   },
   "polvo": {
-    "kicker": "LO QUE VIENE",
-    "chip": "PRÓXIMAMENTE",
+    "kicker": "PARA CAFETERÍAS",
+    "chip": "YA DISPONIBLE",
     "titulo": "Chocolate para beber",
-    "cuerpo": "Ocho variedades hechas con cocoa natural, cocoa alcalina y pasta de cacao.",
+    "cuerpo": "Seis variedades elaboradas con cocoa, pasta de cacao, frutas y esencias naturales.",
     "altPrefijo": "Etiqueta del chocolate en polvo sabor"
   },
   "catar": {
@@ -229,7 +229,7 @@
         ],
         "pasos": "Bate la crema hasta que esté firme. Mezcla aparte el yogur con el chocolate en polvo. Incorpora la crema con suavidad y refrigera una hora.",
         "tip": "El cardamomo hace que un postre sencillísimo sepa mucho más sofisticado.",
-        "chipPolvo": "USA EL POLVO · PRÓXIMAMENTE"
+        "chipPolvo": "USA EL POLVO"
       }
     ]
   },
@@ -276,14 +276,16 @@
         "ficha": "#chocolate-en-polvo",
         "etiqueta": "Chocolate en polvo",
         "titulo": "Chocolate en polvo · 250\u00a0g y 1\u00a0kg",
-        "precioNota": "próximamente",
+        "precioNota": "Precio de mayoreo",
         "precio": null,
         "clave": "salDeMar",
-        "cuerpo": "Ocho variedades para la taza, hechas con cocoa natural, cocoa alcalina y pasta de cacao.",
+        "cuerpo": "Seis variedades para la taza, elaboradas con cocoa, pasta de cacao, frutas y esencias naturales.",
         "datos": [
+          "30\u00a0g por taza, en leche o agua",
           "Se disuelve en bebidas frías o calientes",
           "También para licuados, repostería y postres",
-          "Aún no está a la venta: escríbenos si te interesa"
+          "Presentaciones de 250\u00a0g y 1\u00a0kg",
+          "Pregunta por precio de mayoreo"
         ]
       },
       {
@@ -378,6 +380,9 @@
     "correoNota": "Pedidos, mayoreo, regalos y dudas.",
     "copiar": "Copiar correo",
     "copiado": "¡Copiado!",
+    "whatsappEtiqueta": "WHATSAPP",
+    "whatsapp": "+52 1 55 1009 4606",
+    "whatsappNota": "Pedidos, mayoreo y dudas, por mensaje.",
     "redesEtiqueta": "REDES",
     "redes": "@maracacaomx",
     "redesNota": "Búscanos en redes sociales.",
@@ -457,7 +462,7 @@
       },
       {
         "ancla": "#polvo",
-        "texto": "Chocolate en polvo (próximamente)"
+        "texto": "Chocolate en polvo"
       },
       {
         "ancla": "/fichas-tecnicas",

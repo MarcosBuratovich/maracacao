@@ -151,8 +151,19 @@ describe('gotas y polvo', () => {
     expect(gotas).toHaveLength(6)
   })
 
-  it('la línea de polvo trae las OCHO etiquetas (el canvas mostraba 4)', () => {
-    expect(polvo).toHaveLength(8)
+  it('cada variedad de polvo tiene su etiqueta en disco (el canvas mostraba 4)', () => {
+    // [2026-09-22] Eran ocho: las seis variedades saborizadas más «cocoa
+    // natural» y «cocoa alcalina». Las dos cocoas salieron de acá porque no
+    // son sabores del polvo sino productos aparte —cada una tiene su PROPIA
+    // ficha técnica—, y listarlas como variedades inflaba el conteo que el
+    // sitio publica («Ocho variedades…»).
+    //
+    // Lo que este test cuida no es el número sino lo de abajo: que ninguna
+    // variedad quede sin su imagen de etiqueta. El día que aparezca
+    // «neutro» —que la expo ya anuncia— va a hacer falta
+    // `etiqueta-neutro.webp`, y sin ese archivo esto falla acá en vez de
+    // fallar como un hueco en la página.
+    expect(polvo).toHaveLength(6)
     for (const p of polvo) {
       expect(() => readFileSync(`public/sitio/${p.archivo}.webp`)).not.toThrow()
     }

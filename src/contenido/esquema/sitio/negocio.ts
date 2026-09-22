@@ -85,7 +85,7 @@ const panelDeProducto = (p: {
       precioNota: texto({
         seccion: 'negocios',
         etiqueta: 'Palabra antes del precio',
-        ayuda: 'La palabra chiquita antes del precio: «desde», «próximamente».',
+        ayuda: 'La palabra chiquita antes del precio: «desde», «Precio de mayoreo».',
         maxCaracteres: 20,
       }),
       precio: p.precio,
