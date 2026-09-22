@@ -231,22 +231,43 @@ describe('nada de lo que arma este módulo usa jerga técnica', () => {
 
 describe('Historial — renderiza sin tirar, con contenido real', () => {
   it('con cero publicaciones: no pinta nada (PantallaEditando ni lo llama en ese caso, pero no revienta si algún día se lo llama así)', () => {
-    const html = renderToStaticMarkup(createElement(Historial, { publicaciones: [] }))
+    const html = renderToStaticMarkup(createElement(Historial, { publicaciones: [], ahora: AHORA }))
     expect(html).toBe('')
   })
 
   it('con publicaciones: la frase de arriba está, en palabras (no ISO), y el botón para ver todo también', () => {
     const p = publicacion({ sha: 'nuevo', resumen: 'cambia el precio de las trufas', cuando: enElDia(21, 8, 2026, 9, 3) })
-    const html = renderToStaticMarkup(createElement(Historial, { publicaciones: [p] }))
+    const html = renderToStaticMarkup(createElement(Historial, { publicaciones: [p], ahora: AHORA }))
     expect(html).toContain('cambia el precio de las trufas')
     expect(html).toContain('Ver tu historial completo (1)')
     expect(html).not.toMatch(/\d{4}-\d{2}-\d{2}T/)
   })
 
+  it('el reloj que se le pasa MANDA sobre el del sistema — el guardián de que esto no se vuelva a atar a la fecha de hoy', () => {
+    // [2026-09-22] Este test existe por un build rojo en `main`. El primer
+    // test de esta pantalla fijaba una fecha absoluta y esperaba «hoy a las
+    // 09:03»: pasó el día que se escribió y se cayó a la mañana siguiente,
+    // cuando esa misma fecha pasó a ser «ayer». Como `pnpm build` es el
+    // `buildCommand` de Vercel, un test atado al reloj no es una molestia:
+    // es la clienta sin poder publicar.
+    //
+    // La forma de que no vuelva a pasar no es recordar la regla, es que un
+    // test falle si alguien saca la inyección: acá la MISMA publicación se
+    // pinta con dos relojes lejanos entre sí y tiene que leerse distinto.
+    const p = publicacion({ cuando: enElDia(21, 8, 2026, 9, 3) })
+    const elMismoDia = renderToStaticMarkup(createElement(Historial, { publicaciones: [p], ahora: AHORA }))
+    const mesesDespues = renderToStaticMarkup(
+      createElement(Historial, { publicaciones: [p], ahora: new Date(2027, 2, 15, 4, 0, 0).getTime() }),
+    )
+    expect(elMismoDia).toContain('hoy a las 09:03')
+    expect(mesesDespues).toContain('el 21 de septiembre de 2026')
+    expect(mesesDespues).not.toContain('hoy a las 09:03')
+  })
+
   it('una reversión se ve distinta de un cambio suelto en el HTML de verdad, y el sha nunca aparece', () => {
     const original = publicacion({ sha: 'orig-sha-1234567890', resumen: 'cambia Línea de cierre' })
     const reversion = publicacion({ sha: 'rev-sha-0987654321', resumen: 'cambia Línea de cierre', revierteA: 'orig-sha-1234567890' })
-    const html = renderToStaticMarkup(createElement(Historial, { publicaciones: [reversion, original] }))
+    const html = renderToStaticMarkup(createElement(Historial, { publicaciones: [reversion, original], ahora: AHORA }))
     expect(html).toMatch(/deshace/)
     expect(html).not.toContain('orig-sha-1234567890')
     expect(html).not.toContain('rev-sha-0987654321')
@@ -255,7 +276,7 @@ describe('Historial — renderiza sin tirar, con contenido real', () => {
 
   it('el correo del autor nunca aparece crudo en el HTML', () => {
     const p = publicacion({ autor: 'clienta-secreta@maracacao.mx' })
-    const html = renderToStaticMarkup(createElement(Historial, { publicaciones: [p] }))
+    const html = renderToStaticMarkup(createElement(Historial, { publicaciones: [p], ahora: AHORA }))
     expect(html).not.toContain('clienta-secreta@maracacao.mx')
     expect(html).toContain('Lo publicaste tú')
   })
@@ -263,14 +284,14 @@ describe('Historial — renderiza sin tirar, con contenido real', () => {
 
 describe('PantallaEditando — la primera pantalla (spec §4.5)', () => {
   it('cero publicaciones: ni un hueco ni un error — el aviso de primera vez de siempre, y no revienta', () => {
-    const html = renderToStaticMarkup(createElement(PantallaEditando, { base: 'a'.repeat(40), publicaciones: [] }))
+    const html = renderToStaticMarkup(createElement(PantallaEditando, { base: 'a'.repeat(40), publicaciones: [], ahora: AHORA }))
     expect(html).toContain(textoPublicaciones(0))
     expect(html).not.toMatch(/error/i)
   })
 
   it('con publicaciones: lo primero que se pinta después del título es el resultado de la última — no un tablero limpio', () => {
     const p = publicacion({ sha: 'nuevo', resumen: 'cambia el precio de las trufas', cuando: enElDia(21, 8, 2026, 9, 3) })
-    const html = renderToStaticMarkup(createElement(PantallaEditando, { base: 'a'.repeat(40), publicaciones: [p] }))
+    const html = renderToStaticMarkup(createElement(PantallaEditando, { base: 'a'.repeat(40), publicaciones: [p], ahora: AHORA }))
     expect(html).toContain('cambia el precio de las trufas')
     expect(html).toContain('hoy a las 09:03')
     // No hay una segunda pantalla de por medio: el título va antes del
