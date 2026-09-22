@@ -1,14 +1,26 @@
 /*
  * «¿Ya está en el sitio?».
  *
- * Son DOS preguntas y las dos tienen que dar que sí (spec §4.5, decisión B2):
- *   1. La plataforma dice que el despliegue TERMINÓ.
- *   2. `version.json` —servido por el CDN, sin caché— dice que el commit que
- *      está entregando es ESE.
- * Entre una y otra hay una ventana de segundos. Es corta, y es exactamente
- * cuando ella toca «Ver mi sitio» y ve el precio viejo.
+ * [Inversión de precedencia, medida en producción] Antes esto eran DOS
+ * preguntas que las dos tenían que dar que sí (spec §4.5, decisión B2).
+ * Dejó de serlo: `version.json` —servido por el CDN mismo, sin caché— es
+ * un HECHO observable, no un reporte sobre el hecho. Si dice que el CDN ya
+ * entrega el sha publicado, eso ES que el cambio está en el sitio, y
+ * ninguna otra fuente hace falta para confirmarlo.
  *
- * Sin red a propósito: recibe las dos respuestas ya leídas. Así las once
+ * La plataforma sigue haciendo falta, pero para la otra pregunta: cuando
+ * el CDN TODAVÍA no sirve el sha publicado, distinguir «el despliegue
+ * falló» de «todavía está yendo» — algo que `version.json` no puede
+ * contestar, porque en los dos casos sigue mostrando lo viejo.
+ *
+ * Medido en producción, el día de este arreglo: el despliegue había
+ * terminado bien, el CDN ya servía el sha nuevo, y la plataforma —por una
+ * razón ajena a este archivo, todavía en diagnóstico— contestaba que no
+ * encontraba el despliegue. Con el orden viejo, eso eran 31 sondeos
+ * seguidos de «en curso» con el cambio YA publicado: la fuente barata y
+ * confiable esperando detrás de la que podía fallar.
+ *
+ * Sin red a propósito: recibe las dos respuestas ya leídas. Así todas las
  * combinaciones se prueban en milisegundos, y la acción del router queda
  * siendo dos lecturas y una llamada.
  *
@@ -125,9 +137,25 @@ export interface Veredicto {
 }
 
 export function decide(e: {
-  despliegue: EstadoDeDespliegue
+  /**
+   * `null` es un valor DISTINTO de `'desconocido'`, a propósito. `'desconocido'`
+   * es un reporte real de la plataforma: «no tengo ningún despliegue para
+   * este commit» (vercel.ts). `null` es la AUSENCIA de reporte: no se le
+   * pudo preguntar nada — la plataforma no contestó. Mezclar los dos fue un
+   * bug real de esta misma vuelta de arreglos: `estadoAccion` usaba
+   * `'desconocido'` para «no pudimos preguntarle», y son dos hechos
+   * distintos que un log de Marcos necesita poder distinguir. Las dos caen
+   * en la misma asimetría igual —nunca `'listo'` ni `'falló'` por sí
+   * solas— así que `decide()` no necesita una rama nueva, solo el tipo que
+   * lo diga.
+   */
+  despliegue: EstadoDeDespliegue | null
   url: string | null
-  /** El sha que `version.json` dice que el CDN está sirviendo, o `null`. */
+  /**
+   * El sha que `version.json` dice que el CDN está sirviendo, o `null` si
+   * esa lectura falló o no se hizo. Si coincide con `shaPublicado`, ALCANZA
+   * para «listo» por sí solo — ver el comentario dentro de `decide()`.
+   */
   shaServido: string | null
   /** El sha que ella publicó. */
   shaPublicado: string
@@ -141,14 +169,34 @@ export function decide(e: {
    */
   fracaso?: Fracaso
 }): Veredicto {
-  if (e.despliegue === 'falló') {
-    return { estado: 'falló', frase: fraseDeFracaso(e.fracaso), reintentarEn: null, url: e.url }
+  // [Inversión de precedencia] Esta rama va PRIMERO, antes de mirar
+  // `despliegue` — a propósito, y por esto: el CDN es el hecho observable
+  // (lo que de verdad se le está sirviendo a cualquiera que abra el
+  // sitio); `despliegue` es un REPORTE de la plataforma sobre ese hecho, un
+  // paso más lejos de la verdad, y puede estar mal (es exactamente lo que
+  // se midió en producción: la plataforma decía que no encontraba un
+  // despliegue que el CDN ya estaba sirviendo). Cuando las dos fuentes se
+  // contradicen — acá incluido el caso `despliegue === 'falló'` con el sha
+  // nuevo ya servido, una combinación rara pero posible—, gana la que se
+  // puede observar, no la que informa sobre ella.
+  //
+  // `shaServido` puede ser `null` (version.json no contestó, o se está
+  // construyendo fuera de la plataforma); ahí no coincide con nada, que es
+  // lo correcto — una fuente caída no se vuelve un «sí» por omisión.
+  if (e.shaServido === e.shaPublicado) {
+    return { estado: 'listo', frase: FRASE_LISTO, reintentarEn: null, url: e.url }
   }
 
-  // [B2] Las dos fuentes. `shaServido` puede ser `null` construyendo fuera de
-  // la plataforma; ahí no coincide con nada, que es lo correcto.
-  if (e.despliegue === 'listo' && e.shaServido === e.shaPublicado) {
-    return { estado: 'listo', frase: FRASE_LISTO, reintentarEn: null, url: e.url }
+  // Acá abajo, el CDN TODAVÍA no confirma el sha publicado (o no contestó).
+  // Eso es exactamente lo que se ve tanto si el despliegue falló como si
+  // sigue yendo — `version.json` no puede distinguir los dos casos, porque
+  // en los dos sigue mostrando lo viejo. Para esa distinción sí hace falta
+  // la plataforma — y si ni siquiera a ELLA se le pudo preguntar
+  // (`despliegue === null`), `null !== 'falló'` deja esto caer derecho a la
+  // asimetría de abajo: lo que no se entiende se lee como «en curso»,
+  // nunca como «falló».
+  if (e.despliegue === 'falló') {
+    return { estado: 'falló', frase: fraseDeFracaso(e.fracaso), reintentarEn: null, url: e.url }
   }
 
   // «NUNCA gira infinito» (spec §4.5). Y la frase no promete un aviso: si ella

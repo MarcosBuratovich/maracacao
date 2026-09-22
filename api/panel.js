@@ -18419,11 +18419,11 @@ function fraseDeFracaso(f) {
   return "No sali\xF3 y no pude dejarlo como estaba. Av\xEDsale a Marcos para que lo revise.";
 }
 function decide(e) {
+  if (e.shaServido === e.shaPublicado) {
+    return { estado: "listo", frase: FRASE_LISTO, reintentarEn: null, url: e.url };
+  }
   if (e.despliegue === "fall\xF3") {
     return { estado: "fall\xF3", frase: fraseDeFracaso(e.fracaso), reintentarEn: null, url: e.url };
-  }
-  if (e.despliegue === "listo" && e.shaServido === e.shaPublicado) {
-    return { estado: "listo", frase: FRASE_LISTO, reintentarEn: null, url: e.url };
   }
   if (e.desdeHaceMs > DEJA_DE_PREGUNTAR_MS) {
     return { estado: "enCurso", frase: FRASE_TARDA, reintentarEn: null, url: e.url };
@@ -18717,7 +18717,7 @@ async function revierteYAvisaAMarcos(sha, autorReal, contexto) {
   });
   return { revertido, avisadoAMarcos };
 }
-async function revisaLaCabeza(contexto) {
+async function revisaLaCabeza(contexto, leeShaServido = memoizaLecturaDelCdn(contexto)) {
   try {
     if (!contexto.env.PANEL_VERCEL_TOKEN) return null;
     const gh = clienteDeGitHub(contexto);
@@ -18733,6 +18733,13 @@ async function revisaLaCabeza(contexto) {
     const vercel = clienteVercel({ token: contexto.env.PANEL_VERCEL_TOKEN, proyecto, fetch: contexto.fetch });
     const { estado } = await vercel.despliegueDe(cabeza.sha);
     if (estado !== "fall\xF3") return null;
+    const shaServido = await leeShaServido();
+    if (shaServido === cabeza.sha) {
+      console.error(
+        `revisaLaCabeza: la plataforma dice que el despliegue de ${cabeza.sha} fall\xF3, pero el sitio YA lo est\xE1 sirviendo \u2014 no se revierte.`
+      );
+      return null;
+    }
     const autorReal = autorDelCommit(commit.message) ?? "alguien del panel";
     console.error(`revisaLaCabeza: ${cabeza.sha} es un commit del panel cuyo despliegue fall\xF3 \u2014 revirtiendo.`);
     const fracaso = await revierteYAvisaAMarcos(cabeza.sha, autorReal, contexto);
@@ -18972,27 +18979,48 @@ async function estadoAccion(pedido, contexto) {
     return error51(400, PROBLEMA_INESPERADO);
   }
   const publicadoEn = typeof cuerpo.publicadoEn === "number" ? cuerpo.publicadoEn : contexto.ahora();
-  const shaYaAtendido = await revisaLaCabeza(contexto);
+  const leeShaServido = memoizaLecturaDelCdn(contexto);
+  const shaYaAtendido = await revisaLaCabeza(contexto, leeShaServido);
   const vercel = clienteVercel({
     token: env.PANEL_VERCEL_TOKEN,
     proyecto,
     fetch: contexto.fetch
   });
-  let despliegue;
+  let despliegue = null;
+  let porQueNoContestoLaPlataforma;
   try {
     despliegue = await vercel.despliegueDe(cuerpo.sha);
   } catch (e) {
-    console.error("estado: la plataforma no contest\xF3 por el despliegue \u2014", e);
+    porQueNoContestoLaPlataforma = e;
+  }
+  const shaServido = await leeShaServido();
+  if (despliegue === null) {
+    if (shaServido === cuerpo.sha) {
+      return ok({
+        ok: true,
+        ...decide({
+          despliegue: null,
+          url: null,
+          shaServido,
+          shaPublicado: cuerpo.sha,
+          desdeHaceMs: contexto.ahora() - publicadoEn
+        })
+      });
+    }
+    console.error("estado: la plataforma no contest\xF3 por el despliegue \u2014", porQueNoContestoLaPlataforma);
     return error51(502, PROBLEMA_NO_SE_PUDO_LEER);
   }
-  const shaServido = despliegue.estado === "listo" ? await shaQueSirveElCdn(contexto) : null;
   let fracaso;
   if (despliegue.estado === "fall\xF3") {
     if (shaYaAtendido?.sha === cuerpo.sha) {
       fracaso = { revertido: shaYaAtendido.revertido, avisadoAMarcos: shaYaAtendido.avisadoAMarcos };
       await avisaAElla(sesion.correo, contexto, fracaso);
-    } else {
+    } else if (shaServido !== cuerpo.sha) {
       fracaso = await revierteYAvisa(cuerpo.sha, sesion.correo, contexto);
+    } else {
+      console.error(
+        `estado: la plataforma dice que el despliegue de ${cuerpo.sha} fall\xF3, pero el sitio YA lo est\xE1 sirviendo \u2014 no se revierte.`
+      );
     }
   }
   const veredicto = decide({
@@ -19015,6 +19043,13 @@ async function shaQueSirveElCdn(contexto) {
     console.error("estado: no se pudo leer version.json del sitio \u2014", e);
     return null;
   }
+}
+function memoizaLecturaDelCdn(contexto) {
+  let promesa = null;
+  return () => {
+    promesa ??= shaQueSirveElCdn(contexto);
+    return promesa;
+  };
 }
 var VENTANA_DESHACER_MS = 30 * 6e4;
 var RESUMEN_DESHECHO = "Listo, lo dej\xE9 como estaba antes.";

@@ -1,11 +1,16 @@
 /*
- * «¿Ya está en el sitio?» son DOS preguntas, no una (spec §4.5): la
- * plataforma dice que el deploy TERMINÓ, y `version.json` dice qué commit
- * está sirviendo el CDN. Cantar «listo» con la primera sola es mandarla a
- * mirar un sitio que todavía entrega lo viejo.
+ * «¿Ya está en el sitio?» (spec §4.5). Desde la inversión de precedencia
+ * —medida en producción: el despliegue había terminado, el CDN ya servía
+ * el sha nuevo, y la plataforma igual contestaba «en curso» 31 sondeos
+ * seguidos porque esa lectura, la que puede fallar, no encontraba el
+ * despliegue— `version.json` (el CDN) alcanza solo para «listo»: es un
+ * hecho observable, no un reporte sobre el hecho. La plataforma sigue
+ * haciendo falta para la otra pregunta, la que `version.json` no puede
+ * contestar sola: «falló» o «todavía va», cuando el CDN todavía muestra lo
+ * viejo en los dos casos.
  *
  * Este módulo no tiene red: recibe las dos respuestas ya leídas y decide.
- * Por eso las once combinaciones se prueban acá, en milisegundos.
+ * Por eso las combinaciones se prueban acá, en milisegundos.
  */
 import { describe, it, expect } from 'vitest'
 import { decide, fraseDeFracaso, jergaEn } from '../src/servidor/estado'
@@ -14,14 +19,34 @@ const SHA = 'a'.repeat(40)
 const base = { despliegue: 'enCurso' as const, url: null, shaServido: null, shaPublicado: SHA, desdeHaceMs: 5_000 }
 
 describe('el veredicto', () => {
-  it('B2: listo exige las DOS fuentes — la plataforma terminó Y el CDN ya sirve ese commit', () => {
-    const v = decide({ ...base, despliegue: 'listo', url: 'https://x.vercel.app', shaServido: SHA })
-    expect(v.estado).toBe('listo')
-    expect(v.reintentarEn).toBeNull()
-    expect(v.frase).toBe('Tu cambio ya está en el sitio.')
-  })
+  /*
+   * [Inversión de precedencia] El CDN sirviendo el sha publicado alcanza
+   * para «listo» solo, pase lo que pase con `despliegue`. Cuatro de estas
+   * cinco celdas CAMBIARON de resultado con el arreglo:
+   *   - `'listo'`: ya daba `'listo'` antes también — el caso fácil, el
+   *     único que no cambia, y se deja acá para que la fila quede completa.
+   *   - `'enCurso'` y `'desconocido'`: daban `'enCurso'` antes — el
+   *     escenario medido en producción, 31 sondeos seguidos mintiendo que
+   *     todavía faltaba.
+   *   - `'falló'`: daba `'falló'` antes. Es la combinación contradictoria
+   *     que discute el comentario de `decide()` — un reporte de fracaso
+   *     sobre un sha que el CDN ya está sirviendo—, y acá se deja escrito
+   *     que gana el hecho observable, no el reporte.
+   *   - `null` (Ronda 2/3): ni siquiera se le pudo preguntar a la
+   *     plataforma. Antes eso cortaba con 502 sin mirar el CDN; ahora, si
+   *     el CDN confirma, ni falta que hacer la pregunta.
+   */
+  it.each(['listo', 'enCurso', 'desconocido', 'falló', null] as const)(
+    'el CDN sirviendo el sha publicado alcanza para "listo" solo, sin importar qué diga el despliegue (%s)',
+    (despliegue) => {
+      const v = decide({ ...base, despliegue, url: 'https://x.vercel.app', shaServido: SHA })
+      expect(v.estado).toBe('listo')
+      expect(v.reintentarEn).toBeNull()
+      expect(v.frase).toBe('Tu cambio ya está en el sitio.')
+    },
+  )
 
-  it('B2: la plataforma terminó pero el CDN sigue con lo viejo: todavía NO está listo', () => {
+  it('el CDN sigue con lo viejo: un despliegue reportado "listo" todavía NO alcanza', () => {
     // Es la ventana exacta en la que el panel mentía si mirara una sola
     // fuente. Dura segundos, y en esos segundos ella abre el sitio y ve el
     // precio de antes.
@@ -112,6 +137,24 @@ describe('el veredicto', () => {
     // La plataforma todavía no vio el commit. Tratarlo como fracaso
     // dispararía una reversión automática por un webhook que tardó.
     const v = decide({ ...base, despliegue: 'desconocido' })
+    expect(v.estado).toBe('enCurso')
+  })
+
+  /*
+   * [Ronda 3] `null` tampoco es «falló» — y tampoco es «desconocido», aunque
+   * caigan en el mismo lado de la asimetría. Son dos hechos distintos:
+   * `'desconocido'` es un reporte REAL de la plataforma («no tengo ningún
+   * despliegue para este commit»); `null` es la AUSENCIA de reporte —no se
+   * le pudo preguntar nada—. Mezclarlos fue un bug real de esta misma
+   * vuelta de arreglos (Ronda 2 usaba `'desconocido'` para «no contestó»).
+   * Este test existe para que si alguien intenta unificarlos de nuevo —dos
+   * valores que se comportan igual son un candidato tentador a fusionar—,
+   * se acuerde de por qué no: el tipo, no el comportamiento, es lo que los
+   * separa, y el tipo es lo que evita que el log de Marcos mienta sobre
+   * cuál de las dos cosas pasó.
+   */
+  it('`despliegue: null` —no se le pudo preguntar nada a la plataforma— tampoco es «falló»', () => {
+    const v = decide({ ...base, despliegue: null })
     expect(v.estado).toBe('enCurso')
   })
 

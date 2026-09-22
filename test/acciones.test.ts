@@ -195,6 +195,19 @@ const SHA_MAIN = 'facade01'.repeat(5)
 const SHA_VIEJO = 'de1e7ed0'.repeat(5)
 const SHA_QUE_ELLA_LEYO = '0cea0bad'.repeat(5)
 
+/**
+ * [Inversión de precedencia] `estadoAccion` consulta `version.json` SIEMPRE
+ * ahora, ya no solo cuando la plataforma dice `'listo'` — así que todo test
+ * de `accion=estado` cuyo despliegue llega a `'falló'` tiene que programarle
+ * a `fetchFalso` una respuesta más, o le roba la que le tocaba al siguiente
+ * pedido real (el autor del commit, el primer paso de la reversión) y la
+ * suite se desalinea en silencio. Acá el CDN sigue sirviendo `SHA_VIEJO`, no
+ * el sha que se está probando: ni entra en el «listo» ni contradice el
+ * «falló» — exactamente lo que pasa de verdad cuando un despliegue falla y
+ * el borde de la red se queda con lo de antes.
+ */
+const cdnSirviendoLoViejo = () => ({ cuerpo: { sha: SHA_VIEJO, construido: '2026-09-17T12:00:00.000Z' } })
+
 const contextoBase = (fetch: typeof globalThis.fetch) => ({
   env: {
     PANEL_CLAVE_HASH: hashDeClave(CLAVE),
@@ -2190,10 +2203,13 @@ describe('las acciones que todavía no existen', () => {
 })
 
 // Tarea 7: «¿ya está en el sitio?» (spec §4.5). Cruza dos fuentes — la
-// plataforma dice que el despliegue TERMINÓ, `version.json` dice qué commit
-// está sirviendo el CDN AHORA — y por eso el `fetchFalso` de cada test que
-// llega a tocar red programa DOS respuestas, en ese orden. El cálculo del
-// veredicto en sí (las once combinaciones) lo cubre `test/estado.test.ts`;
+// plataforma dice qué pasó con el despliegue, `version.json` dice qué
+// commit está sirviendo el CDN AHORA — y desde la inversión de precedencia
+// las dos se leen SIEMPRE, no una condicionada a la otra: el `fetchFalso`
+// de cada test que llega a tocar red programa DOS respuestas para esa
+// acción, en ese orden, sin importar qué haya contestado la primera (ver
+// `cdnSirviendoLoViejo()`, arriba, para los que ejercitan un despliegue
+// `'falló'`). El cálculo del veredicto en sí lo cubre `test/estado.test.ts`;
 // acá solo se prueba que el router lee las dos fuentes correctas, en el
 // orden correcto, y con las mismas cuatro capas (secreto, sesión, luego lo
 // suyo) que ya tienen `entrar` y `publicarAccion`.
@@ -2370,6 +2386,7 @@ describe('accion=estado', () => {
     const { f } = fetchFalso([
       ...respuestasDeNingunaReversionPendiente(), // revisaLaCabeza(), primero que nada
       { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } },
+      cdnSirviendoLoViejo(), // version.json — SIEMPRE, ya no solo si el despliegue da 'listo'
       respuestaDelCommitParaElAutor(sha), // revierteYAvisa() lee el autor real ANTES de revierte()
       ...respuestasDeUnaReversionCompleta(sha),
     ])
@@ -2401,6 +2418,7 @@ describe('accion=estado', () => {
     const { f } = fetchFalso([
       ...respuestasDeNingunaReversionPendiente(),
       { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } },
+      cdnSirviendoLoViejo(), // version.json — SIEMPRE, ya no solo si el despliegue da 'listo'
       respuestaDelCommitParaElAutor(sha),
       ...respuestasDeUnaReversionCompleta(sha),
     ])
@@ -2422,7 +2440,7 @@ describe('accion=estado', () => {
   it('Ronda 2, Grupo B: cuando su propio commit es la cabeza rota, van dos correos, no cuatro', async () => {
     const cartas: Array<{ a: string[]; asunto: string; texto: string }> = []
     const sha = 'a'.repeat(40)
-    const { f } = fetchFalso([
+    const { f, pedidos } = fetchFalso([
       { cuerpo: { object: { sha } } }, // gh.ref (revisaLaCabeza)
       {
         cuerpo: {
@@ -2434,6 +2452,7 @@ describe('accion=estado', () => {
         },
       }, // gh.commit (revisaLaCabeza)
       { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // vercel (revisaLaCabeza)
+      cdnSirviendoLoViejo(), // version.json — ÚNICA lectura (Ronda 4): memoizada, la comparten revisaLaCabeza() y estadoAccion()
       ...respuestasDeUnaReversionCompleta(sha), // revierte() dentro de revierteYAvisaAMarcos()
       { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // vercel (la lectura propia de estadoAccion)
     ])
@@ -2448,6 +2467,11 @@ describe('accion=estado', () => {
       }),
     )
     expect((r.cuerpo as { estado: string }).estado).toBe('falló')
+    // [Ronda 4] Los ocho pedidos programados y ni uno más: si la lectura
+    // propia de `estadoAccion` NO reusara la de `revisaLaCabeza()`, pediría
+    // un `version.json` de más que acá no se programó — y `fetchFalso`
+    // reventaría por quedarse sin respuestas.
+    expect(pedidos).toHaveLength(8)
     expect(cartas).toHaveLength(2)
     // Primero Marcos —lo avisó `revisaLaCabeza()`, con el autor real del
     // trailer— y recién después ella, sin que nadie haya vuelto a tocar
@@ -2455,6 +2479,107 @@ describe('accion=estado', () => {
     expect(cartas[0].a).toEqual(['marcos@ejemplo.mx'])
     expect(cartas[0].texto).toContain('clienta@ejemplo.mx')
     expect(cartas[1].a).toEqual(['clienta@ejemplo.mx'])
+  })
+
+  /*
+   * Ronda 4: `estadoAccion` le pregunta al CDN una sola vez por invocación
+   * —memoizada, compartida con `revisaLaCabeza()`— y no dos veces por
+   * separado. Entre una lectura y la otra hay cien a quinientos ms de red:
+   * de sobra para que la primera venga caída y la segunda sana, o al
+   * revés, y que las dos decisiones que dependen de "qué sirve el CDN
+   * ahora" terminen mirando hechos distintos. La revisión reprodujo los
+   * dos casos ejecutando el código; estos dos tests los fijan.
+   *
+   * Los dos usan el mismo truco: programan una SEGUNDA respuesta de
+   * `version.json` que sería consumida por una segunda lectura
+   * independiente (el bug), pero que el arreglo (una sola lectura,
+   * reusada) nunca llega a pedir. Que el resultado sea consistente —y que
+   * `pedidos` tenga el largo exacto, sin la respuesta de más— es la prueba
+   * de que se comparte la medición, no dos veces la misma casualidad.
+   */
+  it('Ronda 4: la lectura del CDN caída se comparte — no hay una "segunda oportunidad" sana que contradiga al revert', async () => {
+    const cartas: Carta[] = []
+    const sha = 'a'.repeat(40)
+    const { f, pedidos } = fetchFalso([
+      { cuerpo: { object: { sha } } }, // gh.ref (revisaLaCabeza)
+      {
+        cuerpo: {
+          sha,
+          tree: { sha: 't' },
+          message: 'cambia algo\n\nPanel: sí\nPanel-Autor: clienta@ejemplo.mx',
+          author: { date: '2026-09-17T12:00:00Z' },
+          parents: [{ sha: 'padre' }],
+        },
+      }, // gh.commit (revisaLaCabeza)
+      { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // vercel (revisaLaCabeza)
+      { status: 500, cuerpo: {} }, // ÚNICA lectura del CDN (memoizada): caída — por eso revisaLaCabeza() revierte
+      ...respuestasDeUnaReversionCompleta(sha), // revierte() dentro de revierteYAvisaAMarcos()
+      { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // vercel (la lectura propia de estadoAccion)
+      { cuerpo: { sha, construido: '2026-09-17T12:00:00.000Z' } }, // "segunda lectura" sana — con el arreglo, NUNCA se pide
+    ])
+    const r = await maneja(
+      'estado',
+      { cuerpo: { sha, publicadoEn: 1_000 }, cookie: cookieValida() },
+      contextoDePrueba({
+        fetch: f,
+        ahora: () => 6_000,
+        correo: async (c) => { cartas.push(c); return { ok: true } },
+        env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
+      }),
+    )
+    // NO 'listo': si hubiera dos lecturas independientes, la segunda —sana,
+    // programada arriba— le ganaría a `decide()` y contradiría el revert
+    // que YA pasó y el correo que ya salió.
+    expect((r.cuerpo as { estado: string }).estado).toBe('falló')
+    // Pantalla y correo cuentan la MISMA historia: la pantalla no promete
+    // más de lo que el correo a ella ya prometió.
+    const fraseHttp = (r.cuerpo as { frase: string }).frase
+    const aElla = cartas.find((c) => c.a.includes('clienta@ejemplo.mx'))!
+    expect(aElla.texto.startsWith(fraseHttp)).toBe(true)
+    // Ocho pedidos: la "segunda lectura sana" —la novena respuesta
+    // programada— nunca se toca.
+    expect(pedidos).toHaveLength(8)
+    expect(cartas).toHaveLength(2)
+  })
+
+  it('Ronda 4: la lectura del CDN que confirma se comparte — no hay una "segunda oportunidad" caída que dispare el revert', async () => {
+    const cartas: Carta[] = []
+    const sha = 'a'.repeat(40)
+    const { f, pedidos } = fetchFalso([
+      { cuerpo: { object: { sha } } }, // gh.ref (revisaLaCabeza)
+      {
+        cuerpo: {
+          sha,
+          tree: { sha: 't' },
+          message: 'cambia algo\n\nPanel: sí\nPanel-Autor: clienta@ejemplo.mx',
+          author: { date: '2026-09-17T12:00:00Z' },
+          parents: [{ sha: 'padre' }],
+        },
+      }, // gh.commit (revisaLaCabeza)
+      { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // vercel (revisaLaCabeza)
+      { cuerpo: { sha, construido: '2026-09-17T12:00:00.000Z' } }, // ÚNICA lectura del CDN (memoizada): confirma el sha
+      { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // vercel (la lectura propia de estadoAccion)
+      cdnSirviendoLoViejo(), // "segunda lectura" caída — con el arreglo, NUNCA se pide
+    ])
+    const r = await maneja(
+      'estado',
+      { cuerpo: { sha, publicadoEn: 1_000 }, cookie: cookieValida() },
+      contextoDePrueba({
+        fetch: f,
+        ahora: () => 6_000,
+        correo: async (c) => { cartas.push(c); return { ok: true } },
+        env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
+      }),
+    )
+    expect((r.cuerpo as { estado: string }).estado).toBe('listo')
+    expect((r.cuerpo as { frase: string }).frase).toBe('Tu cambio ya está en el sitio.')
+    // Cinco pedidos: la "segunda lectura caída" —la sexta respuesta
+    // programada— nunca se toca, y no se dispara ningún pedido de revertir
+    // (ni el autor real, ni los pasos de `revierte()`, ni ninguna carta):
+    // exactamente lo que la Ronda 3 vino a garantizar, ahora a salvo de
+    // que un segundo `fetch` independiente lo desarme.
+    expect(pedidos).toHaveLength(5)
+    expect(cartas).toHaveLength(0)
   })
 
   /*
@@ -2495,6 +2620,7 @@ describe('accion=estado', () => {
       { cuerpo: { object: { sha: shaRevert } } }, // revisaLaCabeza: gh.ref — la cabeza YA es la reversión
       { cuerpo: commitRevert }, // revisaLaCabeza: gh.commit → es una reversión, se va sin tocar nada
       { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // el deploy VIEJO sigue marcado como fallido
+      cdnSirviendoLoViejo(), // version.json — SIEMPRE, ya no solo si el despliegue da 'listo'
       { cuerpo: commitRoto }, // revierteYAvisa: el autor real
       { cuerpo: { object: { sha: shaRevert } } }, // revierte(): gh.ref
       { cuerpo: commitRevert }, // revierte(): la cabeza ya revierte este sha → `ya-revertido`
@@ -2550,6 +2676,7 @@ describe('accion=estado', () => {
     const respuestas = () => [
       ...respuestasDeNingunaReversionPendiente(),
       { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } },
+      cdnSirviendoLoViejo(), // version.json — SIEMPRE, ya no solo si el despliegue da 'listo'
       respuestaDelCommitParaElAutor(sha),
       ...respuestasDeUnaReversionCompleta(sha),
     ]
@@ -2603,6 +2730,7 @@ describe('accion=estado', () => {
     const { f } = fetchFalso([
       ...respuestasDeNingunaReversionPendiente(),
       { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } },
+      cdnSirviendoLoViejo(), // version.json — SIEMPRE, ya no solo si el despliegue da 'listo'
       respuestaDelCommitParaElAutor(sha),
       ...respuestasDeUnaReversionCompleta(sha),
     ])
@@ -2628,6 +2756,7 @@ describe('accion=estado', () => {
     const { f } = fetchFalso([
       ...respuestasDeNingunaReversionPendiente(),
       { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } },
+      cdnSirviendoLoViejo(), // version.json — SIEMPRE, ya no solo si el despliegue da 'listo'
       respuestaDelCommitParaElAutor(sha),
       ...respuestasDeUnaReversionCompleta(sha),
     ])
@@ -2641,6 +2770,93 @@ describe('accion=estado', () => {
       }),
     )
     expect((r.cuerpo as { estado: string }).estado).toBe('falló')
+  })
+
+  /*
+   * Ronda 2 del arreglo de precedencia: el CDN manda sobre el reporte de la
+   * plataforma incluso cuando lo que ese reporte dispara es un EFECTO
+   * SECUNDARIO — revertir un commit. Si el CDN ya sirve el sha publicado,
+   * `estadoAccion` no puede disparar `revierteYAvisa()`: estaría destruyendo
+   * un cambio que está funcionando, servido de verdad, por un reporte de la
+   * plataforma equivocado.
+   *
+   * OJO al verificar esto: desde la Ronda 1, `decide()` ya devuelve 'listo'
+   * en cuanto `shaServido === shaPublicado`, sin mirar `despliegue` — así
+   * que el veredicto por sí solo NO alcanza para probar que el revert no se
+   * disparó (daría 'listo' de cualquier manera, revierta o no). Lo que
+   * prueba que no se disparó es que no salió ningún pedido de más —ni el
+   * del autor real, ni los de `revierte()`— y ninguna carta.
+   */
+  it('Ronda 2: si el CDN ya sirve el sha publicado, NO se revierte aunque la plataforma diga que falló', async () => {
+    const cartas: Array<{ a: string[]; asunto: string }> = []
+    const sha = 'a'.repeat(40)
+    const { f, pedidos } = fetchFalso([
+      ...respuestasDeNingunaReversionPendiente(), // revisaLaCabeza(), primero que nada
+      { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // la plataforma dice que falló
+      { cuerpo: { sha, construido: '2026-09-17T12:00:00.000Z' } }, // pero el CDN YA sirve el sha publicado
+    ])
+    const r = await maneja(
+      'estado',
+      { cuerpo: { sha, publicadoEn: 1_000 }, cookie: cookieValida() },
+      contextoDePrueba({
+        fetch: f,
+        ahora: () => 6_000,
+        correo: async (c) => { cartas.push(c); return { ok: true } },
+        env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
+      }),
+    )
+    expect((r.cuerpo as { estado: string }).estado).toBe('listo')
+    expect((r.cuerpo as { frase: string }).frase).toBe('Tu cambio ya está en el sitio.')
+    // Los cuatro pedidos programados y ni uno más: si `revierteYAvisa()` se
+    // hubiera disparado, habría pedido el autor real (un quinto pedido) que
+    // nadie programó, y `fetchFalso` lo hubiera registrado igual (se anota
+    // ANTES de tirar por quedarse sin respuestas).
+    expect(pedidos).toHaveLength(4)
+    expect(cartas).toHaveLength(0)
+  })
+
+  /*
+   * Ronda 2, degradación: que la plataforma no conteste no puede tapar al
+   * CDN. Antes, un error de red al preguntarle a la plataforma cortaba acá
+   * mismo con 502 — sin mirar nunca `version.json`, que podía estar
+   * confirmando el sha publicado en ese mismo instante.
+   */
+  it('Ronda 2: si la plataforma no contesta pero el CDN ya sirve el sha publicado, igual da "listo"', async () => {
+    const sha = 'a'.repeat(40)
+    const { f, pedidos } = fetchFalso([
+      ...respuestasDeNingunaReversionPendiente(),
+      { status: 500, cuerpo: {} }, // la plataforma no contesta
+      { cuerpo: { sha, construido: '2026-09-17T12:00:00.000Z' } }, // el CDN sí
+    ])
+    const r = await maneja(
+      'estado',
+      { cuerpo: { sha, publicadoEn: 1_000 }, cookie: cookieValida() },
+      contextoDePrueba({ fetch: f, ahora: () => 6_000, correo: correoQueNoSeUsa() }),
+    )
+    expect(r.status).toBe(200)
+    expect((r.cuerpo as { estado: string }).estado).toBe('listo')
+    expect((r.cuerpo as { frase: string }).frase).toBe('Tu cambio ya está en el sitio.')
+    expect(pedidos).toHaveLength(4)
+  })
+
+  // El otro lado de la degradación de arriba: si el CDN TAMPOCO confirma
+  // (o tampoco contesta), de verdad no sabemos nada — ahí sigue
+  // correspondiendo el 502 de siempre, porque falta la única fuente que
+  // distingue «falló» de «todavía va». Que una fuente caída no se
+  // convierta en un «sí» por omisión sigue valiendo para las dos.
+  it('Ronda 2: si ni la plataforma ni el CDN contestan, sigue siendo 502', async () => {
+    const sha = 'a'.repeat(40)
+    const { f } = fetchFalso([
+      ...respuestasDeNingunaReversionPendiente(),
+      { status: 500, cuerpo: {} }, // la plataforma no contesta
+      { status: 500, cuerpo: {} }, // el CDN tampoco
+    ])
+    const r = await maneja(
+      'estado',
+      { cuerpo: { sha, publicadoEn: 1_000 }, cookie: cookieValida() },
+      contextoDePrueba({ fetch: f, ahora: () => 6_000, correo: correoQueNoSeUsa() }),
+    )
+    expect(r.status).toBe(502)
   })
 
   // Ronda 2, F-1: mismo candado que la acción vecina (`estadoAccion`, arriba
@@ -2708,6 +2924,7 @@ describe('accion=estado', () => {
         },
       }, // gh.commit: es del panel, no es una reversión
       { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // vercel.despliegueDe: falló
+      cdnSirviendoLoViejo(), // version.json — revisaLaCabeza() también consulta al CDN antes de revertir (Ronda 3)
       ...respuestasDeUnaReversionCompleta(cabezaRota), // adentro de revierteYAvisaAMarcos()
     ])
     const r = await maneja(
@@ -2731,6 +2948,60 @@ describe('accion=estado', () => {
     expect(cartas[0].a).toEqual(['marcos@ejemplo.mx'])
     expect(cartas[0].texto).toContain(cabezaRota)
     expect(cartas[0].texto).toContain('clienta@ejemplo.mx') // el autor real, del trailer — no de quien pidió esta publicación
+  })
+
+  /*
+   * Ronda 3: el mismo blindaje que B1, de arriba, pero para EL CAMINO SIN
+   * NADIE MIRANDO — que es justo por qué esto importa más ahí. `estadoAccion`
+   * ya tiene su propia guardia (Ronda 2) para cuando alguien está sondeando;
+   * `revisaLaCabeza()` es la red de seguridad que corre SOLA, sin que nadie
+   * la pida, desde CUALQUIER acción autenticada (acá, `publicar`, que no
+   * tiene ninguna guardia propia contra esto — la única protección posible
+   * es la de `revisaLaCabeza()` misma). Si el reporte de la plataforma
+   * está mal, este es el camino donde el panel revertiría por su cuenta una
+   * publicación sana sin que nadie se entere en el momento — el resultado
+   * más caro que tiene este sistema.
+   *
+   * Misma advertencia que en la Ronda 2: no alcanza con mirar el status
+   * HTTP (acá, 422 por `fichas: {}`, que no cambia se revierta o no) — hay
+   * que verificar el EFECTO. Cuatro pedidos programados y ni uno más, y
+   * ninguna carta: si `revierteYAvisaAMarcos()` se hubiera disparado,
+   * habría pedido el autor real y los pasos de `revierte()`, que nadie
+   * programó, y habría mandado el correo a Marcos que este test prueba que
+   * NO sale.
+   */
+  it('Ronda 3: si el CDN ya sirve la cabeza rota, revisaLaCabeza() NO la revierte', async () => {
+    const cartas: Array<{ a: string[]; asunto: string }> = []
+    const cabezaRota = 'b'.repeat(40)
+    const { f, pedidos } = fetchFalso([
+      { cuerpo: { object: { sha: cabezaRota } } }, // gh.ref (revisaLaCabeza)
+      {
+        cuerpo: {
+          sha: cabezaRota,
+          tree: { sha: 't' },
+          message: 'cambia algo\n\nPanel: sí\nPanel-Autor: clienta@ejemplo.mx',
+          author: { date: '2026-09-17T12:00:00Z' },
+          parents: [{ sha: 'padre' }],
+        },
+      }, // gh.commit: es del panel, no es una reversión
+      { cuerpo: { deployments: [{ state: 'ERROR', url: null }] } }, // la plataforma dice que falló
+      { cuerpo: { sha: cabezaRota, construido: '2026-09-17T12:00:00.000Z' } }, // pero el CDN YA sirve esa cabeza
+    ])
+    const r = await maneja(
+      'publicar',
+      { cuerpo: { base: SHA_MAIN, documentos: { fichas: {} } }, cookie: cookieValida() },
+      contextoDePrueba({
+        fetch: f,
+        correo: async (c) => { cartas.push(c); return { ok: true } },
+        env: { PANEL_AVISOS_A: 'marcos@ejemplo.mx' },
+      }),
+    )
+    // La acción sigue su curso normal: `fichas: {}` sigue sin pasar el
+    // esquema — abstenerse de revertir no le cambia el resultado a quien
+    // pidió la publicación.
+    expect(r.status).toBe(422)
+    expect(pedidos).toHaveLength(4)
+    expect(cartas).toHaveLength(0)
   })
 })
 

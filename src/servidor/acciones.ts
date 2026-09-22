@@ -1178,8 +1178,35 @@ async function revierteYAvisaAMarcos(sha: string, autorReal: string, contexto: C
  * si pudo avisarle a Marcos—, porque la frase que ella lee lo promete. Sin
  * esto, `estadoAccion` tenía que elegir entre repetir el intento para
  * averiguarlo o prometer a ciegas.
+ *
+ * [Ronda 3] Antes de revertir, consulta al CDN: si YA está sirviendo la
+ * cabeza que la plataforma reporta como fallida, se abstiene. Esta es LA
+ * red de seguridad —corre sin que nadie la pida, desde cuatro acciones—,
+ * así que es también el camino más peligroso: si el reporte de la
+ * plataforma está mal (que es justo lo que se midió en producción), acá es
+ * donde el panel revertiría por su cuenta una publicación sana, sin que
+ * nadie esté mirando para darse cuenta. `estadoAccion` ya tiene su propia
+ * guardia contra esto (Ronda 2) para el camino en que alguien SÍ está
+ * mirando, pero esa guardia vive en el llamador — y «una invariante que
+ * depende de que todos los llamadores se acuerden no es una invariante»
+ * (mismo argumento que ya usamos para la guardia de «no revertir una
+ * reversión», más arriba en esta función). Acá va la misma regla, en el
+ * lugar que de verdad decide: adentro de la función que revierte.
+ *
+ * [Ronda 4] `leeShaServido` es opcional a propósito: los tres llamadores
+ * que no necesitan el sha servido DESPUÉS de esto (`publicarAccion`,
+ * `deshacerAccion`, `historialAccion`) no le pasan nada, y cada uno recibe
+ * su propio lector de un solo uso —una lectura del CDN por invocación,
+ * como siempre—. `estadoAccion` SÍ vuelve a necesitar el sha servido para
+ * su propio veredicto, así que le pasa el SUYO: comparten la misma
+ * medición en vez de que cada uno pida la suya por separado. Ver
+ * `memoizaLecturaDelCdn()` para el porqué —no es opcional, es la única
+ * forma de que las dos decisiones no puedan contradecirse.
  */
-async function revisaLaCabeza(contexto: Contexto): Promise<({ sha: string } & Fracaso) | null> {
+async function revisaLaCabeza(
+  contexto: Contexto,
+  leeShaServido: LectorDeCdn = memoizaLecturaDelCdn(contexto),
+): Promise<({ sha: string } & Fracaso) | null> {
   // Todo lo de acá adentro es "mejor esfuerzo": si algo falla, se loguea y se
   // sigue. Esta función NUNCA puede hacer fallar la acción que la llamó — sería
   // impedirle publicar por culpa de una limpieza que ni pidió.
@@ -1214,6 +1241,23 @@ async function revisaLaCabeza(contexto: Contexto): Promise<({ sha: string } & Fr
     const vercel = clienteVercel({ token: contexto.env.PANEL_VERCEL_TOKEN, proyecto, fetch: contexto.fetch })
     const { estado } = await vercel.despliegueDe(cabeza.sha)
     if (estado !== 'falló') return null
+
+    // [Ronda 3] Antes de revertir: ¿el CDN ya está sirviendo esta cabeza?
+    // Si es así, el reporte de la plataforma está equivocado —el mismo
+    // argumento que reordenó `decide()` (estado.ts) y que ya frena a
+    // `estadoAccion` (Ronda 2), acá aplicado al camino sin nadie mirando.
+    // Revertir en ese caso no es un error inocuo: es el panel destruyendo
+    // por su cuenta una publicación sana. Es información que Marcos quiere
+    // ver, así que queda en el log aunque no dispare ningún correo —no hay
+    // «fracaso» que contar todavía, el sitio está bien.
+    const shaServido = await leeShaServido()
+    if (shaServido === cabeza.sha) {
+      console.error(
+        `revisaLaCabeza: la plataforma dice que el despliegue de ${cabeza.sha} falló, ` +
+          'pero el sitio YA lo está sirviendo — no se revierte.',
+      )
+      return null
+    }
 
     // El autor real —para el correo de Marcos— sale del propio trailer del
     // commit, nunca de quien disparó esta limpieza.
@@ -1829,13 +1873,30 @@ async function salud(_pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
  * es lo mismo desde donde ella lo mira, es que cada respuesta traiga su
  * `reintentarEn`.
  *
- * Las dos lecturas van en este orden porque la primera es la que puede
- * ahorrar la segunda: si el despliegue falló, no hace falta preguntarle nada
- * al CDN.
+ * [Inversión de precedencia] Las dos lecturas van SIEMPRE, ya no una
+ * condicionada a la otra. Antes, `version.json` (el CDN, barato y confiable)
+ * solo se consultaba si la plataforma YA había dicho `'listo'` — y medido en
+ * producción, un despliegue que SÍ había terminado y SÍ se estaba sirviendo
+ * contestó «en curso» 31 sondeos seguidos porque esa otra lectura, la que
+ * puede fallar, no encontraba el despliegue. `decide()` (estado.ts) le da
+ * ahora la última palabra al CDN: si ya sirve el sha publicado, alcanza
+ * solo. La plataforma sigue haciendo falta para la otra pregunta —«falló» o
+ * «todavía va»—, que `version.json` no puede contestar por sí sola.
  *
  * Si `version.json` no contesta, NO se asume nada: se sigue con
- * `shaServido: null`, que nunca coincide, así que el veredicto es «en curso».
- * Una de las dos fuentes caída no puede volverse un «sí» por omisión.
+ * `shaServido: null`, que nunca coincide, así que el veredicto depende de lo
+ * que diga la plataforma. Una de las dos fuentes caída no puede volverse un
+ * «sí» por omisión.
+ *
+ * [Ronda 2] La misma idea, llevada a las dos puntas que le faltaban:
+ *   - Si la PLATAFORMA no contesta (se cae, tira, lo que sea) pero el CDN
+ *     YA confirma el sha publicado, no se corta con 502 — el CDN alcanza
+ *     solo, la plataforma ahí no hacía falta. Recién si el CDN TAMPOCO lo
+ *     confirma es que de verdad no sabemos nada, y ahí sí el 502 de siempre.
+ *   - Si el CDN YA confirma el sha publicado, tampoco se dispara la
+ *     reversión automática aunque la plataforma diga `'falló'`: sería
+ *     destruir un cambio que está funcionando, servido de verdad, por un
+ *     reporte equivocado.
  */
 async function estadoAccion(pedido: Pedido, contexto: Contexto): Promise<Respuesta> {
   const env = contexto.env
@@ -1880,7 +1941,15 @@ async function estadoAccion(pedido: Pedido, contexto: Contexto): Promise<Respues
   // criterio que `publicarAccion` (Grupo C, ronda 2); el comentario viejo acá
   // decía que esta acción «no tiene ningún chequeo sincrónico previo», y eso
   // era falso: tenía tres.
-  const shaYaAtendido = await revisaLaCabeza(contexto)
+  //
+  // [Ronda 4] `leeShaServido` se crea ACÁ y se comparte con `revisaLaCabeza()`
+  // (abajo) y con la lectura propia de esta función (más abajo todavía): las
+  // dos preguntas «¿hay que revertir la cabeza?» y «¿qué le contesto a
+  // ella?» tienen que mirar el MISMO `version.json`, no uno cada una — ver
+  // `memoizaLecturaDelCdn()` para el porqué, que es de corrección, no de
+  // ahorro.
+  const leeShaServido = memoizaLecturaDelCdn(contexto)
+  const shaYaAtendido = await revisaLaCabeza(contexto, leeShaServido)
 
   const vercel = clienteVercel({
     token: env.PANEL_VERCEL_TOKEN,
@@ -1888,15 +1957,63 @@ async function estadoAccion(pedido: Pedido, contexto: Contexto): Promise<Respues
     fetch: contexto.fetch,
   })
 
-  let despliegue: { estado: EstadoDeDespliegue; url: string | null }
+  // [Ronda 2] Ya no corta con 502 apenas la plataforma falla: `despliegue`
+  // queda en `null` y el error se guarda para el log, pero seguimos —ver el
+  // comentario grande de más abajo sobre por qué.
+  let despliegue: { estado: EstadoDeDespliegue; url: string | null } | null = null
+  let porQueNoContestoLaPlataforma: unknown
   try {
     despliegue = await vercel.despliegueDe(cuerpo.sha)
   } catch (e) {
-    console.error('estado: la plataforma no contestó por el despliegue —', e)
-    return error(502, PROBLEMA_NO_SE_PUDO_LEER)
+    porQueNoContestoLaPlataforma = e
   }
 
-  const shaServido = despliegue.estado === 'listo' ? await shaQueSirveElCdn(contexto) : null
+  // [Inversión de precedencia] SIEMPRE, ya no solo cuando `despliegue.estado
+  // === 'listo'` — ni siquiera condicionado a que la plataforma haya
+  // contestado algo. Medido en producción: el despliegue había terminado
+  // bien, el CDN ya servía el sha nuevo, y esta lectura ni se hacía porque
+  // la de arriba decía otra cosa — 31 sondeos seguidos de «en curso» con el
+  // cambio YA publicado. `decide()` (estado.ts) es quien ahora sabe que el
+  // CDN alcanza solo; acá no hay que adivinarlo, solo preguntarle siempre.
+  //
+  // [Ronda 4] `await leeShaServido()`, NO `await shaQueSirveElCdn(contexto)`
+  // de nuevo: si `revisaLaCabeza()` (arriba) ya leyó el CDN para decidir si
+  // revertía la cabeza, esto devuelve ESA misma lectura, no una nueva. Dos
+  // pedidos por separado podrían ver hechos distintos —uno caído, el otro
+  // sano— y que el revert y el veredicto de acá abajo queden contradiciendo
+  // al correo que ya salió. Ver `memoizaLecturaDelCdn()`.
+  const shaServido = await leeShaServido()
+
+  // [Ronda 2, degradación] Antes, que la plataforma no contestara cortaba
+  // ACÁ MISMO con 502, antes de mirar nada más. Con la inversión de
+  // precedencia de arriba, eso deja muda a la fuente que manda —el CDN—
+  // por culpa de la que puede fallar: el mismo defecto que motivó todo este
+  // arreglo, ahora del lado del error de red y no del lado del estado. Si
+  // el CDN YA confirma el sha publicado, la plataforma no hace falta para
+  // saber que está listo. Recién si el CDN TAMPOCO lo confirma es que de
+  // verdad no sabemos nada —ahí falta la única fuente que distingue
+  // «falló» de «todavía va»— y corresponde el 502 de siempre.
+  if (despliegue === null) {
+    if (shaServido === cuerpo.sha) {
+      // [Ronda 3] `null`, no `'desconocido'`: son dos hechos distintos.
+      // `'desconocido'` es un reporte REAL de la plataforma («no tengo
+      // ningún despliegue para este commit», vercel.ts); acá no hubo
+      // reporte de ningún tipo, la plataforma no contestó nada. `decide()`
+      // (estado.ts) ya distingue los dos en su tipo — ver el comentario ahí.
+      return ok({
+        ok: true,
+        ...decide({
+          despliegue: null,
+          url: null,
+          shaServido,
+          shaPublicado: cuerpo.sha,
+          desdeHaceMs: contexto.ahora() - publicadoEn,
+        }),
+      })
+    }
+    console.error('estado: la plataforma no contestó por el despliegue —', porQueNoContestoLaPlataforma)
+    return error(502, PROBLEMA_NO_SE_PUDO_LEER)
+  }
 
   // [B1] La reversión automática la hace la invocación que VE el fracaso. No
   // hay ningún proceso sondeando: una función de la plataforma muere a los
@@ -1917,13 +2034,30 @@ async function estadoAccion(pedido: Pedido, contexto: Contexto): Promise<Respues
   // estaba y que Marcos ya sabe, y esas dos cosas no se saben hasta
   // haberlas intentado. Con el orden viejo, `decide()` las prometía y el
   // código que las pagaba corría después.
+  //
+  // [Ronda 2] Y el segundo `if` de acá abajo —el que de verdad dispara
+  // `revierteYAvisa()`— no revierte cuando el CDN YA sirve el sha
+  // publicado. Es la misma razón que reordenó `decide()`: el CDN es el
+  // hecho observable, `despliegue.estado === 'falló'` es un reporte SOBRE
+  // ese hecho, y acá el reporte puede estar mal. Revertir en ese caso no es
+  // un error inocuo — es destruir un cambio que está funcionando, servido
+  // de verdad, por un reporte equivocado. Si el sitio ya sirve lo que ella
+  // publicó, no hay nada que revertir.
   let fracaso: Fracaso | undefined
   if (despliegue.estado === 'falló') {
     if (shaYaAtendido?.sha === cuerpo.sha) {
       fracaso = { revertido: shaYaAtendido.revertido, avisadoAMarcos: shaYaAtendido.avisadoAMarcos }
       await avisaAElla(sesion.correo, contexto, fracaso)
-    } else {
+    } else if (shaServido !== cuerpo.sha) {
       fracaso = await revierteYAvisa(cuerpo.sha, sesion.correo, contexto)
+    } else {
+      // [Ronda 3] Mismo log que `revisaLaCabeza()` para el mismo caso: la
+      // plataforma reportando mal es información que Marcos quiere ver,
+      // aunque acá no haga falta ningún correo —el sitio está bien.
+      console.error(
+        `estado: la plataforma dice que el despliegue de ${cuerpo.sha} falló, ` +
+          'pero el sitio YA lo está sirviendo — no se revierte.',
+      )
     }
   }
 
@@ -1960,6 +2094,53 @@ async function shaQueSirveElCdn(contexto: Contexto): Promise<string | null> {
   } catch (e) {
     console.error('estado: no se pudo leer version.json del sitio —', e)
     return null
+  }
+}
+
+/** Una lectura de `shaQueSirveElCdn()` ya en curso o resuelta — ver `memoizaLecturaDelCdn()`. */
+type LectorDeCdn = () => Promise<string | null>
+
+/**
+ * Envuelve `shaQueSirveElCdn()` para que, adentro de UNA invocación, el CDN
+ * se lea como máximo una vez: memoiza la PROMESA, no solo el resultado, así
+ * que dos lados que la piden "al mismo tiempo" (dos `await` sin nada entre
+ * medio) tampoco disparan dos pedidos — comparten el mismo `fetch` en vuelo.
+ *
+ * [Ronda 4] Existe porque `estadoAccion` le preguntaba al CDN dos veces por
+ * invocación: una DENTRO de `revisaLaCabeza()`, para decidir si revierte la
+ * cabeza rota, y otra ELLA MISMA, un instante después, para su propio
+ * veredicto. Entre una lectura y la otra hay cien a quinientos milisegundos
+ * de red — de sobra para que la primera venga caída y la segunda sana, o al
+ * revés. La revisión reprodujo los dos casos, y los dos son reales:
+ *
+ *   - Primera caída, segunda sana: `revisaLaCabeza()` revierte (con su
+ *     correo de «no construyó», y a ella «no pude dejarlo como estaba»), y
+ *     el veredicto por HTTP —que mira la SEGUNDA lectura, la que sanó—
+ *     contesta «Tu cambio ya está en el sitio». Pantalla y correo se
+ *     contradicen en la misma respuesta, sobre una publicación que YA fue
+ *     revertida.
+ *   - Primera sana, segunda caída: `revisaLaCabeza()` se abstiene —hasta lo
+ *     loguea— y tres líneas después `estadoAccion`, con SU lectura aparte,
+ *     revierte ese mismo sha. Es exactamente el bug que la Ronda 3 cerró
+ *     adentro de `revisaLaCabeza()`, reabierto por el llamador que la
+ *     Ronda 3 no tocó.
+ *
+ * Dos decisiones sobre el mismo hecho —«¿qué sirve el CDN AHORA?»— tienen
+ * que mirar la MISMA medición. Si no, no son dos guardias independientes:
+ * son dos oportunidades de que un blip de red las haga contradecirse. Por
+ * eso esto no es una optimización —un pedido de menos al propio sitio, que
+ * ya de por sí es barato— sino una condición de corrección.
+ *
+ * A quien vea `estadoAccion` pasarle este lector a `revisaLaCabeza()` y
+ * DESPUÉS volver a usarlo: no es una llamada de más ni redundancia para
+ * simplificar. Es la regla de arriba, en código — bórrala y vuelven los dos
+ * casos de la lista.
+ */
+function memoizaLecturaDelCdn(contexto: Contexto): LectorDeCdn {
+  let promesa: Promise<string | null> | null = null
+  return () => {
+    promesa ??= shaQueSirveElCdn(contexto)
+    return promesa
   }
 }
 
