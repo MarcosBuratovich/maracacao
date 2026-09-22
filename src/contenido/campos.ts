@@ -378,7 +378,7 @@ export const precio = (meta: Base) =>
     { control: 'precio', ...meta },
   )
 
-/** Un precio que puede no existir todavía (el polvo dice «Próximamente»). */
+/** Un precio que puede no existir (el polvo se cotiza por mayoreo). */
 export const precioONada = (meta: Base) =>
   anota(
     z.int(mensajesPrecio.entero)

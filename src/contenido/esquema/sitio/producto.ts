@@ -369,7 +369,7 @@ export const camposDeProducto = {
       chip: texto({
         ...enProductos,
         etiqueta: 'Cápsula de la tarjeta',
-        ayuda: 'La cápsula amarilla que avisa que todavía no está a la venta.',
+        ayuda: 'La cápsula amarilla de la tarjeta chica del polvo.',
         maxCaracteres: 20,
       }),
       cuerpo: parrafo({

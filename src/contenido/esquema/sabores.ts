@@ -204,7 +204,7 @@ export const esquemaSabores = grupo({
     polvo: lista({
       etiqueta: 'Las variedades de polvo',
       seccion: 'productos',
-      ayuda: 'Las etiquetas del chocolate en polvo, todavía no a la venta.',
+      ayuda: 'Las etiquetas del chocolate en polvo.',
       minItems: 1,
       maxItems: 20,
       elemento: variedadDePolvo,

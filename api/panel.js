@@ -16545,7 +16545,7 @@ var camposDeProducto = {
       chip: texto({
         ...enProductos,
         etiqueta: "C\xE1psula de la tarjeta",
-        ayuda: "La c\xE1psula amarilla que avisa que todav\xEDa no est\xE1 a la venta.",
+        ayuda: "La c\xE1psula amarilla de la tarjeta chica del polvo.",
         maxCaracteres: 20
       }),
       cuerpo: parrafo({
@@ -16828,7 +16828,7 @@ var camposDeExperiencia = {
             chipPolvo: texto({
               ...enRecetas,
               etiqueta: "C\xE1psula de polvo",
-              ayuda: "La c\xE1psula amarilla que avisa que esta receta usa el chocolate en polvo, que todav\xEDa no est\xE1 a la venta.",
+              ayuda: "La c\xE1psula amarilla que avisa que esta receta usa el chocolate en polvo.",
               maxCaracteres: 50
             }).optional()
           }
@@ -16949,7 +16949,7 @@ var panelDeProducto = (p) => grupo({
     precioNota: texto({
       seccion: "negocios",
       etiqueta: "Palabra antes del precio",
-      ayuda: "La palabra chiquita antes del precio: \xABdesde\xBB, \xABpr\xF3ximamente\xBB.",
+      ayuda: "La palabra chiquita antes del precio: \xABdesde\xBB, \xABPrecio de mayoreo\xBB.",
       maxCaracteres: 20
     }),
     precio: p.precio,
@@ -17312,6 +17312,30 @@ var camposDeContacto = {
         etiqueta: "Aviso de copiado",
         ayuda: "Lo que dice el bot\xF3n un momento despu\xE9s de copiar.",
         maxCaracteres: 20
+      }),
+      whatsappEtiqueta: texto({
+        ...enContacto,
+        etiqueta: "Etiqueta de WhatsApp",
+        ayuda: "La l\xEDnea en versales sobre el n\xFAmero de WhatsApp.",
+        maxCaracteres: 20
+      }),
+      // Se guarda UN solo campo: el número tal como se lee en la página.
+      // El enlace de WhatsApp se arma en la página a partir de estos mismos
+      // dígitos (ver `index.astro`), y no se guarda aparte a propósito: dos
+      // campos —número visible y enlace— se pueden desincronizar, y el día
+      // que se desincronicen la página muestra un número y escribe a otro,
+      // que es el peor error posible en un dato de contacto.
+      whatsapp: texto({
+        ...enContacto,
+        etiqueta: "WhatsApp",
+        ayuda: "El n\xFAmero de WhatsApp, con su lada. De aqu\xED sale tambi\xE9n el enlace para escribir.",
+        maxCaracteres: 24
+      }),
+      whatsappNota: texto({
+        ...enContacto,
+        etiqueta: "Nota de WhatsApp",
+        ayuda: "La l\xEDnea chiquita bajo el n\xFAmero: para qu\xE9 escribir.",
+        maxCaracteres: 60
       }),
       redesEtiqueta: texto({
         ...enContacto,
@@ -18015,7 +18039,7 @@ var esquemaSabores = grupo({
     polvo: lista({
       etiqueta: "Las variedades de polvo",
       seccion: "productos",
-      ayuda: "Las etiquetas del chocolate en polvo, todav\xEDa no a la venta.",
+      ayuda: "Las etiquetas del chocolate en polvo.",
       minItems: 1,
       maxItems: 20,
       elemento: variedadDePolvo

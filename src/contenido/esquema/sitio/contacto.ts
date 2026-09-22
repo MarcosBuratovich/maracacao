@@ -171,6 +171,30 @@ export const camposDeContacto = {
         ayuda: 'Lo que dice el botón un momento después de copiar.',
         maxCaracteres: 20,
       }),
+      whatsappEtiqueta: texto({
+        ...enContacto,
+        etiqueta: 'Etiqueta de WhatsApp',
+        ayuda: 'La línea en versales sobre el número de WhatsApp.',
+        maxCaracteres: 20,
+      }),
+      // Se guarda UN solo campo: el número tal como se lee en la página.
+      // El enlace de WhatsApp se arma en la página a partir de estos mismos
+      // dígitos (ver `index.astro`), y no se guarda aparte a propósito: dos
+      // campos —número visible y enlace— se pueden desincronizar, y el día
+      // que se desincronicen la página muestra un número y escribe a otro,
+      // que es el peor error posible en un dato de contacto.
+      whatsapp: texto({
+        ...enContacto,
+        etiqueta: 'WhatsApp',
+        ayuda: 'El número de WhatsApp, con su lada. De aquí sale también el enlace para escribir.',
+        maxCaracteres: 24,
+      }),
+      whatsappNota: texto({
+        ...enContacto,
+        etiqueta: 'Nota de WhatsApp',
+        ayuda: 'La línea chiquita bajo el número: para qué escribir.',
+        maxCaracteres: 60,
+      }),
       redesEtiqueta: texto({
         ...enContacto,
         etiqueta: 'Etiqueta de redes',

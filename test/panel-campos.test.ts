@@ -31,9 +31,12 @@ import { jergaEn } from '@/servidor/estado'
 const idDe = (c: CampoEditable) => `${c.documento}::${c.rutaEsquema}`
 
 describe('el catálogo cubre exactamente lo que es de ella', () => {
-  it('son 198 campos de esquema — ni uno de más ni uno de menos', () => {
+  it('son 201 campos de esquema — ni uno de más ni uno de menos', () => {
     const total = new Set(campos(contenidoPublicado()).map(idDe))
-    expect(total.size).toBe(198)
+    // [2026-09-22] Eran 198. Los tres nuevos son los de WhatsApp
+    // (etiqueta, número y nota), que ella tiene que poder cambiar sola:
+    // un teléfono de contacto es justo el dato que cambia sin avisar.
+    expect(total.size).toBe(201)
   })
 
   it('el tamaño de cada sección coincide con lo que declaró la fase 1', () => {
@@ -43,7 +46,7 @@ describe('el catálogo cubre exactamente lo que es de ella', () => {
       s.add(idDe(c))
       porSeccion.set(c.meta.seccion, s)
     }
-    expect(porSeccion.get('contacto')?.size).toBe(38)
+    expect(porSeccion.get('contacto')?.size).toBe(41)
     expect(porSeccion.get('productos')?.size).toBe(29)
     expect(porSeccion.get('negocios')?.size).toBe(25)
     expect(porSeccion.get('fichas')?.size).toBe(17)
@@ -139,7 +142,7 @@ describe('instancia las rutas con índices concretos contra el contenido real', 
   it('un campo opcional AUSENTE en la mayoría de las instancias: aparece igual, con valor `undefined`', () => {
     const t = campos(contenidoPublicado()).filter((c) => c.rutaEsquema === 'recetas.lista[].chipPolvo')
     expect(t).toHaveLength(4)
-    expect(t.map((c) => c.valor)).toEqual([undefined, undefined, undefined, 'USA EL POLVO · PRÓXIMAMENTE'])
+    expect(t.map((c) => c.valor)).toEqual([undefined, undefined, undefined, 'USA EL POLVO'])
   })
 
   it('un campo NULLABLE con `null` de verdad hoy (el precio del polvo, en Para negocios): valor `null`, no `undefined` ni "0"', () => {

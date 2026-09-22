@@ -411,7 +411,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
       </div>
     </section>
 
-    {/* ——— 04 · Chocolate para beber (próximamente) ——— */}
+    {/* ——— 04 · Chocolate para beber ——— */}
     <section id="polvo" class="seccion" data-tono="oscuro">
       <div class="contenedor polvo-fila">
         <div class="polvo-texto">
@@ -750,6 +750,22 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
               </a>
             </p>
             <p class="info-nota suave" data-campo="sitio:contacto.catalogoNota">{marca.contacto.catalogoNota}</p>
+          </div>
+          {/*
+            El enlace sale de los dígitos del MISMO campo que se muestra
+            (`contacto.whatsapp`), no de un segundo campo con la URL: dos
+            campos se desincronizan, y el día que pase la página mostraría
+            un número y escribiría a otro. `wa.me` quiere los dígitos
+            pelados, sin `+`, espacios ni guiones.
+          */}
+          <div class="info-bloque">
+            <p class="mono info-etiqueta" data-campo="sitio:contacto.whatsappEtiqueta">{marca.contacto.whatsappEtiqueta}</p>
+            <p class="info-dato">
+              <a href={`https://wa.me/${marca.contacto.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener">
+                <span data-campo="sitio:contacto.whatsapp">{marca.contacto.whatsapp}</span><span class="sr-only"> (se abre en pestaña nueva)</span>
+              </a>
+            </p>
+            <p class="info-nota suave" data-campo="sitio:contacto.whatsappNota">{marca.contacto.whatsappNota}</p>
           </div>
           <div class="info-bloque">
             <p class="mono info-etiqueta" data-campo="sitio:contacto.redesEtiqueta">{marca.contacto.redesEtiqueta}</p>
