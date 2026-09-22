@@ -31,12 +31,14 @@ import { jergaEn } from '@/servidor/estado'
 const idDe = (c: CampoEditable) => `${c.documento}::${c.rutaEsquema}`
 
 describe('el catálogo cubre exactamente lo que es de ella', () => {
-  it('son 201 campos de esquema — ni uno de más ni uno de menos', () => {
+  it('son 212 campos de esquema — ni uno de más ni uno de menos', () => {
     const total = new Set(campos(contenidoPublicado()).map(idDe))
     // [2026-09-22] Eran 198. Los tres nuevos son los de WhatsApp
     // (etiqueta, número y nota), que ella tiene que poder cambiar sola:
     // un teléfono de contacto es justo el dato que cambia sin avisar.
-    expect(total.size).toBe(201)
+    // [2026-09-22] Eran 201. Los once nuevos son el bloque de cocoas del
+    // catálogo: seis del bloque más cinco de cada ficha de cocoa.
+    expect(total.size).toBe(212)
   })
 
   it('el tamaño de cada sección coincide con lo que declaró la fase 1', () => {
@@ -47,7 +49,7 @@ describe('el catálogo cubre exactamente lo que es de ella', () => {
       porSeccion.set(c.meta.seccion, s)
     }
     expect(porSeccion.get('contacto')?.size).toBe(41)
-    expect(porSeccion.get('productos')?.size).toBe(29)
+    expect(porSeccion.get('productos')?.size).toBe(40)
     expect(porSeccion.get('negocios')?.size).toBe(25)
     expect(porSeccion.get('fichas')?.size).toBe(17)
   })

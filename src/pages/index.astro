@@ -439,7 +439,40 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
       </div>
     </section>
 
-    {/* ——— 05 · Cómo catar ——— */}
+    {/*
+      ——— 05 · Cocoas sin azúcar añadida ———
+      Hasta hoy las dos cocoas existían en el sitio SOLO como fichas
+      técnicas: dos productos que se venden, con precio, y sin ninguna
+      página donde mirarlos. Va acá, pegada al polvo, porque la pregunta
+      que resuelve es justo la que queda después de leer el polvo: «¿y si
+      no quiero azúcar?».
+    */}
+    <section id="cocoas" class="seccion" data-tono="crema">
+      <div class="contenedor">
+        <EtiquetaSabor texto={marca.cocoas.kicker} campo="sitio:cocoas.kicker" />
+        <h2 class="titular" data-campo="sitio:cocoas.titulo">{marca.cocoas.titulo}</h2>
+        <p class="suave" data-campo="sitio:cocoas.cuerpo">{marca.cocoas.cuerpo}</p>
+        <ul class="cocoas-lista">
+          {marca.cocoas.lista.map((c, i) => (
+            <li class="cocoa-ficha" data-revelar>
+              <h3 class="cocoa-nombre" data-campo={`sitio:cocoas.lista.${i}.nombre`}>{c.nombre}</h3>
+              <p class="cocoa-perfil" data-campo={`sitio:cocoas.lista.${i}.perfil`}>{c.perfil}</p>
+              <p class="mono cocoa-usos"><span data-campo={`sitio:cocoas.lista.${i}.usos`}>{c.usos}</span></p>
+              <p class="mono cocoa-precios">
+                <span data-campo="sitio:cocoas.etiquetaChica">{marca.cocoas.etiquetaChica}</span>{' '}
+                <span data-campo={`sitio:cocoas.lista.${i}.precioChico`}>{precioMXN(c.precioChico)}</span>
+                <span aria-hidden="true"> · </span>
+                <span data-campo="sitio:cocoas.etiquetaGrande">{marca.cocoas.etiquetaGrande}</span>{' '}
+                <span data-campo={`sitio:cocoas.lista.${i}.precioGrande`}>{precioMXN(c.precioGrande)}</span>
+              </p>
+            </li>
+          ))}
+        </ul>
+        <p class="cocoas-nota suave" data-campo="sitio:cocoas.nota">{marca.cocoas.nota}</p>
+      </div>
+    </section>
+
+    {/* ——— 06 · Cómo catar ——— */}
     <section id="catar" class="seccion" data-tono="crema">
       <div class="contenedor">
         <EtiquetaSabor texto={marca.catar.kicker} campo="sitio:catar.kicker" />
@@ -468,7 +501,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
       </div>
     </section>
 
-    {/* ——— 06 · Recetas ——— */}
+    {/* ——— 07 · Recetas ——— */}
     <section id="recetas" class="seccion" data-tono="calida">
       <div class="contenedor recetas-encabezado">
         <EtiquetaSabor texto={marca.recetas.kicker} campo="sitio:recetas.kicker" />
@@ -499,7 +532,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
       </div>
     </section>
 
-    {/* ——— 07 · Nosotros ——— */}
+    {/* ——— 08 · Nosotros ——— */}
     <section id="nosotros" class="seccion" data-tono="crema">
       <div class="contenedor nosotros">
         <div>
@@ -527,7 +560,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
       </div>
     </section>
 
-    {/* ——— 08 · Para negocios ——— */}
+    {/* ——— 09 · Para negocios ——— */}
     <section id="negocios" class="seccion" data-tono="clara">
       {/* data-tabs va en el CONTENEDOR: pestañas y paneles viven en
           columnas distintas, y el script los busca dentro del grupo. */}
@@ -604,7 +637,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
       </div>
     </section>
 
-    {/* ——— 09 · Preguntas frecuentes ——— */}
+    {/* ——— 10 · Preguntas frecuentes ——— */}
     <section id="preguntas" class="seccion" data-tono="crema">
       <div class="contenedor preguntas">
         <EtiquetaSabor texto={marca.preguntas.kicker} campo="sitio:preguntas.kicker" />
@@ -623,7 +656,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
       </div>
     </section>
 
-    {/* ——— 10 · Contacto ——— */}
+    {/* ——— 11 · Contacto ——— */}
     <section id="contacto" class="seccion" data-tono="calida">
       <div class="contenedor">
         <EtiquetaSabor texto={marca.contacto.kicker} campo="sitio:contacto.kicker" />
@@ -1411,6 +1444,45 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
   .polvo-riel img:hover { transform: translateY(-6px) rotate(-1.5deg); }
   .polvo-riel img:nth-child(even):hover { transform: translateY(-6px) rotate(1.5deg); }
   @media (prefers-reduced-motion: reduce) { .polvo-riel img { transition: none; } }
+
+  /* ---------- Cocoas sin azúcar añadida ---------- */
+  #cocoas :global(.etiqueta-sabor) { color: var(--mrc-marca-rojoHondo); --chispa: var(--mrc-marca-rojo); }
+  #cocoas .titular { margin: 8px 0 12px; }
+  #cocoas > .contenedor > .suave { max-width: 62ch; margin: 0 0 clamp(18px, 2.5vw, 30px); }
+  .cocoas-lista {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    /* Dos fichas en pantalla ancha, una sola apiladas en el celular: el
+       mínimo es el ancho al que el perfil deja de partirse feo. */
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: clamp(14px, 2vw, 24px);
+  }
+  .cocoa-ficha {
+    background: color-mix(in srgb, var(--mrc-papel) 70%, transparent);
+    border: 1px solid color-mix(in srgb, var(--texto) 14%, transparent);
+    border-radius: 10px;
+    padding: clamp(16px, 2vw, 22px);
+  }
+  .cocoa-nombre {
+    font-family: var(--mrc-font-display);
+    font-size: var(--mrc-text-subtitulo);
+    margin: 0 0 8px;
+  }
+  .cocoa-perfil { font-size: 0.84375rem; line-height: 1.6; margin: 0 0 12px; }
+  .cocoa-usos {
+    font-size: var(--mrc-text-menor);
+    opacity: 0.75;
+    margin: 0 0 10px;
+  }
+  .cocoa-precios { font-size: var(--mrc-text-menor); margin: 0; }
+  .cocoas-nota {
+    max-width: 62ch;
+    margin: clamp(16px, 2vw, 24px) 0 0;
+    font-size: 0.84375rem;
+    line-height: 1.6;
+  }
 
   /* ---------- Cómo catar ---------- */
   #catar :global(.etiqueta-sabor) { color: var(--mrc-marca-rojoHondo); --chispa: var(--mrc-marca-rojo); }

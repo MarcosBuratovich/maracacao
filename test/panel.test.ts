@@ -100,6 +100,8 @@ const TRANSFORMADOS = new Map<string, string>([
   // podredumbre de más abajo no exige que cada entrada tenga nodo hoy.
   ['sitio:negocios.tabs.0.precio', 'precioMXN() le pone el signo $'],
   ['sabores:sabores[].precio', 'precioMXN() le pone el signo $'],
+  ['sitio:cocoas.lista[].precioChico', 'precioMXN() le pone el signo $'],
+  ['sitio:cocoas.lista[].precioGrande', 'precioMXN() le pone el signo $'],
   ['sabores:polvo[].nombre', 'se muestra en minúsculas'],
   ['sitio:anaquel.envolturaAltPrefijo', 'el alt le agrega el nombre del sabor elegido'],
   ['sitio:anaquel.ilustracionAltPrefijo', 'el alt le agrega el nombre del sabor elegido'],
