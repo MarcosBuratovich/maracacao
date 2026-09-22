@@ -245,7 +245,18 @@ export function textoPublicaciones(n: number): string {
  * el resultado de la más reciente —arriba de todo, sin un clic de más— y
  * la lista completa, debajo, colapsada.
  */
-export function PantallaEditando({ base, publicaciones }: { base: string | null; publicaciones: Publicada[] }) {
+export function PantallaEditando({
+  base,
+  publicaciones,
+  ahora,
+}: {
+  base: string | null
+  publicaciones: Publicada[]
+  // Opcional y solo para los tests: en producción nadie lo pasa y el
+  // historial captura el reloj al montar. Ver el comentario de
+  // `Historial.tsx`, que explica por qué esto no es un lujo.
+  ahora?: number
+}) {
   return (
     <>
       <h1 className="panel-titulo">Tu panel</h1>
@@ -255,7 +266,7 @@ export function PantallaEditando({ base, publicaciones }: { base: string | null;
           <p className="panel-aviso">{textoPublicaciones(0)}</p>
         </>
       ) : (
-        <Historial publicaciones={publicaciones} />
+        <Historial publicaciones={publicaciones} ahora={ahora} />
       )}
       <Sesion base={base} />
     </>
