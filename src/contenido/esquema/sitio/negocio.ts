@@ -132,7 +132,7 @@ const tabs = tupla({
       precio: precioONada({
         seccion: 'negocios',
         etiqueta: 'Precio del polvo',
-        ayuda: 'Déjalo vacío mientras el chocolate en polvo no esté a la venta.',
+        ayuda: 'El precio más bajo del chocolate en polvo, el de la bolsa chica sin sabor.',
       }),
     }),
     // «6 sabores: jengibre y naranja, …» — el conteo está en los DATOS
@@ -237,6 +237,59 @@ export const camposDeNegocio = {
               etiqueta: 'Dónde está ese dato',
               ayuda: 'La columna derecha: «confirmados en ficha técnica».',
               maxCaracteres: 50,
+            }),
+          },
+        }),
+      }),
+      /*
+       * Las condiciones de mayoreo (catálogo Maracacao, sección 06). Hasta
+       * hoy el sitio invitaba a escribir por mayoreo sin decir NADA de lo
+       * que una cafetería necesita saber antes de escribir: cuánto es el
+       * mínimo, cuándo se paga y cuándo llega. Esa conversación se estaba
+       * teniendo por WhatsApp una vez por cliente.
+       *
+       * Misma forma que `fichas` —dato a la izquierda, estado a la
+       * derecha— a propósito: es el mismo tipo de lectura rápida y ya
+       * tiene su lugar en la página.
+       */
+      condicionesTitulo: texto({
+        ...enNegocios,
+        etiqueta: 'Título de las condiciones',
+        ayuda: 'El encabezado de la lista de condiciones de mayoreo.',
+        maxCaracteres: 40,
+      }),
+      condiciones: lista({
+        ...enNegocios,
+        etiqueta: 'Condiciones de mayoreo',
+        ayuda: 'Mínimo, pago, tiempos y entregas: lo que hay que saber antes de pedir.',
+        minItems: 1,
+        maxItems: 8,
+        elemento: grupo({
+          ...enNegocios,
+          etiqueta: 'Condición',
+          ayuda: 'Un renglón de las condiciones de mayoreo.',
+          nombra: (v) => (v as { dato?: string }).dato ?? 'Condición',
+          campos: {
+            dato: texto({
+              ...enNegocios,
+              etiqueta: 'Qué condición es',
+              ayuda: 'La columna izquierda: «Pedido mínimo».',
+              maxCaracteres: 60,
+            }),
+            estado: texto({
+              ...enNegocios,
+              etiqueta: 'Cuál es la condición',
+              ayuda: 'La columna derecha: «jueves o viernes».',
+              maxCaracteres: 60,
+            }),
+            // El mínimo de mayoreo es un PRECIO y va en un campo de precio,
+            // no adentro del texto: el sistema rechaza un «$4,000» escrito
+            // en prosa justamente para que no se quede viejo sin que nadie
+            // lo note. Los renglones que no hablan de plata lo dejan nulo.
+            precio: precioONada({
+              ...enNegocios,
+              etiqueta: 'Monto de la condición',
+              ayuda: 'Si la condición es un monto, va acá. Si no, se deja vacío.',
             }),
           },
         }),

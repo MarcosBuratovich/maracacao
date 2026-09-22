@@ -213,26 +213,57 @@ export const camposDeContacto = {
         ayuda: 'La línea chiquita bajo el nombre de usuario.',
         maxCaracteres: 50,
       }),
+      /*
+       * Dos enlaces distintos que antes eran uno solo, y se confundían:
+       * el CATÁLOGO es de dónde sale la información (productos,
+       * presentaciones y precios) y la TIENDA es dónde se compra. Hasta
+       * hoy los dos apuntaban a la tienda, así que el sitio no tenía a
+       * dónde mandar a alguien que solo quería saber qué hay y cuánto
+       * cuesta.
+       */
       catalogoEtiqueta: texto({
         ...enContacto,
         etiqueta: 'Etiqueta del catálogo',
-        ayuda: 'La línea en versales sobre el enlace a la tienda.',
+        ayuda: 'La línea en versales sobre el enlace al catálogo.',
         maxCaracteres: 30,
       }),
       catalogoNombre: texto({
         ...enContacto,
         etiqueta: 'Nombre del catálogo',
-        ayuda: 'Cómo se lee el enlace a la tienda en línea.',
+        ayuda: 'Cómo se lee el enlace del catálogo.',
         maxCaracteres: 40,
       }),
       catalogoUrl: url({
         ...enContacto,
         etiqueta: 'Dirección del catálogo',
-        ayuda: 'A dónde lleva el enlace de la tienda en línea.',
+        ayuda: 'A dónde lleva el enlace del catálogo, donde están los productos y sus precios.',
       }),
       catalogoNota: texto({
         ...enContacto,
         etiqueta: 'Nota del catálogo',
+        ayuda: 'La línea chiquita bajo el enlace del catálogo.',
+        maxCaracteres: 60,
+      }),
+      tiendaEtiqueta: texto({
+        ...enContacto,
+        etiqueta: 'Etiqueta de la tienda',
+        ayuda: 'La línea en versales sobre el enlace a la tienda en línea.',
+        maxCaracteres: 30,
+      }),
+      tiendaNombre: texto({
+        ...enContacto,
+        etiqueta: 'Nombre de la tienda',
+        ayuda: 'Cómo se lee el enlace de la tienda en línea.',
+        maxCaracteres: 40,
+      }),
+      tiendaUrl: url({
+        ...enContacto,
+        etiqueta: 'Dirección de la tienda',
+        ayuda: 'A dónde lleva el enlace de la tienda en línea, donde se compra.',
+      }),
+      tiendaNota: texto({
+        ...enContacto,
+        etiqueta: 'Nota de la tienda',
         ayuda: 'La línea chiquita bajo el enlace de la tienda.',
         maxCaracteres: 60,
       }),

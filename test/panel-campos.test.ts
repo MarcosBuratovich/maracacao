@@ -31,14 +31,14 @@ import { jergaEn } from '@/servidor/estado'
 const idDe = (c: CampoEditable) => `${c.documento}::${c.rutaEsquema}`
 
 describe('el catálogo cubre exactamente lo que es de ella', () => {
-  it('son 212 campos de esquema — ni uno de más ni uno de menos', () => {
+  it('son 219 campos de esquema — ni uno de más ni uno de menos', () => {
     const total = new Set(campos(contenidoPublicado()).map(idDe))
     // [2026-09-22] Eran 198. Los tres nuevos son los de WhatsApp
     // (etiqueta, número y nota), que ella tiene que poder cambiar sola:
     // un teléfono de contacto es justo el dato que cambia sin avisar.
     // [2026-09-22] Eran 201. Los once nuevos son el bloque de cocoas del
     // catálogo: seis del bloque más cinco de cada ficha de cocoa.
-    expect(total.size).toBe(212)
+    expect(total.size).toBe(219)
   })
 
   it('el tamaño de cada sección coincide con lo que declaró la fase 1', () => {
@@ -48,9 +48,9 @@ describe('el catálogo cubre exactamente lo que es de ella', () => {
       s.add(idDe(c))
       porSeccion.set(c.meta.seccion, s)
     }
-    expect(porSeccion.get('contacto')?.size).toBe(41)
+    expect(porSeccion.get('contacto')?.size).toBe(44)
     expect(porSeccion.get('productos')?.size).toBe(40)
-    expect(porSeccion.get('negocios')?.size).toBe(25)
+    expect(porSeccion.get('negocios')?.size).toBe(29)
     expect(porSeccion.get('fichas')?.size).toBe(17)
   })
 
@@ -147,8 +147,11 @@ describe('instancia las rutas con índices concretos contra el contenido real', 
     expect(t.map((c) => c.valor)).toEqual([undefined, undefined, undefined, 'USA EL POLVO'])
   })
 
-  it('un campo NULLABLE con `null` de verdad hoy (el precio del polvo, en Para negocios): valor `null`, no `undefined` ni "0"', () => {
-    const c = campos(contenidoPublicado()).find((x) => x.ruta === 'negocios.tabs.0.precio')
+  it('un campo NULLABLE con `null` de verdad hoy (una condición de mayoreo que no es un monto): valor `null`, no `undefined` ni "0"', () => {
+    // [2026-09-22] El ejemplo era el precio del polvo, que hoy ya tiene
+    // precio ($58, del catálogo nuevo). El nullable que queda con `null`
+    // de verdad es el monto de las condiciones que no hablan de plata.
+    const c = campos(contenidoPublicado()).find((x) => x.ruta === 'negocios.condiciones.1.precio')
     expect(c?.valor).toBeNull()
     expect(c?.meta.control).toBe('precio')
   })
@@ -172,7 +175,7 @@ describe('leer y escribir un valor por ruta', () => {
 
   it('leer: un campo nullable con `null` da `null`, no `undefined`', () => {
     const documentos = contenidoPublicado()
-    expect(leer(documentos.sitio, 'negocios.tabs.0.precio')).toBeNull()
+    expect(leer(documentos.sitio, 'negocios.condiciones.1.precio')).toBeNull()
   })
 
   it('escribir: una tupla por índice, sin mutar el documento que recibió', () => {

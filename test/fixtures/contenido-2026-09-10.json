@@ -92,7 +92,7 @@
       "contadorDe": "de 15",
       "fichaEtiqueta": "Barra n.º",
       "grupoAria": "Elige un sabor para ver su ficha",
-      "pesoInsignia": "70 g",
+      "pesoInsignia": "70\u00a0g",
       "manoInsignia": "hecho a mano",
       "ingredientesEtiqueta": "Ingredientes",
       "cta": "Ver en el catálogo",
@@ -109,7 +109,7 @@
       "nota": "Para probar la línea sin casarte con una sola barra."
     },
     "gotas": {
-      "titulo": "Gotas de chocolate · 250 g",
+      "titulo": "Gotas de chocolate · 250\u00a0g",
       "precioDesde": 258,
       "precioJengibre": 340,
       "desdeEtiqueta": "desde",
@@ -118,7 +118,7 @@
       "notaPrecio": "Jengibre y naranja"
     },
     "polvoCard": {
-      "titulo": "En polvo · 250 g",
+      "titulo": "En polvo · 250\u00a0g",
       "chip": "PRÓXIMAMENTE",
       "cuerpo": "Para beber frío o caliente, con espuma, aroma y tradición."
     },
@@ -279,7 +279,7 @@
           "id": "polvo",
           "ficha": "#chocolate-en-polvo",
           "etiqueta": "Chocolate en polvo",
-          "titulo": "Chocolate en polvo · 250 g y 1 kg",
+          "titulo": "Chocolate en polvo · 250\u00a0g y 1\u00a0kg",
           "precioNota": "próximamente",
           "precio": null,
           "clave": "salDeMar",
@@ -294,7 +294,7 @@
           "id": "gotas",
           "ficha": "#barras-y-gotas",
           "etiqueta": "Chocolate en gotas",
-          "titulo": "Chocolate en gotas · 250 g",
+          "titulo": "Chocolate en gotas · 250\u00a0g",
           "precioNota": "desde",
           "precio": 258,
           "clave": "cardamomo",
@@ -310,7 +310,7 @@
           "id": "barras",
           "ficha": "#barras-y-gotas",
           "etiqueta": "Chocolate en barras",
-          "titulo": "Chocolate en barras · 70 g",
+          "titulo": "Chocolate en barras · 70\u00a0g",
           "precioNota": "desde",
           "precio": 108,
           "clave": "canela",
@@ -321,6 +321,34 @@
             "Contienen soya; pueden llevar trazas de leche y frutos de cáscara",
             "Vida de anaquel de dos años; no requieren refrigeración"
           ]
+        }
+      ],
+      "condicionesTitulo": "Antes de pedir",
+      "condiciones": [
+        {
+          "dato": "Pedido mínimo de mayoreo",
+          "estado": "en producto",
+          "precio": 4000
+        },
+        {
+          "dato": "Pago",
+          "estado": "por anticipado",
+          "precio": null
+        },
+        {
+          "dato": "Entrega",
+          "estado": "unos 10 días después del pago",
+          "precio": null
+        },
+        {
+          "dato": "Entregas en Ciudad de México",
+          "estado": "jueves o viernes",
+          "precio": null
+        },
+        {
+          "dato": "Envíos al resto del país",
+          "estado": "con costo de flete aparte",
+          "precio": null
         }
       ]
     },
@@ -422,7 +450,11 @@
         "trampa": "Apellido (no llenar)",
         "asuntoPersonal": "Mensaje desde el sitio — compra personal",
         "asuntoNegocio": "Mensaje desde el sitio — negocio"
-      }
+      },
+      "tiendaEtiqueta": "TIENDA EN LÍNEA",
+      "tiendaNombre": "chocolateria.pulpos.shop",
+      "tiendaUrl": "https://chocolateria.pulpos.shop",
+      "tiendaNota": "Compra en línea con envío."
     },
     "fichasTecnicas": {
       "ruta": "/fichas-tecnicas",
@@ -458,11 +490,11 @@
       "productos": [
         {
           "ancla": "#sabores",
-          "texto": "Barras 70 g"
+          "texto": "Barras 70\u00a0g"
         },
         {
           "ancla": "#sabores",
-          "texto": "Gotas de chocolate 250 g"
+          "texto": "Gotas de chocolate 250\u00a0g"
         },
         {
           "ancla": "#polvo",
@@ -485,8 +517,8 @@
       "titulo": "Cocoas para crear",
       "cuerpo": "Las cocoas Maracacao no contienen azúcar añadida. La natural conserva una acidez más pronunciada; la alcalina pasó por un proceso que reduce su acidez, oscurece su color y mejora su solubilidad.",
       "nota": "No siempre pueden sustituirse una por otra sin ajustar la fórmula: en repostería el pH cambia el sabor, el color y cómo reaccionan los demás ingredientes.",
-      "etiquetaChica": "250 g",
-      "etiquetaGrande": "1 kg",
+      "etiquetaChica": "250\u00a0g",
+      "etiquetaGrande": "1\u00a0kg",
       "lista": [
         {
           "nombre": "Cocoa natural",
