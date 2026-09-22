@@ -237,7 +237,7 @@ export const camposDeExperiencia = {
             chipPolvo: texto({
               ...enRecetas,
               etiqueta: 'Cápsula de polvo',
-              ayuda: 'La cápsula amarilla que avisa que esta receta usa el chocolate en polvo, que todavía no está a la venta.',
+              ayuda: 'La cápsula amarilla que avisa que esta receta usa el chocolate en polvo.',
               maxCaracteres: 50,
             }).optional(),
           },

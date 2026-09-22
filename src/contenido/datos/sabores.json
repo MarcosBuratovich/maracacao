@@ -208,14 +208,6 @@
     {
       "archivo": "etiqueta-cardamomo",
       "nombre": "Cardamomo"
-    },
-    {
-      "archivo": "etiqueta-cocoa-natural",
-      "nombre": "Cocoa natural"
-    },
-    {
-      "archivo": "etiqueta-cocoa-alcalina",
-      "nombre": "Cocoa alcalina"
     }
   ]
 }
