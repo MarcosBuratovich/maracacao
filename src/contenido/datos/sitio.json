@@ -110,7 +110,7 @@
     "titulo": "Gotas de chocolate · 250\u00a0g",
     "desdeEtiqueta": "desde",
     "cuerpo": "Gotas de 10 g del mismo chocolate 70%: para hornear, fundir en taza o comer como botana.",
-    "sabores": "6 sabores",
+    "sabores": "5 sabores",
     "notaPrecio": "Jengibre y naranja"
   },
   "polvoCard": {
@@ -122,8 +122,32 @@
     "kicker": "PARA CAFETERÍAS",
     "chip": "YA DISPONIBLE",
     "titulo": "Chocolate para beber",
-    "cuerpo": "Seis variedades elaboradas con cocoa, pasta de cacao, frutas y esencias naturales.",
+    "cuerpo": "Seis variedades sobre una mezcla endulzada de azúcar, cocoa natural, pasta de cacao y cocoa alcalina.",
     "altPrefijo": "Etiqueta del chocolate en polvo sabor"
+  },
+  "cocoas": {
+    "kicker": "SIN AZÚCAR AÑADIDA",
+    "titulo": "Cocoas para crear",
+    "cuerpo": "Las cocoas Maracacao no contienen azúcar añadida. La natural conserva una acidez más pronunciada; la alcalina pasó por un proceso que reduce su acidez, oscurece su color y mejora su solubilidad.",
+    "nota": "No siempre pueden sustituirse una por otra sin ajustar la fórmula: en repostería el pH cambia el sabor, el color y cómo reaccionan los demás ingredientes.",
+    "etiquetaChica": "250\u00a0g",
+    "etiquetaGrande": "1\u00a0kg",
+    "lista": [
+      {
+        "nombre": "Cocoa natural",
+        "perfil": "Sólidos 100% de cacao en polvo. Mayor acidez natural y color café. Pide buena incorporación al mezclarla.",
+        "usos": "Repostería, cocina, chocolatería y bebidas",
+        "precioChico": 86,
+        "precioGrande": 344
+      },
+      {
+        "nombre": "Cocoa alcalina",
+        "perfil": "Sólidos de cacao alcalinizados con carbonato de potasio. Menor acidez, color más oscuro y mejor solubilidad.",
+        "usos": "Repostería, chocolatería, confitería y bebidas",
+        "precioChico": 102,
+        "precioGrande": 399
+      }
+    ]
   },
   "catar": {
     "kicker": "CÓMO CATAR CHOCOLATE",
@@ -279,10 +303,10 @@
         "precioNota": "Precio de mayoreo",
         "precio": null,
         "clave": "salDeMar",
-        "cuerpo": "Seis variedades para la taza, elaboradas con cocoa, pasta de cacao, frutas y esencias naturales.",
+        "cuerpo": "Seis variedades para la taza, sobre una mezcla endulzada de azúcar, cocoa natural, pasta de cacao y cocoa alcalina.",
         "datos": [
-          "30\u00a0g por taza, en leche o agua",
-          "Se disuelve en bebidas frías o calientes",
+          "30\u00a0g por taza, en 200\u00a0ml de leche o agua",
+          "Se prepara en leche o agua caliente",
           "También para licuados, repostería y postres",
           "Presentaciones de 250\u00a0g y 1\u00a0kg",
           "Pregunta por precio de mayoreo"
@@ -297,7 +321,7 @@
         "clave": "cardamomo",
         "cuerpo": "Gotas de unos 10 g del mismo chocolate 70% de las barras. Listas para usar: sin picar, rallar ni trocear.",
         "datos": [
-          "6 sabores: jengibre y naranja, hierbabuena, canela, menta, limoncillo y lima y chile",
+          "5 sabores: canela, cardamomo, limoncillo, menta y naranja con jengibre",
           "Para galletas, brownies, panes, ganaches y coberturas",
           "También se comen solas, como botana",
           "Vida de anaquel de dos años; no requieren refrigeración"
@@ -463,6 +487,10 @@
       {
         "ancla": "#polvo",
         "texto": "Chocolate en polvo"
+      },
+      {
+        "ancla": "#cocoas",
+        "texto": "Cocoas sin azúcar añadida"
       },
       {
         "ancla": "/fichas-tecnicas",

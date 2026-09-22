@@ -143,12 +143,15 @@ describe('sabores — fuente única sincronizada con el arte de imprenta', () =>
 })
 
 describe('gotas y polvo', () => {
-  it('las gotas son 6 sabores del catálogo', () => {
+  it('las gotas son 5 sabores del catálogo', () => {
     // El conteo se queda hasta la Fase 7: hasta que exista el alta de ítems
     // nadie lo puede violar, así que es un guard gratis. Los precios
     // exactos (340 / 258) no: eran el mismo assert de valor que los 122/108
     // de las barras y cayeron con ellos en la Fase 1.
-    expect(gotas).toHaveLength(6)
+    // [2026-09-22] Eran 6. El catálogo nuevo de Maracacao lista cinco:
+    // salió hierbabuena, salió lima con chile y entró cardamomo. El
+    // precio común de los cuatro también se movió (258 a 276).
+    expect(gotas).toHaveLength(5)
   })
 
   it('cada variedad de polvo tiene su etiqueta en disco (el canvas mostraba 4)', () => {

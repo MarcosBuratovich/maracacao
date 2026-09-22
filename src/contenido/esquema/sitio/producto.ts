@@ -426,4 +426,107 @@ export const camposDeProducto = {
       }),
     },
   }),
+
+  /*
+   * Las cocoas (catálogo Maracacao, sección 05). Hasta hoy estaban en el
+   * sitio SOLO como fichas técnicas: dos productos que se venden, con
+   * precio, y sin ninguna página donde mirarlos. Peor: estaban listadas
+   * como «variedades» del chocolate en polvo, que es otra cosa —el polvo
+   * lleva azúcar y las cocoas no— e inflaba el conteo que el sitio publica.
+   *
+   * Se muestran los precios PÚBLICOS nada más, como en el resto del sitio.
+   * Los de mayoreo existen en el catálogo, pero publicarlos es una decisión
+   * comercial y acá se sigue lo que ya hacía la página: precio público a la
+   * vista y «pregunta por mayoreo» para lo demás.
+   */
+  cocoas: grupo({
+    ...enProductos,
+    etiqueta: 'Cocoas sin azúcar añadida',
+    ayuda: 'El bloque de las dos cocoas: la natural y la alcalina.',
+    campos: {
+      kicker: texto({
+        ...enProductos,
+        etiqueta: 'Antetítulo del bloque de cocoas',
+        ayuda: 'La línea en versales arriba del título.',
+        maxCaracteres: 30,
+      }),
+      titulo: texto({
+        ...enProductos,
+        etiqueta: 'Título del bloque de cocoas',
+        ayuda: 'El título grande del bloque de cocoas.',
+        maxCaracteres: 40,
+      }),
+      cuerpo: parrafo({
+        ...enProductos,
+        etiqueta: 'Texto del bloque de cocoas',
+        ayuda: 'El párrafo que explica en qué se diferencian las dos.',
+        maxCaracteres: 260,
+      }),
+      // La advertencia del catálogo, que es la que de verdad le sirve a una
+      // repostería: no son intercambiables sin ajustar la fórmula.
+      nota: parrafo({
+        ...enProductos,
+        etiqueta: 'Advertencia de sustitución',
+        ayuda: 'La línea que avisa que no siempre se pueden cambiar una por otra.',
+        maxCaracteres: 200,
+      }),
+      etiquetaChica: texto({
+        ...enProductos,
+        etiqueta: 'Etiqueta de la presentación chica',
+        ayuda: 'Cómo se nombra la bolsa chica en la lista de precios.',
+        maxCaracteres: 12,
+      }),
+      etiquetaGrande: texto({
+        ...enProductos,
+        etiqueta: 'Etiqueta de la presentación grande',
+        ayuda: 'Cómo se nombra la bolsa grande en la lista de precios.',
+        maxCaracteres: 12,
+      }),
+      lista: lista({
+        ...enProductos,
+        etiqueta: 'Las cocoas',
+        ayuda: 'Las dos cocoas, con su perfil, sus usos y sus precios.',
+        minItems: 1,
+        maxItems: 6,
+        elemento: grupo({
+          ...enProductos,
+          etiqueta: 'Una cocoa',
+          ayuda: 'Una de las cocoas del bloque.',
+          // Para que en el panel cada instancia se llame por su nombre y no
+          // «Una cocoa 1» / «Una cocoa 2».
+          nombra: (v) => (v as { nombre?: string }).nombre ?? 'Cocoa',
+          campos: {
+            nombre: texto({
+              ...enProductos,
+              etiqueta: 'Nombre de la cocoa',
+              ayuda: 'Cómo se llama: «Cocoa natural» o «Cocoa alcalina».',
+              maxCaracteres: 30,
+            }),
+            perfil: parrafo({
+              ...enProductos,
+              etiqueta: 'Perfil de la cocoa',
+              ayuda: 'En qué se nota la diferencia: acidez, color, solubilidad.',
+              maxCaracteres: 180,
+            }),
+            usos: texto({
+              ...enProductos,
+              etiqueta: 'Usos de la cocoa',
+              ayuda: 'Para qué sirve, separado por comas.',
+              maxCaracteres: 90,
+            }),
+            precioChico: precio({
+              ...enProductos,
+              etiqueta: 'Precio de la bolsa chica',
+              ayuda: 'En pesos, sin centavos.',
+            }),
+            precioGrande: precio({
+              ...enProductos,
+              etiqueta: 'Precio de la bolsa grande',
+              ayuda: 'En pesos, sin centavos.',
+            }),
+          },
+        }),
+      }),
+    },
+  }),
 }

@@ -92,7 +92,7 @@
       "contadorDe": "de 15",
       "fichaEtiqueta": "Barra n.º",
       "grupoAria": "Elige un sabor para ver su ficha",
-      "pesoInsignia": "70\u00a0g",
+      "pesoInsignia": "70 g",
       "manoInsignia": "hecho a mano",
       "ingredientesEtiqueta": "Ingredientes",
       "cta": "Ver en el catálogo",
@@ -109,7 +109,7 @@
       "nota": "Para probar la línea sin casarte con una sola barra."
     },
     "gotas": {
-      "titulo": "Gotas de chocolate · 250\u00a0g",
+      "titulo": "Gotas de chocolate · 250 g",
       "precioDesde": 258,
       "precioJengibre": 340,
       "desdeEtiqueta": "desde",
@@ -118,7 +118,7 @@
       "notaPrecio": "Jengibre y naranja"
     },
     "polvoCard": {
-      "titulo": "En polvo · 250\u00a0g",
+      "titulo": "En polvo · 250 g",
       "chip": "PRÓXIMAMENTE",
       "cuerpo": "Para beber frío o caliente, con espuma, aroma y tradición."
     },
@@ -279,7 +279,7 @@
           "id": "polvo",
           "ficha": "#chocolate-en-polvo",
           "etiqueta": "Chocolate en polvo",
-          "titulo": "Chocolate en polvo · 250\u00a0g y 1\u00a0kg",
+          "titulo": "Chocolate en polvo · 250 g y 1 kg",
           "precioNota": "próximamente",
           "precio": null,
           "clave": "salDeMar",
@@ -294,7 +294,7 @@
           "id": "gotas",
           "ficha": "#barras-y-gotas",
           "etiqueta": "Chocolate en gotas",
-          "titulo": "Chocolate en gotas · 250\u00a0g",
+          "titulo": "Chocolate en gotas · 250 g",
           "precioNota": "desde",
           "precio": 258,
           "clave": "cardamomo",
@@ -310,7 +310,7 @@
           "id": "barras",
           "ficha": "#barras-y-gotas",
           "etiqueta": "Chocolate en barras",
-          "titulo": "Chocolate en barras · 70\u00a0g",
+          "titulo": "Chocolate en barras · 70 g",
           "precioNota": "desde",
           "precio": 108,
           "clave": "canela",
@@ -458,11 +458,11 @@
       "productos": [
         {
           "ancla": "#sabores",
-          "texto": "Barras 70\u00a0g"
+          "texto": "Barras 70 g"
         },
         {
           "ancla": "#sabores",
-          "texto": "Gotas de chocolate 250\u00a0g"
+          "texto": "Gotas de chocolate 250 g"
         },
         {
           "ancla": "#polvo",
@@ -479,6 +479,30 @@
       ],
       "legalesNota": "En preparación",
       "derechos": "Maracacao · Chocolate mexicano · Hecho a mano en México"
+    },
+    "cocoas": {
+      "kicker": "SIN AZÚCAR AÑADIDA",
+      "titulo": "Cocoas para crear",
+      "cuerpo": "Las cocoas Maracacao no contienen azúcar añadida. La natural conserva una acidez más pronunciada; la alcalina pasó por un proceso que reduce su acidez, oscurece su color y mejora su solubilidad.",
+      "nota": "No siempre pueden sustituirse una por otra sin ajustar la fórmula: en repostería el pH cambia el sabor, el color y cómo reaccionan los demás ingredientes.",
+      "etiquetaChica": "250 g",
+      "etiquetaGrande": "1 kg",
+      "lista": [
+        {
+          "nombre": "Cocoa natural",
+          "perfil": "Sólidos 100% de cacao en polvo. Mayor acidez natural y color café. Pide buena incorporación al mezclarla.",
+          "usos": "Repostería, cocina, chocolatería y bebidas",
+          "precioChico": 86,
+          "precioGrande": 344
+        },
+        {
+          "nombre": "Cocoa alcalina",
+          "perfil": "Sólidos de cacao alcalinizados con carbonato de potasio. Menor acidez, color más oscuro y mejor solubilidad.",
+          "usos": "Repostería, chocolatería, confitería y bebidas",
+          "precioChico": 102,
+          "precioGrande": 399
+        }
+      ]
     }
   },
   "sabores": [

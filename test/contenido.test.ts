@@ -1651,7 +1651,7 @@ describe('la capa de contenido', () => {
     )
     expect(fixture.sabores).toHaveLength(15)
     expect(fixture.fichas).toHaveLength(4)
-    expect(Object.keys(fixture.marca)).toHaveLength(21)
+    expect(Object.keys(fixture.marca)).toHaveLength(22)
   })
 
   it('capturaFixture() se niega a correr si src/contenido/datos/ ya tiene un documento migrado', () => {
@@ -1792,7 +1792,7 @@ describe('la capa de contenido', () => {
       // Los derivados NO están en el JSON, pero cargar() y validar() los
       // exigen: es el contrato con la fachada. El fixture los tiene porque
       // salió del módulo viejo, donde estaban escritos a mano.
-      return { postura: m.postura, anaquel: m.anaquel, minis: m.minis, gotas: m.gotas, polvoCard: m.polvoCard, polvo: m.polvo }
+      return { postura: m.postura, anaquel: m.anaquel, minis: m.minis, gotas: m.gotas, polvoCard: m.polvoCard, polvo: m.polvo, cocoas: m.cocoas }
     }
     const CONTEOS = { sabores: 15, gotas: 6, polvo: 8, ingredientes: 5 }
 
@@ -2044,7 +2044,7 @@ describe('la capa de contenido', () => {
     // documentan es qué colecciones necesita ESE fragmento.
     const CONTEOS = conteosDe({ sitio: fixture.marca, sabores: fixture })
 
-    it('los 21 bloques están, en el orden de la página', () => {
+    it('los 22 bloques están, en el orden de la página', () => {
       // El orden de las claves del esquema es el orden del JSON y el orden
       // en que el panel dibuja las secciones. Si alguien reordena los
       // spread de sitio.ts, el JSON entero se reescribe y el diff del
@@ -2052,7 +2052,7 @@ describe('la capa de contenido', () => {
       const bloques = Object.keys((esquemaSitio as unknown as { _zod: { def: { shape: object } } })._zod.def.shape)
       expect(bloques).toEqual([
         'titulo', 'descripcion', 'skipLink', 'marca', 'nav', 'hero',
-        'postura', 'anaquel', 'minis', 'gotas', 'polvoCard', 'polvo',
+        'postura', 'anaquel', 'minis', 'gotas', 'polvoCard', 'polvo', 'cocoas',
         'catar', 'recetas', 'nosotros',
         'negocios', 'preguntas', 'contacto',
         'fichasTecnicas', 'noEncontrada', 'footer',

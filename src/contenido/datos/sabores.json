@@ -127,7 +127,7 @@
       "clave": "blancoConPistache",
       "nombre": "Blanco con pistache",
       "cacao": "Chocolate blanco",
-      "precio": 108,
+      "precio": 128,
       "ingredientes": "Manteca de cacao, leche en polvo, azúcar, lecitina de soya, pistaches",
       "catalogo": null
     },
@@ -154,34 +154,29 @@
   ],
   "gotas": [
     {
-      "clave": "jengibreYNaranja",
-      "nombre": "Jengibre y naranja",
-      "precio": 340
-    },
-    {
-      "clave": "hierbabuena",
-      "nombre": "Hierbabuena",
-      "precio": 258
-    },
-    {
       "clave": "canela",
       "nombre": "Canela",
-      "precio": 258
+      "precio": 276
     },
     {
-      "clave": "mentaIntensa",
-      "nombre": "Menta",
-      "precio": 258
+      "clave": "cardamomo",
+      "nombre": "Cardamomo",
+      "precio": 276
     },
     {
       "clave": "limoncillo",
       "nombre": "Limoncillo",
-      "precio": 258
+      "precio": 276
     },
     {
-      "clave": "limaYChile",
-      "nombre": "Lima y chile",
-      "precio": 258
+      "clave": "mentaIntensa",
+      "nombre": "Menta",
+      "precio": 276
+    },
+    {
+      "clave": "jengibreYNaranja",
+      "nombre": "Naranja con jengibre",
+      "precio": 340
     }
   ],
   "polvo": [
