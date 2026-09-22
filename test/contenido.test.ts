@@ -2367,6 +2367,7 @@ describe('los candados del sistema de contenido', () => {
         "contacto.formulario.tipoOpciones.0.valor",
         "contacto.formulario.tipoOpciones.1.valor",
         "contacto.formulario.trampa",
+        "contacto.tiendaUrl",
         "fichasTecnicas.ruta",
         "fichasTecnicas.rutaInicio",
         "fichasTecnicas.rutaPdf",

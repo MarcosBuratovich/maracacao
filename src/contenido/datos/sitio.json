@@ -93,7 +93,7 @@
     "pesoInsignia": "70\u00a0g",
     "manoInsignia": "hecho a mano",
     "ingredientesEtiqueta": "Ingredientes",
-    "cta": "Ver en el catálogo",
+    "cta": "Comprar en línea",
     "remate": "Hecho para comerse despacio.",
     "ilustracionCaption": "El personaje de la etiqueta",
     "visorAlt": "La barra en tres dimensiones; arrastra para girarla",
@@ -294,14 +294,42 @@
         "estado": "disponibles en ficha técnica"
       }
     ],
+    "condicionesTitulo": "Antes de pedir",
+    "condiciones": [
+      {
+        "dato": "Pedido mínimo de mayoreo",
+        "estado": "en producto",
+        "precio": 4000
+      },
+      {
+        "dato": "Pago",
+        "estado": "por anticipado",
+        "precio": null
+      },
+      {
+        "dato": "Entrega",
+        "estado": "unos 10 días después del pago",
+        "precio": null
+      },
+      {
+        "dato": "Entregas en Ciudad de México",
+        "estado": "jueves o viernes",
+        "precio": null
+      },
+      {
+        "dato": "Envíos al resto del país",
+        "estado": "con costo de flete aparte",
+        "precio": null
+      }
+    ],
     "tabs": [
       {
         "id": "polvo",
         "ficha": "#chocolate-en-polvo",
         "etiqueta": "Chocolate en polvo",
         "titulo": "Chocolate en polvo · 250\u00a0g y 1\u00a0kg",
-        "precioNota": "Precio de mayoreo",
-        "precio": null,
+        "precioNota": "desde",
+        "precio": 58,
         "clave": "salDeMar",
         "cuerpo": "Seis variedades para la taza, sobre una mezcla endulzada de azúcar, cocoa natural, pasta de cacao y cocoa alcalina.",
         "datos": [
@@ -309,7 +337,7 @@
           "Se prepara en leche o agua caliente",
           "También para licuados, repostería y postres",
           "Presentaciones de 250\u00a0g y 1\u00a0kg",
-          "Pregunta por precio de mayoreo"
+          "Rinde unas 8 bebidas por bolsa de 250\u00a0g"
         ]
       },
       {
@@ -410,10 +438,14 @@
     "redesEtiqueta": "REDES",
     "redes": "@maracacaomx",
     "redesNota": "Búscanos en redes sociales.",
-    "catalogoEtiqueta": "CATÁLOGO EN LÍNEA",
-    "catalogoNombre": "chocolateria.pulpos.shop",
-    "catalogoUrl": "https://chocolateria.pulpos.shop",
-    "catalogoNota": "Precios públicos en pesos mexicanos.",
+    "catalogoEtiqueta": "CATÁLOGO",
+    "catalogoNombre": "Catálogo Maracacao",
+    "catalogoUrl": "https://app.notion.com/p/Cat-logo-Maracacao-3d631bcb034780cab357ca7801d1990d",
+    "catalogoNota": "Productos, presentaciones y precios.",
+    "tiendaEtiqueta": "TIENDA EN LÍNEA",
+    "tiendaNombre": "chocolateria.pulpos.shop",
+    "tiendaUrl": "https://chocolateria.pulpos.shop",
+    "tiendaNota": "Compra en línea con envío.",
     "personajeAlt": "El personaje de Maracacao batiendo chocolate con su molinillo",
     "formulario": {
       "titulo": "Escríbenos",

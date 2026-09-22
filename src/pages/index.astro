@@ -168,7 +168,7 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
           <div class="portada-ctas">
             {/* A la categoría de barras por más vendidas (pedido de
                 Marcos), no a la portada general del catálogo. */}
-            <BotonMarca href={urlCatalogoBarras} externo><span data-campo="sitio:hero.ctaCatalogo">{marca.hero.ctaCatalogo}</span></BotonMarca>
+            <BotonMarca href={marca.contacto.catalogoUrl} externo><span data-campo="sitio:hero.ctaCatalogo">{marca.hero.ctaCatalogo}</span></BotonMarca>
             <a class="enlace-sabores" href="#sabores" data-campo="sitio:hero.ctaSabores">{marca.hero.ctaSabores}</a>
           </div>
         </div>
@@ -591,6 +591,22 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
               </div>
             ))}
           </dl>
+          {/* Las condiciones de mayoreo (catálogo, sección 06). Iban acá y
+              no en Contacto porque son la respuesta a la pregunta que se
+              hace justo en esta sección —«¿puedo trabajar con esto?»— y
+              antes se contestaban una por una, por WhatsApp. */}
+          <h3 class="negocios-condiciones-titulo mono" data-campo="sitio:negocios.condicionesTitulo">{marca.negocios.condicionesTitulo}</h3>
+          <dl class="semaforo">
+            {marca.negocios.condiciones.map((c, i) => (
+              <div class="semaforo-fila">
+                <dt data-campo={`sitio:negocios.condiciones.${i}.dato`}>{c.dato}</dt>
+                <dd class="mono">
+                  {c.precio !== null && <><span data-campo={`sitio:negocios.condiciones.${i}.precio`}>{precioMXN(c.precio)}</span>{' '}</>}
+                  <span data-campo={`sitio:negocios.condiciones.${i}.estado`}>{c.estado}</span>
+                </dd>
+              </div>
+            ))}
+          </dl>
           {/* Las fichas completas se leen en su propia página (2026-09-02);
               botón de verdad — el enlace de texto pasaba desapercibido
               (retro de Marcos, 2026-09-02). */}
@@ -775,6 +791,11 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
             <p class="info-dato"><span data-campo="sitio:contacto.puestoTitulo.0">{marca.contacto.puestoTitulo[0]}</span> <span data-campo="sitio:contacto.puestoTitulo.1">{marca.contacto.puestoTitulo[1]}</span></p>
             <p class="info-nota suave"><span data-campo="sitio:contacto.direccion.0">{marca.contacto.direccion[0]}</span> · <span data-campo="sitio:contacto.direccion.1">{marca.contacto.direccion[1]}</span></p>
           </div>
+          {/* Dos bloques, no uno: el CATÁLOGO es de dónde sale la
+              información (qué hay, en qué presentación, a cuánto) y la
+              TIENDA es dónde se compra. Hasta hoy los dos eran el mismo
+              enlace, así que quien solo quería saber qué hay y cuánto
+              cuesta caía en un carrito. */}
           <div class="info-bloque">
             <p class="mono info-etiqueta" data-campo="sitio:contacto.catalogoEtiqueta">{marca.contacto.catalogoEtiqueta}</p>
             <p class="info-dato">
@@ -783,6 +804,15 @@ const esquema = [esquemaNegocio(origen), esquemaPreguntas(), esquemaBarras(orige
               </a>
             </p>
             <p class="info-nota suave" data-campo="sitio:contacto.catalogoNota">{marca.contacto.catalogoNota}</p>
+          </div>
+          <div class="info-bloque">
+            <p class="mono info-etiqueta" data-campo="sitio:contacto.tiendaEtiqueta">{marca.contacto.tiendaEtiqueta}</p>
+            <p class="info-dato">
+              <a href={marca.contacto.tiendaUrl} target="_blank" rel="noopener">
+                <span data-campo="sitio:contacto.tiendaNombre">{marca.contacto.tiendaNombre}</span><span class="sr-only"> (se abre en pestaña nueva)</span>
+              </a>
+            </p>
+            <p class="info-nota suave" data-campo="sitio:contacto.tiendaNota">{marca.contacto.tiendaNota}</p>
           </div>
           {/*
             El enlace sale de los dígitos del MISMO campo que se muestra

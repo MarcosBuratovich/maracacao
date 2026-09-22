@@ -17097,7 +17097,7 @@ var tabs = tupla({
       precio: precioONada({
         seccion: "negocios",
         etiqueta: "Precio del polvo",
-        ayuda: "D\xE9jalo vac\xEDo mientras el chocolate en polvo no est\xE9 a la venta."
+        ayuda: "El precio m\xE1s bajo del chocolate en polvo, el de la bolsa chica sin sabor."
       })
     }),
     // «6 sabores: jengibre y naranja, …» — el conteo está en los DATOS
@@ -17201,6 +17201,59 @@ var camposDeNegocio = {
               etiqueta: "D\xF3nde est\xE1 ese dato",
               ayuda: "La columna derecha: \xABconfirmados en ficha t\xE9cnica\xBB.",
               maxCaracteres: 50
+            })
+          }
+        })
+      }),
+      /*
+       * Las condiciones de mayoreo (catálogo Maracacao, sección 06). Hasta
+       * hoy el sitio invitaba a escribir por mayoreo sin decir NADA de lo
+       * que una cafetería necesita saber antes de escribir: cuánto es el
+       * mínimo, cuándo se paga y cuándo llega. Esa conversación se estaba
+       * teniendo por WhatsApp una vez por cliente.
+       *
+       * Misma forma que `fichas` —dato a la izquierda, estado a la
+       * derecha— a propósito: es el mismo tipo de lectura rápida y ya
+       * tiene su lugar en la página.
+       */
+      condicionesTitulo: texto({
+        ...enNegocios,
+        etiqueta: "T\xEDtulo de las condiciones",
+        ayuda: "El encabezado de la lista de condiciones de mayoreo.",
+        maxCaracteres: 40
+      }),
+      condiciones: lista({
+        ...enNegocios,
+        etiqueta: "Condiciones de mayoreo",
+        ayuda: "M\xEDnimo, pago, tiempos y entregas: lo que hay que saber antes de pedir.",
+        minItems: 1,
+        maxItems: 8,
+        elemento: grupo({
+          ...enNegocios,
+          etiqueta: "Condici\xF3n",
+          ayuda: "Un rengl\xF3n de las condiciones de mayoreo.",
+          nombra: (v) => v.dato ?? "Condici\xF3n",
+          campos: {
+            dato: texto({
+              ...enNegocios,
+              etiqueta: "Qu\xE9 condici\xF3n es",
+              ayuda: "La columna izquierda: \xABPedido m\xEDnimo\xBB.",
+              maxCaracteres: 60
+            }),
+            estado: texto({
+              ...enNegocios,
+              etiqueta: "Cu\xE1l es la condici\xF3n",
+              ayuda: "La columna derecha: \xABjueves o viernes\xBB.",
+              maxCaracteres: 60
+            }),
+            // El mínimo de mayoreo es un PRECIO y va en un campo de precio,
+            // no adentro del texto: el sistema rechaza un «$4,000» escrito
+            // en prosa justamente para que no se quede viejo sin que nadie
+            // lo note. Los renglones que no hablan de plata lo dejan nulo.
+            precio: precioONada({
+              ...enNegocios,
+              etiqueta: "Monto de la condici\xF3n",
+              ayuda: "Si la condici\xF3n es un monto, va ac\xE1. Si no, se deja vac\xEDo."
             })
           }
         })
@@ -17457,26 +17510,57 @@ var camposDeContacto = {
         ayuda: "La l\xEDnea chiquita bajo el nombre de usuario.",
         maxCaracteres: 50
       }),
+      /*
+       * Dos enlaces distintos que antes eran uno solo, y se confundían:
+       * el CATÁLOGO es de dónde sale la información (productos,
+       * presentaciones y precios) y la TIENDA es dónde se compra. Hasta
+       * hoy los dos apuntaban a la tienda, así que el sitio no tenía a
+       * dónde mandar a alguien que solo quería saber qué hay y cuánto
+       * cuesta.
+       */
       catalogoEtiqueta: texto({
         ...enContacto,
         etiqueta: "Etiqueta del cat\xE1logo",
-        ayuda: "La l\xEDnea en versales sobre el enlace a la tienda.",
+        ayuda: "La l\xEDnea en versales sobre el enlace al cat\xE1logo.",
         maxCaracteres: 30
       }),
       catalogoNombre: texto({
         ...enContacto,
         etiqueta: "Nombre del cat\xE1logo",
-        ayuda: "C\xF3mo se lee el enlace a la tienda en l\xEDnea.",
+        ayuda: "C\xF3mo se lee el enlace del cat\xE1logo.",
         maxCaracteres: 40
       }),
       catalogoUrl: url2({
         ...enContacto,
         etiqueta: "Direcci\xF3n del cat\xE1logo",
-        ayuda: "A d\xF3nde lleva el enlace de la tienda en l\xEDnea."
+        ayuda: "A d\xF3nde lleva el enlace del cat\xE1logo, donde est\xE1n los productos y sus precios."
       }),
       catalogoNota: texto({
         ...enContacto,
         etiqueta: "Nota del cat\xE1logo",
+        ayuda: "La l\xEDnea chiquita bajo el enlace del cat\xE1logo.",
+        maxCaracteres: 60
+      }),
+      tiendaEtiqueta: texto({
+        ...enContacto,
+        etiqueta: "Etiqueta de la tienda",
+        ayuda: "La l\xEDnea en versales sobre el enlace a la tienda en l\xEDnea.",
+        maxCaracteres: 30
+      }),
+      tiendaNombre: texto({
+        ...enContacto,
+        etiqueta: "Nombre de la tienda",
+        ayuda: "C\xF3mo se lee el enlace de la tienda en l\xEDnea.",
+        maxCaracteres: 40
+      }),
+      tiendaUrl: url2({
+        ...enContacto,
+        etiqueta: "Direcci\xF3n de la tienda",
+        ayuda: "A d\xF3nde lleva el enlace de la tienda en l\xEDnea, donde se compra."
+      }),
+      tiendaNota: texto({
+        ...enContacto,
+        etiqueta: "Nota de la tienda",
         ayuda: "La l\xEDnea chiquita bajo el enlace de la tienda.",
         maxCaracteres: 60
       }),
