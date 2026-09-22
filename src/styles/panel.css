@@ -1,0 +1,449 @@
+/* Estilos de /panel (Tarea 1, fase 6). Mobile-first a propósito: ella
+   edita parada, con una mano, en un mercado — nada que dependa de
+   :hover como única señal, y objetivos de toque grandes (mínimo 44-52px).
+   Mismas reglas que marca.css/landing.css: ningún hex a mano, todo color y
+   tipografía sale de las custom properties de tokens.generated.css. */
+
+.panel-shell {
+  box-sizing: border-box;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  padding: 2rem 1.25rem;
+  background: var(--mrc-marca-crema);
+  color: var(--mrc-marca-tinta);
+  font-family: var(--mrc-font-texto);
+  font-size: 1.0625rem;
+  line-height: 1.5;
+}
+
+.panel-shell *,
+.panel-shell *::before,
+.panel-shell *::after {
+  box-sizing: border-box;
+}
+
+.panel-titulo {
+  font-family: var(--mrc-font-titular);
+  font-weight: 700;
+  font-size: 1.625rem;
+  margin: 0;
+  text-align: center;
+}
+
+.panel-formulario {
+  width: min(360px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.panel-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-weight: 600;
+  width: 100%;
+}
+
+.panel-campo input {
+  font-size: 1.0625rem;
+  min-height: 52px;
+  padding: 0.75rem 0.9rem;
+  border: 2px solid var(--mrc-marca-textoSuave);
+  border-radius: 10px;
+  background: var(--mrc-marca-blanco);
+  color: var(--mrc-marca-tinta);
+  font-family: var(--mrc-font-texto);
+  width: 100%;
+}
+
+.panel-campo input:focus-visible {
+  outline: 3px solid var(--mrc-marca-rojo);
+  outline-offset: 1px;
+}
+
+.panel-recordar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.95rem;
+  font-weight: 400;
+}
+
+.panel-recordar input {
+  width: 24px;
+  height: 24px;
+  flex: none;
+}
+
+/* `.panel-boton` viste tanto a `<button>` como a un `<a>` («Ver mi
+   sitio», Tarea 4): el `display: inline-flex` centra el texto en los dos
+   por igual, y `text-decoration: none` saca el subrayado que un enlace
+   trae de fábrica. */
+.panel-boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  font-family: var(--mrc-font-titular);
+  color: var(--mrc-marca-blanco);
+  background: var(--mrc-marca-rojo);
+  border: none;
+  border-radius: 10px;
+  padding: 0.75rem 1.25rem;
+  cursor: pointer;
+  text-decoration: none;
+  text-align: center;
+  width: 100%;
+}
+
+.panel-boton:active {
+  background: var(--mrc-marca-rojoHover);
+}
+
+.panel-boton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.panel-boton:focus-visible {
+  outline: 3px solid var(--mrc-marca-oscuro);
+  outline-offset: 2px;
+}
+
+.panel-enlace-discreto {
+  background: none;
+  border: none;
+  color: var(--mrc-marca-textoSuave);
+  text-decoration: underline;
+  font-size: 0.95rem;
+  font-family: var(--mrc-font-texto);
+  padding: 0.75rem;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.panel-enlace-discreto:focus-visible {
+  outline: 3px solid var(--mrc-marca-rojo);
+}
+
+.panel-enlace-discreto:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.panel-error {
+  color: var(--mrc-marca-rojoHondo);
+  font-weight: 600;
+  margin: 0;
+  text-align: center;
+}
+
+.panel-aviso {
+  color: var(--mrc-marca-textoSuave);
+  margin: 0;
+  text-align: center;
+}
+
+/* El editor (Tarea 2, fase 6): navegación por sección y, debajo, los
+   campos de esa sección. `.panel-shell` centra horizontalmente con
+   `align-items: center`, así que el editor necesita su propio ancho —
+   más generoso que el formulario de entrada porque acá hay párrafos y
+   contadores, pero acotado igual para no volverse un renglón larguísimo
+   en pantallas anchas. */
+
+.panel-editor {
+  width: min(560px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  align-items: stretch;
+  text-align: left;
+}
+
+.panel-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  background: var(--mrc-marca-crema);
+  padding-block: 0.5rem;
+  z-index: 1;
+}
+
+.panel-selector-control {
+  font-size: 1.0625rem;
+  min-height: 52px;
+  padding: 0.75rem 0.9rem;
+  border: 2px solid var(--mrc-marca-textoSuave);
+  border-radius: 10px;
+  background: var(--mrc-marca-blanco);
+  color: var(--mrc-marca-tinta);
+  font-family: var(--mrc-font-texto);
+  width: 100%;
+}
+
+.panel-selector-control:focus-visible {
+  outline: 3px solid var(--mrc-marca-rojo);
+  outline-offset: 1px;
+}
+
+.panel-campos {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.panel-grupo-titulo {
+  font-family: var(--mrc-font-titular);
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin: 0;
+  padding-top: 0.5rem;
+  border-top: 2px solid var(--mrc-marca-bandaCalida);
+}
+
+.panel-campo-en-grupo {
+  padding-left: 0.85rem;
+  border-left: 3px solid var(--mrc-marca-bandaCalida);
+}
+
+.panel-campo-editable {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding-block: 0.25rem;
+}
+
+.panel-campo-etiqueta {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.panel-campo-sufijo {
+  font-weight: 400;
+  color: var(--mrc-marca-textoSuave);
+}
+
+.panel-campo-ayuda {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--mrc-marca-textoSuave);
+}
+
+.panel-campo-input,
+.panel-campo-textarea {
+  font-size: 1.0625rem;
+  min-height: 52px;
+  padding: 0.75rem 0.9rem;
+  border: 2px solid var(--mrc-marca-textoSuave);
+  border-radius: 10px;
+  background: var(--mrc-marca-blanco);
+  color: var(--mrc-marca-tinta);
+  font-family: var(--mrc-font-texto);
+  width: 100%;
+}
+
+.panel-campo-textarea {
+  resize: vertical;
+}
+
+.panel-campo-input:focus-visible,
+.panel-campo-textarea:focus-visible {
+  outline: 3px solid var(--mrc-marca-rojo);
+  outline-offset: 1px;
+}
+
+.panel-campo-input[aria-invalid='true'],
+.panel-campo-textarea[aria-invalid='true'] {
+  border-color: var(--mrc-marca-rojoHondo);
+}
+
+.panel-campo-contador {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--mrc-marca-textoSuave);
+  text-align: right;
+}
+
+.panel-campo-error {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--mrc-marca-rojoHondo);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.panel-campo-arreglo {
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: var(--mrc-font-texto);
+  color: var(--mrc-marca-tinta);
+  background: var(--mrc-marca-blanco);
+  border: 2px solid var(--mrc-marca-rojoHondo);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.panel-campo-arreglo:focus-visible {
+  outline: 3px solid var(--mrc-marca-rojoHondo);
+  outline-offset: 1px;
+}
+
+/* El borrador y publicar/saber/deshacer (Tareas 3 y 4, fase 6): comparten
+   pantalla con el editor, así que comparten también su ancho y su gramática
+   visual — nada nuevo, los mismos `.panel-boton`/`.panel-aviso`/`.panel-error`
+   de arriba, más un puñado de contenedores para agruparlos. */
+
+.panel-sesion {
+  width: min(560px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  align-items: stretch;
+  text-align: left;
+}
+
+.panel-conflicto {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 2px solid var(--mrc-marca-rojoHondo);
+  border-radius: 10px;
+  background: var(--mrc-marca-blanco);
+}
+
+.panel-revision,
+.panel-resultado {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: stretch;
+  text-align: left;
+}
+
+.panel-revision-lista {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.panel-avisos {
+  padding: 0.85rem;
+  border: 2px solid var(--mrc-marca-amarillo);
+  border-radius: 10px;
+  background: var(--mrc-marca-blanco);
+}
+
+.panel-avisos-titulo {
+  margin: 0 0 0.5rem;
+  font-weight: 700;
+}
+
+.panel-avisos-lista {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.panel-boton-deshacer {
+  min-height: 52px;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  font-family: var(--mrc-font-titular);
+  color: var(--mrc-marca-blanco);
+  background: var(--mrc-marca-oscuro);
+  border: none;
+  border-radius: 10px;
+  padding: 0.75rem 1.25rem;
+  cursor: pointer;
+  width: 100%;
+}
+
+.panel-boton-deshacer:focus-visible {
+  outline: 3px solid var(--mrc-marca-rojo);
+  outline-offset: 2px;
+}
+
+/* El historial (Tarea 5): la frase de arriba de todo usa `.panel-aviso`
+   tal cual, centrada como cualquier otro aviso de esta pantalla. La lista
+   completa va colapsada en un `<details>` nativo —cero JS propio, cero
+   estado que probar— con el mismo ancho y alineación a la izquierda que
+   `.panel-editor`/`.panel-sesion`. */
+
+.panel-historial {
+  width: min(560px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  align-items: stretch;
+}
+
+.panel-historial-caja {
+  text-align: left;
+}
+
+.panel-historial-resumen {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0.6rem 0.25rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.panel-historial-resumen:focus-visible {
+  outline: 3px solid var(--mrc-marca-rojo);
+  outline-offset: 2px;
+}
+
+.panel-historial-lista {
+  margin: 0.25rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.panel-historial-fila {
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  background: var(--mrc-marca-blanco);
+}
+
+/* Una reversión no es "un cambio más": el acento a la izquierda es el
+   mismo que ya usa `.panel-campo-en-grupo` para marcar un agrupamiento —
+   mismo vocabulario visual, no uno nuevo. */
+.panel-historial-fila-deshace {
+  border-left: 3px solid var(--mrc-marca-bandaCalida);
+}
+
+.panel-historial-titulo {
+  margin: 0;
+  font-weight: 600;
+}
+
+.panel-historial-meta {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  color: var(--mrc-marca-textoSuave);
+}

@@ -646,6 +646,85 @@ describe('la capa de contenido', () => {
     ])
   })
 
+  describe('recorre() expone la instancia de lista más cercana (el panel la usa para `nombra`)', () => {
+    // `nombra` vive en el grupo del ELEMENTO de una lista, y `recorre()`
+    // nunca visita ese grupo como hoja —salta directo a sus campos—, así
+    // que sin este cuarto argumento el panel no tiene forma de nombrar la
+    // receta 3 con su propio título en vez de con «Receta 3». Ver el
+    // docstring de `InstanciaDeLista` en carga.ts.
+    const paso = grupo({
+      etiqueta: 'Paso', seccion: 'catar', ayuda: 'x',
+      nombra: (v) => `Paso: ${(v as { nombre?: string }).nombre ?? ''}`,
+      campos: {
+        nombre: texto({ etiqueta: 'Nombre', seccion: 'catar', ayuda: 'y', maxCaracteres: 20 }),
+      },
+    })
+    const conLista = grupo({
+      etiqueta: 'Prueba', seccion: 'catar', ayuda: 'x',
+      campos: {
+        pasos: lista({ etiqueta: 'Pasos', seccion: 'catar', ayuda: 'x', minItems: 1, maxItems: 5, elemento: paso }),
+      },
+    })
+
+    it('la hoja dentro de un elemento con `nombra` recibe esa instancia', () => {
+      const vistas: { ruta: string; instancia: string | undefined }[] = []
+      recorre(conLista, (ruta, _meta, _hoja, instancia) => {
+        vistas.push({ ruta, instancia: instancia?.ruta })
+      })
+      expect(vistas).toEqual([{ ruta: 'pasos[].nombre', instancia: 'pasos[]' }])
+    })
+
+    it('la instancia trae el `nombra` de verdad, no solo la ruta', () => {
+      let capturada: MetaCampo | undefined
+      recorre(conLista, (_ruta, _meta, _hoja, instancia) => {
+        capturada = instancia?.meta
+      })
+      expect(capturada?.nombra?.({ nombre: 'Mira' })).toBe('Paso: Mira')
+    })
+
+    it('sin ninguna lista de por medio, no hay instancia', () => {
+      const suelto = grupo({
+        etiqueta: 'Prueba', seccion: 'catar', ayuda: 'x',
+        campos: { titulo: texto({ etiqueta: 'Título', seccion: 'catar', ayuda: 'y', maxCaracteres: 20 }) },
+      })
+      let capturada: unknown = 'sin tocar'
+      recorre(suelto, (_ruta, _meta, _hoja, instancia) => {
+        capturada = instancia
+      })
+      expect(capturada).toBeUndefined()
+    })
+
+    it('la lista MÁS CERCANA gana: una lista anidada pisa la de más afuera', () => {
+      const interno = grupo({
+        etiqueta: 'Interno', seccion: 'catar', ayuda: 'x',
+        nombra: (v) => `Interno: ${(v as { n?: string }).n ?? ''}`,
+        campos: { n: texto({ etiqueta: 'N', seccion: 'catar', ayuda: 'y', maxCaracteres: 10 }) },
+      })
+      const externo = grupo({
+        etiqueta: 'Externo', seccion: 'catar', ayuda: 'x',
+        nombra: () => 'Externo',
+        campos: {
+          internos: lista({
+            etiqueta: 'Internos', seccion: 'catar', ayuda: 'x', minItems: 1, maxItems: 5, elemento: interno,
+          }),
+        },
+      })
+      const raiz = grupo({
+        etiqueta: 'Raíz', seccion: 'catar', ayuda: 'x',
+        campos: {
+          externos: lista({
+            etiqueta: 'Externos', seccion: 'catar', ayuda: 'x', minItems: 1, maxItems: 5, elemento: externo,
+          }),
+        },
+      })
+      let capturada: string | undefined
+      recorre(raiz, (ruta, _meta, _hoja, instancia) => {
+        if (ruta === 'externos[].internos[].n') capturada = instancia?.ruta
+      })
+      expect(capturada).toBe('externos[].internos[]')
+    })
+  })
+
   it('recorre() no trata una unión SIN discriminante como hoja: truena y dice qué falta', () => {
     // Silencio es el peor resultado acá: una unión emitida como hoja deja
     // todos los campos de sus variantes invisibles para el panel, sin error.
@@ -2190,13 +2269,42 @@ describe('los candados del sistema de contenido', () => {
     }
   })
 
-  it('4 · el contenido publicado no tiene ni un problema, avisos incluidos', () => {
-    // El candado de conteos (Ruling F). `cargar()` no cruza conteos porque
-    // un aviso no impide publicar; acá sí se exige que no haya ninguno,
-    // porque este test corre adentro de `pnpm build` y el contenido que se
-    // publica no tiene por qué tener textos viejos.
+  it('4 · el contenido publicado no tiene nada que IMPIDA publicar', () => {
+    // [2026-09-21, fase 6] Antes este test exigía cero problemas «avisos
+    // incluidos», y eso era una contradicción con el resto del sistema:
+    // `validar()` distingue `gravedad: 'impide'` de `'avisa'`, el servidor
+    // deja publicar con avisos a propósito, y el panel se los muestra a
+    // ella con todas las letras («Para revisar cuando puedas (esto no
+    // bloquea nada)»). Pero este test corre adentro de `pnpm build`, que
+    // es el `buildCommand` de `vercel.json` — así que un aviso SÍ tumbaba
+    // la publicación.
+    //
+    // El camino real: ella edita un texto que menciona un número («15
+    // sabores»), el número deja de coincidir con la lista, el panel le
+    // dice que puede publicar, publica, y el build se cae. La red de
+    // seguridad lo revierte sola y le manda el correo a Marcos, así que no
+    // queda el sitio roto — pero es un «algo salió mal» por algo que el
+    // propio sistema le había aprobado, y ella no tiene cómo entenderlo.
+    //
+    // Entre «el panel miente» y «el portón es más estricto que el panel»,
+    // gana el panel: es quien habla con ella. El aviso no se pierde, lo
+    // sigue viendo mientras edita, que es cuando puede arreglarlo.
     for (const id of Object.keys(DOCUMENTOS) as IdDocumento[]) {
-      expect(validar(DOCUMENTOS[id], CRUDO[id], CONTEOS), id).toEqual([])
+      const impiden = validar(DOCUMENTOS[id], CRUDO[id], CONTEOS).filter((p) => p.gravedad === 'impide')
+      expect(impiden, id).toEqual([])
+    }
+  })
+
+  it('4b · los avisos del contenido publicado se ven, pero no tumban el build', () => {
+    // El contrapeso del cambio de arriba: los avisos no desaparecen del
+    // radar, quedan impresos en el log del build. Este test no puede
+    // fallar por un aviso —ese es justamente el punto— pero sí falla si
+    // alguien rompe `gravedad` y los avisos dejan de ser distinguibles.
+    for (const id of Object.keys(DOCUMENTOS) as IdDocumento[]) {
+      for (const p of validar(DOCUMENTOS[id], CRUDO[id], CONTEOS)) {
+        expect(['impide', 'avisa'], `${id} · ${p.campo}`).toContain(p.gravedad)
+        if (p.gravedad === 'avisa') console.warn(`aviso de contenido — ${id} · ${p.campo}: ${p.titulo}`)
+      }
     }
   })
 

@@ -14997,7 +14997,15 @@ var marca = {
   bandaCalida: "#F3E4CA",
   bandaClara: "#FFF9EE",
   oscuro: "#33190A",
-  textoSuave: "#7A604A"
+  textoSuave: "#7A604A",
+  /**
+   * Blanco puro — no un tono cálido de la paleta. `paresAprobados` (abajo)
+   * ya lo usaba como literal `'#FFFFFF'` para «texto en botón rojo» y
+   * «texto sobre banda oscura»: acá se nombra, para que cualquier CSS
+   * —el panel, `src/styles/panel.css`— lo pueda pedir como
+   * `--mrc-marca-blanco` en vez de escribir el hex a mano.
+   */
+  blanco: "#FFFFFF"
 };
 var tintaSabor = {
   jengibreYNaranja: "#FFFFFF",
@@ -15254,7 +15262,7 @@ var discriminanteDe = (quien, def, donde) => {
   }
   return d;
 };
-function recorre(esquema, visita, prefijo = "") {
+function recorre(esquema, visita, prefijo = "", instancia = void 0) {
   const def = definicion(esquema);
   switch (def.type) {
     case "optional":
@@ -15263,36 +15271,42 @@ function recorre(esquema, visita, prefijo = "") {
       const dentro = definicion(fondo);
       exigeEnvolturaConocida("recorre", dentro, prefijo);
       if (esContenedor(dentro.type)) {
-        recorre(fondo, visita, prefijo);
+        recorre(fondo, visita, prefijo, instancia);
       } else {
-        visita(prefijo, meta3, esquema);
+        visita(prefijo, meta3, esquema, instancia);
       }
       return;
     }
     case "object": {
       const shape = def.shape;
-      for (const clave of Object.keys(shape)) recorre(shape[clave], visita, con(prefijo, clave));
+      for (const clave of Object.keys(shape)) recorre(shape[clave], visita, con(prefijo, clave), instancia);
       return;
     }
     case "tuple": {
       const items = def.items;
-      items.forEach((item, i) => recorre(item, visita, con(prefijo, i)));
+      items.forEach((item, i) => recorre(item, visita, con(prefijo, i), instancia));
       return;
     }
-    case "array":
-      recorre(def.element, visita, `${prefijo}[]`);
+    case "array": {
+      const elemento = def.element;
+      const rutaLista = `${prefijo}[]`;
+      const metaElemento = panel.get(elemento);
+      recorre(elemento, visita, rutaLista, metaElemento ? { ruta: rutaLista, meta: metaElemento } : instancia);
       return;
+    }
     case "union": {
       const discriminante = discriminanteDe("recorre", def, prefijo);
       for (const opcion of def.options) {
         const variante = marcaDeVariante(discriminante, varianteDe(opcion, discriminante, prefijo));
-        recorre(opcion, visita, `${prefijo}${variante}`);
+        const rutaVariante = `${prefijo}${variante}`;
+        const metaOpcion = panel.get(opcion);
+        recorre(opcion, visita, rutaVariante, metaOpcion ? { ruta: rutaVariante, meta: metaOpcion } : instancia);
       }
       return;
     }
     default:
       exigeEnvolturaConocida("recorre", def, prefijo);
-      visita(prefijo, panel.get(esquema), esquema);
+      visita(prefijo, panel.get(esquema), esquema, instancia);
   }
 }
 var escapaInvisibles = (json2) => json2.replace(

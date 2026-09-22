@@ -1,0 +1,42 @@
+---
+/*
+ * `/panel` — la cáscara del panel (Tarea 1, fase 6). Estática a propósito,
+ * mismo criterio que `entrar.astro` (léela): SIN el `candado` de
+ * `Base.astro`. Ese candado compara un SHA-256 en el navegador y su propio
+ * comentario lo dice con todas las letras: es una TRANCA para que nadie
+ * llegue de casualidad, NO seguridad real (el sitio es estático, el HTML
+ * viaja igual). Acá la seguridad de verdad es la cookie `HttpOnly` que
+ * firma el servidor (`src/servidor/sesion.ts`) — ponerle el candado
+ * encima no protege nada más, solo le suma una contraseña de más a
+ * escribir el día que ella ya tiene la suya.
+ *
+ * Por eso tampoco usa `Base.astro` entero: esta página no necesita SEO
+ * (canonical, Open Graph, JSON-LD) ni el precargado de fuentes del sitio
+ * público — es privada, y las cabeceras `noindex` de `/panel/:camino*` ya
+ * están en `vercel.json`. El `<meta name="robots">` de acá es la misma
+ * defensa en profundidad que ya usa `entrar.astro` [G]: dos capas, nunca
+ * solo una.
+ *
+ * `client:only="react"`: la isla `<App/>` NUNCA se renderiza en el
+ * servidor — arranca siempre en el navegador mostrando «Cargando…» y
+ * decide sola si pedir la contraseña o mostrar el editor (llama a
+ * `historial`; un 401 es «pedí la contraseña» — ver `src/panel/App.tsx`).
+ */
+import App from '@/panel/App'
+import '@/styles/global.css'
+import '@/styles/panel.css'
+---
+
+<!doctype html>
+<html lang="es-MX">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>Panel — Maracacao</title>
+  </head>
+  <body>
+    <App client:only="react" />
+  </body>
+</html>
