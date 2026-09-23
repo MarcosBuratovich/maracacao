@@ -9,10 +9,11 @@
  * Al entrar a una puerta ya hay algo elegido — el diseño lo dice así
  * («detrás de «Productos» hay 105 campos, pero la pantalla MUESTRA entre
  * dos y siete», spec D2): nunca una pantalla en blanco pidiéndole que
- * elija antes de ver nada. Se elige el primer ítem REAL (no el balde de
- * "sueltos", que en Productos junta 49 campos sueltos y rompería la
- * promesa de "un puñado") y ella puede cambiarlo con el cajón, que sigue
- * ahí al costado.
+ * elija antes de ver nada. Se elige el primer ítem REAL (nunca uno del
+ * balde de "sueltos" —`esSuelto()`, en `./ListaDeItems`, ronda de arreglo
+ * de la Tarea 5: ese balde se parte cuando es grande, pero sigue siendo
+ * texto general de un bloque, no un ítem con nombre propio) y ella puede
+ * cambiarlo con el cajón, que sigue ahí al costado.
  *
  * El árbol de navegación es SIEMPRE: puerta → ítem → campos — con UNA
  * excepción. Fichas técnicas ya viene anidada en el propio esquema (ficha →
@@ -51,7 +52,7 @@ import {
   camposDePuerta, PUERTAS, ETIQUETA_DE_PUERTA, AVISO_DE_PUERTA,
   type Puerta as TipoPuerta,
 } from './puertas'
-import ListaDeItems, { itemsDe, type ItemNavegable } from './ListaDeItems'
+import ListaDeItems, { itemsDe, esSuelto, type ItemNavegable } from './ListaDeItems'
 import Campo from './Campo'
 import {
   agregarItem, quitarItem, puedeAgregar, puedeBorrar, listasAbiertas,
@@ -200,13 +201,19 @@ function seccionesDe(rutaFicha: string, camposDeLaFicha: readonly CampoEditable[
 
 /**
  * El ítem que se elige SOLO, al entrar a una puerta o al cambiar de ficha:
- * el primero que no sea el balde de "sueltos" — ese junta hasta 49 campos
- * en Productos, y elegirlo de arranque rompería la promesa de "un puñado"
- * el primer segundo que ella ve la pantalla. Si la puerta NO tiene más que
- * sueltos (el caso de "Lo que no se ve"), no queda otra: se elige ese.
+ * el primero que no sea del balde de "sueltos" —ni el balde entero cuando
+ * queda sin partir, ni uno de sus pedazos partidos (Tarea 5, ronda de
+ * arreglo: hasta 26 campos en un pedazo de Contacto y negocio)— porque
+ * elegir cualquiera de esos de arranque rompería la promesa de "un
+ * puñado" el primer segundo que ella ve la pantalla. Si la puerta NO
+ * tiene más que sueltos (el caso de "Lo que no se ve"), no queda otra: se
+ * elige ese. `esSuelto()` (`./ListaDeItems`) es la única fuente de verdad
+ * de qué clave es del balde — nunca comparar contra `'sueltos'` a mano
+ * acá: desde la ronda de arreglo, un pedazo partido lleva una clave como
+ * `'sueltos:sitio:postura'`, que un `=== 'sueltos'` literal no reconoce.
  */
 function primeroReal(items: readonly ItemNavegable[]): ItemNavegable | undefined {
-  return items.find((i) => i.clave !== 'sueltos') ?? items[0]
+  return items.find((i) => !esSuelto(i.clave)) ?? items[0]
 }
 
 /*
@@ -484,7 +491,7 @@ function AltaBajaDeItem({
   abiertas: readonly ListaAbierta[]
   onCambia: (documentos: Documentos) => void
 }) {
-  if (itemElegido.clave === 'sueltos') return null
+  if (esSuelto(itemElegido.clave)) return null
   const documento = itemElegido.campos[0]?.documento
   if (!documento) return null
   // `itemElegido.clave` es '<documento> <rutaConcreta>' (ver `itemsDe()`
