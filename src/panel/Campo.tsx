@@ -26,8 +26,20 @@
  * resincronizarlo cuando la prop cambia: cada campo se dibuja con una
  * `key` propia por ruta (ver `ListaDeCampos` en `Editor.tsx`), así que un
  * campo distinto monta una instancia nueva en vez de reciclar esta.
+ *
+ * Ronda de arreglo (revisión posterior a la Tarea 4): el error SOLO se
+ * muestra después de que ella sale del campo por primera vez
+ * (`tocado`) — antes de eso, la pantalla se calla aunque lo que va
+ * tipeando todavía no sea válido (un correo a medio escribir, un campo
+ * que acaba de vaciar para retipearlo). Validar en cada tecla desde el
+ * primer carácter medía, en un campo de correo real, el mensaje de
+ * error en pantalla en 16 de las 17 pulsaciones que hacían falta para
+ * escribirlo entero: no es ayuda, es ruido, y un error que está siempre
+ * prendido deja de leerse. Una vez que salió del campo la primera vez
+ * (`tocado === true`), el error SÍ se actualiza en vivo — para que lo
+ * vea desaparecer al corregirlo, sin tener que volver a salir.
  */
-import { useState, type ChangeEvent } from 'react'
+import { useState, type ChangeEvent, type FocusEvent } from 'react'
 import type { CampoEditable } from './campos'
 
 /** Lo que se escribe en el input: nunca "null"/"undefined" como texto — una caja vacía. */
@@ -38,8 +50,16 @@ function comoTexto(valor: unknown): string {
 /**
  * «Te quedan 74 letras», nunca «126/200»: la primera le dice a ella
  * cuánto margen le queda AHORA; la segunda le pide hacer la resta sola.
+ *
+ * Pasado el tope, el contador deja de contar hacia atrás («Te quedan -15
+ * letras» la obliga a una cuenta mental para entender que se pasó) y dice
+ * derecho por cuánto se excedió, en la misma unidad.
  */
 function textoQuedan(quedan: number): string {
+  if (quedan < 0) {
+    const exceso = -quedan
+    return `Te pasaste por ${exceso} ${exceso === 1 ? 'letra' : 'letras'}.`
+  }
   return `Te quedan ${quedan} ${quedan === 1 ? 'letra' : 'letras'}.`
 }
 
@@ -51,6 +71,9 @@ export default function Campo({
   onCambio: (valor: unknown) => void
 }) {
   const [valor, setValor] = useState<unknown>(campo.valor)
+  // Arranca sin tocar: recién sale del silencio cuando ella deja el campo
+  // por primera vez (`alSalir`, más abajo).
+  const [tocado, setTocado] = useState(false)
   const { meta } = campo
 
   // La ruta concreta ('cocoas.lista.0.nombre') es única en todo el
@@ -61,6 +84,9 @@ export default function Campo({
   const idError = `${id}-error`
 
   const problema = campo.validar(valor)[0]
+  // Lo que de verdad se DIBUJA: antes del primer `blur`, aunque `problema`
+  // exista, la pantalla se calla.
+  const problemaVisible = tocado ? problema : undefined
 
   function alCambiar(nuevo: unknown) {
     setValor(nuevo)
@@ -80,9 +106,13 @@ export default function Campo({
     alCambiar(e.target.value === '' ? null : Number(e.target.value))
   }
 
+  function alSalir(_e: FocusEvent<HTMLInputElement | HTMLTextAreaElement>) {
+    setTocado(true)
+  }
+
   // La ayuda y, si hay, el error se leen JUNTO con el control — no solo
   // detrás de la etiqueta — para quien usa lector de pantalla.
-  const describedBy = [idAyuda, problema ? idError : undefined].filter(Boolean).join(' ')
+  const describedBy = [idAyuda, problemaVisible ? idError : undefined].filter(Boolean).join(' ')
 
   return (
     <div className="panel-campo">
@@ -103,8 +133,9 @@ export default function Campo({
           className="panel-campo-textarea"
           value={comoTexto(valor)}
           onChange={alCambiarTexto}
+          onBlur={alSalir}
           aria-describedby={describedBy}
-          aria-invalid={problema !== undefined}
+          aria-invalid={problemaVisible !== undefined}
         />
       ) : meta.control === 'precio' ? (
         <input
@@ -113,8 +144,9 @@ export default function Campo({
           className="panel-campo-input"
           value={comoTexto(valor)}
           onChange={alCambiarPrecio}
+          onBlur={alSalir}
           aria-describedby={describedBy}
-          aria-invalid={problema !== undefined}
+          aria-invalid={problemaVisible !== undefined}
         />
       ) : (
         <input
@@ -123,8 +155,9 @@ export default function Campo({
           className="panel-campo-input"
           value={comoTexto(valor)}
           onChange={alCambiarTexto}
+          onBlur={alSalir}
           aria-describedby={describedBy}
-          aria-invalid={problema !== undefined}
+          aria-invalid={problemaVisible !== undefined}
         />
       )}
 
@@ -132,9 +165,14 @@ export default function Campo({
         <p className="panel-campo-contador">{textoQuedan(meta.maxCaracteres - comoTexto(valor).length)}</p>
       )}
 
-      {problema && (
+      {problemaVisible && (
         <p id={idError} className="panel-campo-error" role="alert">
-          {problema.titulo}
+          {problemaVisible.titulo}
+          {problemaVisible.arreglo && (
+            <button type="button" className="panel-campo-arreglo" onClick={() => alCambiar(problemaVisible.arreglo?.valor)}>
+              {problemaVisible.arreglo.etiqueta}
+            </button>
+          )}
         </p>
       )}
     </div>
