@@ -37,6 +37,7 @@
  * `panel.get()` sobre el nodo del esquema, la misma fuente que ya usa
  * `nodoDeLista()` en `listas.ts` para el nombre de una lista abierta.
  */
+import { useRef } from 'react'
 import type { z } from 'zod'
 import type { CampoEditable, IdDocumento } from './campos'
 import type { MetaCampo } from '../contenido/campos'
@@ -315,26 +316,55 @@ export function itemsDe(campos: readonly CampoEditable[]): ItemNavegable[] {
  * ---------------------------------------------------------------------
  */
 
+/**
+ * Cómo se llama la lista de este cajón, para el botón que lo abre y para
+ * el nombre del `<nav>`. El default sirve para las cuatro puertas «de dos
+ * niveles», donde hay UN solo cajón en pantalla y «la lista» no puede
+ * confundirse con nada.
+ *
+ * [Ronda de arreglo final] La puerta de fichas es la excepción: ahí
+ * conviven DOS cajones —fichas y secciones—, y con el texto fijo quedaban
+ * dos botones idénticos, apilados uno arriba del otro en el celular, sin
+ * que ninguno dijera qué elegía.
+ */
+const NOMBRE_POR_DEFECTO = 'la lista'
+
 export default function ListaDeItems({
   items,
   elegido,
   onElegir,
   abierta,
   onAbrir,
+  nombre = NOMBRE_POR_DEFECTO,
 }: {
   items: ItemNavegable[]
   elegido: string
   onElegir: (clave: string) => void
   abierta: boolean
   onAbrir: (v: boolean) => void
+  nombre?: string
 }) {
+  const botonCajon = useRef<HTMLButtonElement>(null)
+
   // Elegir un ítem la devuelve al formulario: en el celular no tendría
   // sentido dejar el cajón abierto tapando lo que acaba de pedir ver. En
   // escritorio esto no se nota —la lista queda fija al costado sin
   // importar `abierta`— así que un mismo click sirve para los dos casos.
+  //
+  // [Ronda de arreglo final] Y el foco se mueve a mano, porque cerrar el
+  // cajón en el celular le pone `display: none` al `<nav>` donde vive el
+  // botón que ella acaba de tocar: sin esto el foco cae a `<body>` y quien
+  // navega con teclado (o con un switch) vuelve a empezar desde el
+  // principio de la página. Va al botón que abre y cierra el cajón: es el
+  // control del que salió y el único que sigue en pantalla. Solo cuando el
+  // cajón estaba ABIERTO: en escritorio el botón ni se dibuja (la lista
+  // queda fija al costado), así que `abierta` se queda en `false` y el
+  // foco no se mueve — que es lo correcto, porque ahí la fila que tocó
+  // sigue a la vista.
   function elegir(clave: string) {
     onElegir(clave)
     onAbrir(false)
+    if (abierta) botonCajon.current?.focus()
   }
 
   return (
@@ -348,17 +378,18 @@ export default function ListaDeItems({
         este botón no hace falta.
       */}
       <button
+        ref={botonCajon}
         type="button"
         className="panel-lista-boton-cajon"
         aria-expanded={abierta}
         onClick={() => onAbrir(!abierta)}
       >
-        {abierta ? 'Cerrar la lista' : 'Elegir de la lista'}
+        {abierta ? `Cerrar ${nombre}` : `Elegir de ${nombre}`}
       </button>
 
       <nav
         className={abierta ? 'panel-lista-items panel-lista-items-abierta' : 'panel-lista-items'}
-        aria-label="Elementos de esta sección"
+        aria-label={`Elementos de ${nombre}`}
       >
         <ul className="panel-lista-ul">
           {items.map((item) => {

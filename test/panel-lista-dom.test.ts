@@ -32,6 +32,26 @@ describe('la lista de ítems', () => {
     expect(boton.textContent!.replace(/[^a-záéíóúñ ]/gi, '').trim().length).toBeGreaterThan(3)
   })
 
+  /*
+   * [Ronda de arreglo final] En el celular, elegir un ítem le pone
+   * `display: none` al `<nav>` donde vive el botón que ella acaba de
+   * tocar: sin mover el foco a mano, queda en `<body>` y el teclado
+   * arranca de cero desde arriba de la página. El destino natural es el
+   * botón que abre y cierra el cajón —el control que sigue en pantalla y
+   * del que salió—, que es el patrón de siempre para algo que se despliega
+   * y se vuelve a plegar.
+   */
+  it('al elegir del cajón abierto, el foco vuelve al botón que lo abre', () => {
+    const items = itemsDeProductos()
+    render(createElement(ListaDeItems, {
+      items, elegido: items[0].clave,
+      onElegir: () => {}, abierta: true, onAbrir: () => {},
+    }))
+    const boton = screen.getByRole('button', { name: /cerrar/i })
+    fireEvent.click(screen.getByText(items[1].etiqueta))
+    expect(document.activeElement).toBe(boton)
+  })
+
   it('elegir un ítem lo avisa hacia afuera', () => {
     const items = itemsDeProductos()
     const elegidos: string[] = []

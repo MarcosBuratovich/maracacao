@@ -401,3 +401,99 @@ describe('agregar y borrar', () => {
     expect(jergaEn(parrafoConfirma.textContent ?? '')).toBeNull()
   })
 })
+
+/*
+ * ---------------------------------------------------------------------
+ * [Ronda de arreglo final] «Datos de cabecera»: los pares del encabezado
+ * de una ficha. La pantalla dibujaba las cuatro cajas «Nombre del dato»
+ * seguidas, después las cuatro «Valor del dato» —nunca intercaladas— y
+ * debajo cuatro botones idénticos «Borrar este elemento», sin ninguna
+ * marca de a cuál par correspondía cada uno: solo se descubría haciendo
+ * clic y leyendo la confirmación. En la puerta de las declaraciones que
+ * tienen que coincidir con el empaque impreso, eso no se puede usar.
+ * ---------------------------------------------------------------------
+ */
+describe('los datos de cabecera de una ficha', () => {
+  // Al entrar a la puerta de fichas ya hay ficha y sección elegidas
+  // («Datos generales de la ficha» es el primer ítem del nivel 2, y es el
+  // único que trae los pares de cabecera): no hace falta ningún clic más.
+  const valoresEnPantalla = () => (screen.getAllByRole('textbox') as HTMLInputElement[]).map((c) => c.value)
+
+  it('cada par se lee como un par: el nombre del dato y su valor, uno al lado del otro', () => {
+    pintar()
+    fireEvent.click(screen.getByText(ETIQUETA_DE_PUERTA.fichas))
+    const valores = valoresEnPantalla()
+    const marca = valores.indexOf('Marca')
+    expect(marca).toBeGreaterThanOrEqual(0)
+    expect(valores[marca + 1]).toBe('Maracacao')
+    expect(valores[marca + 2]).toBe('País de elaboración')
+    expect(valores[marca + 3]).toBe('México')
+  })
+
+  it('cada botón de borrar dice cuál dato borra, y ninguno se repite', () => {
+    pintar()
+    fireEvent.click(screen.getByText(ETIQUETA_DE_PUERTA.fichas))
+    const nombres = screen.getAllByRole('button', { name: /^Borrar/ }).map((b) => b.textContent ?? '')
+    expect(nombres).toContain('Borrar el dato «Marca»')
+    expect(nombres).toContain('Borrar el dato «Vida de anaquel»')
+    expect(new Set(nombres).size).toBe(nombres.length)
+  })
+
+  /*
+   * El mismo defecto del formulario de cocoas, pero en la puerta donde
+   * duele: al borrar «Marca» (índice 0 de 4) las filas se corren un lugar,
+   * y sin resincronizar el valor «Vida de anaquel» desaparecía de la vista
+   * — corregir la fila rotulada «Presentaciones» escribía, en realidad,
+   * sobre la vida de anaquel.
+   */
+  it('borrar un par que no es el último deja los demás emparejados y a la vista', () => {
+    pintarControlada()
+    fireEvent.click(screen.getByText(ETIQUETA_DE_PUERTA.fichas))
+    fireEvent.click(screen.getByRole('button', { name: 'Borrar el dato «Marca»' }))
+    fireEvent.change(screen.getByLabelText(/escribe el nombre/i), { target: { value: 'Marca' } })
+    fireEvent.click(screen.getByRole('button', { name: /confirmar/i }))
+
+    const valores = valoresEnPantalla()
+    expect(valores).not.toContain('Marca')
+    const anaquel = valores.indexOf('Vida de anaquel')
+    expect(anaquel).toBeGreaterThanOrEqual(0)
+    expect(valores[anaquel + 1]).toBe('Dos años en condiciones sugeridas')
+    // Y el botón que quedó sigue diciendo la verdad sobre lo que borra.
+    expect(screen.getByRole('button', { name: 'Borrar el dato «Vida de anaquel»' })).toBeTruthy()
+  })
+
+  it('ningún texto nuevo de esta parte trae jerga técnica', () => {
+    pintar()
+    fireEvent.click(screen.getByText(ETIQUETA_DE_PUERTA.fichas))
+    for (const b of screen.getAllByRole('button', { name: /^Borrar/ })) {
+      expect(jergaEn(b.textContent ?? ''), b.textContent ?? '').toBeNull()
+    }
+  })
+})
+
+/*
+ * ---------------------------------------------------------------------
+ * [Ronda de arreglo final] Los dos cajones de la puerta de fichas —el de
+ * fichas y el de secciones— dibujaban el MISMO botón «Elegir de la
+ * lista», apilados uno arriba del otro en el celular: dos botones
+ * idénticos, ninguno diciendo qué elige.
+ * ---------------------------------------------------------------------
+ */
+describe('los dos cajones de la puerta de fichas', () => {
+  it('cada botón de cajón dice de qué lista elige', () => {
+    pintar()
+    fireEvent.click(screen.getByText(ETIQUETA_DE_PUERTA.fichas))
+    const fichas = screen.getByRole('button', { name: 'Elegir de la lista de fichas' })
+    const secciones = screen.getByRole('button', { name: 'Elegir de la lista de secciones' })
+    expect(fichas).toBeTruthy()
+    expect(secciones).toBeTruthy()
+    expect(jergaEn(fichas.textContent ?? '')).toBeNull()
+    expect(jergaEn(secciones.textContent ?? '')).toBeNull()
+  })
+
+  it('en las otras puertas el botón sigue diciendo lo de siempre', () => {
+    pintar()
+    fireEvent.click(screen.getByText(ETIQUETA_DE_PUERTA.productos))
+    expect(screen.getByRole('button', { name: 'Elegir de la lista' })).toBeTruthy()
+  })
+})

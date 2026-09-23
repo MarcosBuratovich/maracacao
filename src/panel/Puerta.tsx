@@ -76,8 +76,8 @@ const TITULO_PUERTAS = '¿Qué quieres editar?'
  * puerta: solo cuando el ítem que ella está mirando pertenece a una de las
  * OTRAS nueve listas repetibles (sabores, gotas, polvo, recetas, los pasos
  * de «Cómo catar», los enlaces del menú, los productos del pie, las
- * fichas mismas y sus secciones). Ver `AltaBajaDeItem()`/`AltaBajaDeMeta()`
- * más abajo, que deciden esto llamando a `puedeAgregar()`/`puedeBorrar()`
+ * fichas mismas y sus secciones). Ver `AltaBajaDeItem()` más abajo, que
+ * decide esto llamando a `puedeAgregar()`/`puedeBorrar()`
  * en vez de a una lista fija escrita a mano.
  */
 const AVISO_ALTA_BAJA =
@@ -86,6 +86,41 @@ const AVISO_ALTA_BAJA =
 const AVISO_SIN_SECCION = 'Elige una sección para ver sus datos.'
 const ETIQUETA_DATOS_GENERALES = 'Datos generales de la ficha'
 const VOLVER_A_PUERTAS = 'Volver a las cinco puertas'
+
+/*
+ * [Ronda de arreglo final] La puerta de fichas es la única con DOS cajones
+ * en pantalla, uno anidado adentro del otro. Con el texto por defecto de
+ * `ListaDeItems` los dos botones decían «Elegir de la lista» —idénticos, y
+ * en el celular apilados uno arriba del otro—, así que no había forma de
+ * saber cuál elegía la ficha y cuál la sección sin tocarlos.
+ */
+const NOMBRE_LISTA_FICHAS = 'la lista de fichas'
+const NOMBRE_LISTA_SECCIONES = 'la lista de secciones'
+
+const ETIQUETA_BORRAR = 'Borrar este elemento'
+
+/**
+ * El rótulo de un par de «Datos de cabecera» y el de su botón de borrar.
+ *
+ * [Ronda de arreglo final] Antes, la pantalla dibujaba las cuatro cajas
+ * «Nombre del dato» seguidas, después las cuatro «Valor del dato» —nunca
+ * intercaladas— y debajo cuatro botones idénticos «Borrar este elemento»:
+ * no había forma de saber qué valor iba con qué nombre, ni cuál borraba
+ * cada botón, salvo tocándolo y leyendo la confirmación. En la puerta de
+ * las fichas eso es grave: lo que dicen esas filas tiene que coincidir con
+ * el empaque impreso.
+ *
+ * El número va además del nombre porque el nombre puede estar vacío
+ * (`SIN_NOMBRE`) o repetido, y la posición no: siempre dice de cuál de las
+ * filas de la tabla se está hablando.
+ */
+function rotuloDePar(indice: number, nombre: string): string {
+  return `Dato ${indice + 1}: ${nombre}`
+}
+
+function etiquetaBorrarPar(nombre: string): string {
+  return `Borrar el dato «${nombre}»`
+}
 
 /*
  * ---------------------------------------------------------------------
@@ -233,15 +268,7 @@ function textoResumenDeFaltantes(faltan: number, etiqueta: string): string {
 }
 
 /**
- * Dibuja los campos de un ítem ya elegido, con un encabezado chico cada vez
- * que aparece un grupo más adentro del que ella ya eligió — el caso real es
- * un bloque (párrafo/lista/tabla) DENTRO de una sección de ficha, para que
- * una tabla de 20 celdas no se confunda con el párrafo de al lado. Para
- * cualquier ítem de las otras cuatro puertas esto nunca dibuja un
- * encabezado: `itemsDe()` ya agrupó esos campos por su único grupo, así que
- * `campo.grupo.ruta` nunca cambia dentro de un mismo ítem.
- *
- * Arriba de todo, un resumen a nivel de ÍTEM cuando algo de acá adentro
+ * El resumen a nivel de ÍTEM, arriba de todo, cuando algo de adentro
  * todavía no puede publicarse (`gravedad: 'impide'`) — hallazgo de la
  * ronda de arreglo de la Tarea 6: `agregarItem()` (Tarea 3) crea un ítem
  * con `''`/`null` en todos sus campos A PROPÓSITO, y `Campo` (ronda de
@@ -254,22 +281,46 @@ function textoResumenDeFaltantes(faltan: number, etiqueta: string): string {
  * propia de qué falta: si el esquema cambia qué es obligatorio, este
  * resumen lo sigue solo.
  */
-function FormularioDeCampos({
+function ResumenDeFaltantes({
   campos: lista,
   etiqueta,
+}: {
+  campos: readonly CampoEditable[]
+  etiqueta: string
+}) {
+  const faltan = lista.filter((c) => c.validar(c.valor).some((p) => p.gravedad === 'impide')).length
+  if (faltan === 0) return null
+  return <p className="panel-aviso">{textoResumenDeFaltantes(faltan, etiqueta)}</p>
+}
+
+/**
+ * Dibuja los campos de un ítem ya elegido, con un encabezado chico cada vez
+ * que aparece un grupo más adentro del que ella ya eligió — el caso real es
+ * un bloque (párrafo/lista/tabla) DENTRO de una sección de ficha, para que
+ * una tabla de 20 celdas no se confunda con el párrafo de al lado. Para
+ * cualquier ítem de las otras cuatro puertas esto nunca dibuja un
+ * encabezado: `itemsDe()` ya agrupó esos campos por su único grupo, así que
+ * `campo.grupo.ruta` nunca cambia dentro de un mismo ítem.
+ *
+ * [Ronda de arreglo final] Vive separado del resumen de faltantes y del
+ * `<div>` que los envuelve (`FormularioDeCampos`, acá abajo) para que
+ * «Datos generales de la ficha» pueda intercalar SUS propios pedazos —los
+ * pares de cabecera, cada uno con su rótulo y su botón de borrar— entre
+ * tandas de campos, sin dibujar dos veces el resumen ni repetir esta
+ * lógica de encabezados.
+ */
+function ListaDeCampos({
+  campos: lista,
   rutaContexto,
   onCambio,
 }: {
   campos: readonly CampoEditable[]
-  etiqueta: string
   rutaContexto: string | undefined
   onCambio: (campo: CampoEditable, valor: unknown) => void
 }) {
   let grupoAbierto: string | undefined
-  const faltan = lista.filter((c) => c.validar(c.valor).some((p) => p.gravedad === 'impide')).length
   return (
-    <div className="panel-puerta-campos">
-      {faltan > 0 && <p className="panel-aviso">{textoResumenDeFaltantes(faltan, etiqueta)}</p>}
+    <>
       {lista.map((campo) => {
         const clave = `${campo.documento} ${campo.ruta}`
         const esSubgrupo = campo.grupo !== undefined && campo.grupo.ruta !== rutaContexto
@@ -282,6 +333,25 @@ function FormularioDeCampos({
           </div>
         )
       })}
+    </>
+  )
+}
+
+function FormularioDeCampos({
+  campos: lista,
+  etiqueta,
+  rutaContexto,
+  onCambio,
+}: {
+  campos: readonly CampoEditable[]
+  etiqueta: string
+  rutaContexto: string | undefined
+  onCambio: (campo: CampoEditable, valor: unknown) => void
+}) {
+  return (
+    <div className="panel-puerta-campos">
+      <ResumenDeFaltantes campos={lista} etiqueta={etiqueta} />
+      <ListaDeCampos campos={lista} rutaContexto={rutaContexto} onCambio={onCambio} />
     </div>
   )
 }
@@ -427,6 +497,7 @@ function BotonBorrarItem({
   rutaLista,
   rutaItem,
   nombreItem,
+  etiquetaBoton = ETIQUETA_BORRAR,
   info,
   onCambia,
 }: {
@@ -435,6 +506,8 @@ function BotonBorrarItem({
   rutaLista: string
   rutaItem: string
   nombreItem: string
+  /** Solo cuando hay MÁS DE UN botón de borrar en pantalla: ver `DatosGeneralesDeFicha()`. */
+  etiquetaBoton?: string
   info: ListaAbierta
   onCambia: (documentos: Documentos) => void
 }) {
@@ -462,19 +535,23 @@ function BotonBorrarItem({
   return (
     <div className="panel-lista-borrar">
       {!confirmando ? (
-        // El texto NO lleva el nombre del ítem (a diferencia del párrafo de
-        // confirmación, de acá abajo): el nombre real vive TAMBIÉN en el
-        // cajón de la izquierda («Cocoa natural», etc.), y repetirlo acá le
-        // da a `getByText()` dos lugares donde matchear el mismo texto —lo
-        // encontré corriendo el test 1 del despacho, que elige el ítem por
-        // su nombre y por eso necesita que ese nombre sea único en pantalla.
+        // El texto por defecto NO lleva el nombre del ítem (a diferencia del
+        // párrafo de confirmación, de acá abajo): el nombre real vive
+        // TAMBIÉN en el cajón de la izquierda («Cocoa natural», etc.), y
+        // repetirlo acá le da a `getByText()` dos lugares donde matchear el
+        // mismo texto —lo encontré corriendo el test 1 del despacho, que
+        // elige el ítem por su nombre y por eso necesita que ese nombre sea
+        // único en pantalla. Ese razonamiento vale mientras haya UN solo
+        // botón de borrar en pantalla, que es el caso de las cuatro puertas
+        // de dos niveles; los pares de cabecera de una ficha dibujan varios
+        // a la vez y le pasan un rótulo propio.
         <button
           type="button"
           className="panel-boton panel-boton-borrar"
           disabled={!habilitado}
           onClick={() => setConfirmando(true)}
         >
-          Borrar este elemento
+          {etiquetaBoton}
         </button>
       ) : (
         <div className="panel-confirmar-borrado">
@@ -574,67 +651,146 @@ function AltaBajaDeItem({
 }
 
 /**
- * El bloque de alta/baja para «Datos generales de la ficha»: la QUINTA
- * lista abierta, `fichas[].meta[]` — los pares «Nombre del dato / Valor
- * del dato» del encabezado. A diferencia de las otras cuatro, el elemento
- * de esta lista es una TUPLA sin `nombra()` (ver `fichas.ts`), así que
- * `campo.grupo` nunca se completa para sus campos y no aparecen como
- * ítems navegables propios — viven adentro del balde "Datos generales",
- * mezclados con el nombre del producto y la denominación legal. Por eso
- * este bloque no reutiliza `AltaBajaDeItem()`: agrega UN botón para toda
- * la lista y un botón de borrar POR PAR, leyendo los pares directo del
- * documento con `leer()`.
+ * 'fichas.0.meta.2.0' → 2 (la fila de la tabla de cabecera a la que
+ * pertenece este campo); cualquier otra ruta de la ficha → `undefined`.
  */
-function AltaBajaDeMeta({
-  documentos,
+function indiceDePar(rutaLista: string, ruta: string): number | undefined {
+  const prefijo = `${rutaLista}.`
+  if (!ruta.startsWith(prefijo)) return undefined
+  const indice = ruta.slice(prefijo.length).split('.')[0]
+  return /^\d+$/.test(indice) ? Number(indice) : undefined
+}
+
+/** Las dos partes de un par, siempre en el orden del esquema: el nombre y después el valor. */
+function ordenarPorParte(campos: readonly CampoEditable[]): CampoEditable[] {
+  const parte = (c: CampoEditable) => Number(c.ruta.split('.').at(-1))
+  return [...campos].sort((a, b) => parte(a) - parte(b))
+}
+
+/**
+ * Cómo se llama un par: lo que ella escribió en «Nombre del dato» (la
+ * parte 0 de la tupla). Se lee del campo y no del documento para que el
+ * rótulo y el botón de borrar la sigan mientras escribe, en vez de quedar
+ * un renglón atrás. Mismo respaldo `SIN_NOMBRE` que el resto del panel: un
+ * rótulo en blanco es peor que uno provisorio.
+ */
+function nombreDelPar(campos: readonly CampoEditable[]): string {
+  const primera = campos.find((c) => c.ruta.endsWith('.0'))
+  const crudo = typeof primera?.valor === 'string' ? primera.valor.trim() : ''
+  return crudo.length > 0 ? crudo : SIN_NOMBRE
+}
+
+/**
+ * «Datos generales de la ficha»: el nombre del producto, la denominación
+ * legal y —lo que le da trabajo a este componente— los pares «Nombre del
+ * dato / Valor del dato» del encabezado, que son la QUINTA lista abierta
+ * (`fichas[].meta[]`).
+ *
+ * Esos pares no son ítems navegables como los de las otras cuatro puertas:
+ * su elemento es una TUPLA sin `nombra()` (ver el esquema de fichas), así
+ * que `campo.grupo` nunca se completa para ellos y caen todos juntos
+ * adentro de este ítem, mezclados con el nombre del producto y la
+ * denominación legal. Y como `campos()` recorre el esquema HOJA POR HOJA
+ * —todas las instancias de «Nombre del dato», después todas las de «Valor
+ * del dato»— llegan acá en ese orden: cuatro nombres seguidos y después
+ * cuatro valores.
+ *
+ * [Ronda de arreglo final] Por eso este componente los REAGRUPA por
+ * índice de par antes de dibujarlos, le pone a cada par su rótulo
+ * (`rotuloDePar()`) y le deja SU botón de borrar adentro, diciendo cuál
+ * borra. Antes de esto, la pantalla mostraba las cuatro cajas de nombre,
+ * después las cuatro de valor, y debajo cuatro botones idénticos: la
+ * puerta donde viven las declaraciones que tienen que coincidir con el
+ * empaque impreso era, literalmente, la que no se podía usar.
+ */
+function DatosGeneralesDeFicha({
+  item,
   rutaFicha,
+  documentos,
   abiertas,
+  onCambio,
   onCambia,
 }: {
-  documentos: Documentos
+  item: ItemNavegable
   rutaFicha: string
+  documentos: Documentos
   abiertas: readonly ListaAbierta[]
+  onCambio: (campo: CampoEditable, valor: unknown) => void
   onCambia: (documentos: Documentos) => void
 }) {
   const rutaLista = `${rutaFicha}.meta`
+  // No debería faltar — 'fichas[].meta[]' es una de las cinco abiertas por
+  // diseño — pero si el día de mañana deja de estarlo, los pares se siguen
+  // viendo y emparejados: lo único que desaparece son los botones.
   const info = buscarListaAbierta(abiertas, 'fichas', rutaLista)
-  // No debería pasar — 'fichas[].meta[]' es una de las cinco abiertas por
-  // diseño — pero si el día de mañana deja de estarlo, mejor no mostrar
-  // nada que mostrar un botón que tira al tocarlo.
-  if (!info) return null
-  const pares = (leer(documentos.fichas, rutaLista) as unknown[][] | undefined) ?? []
+
+  const sinPar: CampoEditable[] = []
+  const pares = new Map<number, CampoEditable[]>()
+  for (const campo of item.campos) {
+    const indice = indiceDePar(rutaLista, campo.ruta)
+    if (indice === undefined) {
+      sinPar.push(campo)
+      continue
+    }
+    const balde = pares.get(indice)
+    if (balde) balde.push(campo)
+    else pares.set(indice, [campo])
+  }
+  const ordenados = [...pares.entries()].sort(([a], [b]) => a - b)
+
   return (
-    <div className="panel-lista-alta-baja">
-      {/*
-        Acá no hace falta "pararse en el nuevo": los pares de "Datos de
-        cabecera" no son ítems navegables (Tarea 7, ver el docstring de
-        arriba) — el par nuevo aparece de una en esta misma vista, sin
-        necesitar que se mueva ninguna selección.
-      */}
-      <BotonAgregarLista
-        documentos={documentos}
-        documento="fichas"
-        rutaLista={rutaLista}
-        info={info}
-        onAgregado={onCambia}
-      />
-      {pares.map((par, indice) => {
-        const rutaItem = `${rutaLista}.${indice}`
-        const crudo = typeof par?.[0] === 'string' ? par[0].trim() : ''
-        const nombre = crudo.length > 0 ? crudo : SIN_NOMBRE
-        return (
-          <BotonBorrarItem
-            key={rutaItem}
-            documentos={documentos}
-            documento="fichas"
-            rutaLista={rutaLista}
-            rutaItem={rutaItem}
-            nombreItem={nombre}
-            info={info}
-            onCambia={onCambia}
-          />
-        )
-      })}
+    <div className="panel-puerta-campos">
+      {/* El resumen cuenta TODOS los campos del ítem, pares incluidos: lo
+          que falta para poder publicar no cambia porque abajo se dibuje en
+          dos tandas. */}
+      <ResumenDeFaltantes campos={item.campos} etiqueta={item.etiqueta} />
+      <ListaDeCampos campos={sinPar} rutaContexto={rutaFicha} onCambio={onCambio} />
+
+      {ordenados.length > 0 && info && (
+        <div className="panel-datos-cabecera">
+          <h3 className="panel-grupo-titulo">{info.etiqueta}</h3>
+          {ordenados.map(([indice, campos]) => {
+            const nombre = nombreDelPar(campos)
+            const rutaItem = `${rutaLista}.${indice}`
+            // La `key` lleva la ruta ENTERA, con la ficha adentro, y no el
+            // índice solo: `BotonBorrarItem` guarda adentro si está
+            // confirmando y qué nombre escribió ella, y con una `key` que
+            // se repite entre fichas ese estado viajaría de una ficha a la
+            // otra al cambiar de ficha en el cajón. Es la misma trampa que
+            // esta ronda vino a arreglar en `Campo`, un piso más arriba.
+            return (
+              <div key={rutaItem} className="panel-dato-par">
+                <h4 className="panel-dato-par-titulo">{rotuloDePar(indice, nombre)}</h4>
+                <ListaDeCampos campos={ordenarPorParte(campos)} rutaContexto={rutaFicha} onCambio={onCambio} />
+                <BotonBorrarItem
+                  documentos={documentos}
+                  documento="fichas"
+                  rutaLista={rutaLista}
+                  rutaItem={rutaItem}
+                  nombreItem={nombre}
+                  etiquetaBoton={etiquetaBorrarPar(nombre)}
+                  info={info}
+                  onCambia={onCambia}
+                />
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {info && (
+        // Acá no hace falta "pararse en el nuevo": los pares de cabecera no
+        // son ítems navegables (ver el docstring de arriba) — el par nuevo
+        // aparece de una en esta misma vista, sin necesitar que se mueva
+        // ninguna selección.
+        <BotonAgregarLista
+          documentos={documentos}
+          documento="fichas"
+          rutaLista={rutaLista}
+          info={info}
+          onAgregado={onCambia}
+        />
+      )}
     </div>
   )
 }
@@ -815,6 +971,7 @@ export default function Puerta({
             onElegir={elegirNivel1}
             abierta={cajon1Abierto}
             onAbrir={setCajon1Abierto}
+            nombre={NOMBRE_LISTA_FICHAS}
           />
           <div className="panel-puerta-contenido">
             {fichaElegida !== null && !esFichaReal && (
@@ -836,36 +993,38 @@ export default function Puerta({
                     onElegir={setElegido2}
                     abierta={cajon2Abierto}
                     onAbrir={setCajon2Abierto}
+                    nombre={NOMBRE_LISTA_SECCIONES}
                   />
                   <div className="panel-puerta-contenido">
                     {seccionElegida === null ? (
                       <p className="panel-aviso">{AVISO_SIN_SECCION}</p>
                     ) : (
-                      <>
+                      /*
+                        "Datos generales de la ficha" (Tarea 6) es el ÚNICO
+                        ítem de nivel 2 cuya clave es la ruta de la FICHA
+                        misma (ver `seccionesDe()`, más arriba): ahí adentro
+                        viven los pares de "Datos de cabecera"
+                        (`fichas[].meta[]`), la quinta lista abierta, que
+                        necesitan su propio armado. Ninguna sección real
+                        (`fichas.<i>.secciones.<j>`) entra acá.
+                      */
+                      seccionElegida.clave === fichaElegida.clave ? (
+                        <DatosGeneralesDeFicha
+                          item={seccionElegida}
+                          rutaFicha={fichaElegida.clave}
+                          documentos={documentos}
+                          abiertas={abiertas}
+                          onCambio={alCambiarValor}
+                          onCambia={onCambia}
+                        />
+                      ) : (
                         <FormularioDeCampos
                           campos={seccionElegida.campos}
                           etiqueta={seccionElegida.etiqueta}
                           rutaContexto={seccionElegida.clave}
                           onCambio={alCambiarValor}
                         />
-                        {/*
-                          "Datos generales de la ficha" (Tarea 6) es el
-                          ÚNICO ítem de nivel 2 cuya clave es la ruta de la
-                          FICHA misma (ver `seccionesDe()`, más arriba): ahí
-                          adentro viven los pares de "Datos de cabecera"
-                          (`fichas[].meta[]`), la quinta lista abierta.
-                          Ninguna sección real (`fichas.<i>.secciones.<j>`)
-                          entra acá.
-                        */}
-                        {seccionElegida.clave === fichaElegida.clave && (
-                          <AltaBajaDeMeta
-                            documentos={documentos}
-                            rutaFicha={fichaElegida.clave}
-                            abiertas={abiertas}
-                            onCambia={onCambia}
-                          />
-                        )}
-                      </>
+                      )
                     )}
                   </div>
                 </div>
