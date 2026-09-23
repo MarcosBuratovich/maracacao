@@ -6,15 +6,23 @@
  * auto-guardado— vive en `./borrador.ts` y `./publicacion.ts`, y ya se
  * prueba ahí, directo, sin React (`test/panel-borrador.test.ts`,
  * `test/panel-publicacion.test.ts`). Acá, sin DOM en el harness (misma
- * razón que documentan `test/panel-app.test.ts`/`test/panel-editor.test.ts`:
- * este proyecto no tiene jsdom/happy-dom), lo que se puede probar es que el
- * primer render —antes de que corra ningún efecto, que en SSR nunca
+ * razón que documenta `test/panel-app.test.ts`: este proyecto no tiene
+ * jsdom/happy-dom en el resto de la suite), lo que se puede probar es que
+ * el primer render —antes de que corra ningún efecto, que en SSR nunca
  * corren— no revienta, y que ninguno de los textos PROPIOS de este
  * componente (los que no vienen de `src/contenido/**` ni del servidor) trae
  * jerga.
+ *
+ * [Tarea 8, fase 7] Este archivo YA NO afirma que un texto esté escrito en
+ * `Sesion.tsx` (`readFileSync` + `toContain` sobre el propio fuente): ese
+ * candado solo notaba que ALGUIEN reescribió el texto acá sin tocar el
+ * componente, nunca que la pantalla hiciera algo — el mismo hueco por el
+ * que entraron los cinco defectos que documenta `test/panel-sesion-dom.test.ts`
+ * (H1-H5). Esa cobertura de comportamiento real —con DOM, clic y tipeo de
+ * verdad— ya existe ahí; acá solo queda la jerga y que el primer render (SSR,
+ * sin ningún efecto corrido) no reviente.
  */
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import Sesion, { PantallaPublicacion, BotonesDeSalida, ListaAvisos } from '@/panel/Sesion'
@@ -39,7 +47,7 @@ function manejadoresDeMentira() {
  * Los textos propios de `Sesion.tsx` — ni etiqueta de campo, ni mensaje de
  * esquema (eso ya lo cubre `panel-campos.test.ts`), ni frase del servidor
  * (esas se muestran tal cual, regla de la tarea): sacados a mano del
- * código, mismo criterio que `panel-app.test.ts`/`panel-editor.test.ts`.
+ * código, mismo criterio que `panel-app.test.ts`.
  */
 const TEXTOS_VISIBLES = [
   'Buscando si tienes cambios guardados en otro aparato…',
@@ -73,17 +81,10 @@ describe('Sesion — textos propios', () => {
       expect(jergaEn(texto), texto).toBeNull()
     }
   })
-
-  it('todos están de verdad en el código fuente (si se reescriben acá sin tocar Sesion.tsx, esto lo nota)', () => {
-    const fuente = readFileSync('src/panel/Sesion.tsx', 'utf8')
-    for (const texto of TEXTOS_VISIBLES) {
-      expect(fuente, `no se encontró «${texto}» en Sesion.tsx`).toContain(texto)
-    }
-  })
 })
 
 describe('Sesion — el primer render no revienta (sin DOM: `renderToStaticMarkup`)', () => {
-  it('antes de que corra ningún efecto (SSR nunca los corre), muestra que está buscando un borrador — nunca el editor ni el resultado de una publicación', () => {
+  it('antes de que corra ningún efecto (SSR nunca los corre), muestra que está buscando un borrador — nunca las puertas ni el resultado de una publicación', () => {
     const html = renderToStaticMarkup(createElement(Sesion, { base: 'a'.repeat(40) }))
     expect(html).toContain('Buscando si tienes cambios guardados en otro aparato…')
     expect(html).not.toContain('Publicar')

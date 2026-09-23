@@ -1,8 +1,9 @@
 /*
  * La pantalla que comparten las Tareas 3 y 4 (fase 6): el borrador y
- * publicar/saber/deshacer. Envuelve a `Editor` (Tarea 2) — nunca reescribe
+ * publicar/saber/deshacer. Envuelve a `Puerta` (Tarea 6, fase 7 — antes
+ * `Editor`, Tarea 2 de la fase 6, borrado en la Tarea 8) — nunca reescribe
  * el formulario, solo lo controla desde afuera (`documentos`/`onCambia`,
- * ver `Editor.tsx`) para poder autoguardar cada cambio y armar la bandeja
+ * ver `Puerta.tsx`) para poder autoguardar cada cambio y armar la bandeja
  * de publicar con lo mismo que ella está viendo.
  *
  * Toda la lógica de estado vive en funciones/clases puras e inyectables en
@@ -14,7 +15,7 @@
  * que hace algo.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import Editor from './Editor'
+import Puerta from './Puerta'
 import { contenidoPublicado, type Documentos } from './campos'
 import { idDeAparato } from './aparato'
 import {
@@ -378,7 +379,7 @@ export default function Sesion({ base }: { base: string | null }) {
             </div>
           )}
 
-          <Editor documentos={documentos} onCambia={alCambiarDocumentos} />
+          <Puerta documentos={documentos} onCambia={alCambiarDocumentos} />
 
           {baseActual === null && <p className="panel-aviso">{PROBLEMA_SIN_BASE_LOCAL}</p>}
           {baseActual !== null && revisionActual.cambios.length === 0 && (

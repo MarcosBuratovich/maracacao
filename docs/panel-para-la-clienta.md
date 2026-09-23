@@ -19,11 +19,22 @@ llega un mensaje con un botón que te deja entrar sin escribirla.
 
 ## Cambiar tus textos
 
-Adentro vas a ver tu sitio partido en secciones —portada, sabores, recetas,
-contacto— y dentro de cada una, los textos que puedes cambiar. Toca el que
-quieras y escribe encima.
+Adentro vas a ver cinco puertas: **Productos**, **Textos del sitio**, **Fichas
+técnicas**, **Contacto y negocio** y **Lo que no se ve**. Toca la que te
+interesa.
 
-Tres cosas que conviene saber:
+Detrás de cada puerta hay una lista al costado —un sabor, una receta, una
+pregunta frecuente, un producto del pie de página— con las partes que puedes
+cambiar. En la computadora la ves fija a un lado; en el teléfono toca **Elegir
+de la lista** para abrirla, elige lo que quieres cambiar y la lista se cierra
+sola. Toca cualquier elemento y ahí abajo aparecen sus textos, listos para
+escribir encima.
+
+Fichas técnicas es la única puerta con dos listas seguidas: primero eliges la
+ficha (por ejemplo «Chocolate en polvo») y después la sección de esa ficha que
+quieres cambiar.
+
+Cuatro cosas que conviene saber:
 
 **Algunos textos tienen un tope.** Cuando un texto no puede pasar de cierto
 largo porque si no se rompe el diseño, vas a ver cuántas letras te quedan
@@ -33,6 +44,13 @@ mientras escribes. No te va a dejar pasarte.
 cacao y la lista de ingredientes tienen que decir exactamente lo mismo que la
 envoltura impresa. Si el sitio dijera una cosa y el empaque otra, el problema
 sería del empaque. Si necesitas cambiarlos, avísale a Marcos.
+
+**En algunas listas puedes agregar o quitar un elemento tú misma** —tus
+cocoas, tus preguntas frecuentes, entre otras—: vas a ver un botón para
+agregar uno nuevo, y dentro de cada elemento, uno para borrarlo. Para borrar
+te va a pedir que escribas el nombre exacto, así no se te borra nada por
+accidente. En el resto de las listas, dar de alta o de baja algo lo sigue
+haciendo Marcos: escríbele si necesitas uno nuevo.
 
 **Se guarda solo.** Mientras escribes, tus cambios se van guardando cada tanto,
 aunque no hayas publicado nada. Si cierras la página y vuelves mañana, lo que

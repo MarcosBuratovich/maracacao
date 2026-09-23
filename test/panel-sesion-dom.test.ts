@@ -23,6 +23,7 @@ import { render, screen, cleanup, fireEvent, waitFor, act } from '@testing-libra
 import Sesion from '@/panel/Sesion'
 import type { ResultadoBorradorLeer, ResultadoPublicar, ResultadoEstado, ResultadoDeshacer } from '@/panel/api'
 import { PISO_GUARDADO_MS, RETARDO_GUARDADO_MS } from '@/panel/borrador'
+import { ETIQUETA_DE_PUERTA } from '@/panel/puertas'
 
 vi.mock('@/panel/api', async (importOriginal) => {
   const real = await importOriginal<typeof import('@/panel/api')>()
@@ -62,7 +63,7 @@ afterEach(() => {
 })
 
 describe('Sesion — el DOM de verdad', () => {
-  it('arranca buscando el borrador, no mostrando el editor', () => {
+  it('arranca buscando el borrador, no mostrando las cinco puertas', () => {
     render(createElement(Sesion, { base: BASE }))
     expect(screen.getByText(/Buscando si tienes cambios guardados/)).toBeTruthy()
     expect(screen.queryByText('Publicar')).toBeNull()
@@ -71,16 +72,21 @@ describe('Sesion — el DOM de verdad', () => {
 
 /*
  * ---------------------------------------------------------------------
- * Punto de partida compartido: abre el editor (borrador vacío) y le hace
+ * Punto de partida compartido: abre una puerta (borrador vacío) y le hace
  * UN cambio de verdad — lo que hace falta para que «Publicar» deje de
  * estar deshabilitado (`revisionActual.cambios.length > 0`). Cada test de
  * acá abajo arranca desde acá y sigue por su propio camino.
- * ---------------------------------------------------------------------
+ *
+ * [Tarea 8] Con `Puerta` (que reemplazó a `Editor`), la primera pantalla
+ * son las cinco puertas — no hay ninguna casilla a la vista todavía, hay
+ * que elegir una primero. `productos` alcanza: al entrar ya hay un ítem
+ * real elegido solo (`Puerta.tsx`, «nunca una pantalla en blanco»).
  */
-async function abreEditorYCambiaAlgo(): Promise<HTMLElement> {
+async function abreUnaPuertaYCambiaAlgo(): Promise<HTMLElement> {
   render(createElement(Sesion, { base: BASE }))
   const botonPublicar = await screen.findByRole('button', { name: 'Publicar' })
   expect((botonPublicar as HTMLButtonElement).disabled).toBe(true)
+  fireEvent.click(screen.getByText(ETIQUETA_DE_PUERTA.productos))
   const [primerCampo] = screen.getAllByRole('textbox')
   fireEvent.change(primerCampo, { target: { value: `${(primerCampo as HTMLInputElement).value} (editado)` } })
   await waitFor(() => expect((botonPublicar as HTMLButtonElement).disabled).toBe(false))
@@ -91,7 +97,7 @@ const AVISOS_VACIOS = [] as const
 
 describe('Publicar → «Reintentar» en error-publicar (H1)', () => {
   it('vuelve a intentar de verdad — antes de la ronda de arreglo, «Reintentar» llamaba a la MISMA función que «Confirmar y publicar» y esa guarda solo dejaba pasar la fase «revisando», así que el botón no hacía nada', async () => {
-    const botonPublicar = await abreEditorYCambiaAlgo()
+    const botonPublicar = await abreUnaPuertaYCambiaAlgo()
     fireEvent.click(botonPublicar)
     await screen.findByRole('button', { name: 'Confirmar y publicar' })
 
@@ -129,7 +135,7 @@ describe('Publicar → «Reintentar» en error-publicar (H1)', () => {
 
 describe('«Ver mi sitio» — enlace real en pestaña nueva (H2)', () => {
   it('llega con `target="_blank"` y `rel="noopener noreferrer"` ya adentro del árbol real de Sesion — antes navegaba en la MISMA pestaña y se llevaba puesto el botón «Deshacer» al volver, porque `/panel/*` sirve `Cache-Control: no-store` y eso saca la página del bfcache', async () => {
-    const botonPublicar = await abreEditorYCambiaAlgo()
+    const botonPublicar = await abreUnaPuertaYCambiaAlgo()
     fireEvent.click(botonPublicar)
     await screen.findByRole('button', { name: 'Confirmar y publicar' })
 
@@ -173,6 +179,7 @@ describe('El autoguardado — el piso sobrevive a tipeo continuo (H3, cableado r
       // termine de propagarse a la pantalla antes de seguir.
       await act(async () => {})
       const botonPublicar = screen.getByRole('button', { name: 'Publicar' })
+      fireEvent.click(screen.getByText(ETIQUETA_DE_PUERTA.productos))
       const [primerCampo] = screen.getAllByRole('textbox')
 
       // Un paso bajo el retardo, para que cada cambio lo reinicie sin
@@ -220,6 +227,7 @@ describe('El guardado de emergencia al cerrar la pestaña (H4)', () => {
 
     render(createElement(Sesion, { base: BASE }))
     await screen.findByRole('button', { name: 'Publicar' })
+    fireEvent.click(screen.getByText(ETIQUETA_DE_PUERTA.productos))
     const [primerCampo] = screen.getAllByRole('textbox')
     fireEvent.change(primerCampo, { target: { value: 'algo que todavía no se guardó' } })
 
@@ -255,7 +263,7 @@ describe('«Volver a editar» tras deshacer — recarga el panel de verdad (H5)'
       writable: true,
     })
 
-    const botonPublicar = await abreEditorYCambiaAlgo()
+    const botonPublicar = await abreUnaPuertaYCambiaAlgo()
     fireEvent.click(botonPublicar)
     await screen.findByRole('button', { name: 'Confirmar y publicar' })
 
