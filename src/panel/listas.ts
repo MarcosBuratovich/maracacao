@@ -318,6 +318,18 @@ export function quitarItem(documentos: Documentos, documento: IdDocumento, rutaI
     throw new Error(`No se puede quitar de «${rutaLista}»: no es una lista donde ella dé de baja sola.`)
   }
   const actuales = leer(documentos[documento], rutaLista) as unknown[]
+  // `actuales.filter((_, i) => i !== indice)` no se queja si `indice` no
+  // matchea ningún elemento: simplemente no saca nada, y de ahí abajo
+  // sale un documento «nuevo» que en realidad es idéntico al de entrada.
+  // Sin este chequeo, un índice que no existe (`999`, `-1`, o `NaN` por un
+  // `rutaItem` mal formado como 'cocoas.lista.abc') hace que la pantalla
+  // le muestre a ella la confirmación de un borrado que nunca pasó.
+  // `Number.isInteger()` hace falta ADEMÁS de `indice < 0`: `NaN < 0` da
+  // `false`, así que un `NaN` solo, sin este chequeo, se cuela como si
+  // fuera válido.
+  if (!Number.isInteger(indice) || indice < 0 || indice >= actuales.length) {
+    throw new Error(`No se puede quitar: «${rutaItem}» no es un ítem que exista.`)
+  }
   // Mismo motivo que en `agregarItem()`: el guardia va acá TAMBIÉN, no
   // solo en `puedeBorrar()`.
   if (actuales.length <= lista.minItems) {

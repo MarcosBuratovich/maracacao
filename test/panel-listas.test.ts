@@ -65,4 +65,26 @@ describe('quitar un ítem', () => {
     expect(puedeBorrar(d, 'sitio', 'preguntas.items')).toBe(false)
     expect(() => quitarItem(d, 'sitio', 'preguntas.items.0')).toThrow()
   })
+
+  it('no muta el documento que recibió', () => {
+    const antes = contenidoPublicado()
+    const largoAntes = (leer(antes.sitio, 'cocoas.lista') as unknown[]).length
+    const despues = quitarItem(antes, 'sitio', 'cocoas.lista.0')
+    expect((leer(despues.sitio, 'cocoas.lista') as unknown[]).length).toBe(largoAntes - 1)
+    expect((leer(antes.sitio, 'cocoas.lista') as unknown[]).length).toBe(largoAntes)
+  })
+
+  it('un índice que no existe tira, no borra en silencio', () => {
+    const d = contenidoPublicado()
+    const largoPreguntas = (leer(d.sitio, 'preguntas.items') as unknown[]).length
+    const largoCocoas = (leer(d.sitio, 'cocoas.lista') as unknown[]).length
+
+    expect(() => quitarItem(d, 'sitio', 'preguntas.items.999')).toThrow()
+    expect(() => quitarItem(d, 'sitio', 'preguntas.items.-1')).toThrow()
+    expect(() => quitarItem(d, 'sitio', 'cocoas.lista.abc')).toThrow()
+
+    // Ninguno de los tres tiene que haber cambiado nada.
+    expect((leer(d.sitio, 'preguntas.items') as unknown[]).length).toBe(largoPreguntas)
+    expect((leer(d.sitio, 'cocoas.lista') as unknown[]).length).toBe(largoCocoas)
+  })
 })
