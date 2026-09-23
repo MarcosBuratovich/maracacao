@@ -22,10 +22,49 @@
  * El estado del valor tipeado vive ACÁ adentro (sembrado con
  * `campo.valor`) y no en la prop: así el contador y el error reaccionan
  * a lo que ella está escribiendo AHORA, sin depender de que el padre
- * vuelva a renderizar con un `campo.valor` actualizado. No hace falta
- * resincronizarlo cuando la prop cambia: cada campo se dibuja con una
- * `key` propia por ruta (ver `ListaDeCampos` en `Editor.tsx`), así que un
- * campo distinto monta una instancia nueva en vez de reciclar esta.
+ * vuelva a renderizar con un `campo.valor` actualizado.
+ *
+ * [Ronda de arreglo final] Ese estado interno SÍ se resincroniza cuando la
+ * prop trae otro valor. La versión anterior no lo hacía, con este
+ * argumento: «cada campo se dibuja con una `key` propia por ruta, así que
+ * un campo distinto monta una instancia nueva en vez de reciclar esta».
+ * El argumento vale solo si RUTA == IDENTIDAD, y borrar un elemento que no
+ * es el último rompe exactamente eso: el sobreviviente ocupa el índice del
+ * borrado, la ruta no cambia, React recicla esta instancia — y adentro
+ * seguía guardado el valor del ítem que ya no existe. La pantalla mostraba
+ * los datos de la cocoa borrada; tocar una letra del nombre dejaba en el
+ * documento un ítem Frankenstein (el nombre de una, el perfil y los
+ * precios de la otra), y nada lo decía. En las fichas técnicas era peor:
+ * borrar el par «Marca» corría las filas un lugar y «Vida de anaquel»
+ * desaparecía de la vista, así que corregir la fila rotulada
+ * «Presentaciones» escribía sobre una declaración que tiene que coincidir
+ * con el empaque impreso.
+ *
+ * Se resincroniza comparando contra la ÚLTIMA PROP VISTA, no contra el
+ * valor tipeado, y por eso sigue sirviendo para las dos cosas a la vez:
+ *
+ * - Mientras ella escribe, el padre controlado devuelve como prop lo mismo
+ *   que ella acaba de tipear: la prop cambió, sí, pero coincide con lo que
+ *   ya está en pantalla, así que no se pisa nada y —clave— `tocado` NO se
+ *   reinicia: un error ya visible tiene que seguir actualizándose en vivo
+ *   tecla a tecla, no volver a callarse en la primera pulsación.
+ * - Con un padre que NO realimenta (los tests de esta pieza sola), la prop
+ *   nunca cambia, así que nunca se resincroniza y lo tipeado queda intacto.
+ * - Cuando la prop cambia a algo distinto de lo que se ve, es otro ítem
+ *   (un borrado en el medio de la lista, una vuelta atrás del borrador):
+ *   se reemplaza el valor y se vuelve al silencio de `tocado === false`,
+ *   porque ella todavía no tocó ESTE dato.
+ *
+ * `Object.is` y no `!==`: el control de precio manda `Number(texto)`, que
+ * con letras adentro da `NaN`, y `NaN !== NaN` es `true` — con `!==` el
+ * componente se resincronizaría contra sí mismo en cada renderizado, para
+ * siempre («Maximum update depth exceeded»).
+ *
+ * No se resuelve con el camino de arriba —subir el valor a la prop y
+ * dibujar siempre `campo.valor`— porque el contador y el error quedarían
+ * atados al ida y vuelta completo por cada tecla: son 692 campos y el
+ * catálogo se reconstruye entero en cada cambio de `documentos`. Este
+ * arreglo no agrega ni un recálculo: es una comparación por campo.
  *
  * Ronda de arreglo (revisión posterior a la Tarea 4): el error SOLO se
  * muestra después de que ella sale del campo por primera vez
@@ -74,7 +113,26 @@ export default function Campo({
   // Arranca sin tocar: recién sale del silencio cuando ella deja el campo
   // por primera vez (`alSalir`, más abajo).
   const [tocado, setTocado] = useState(false)
+  // La última `campo.valor` que vio este componente. No es lo mismo que
+  // `valor` —ese es lo que ella tiene escrito— y esa diferencia es todo el
+  // arreglo: ver el comentario de arriba.
+  const [propVista, setPropVista] = useState<unknown>(campo.valor)
   const { meta } = campo
+
+  // Ajustar estado DURANTE el renderizado cuando una prop cambia es el
+  // camino que documenta React para este caso exacto: React descarta lo ya
+  // renderizado y vuelve a llamar a esta función enseguida, sin pintar la
+  // pantalla en el medio ni disparar un efecto de más. La condición
+  // converge en una sola vuelta: `propVista` queda igual a `campo.valor`.
+  if (!Object.is(campo.valor, propVista)) {
+    setPropVista(campo.valor)
+    // Solo cuando la prop trae algo DISTINTO de lo que se está mostrando:
+    // si coincide, es el eco de su propia tecla y no hay nada que hacer.
+    if (!Object.is(campo.valor, valor)) {
+      setValor(campo.valor)
+      setTocado(false)
+    }
+  }
 
   // La ruta concreta ('cocoas.lista.0.nombre') es única en todo el
   // catálogo — verificado contra los 198 campos reales, no supuesto—, así

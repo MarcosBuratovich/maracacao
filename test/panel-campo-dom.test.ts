@@ -25,6 +25,15 @@
  *    `Editor.tsx`, que esta tarea reemplaza.
  * 6. Avisa hacia afuera con `onCambio`, para que quien lo use decida que
  *    hacer con el valor nuevo (autoguardar, revalidar, lo que sea).
+ * 7. [Ronda de arreglo final] Cuando le cambian la prop `campo` por otra
+ *    con la MISMA ruta y otro contenido — lo que pasa al borrar un item
+ *    que no es el ultimo: el sobreviviente ocupa el indice del borrado y
+ *    React recicla esta instancia en vez de montar una nueva — la pantalla
+ *    muestra el valor NUEVO. Y las dos vueltas de eso, que son las que
+ *    vuelven peligroso el arreglo ingenuo: un redibujado con el MISMO
+ *    valor no le pisa lo que esta escribiendo, y el padre devolviendole
+ *    lo que ella acaba de escribir no vuelve a silenciar el error que ya
+ *    estaba a la vista.
  */
 import { describe, it, expect, afterEach } from 'vitest'
 import { createElement } from 'react'
@@ -130,6 +139,58 @@ describe('un campo', () => {
 
     expect(vistos.at(-1)).toBe(arreglo.valor)
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  /*
+   * Ronda de arreglo final: hasta ahora NINGÚN test cambiaba la prop
+   * `campo` de este componente — la afirmación de seguridad que el propio
+   * componente documentaba («no hace falta resincronizar, cada campo tiene
+   * su `key` por ruta») no estaba protegida por nada, y era falsa: la ruta
+   * es igual a la identidad solo mientras nadie borre un elemento
+   * intermedio de una lista.
+   */
+  it('si le cambian el campo por otro con la misma ruta, muestra el valor nuevo', () => {
+    const natural = unCampo('cocoas.lista.0.nombre')
+    const { rerender } = render(createElement(Campo, { campo: natural, onCambio: () => {} }))
+    const entrada = () => screen.getByLabelText(natural.meta.etiqueta!) as HTMLInputElement
+    expect(entrada().value).toBe('Cocoa natural')
+
+    // Exactamente lo que le llega a este componente cuando ella borra
+    // «Cocoa natural» (índice 0 de 2): misma ruta, el contenido de la que
+    // quedó. Sin resincronizar, la caja seguiría diciendo «Cocoa natural»
+    // y el documento terminaría con un ítem Frankenstein.
+    rerender(createElement(Campo, { campo: { ...natural, valor: 'Cocoa alcalina' }, onCambio: () => {} }))
+    expect(entrada().value).toBe('Cocoa alcalina')
+  })
+
+  it('un redibujado con el MISMO valor no le pisa lo que está escribiendo', () => {
+    const c = unCampo('cocoas.lista.0.nombre')
+    const { rerender } = render(createElement(Campo, { campo: c, onCambio: () => {} }))
+    const entrada = () => screen.getByLabelText(c.meta.etiqueta!) as HTMLInputElement
+    fireEvent.change(entrada(), { target: { value: 'Cocoa nueva' } })
+
+    // Un objeto `campo` NUEVO (así los arma `campos()` en cada redibujado)
+    // con el mismo valor de antes: no es un ítem distinto, es el mismo —
+    // lo que ella tiene a medio escribir no se toca.
+    rerender(createElement(Campo, { campo: { ...c }, onCambio: () => {} }))
+    expect(entrada().value).toBe('Cocoa nueva')
+  })
+
+  it('cuando el padre le devuelve lo que ella acaba de escribir, el error sigue en vivo', () => {
+    const c = unCampo('cocoas.lista.0.nombre')
+    const { rerender } = render(createElement(Campo, { campo: c, onCambio: () => {} }))
+    const entrada = () => screen.getByLabelText(c.meta.etiqueta!) as HTMLInputElement
+
+    // Lo vacía, sale del campo: el error aparece.
+    fireEvent.change(entrada(), { target: { value: '' } })
+    fireEvent.blur(entrada())
+    expect(screen.queryByRole('alert')).not.toBeNull()
+
+    // El padre controlado la vuelve a dibujar con lo que ella misma
+    // escribió. Eso NO es «otro ítem»: el error tiene que seguir a la
+    // vista, no volver al silencio de antes del primer `blur`.
+    rerender(createElement(Campo, { campo: { ...c, valor: '' }, onCambio: () => {} }))
+    expect(screen.queryByRole('alert')).not.toBeNull()
   })
 
   it('avisa del cambio hacia afuera', () => {

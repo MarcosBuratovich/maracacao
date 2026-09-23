@@ -33,11 +33,28 @@ const pintar = (onCambia: (documentos: Documentos) => void = () => {}) =>
  * ("agregar no mueve la selección") se le escapó a mi primer test, que sí
  * pasaba porque nunca recorría el camino real.
  */
-function PuertaControlada({ inicial }: { inicial: Documentos }) {
+function PuertaControlada({ inicial, espia }: { inicial: Documentos; espia?: (d: Documentos) => void }) {
   const [documentos, setDocumentos] = useState(inicial)
-  return createElement(Puerta, { documentos, onCambia: setDocumentos })
+  return createElement(Puerta, {
+    documentos,
+    onCambia: (d: Documentos) => {
+      setDocumentos(d)
+      espia?.(d)
+    },
+  })
 }
-const pintarControlada = () => render(createElement(PuertaControlada, { inicial: contenidoPublicado() }))
+
+/*
+ * El espía es OPCIONAL y NUNCA reemplaza la realimentación: `setDocumentos`
+ * corre siempre, así que la pantalla se vuelve a dibujar con el documento
+ * nuevo igual que en la aplicación real. Mirar de paso lo que salió hacia
+ * afuera es legítimo; lo que estaba mal en los tres tests de más abajo
+ * antes de esta ronda era CAPTURAR SIN REALIMENTAR: sin `setDocumentos`,
+ * la prop `documentos` queda congelada, la pantalla no se redibuja nunca y
+ * el test termina afirmando sobre una variable de su propio andamio.
+ */
+const pintarControlada = (espia?: (d: Documentos) => void) =>
+  render(createElement(PuertaControlada, { inicial: contenidoPublicado(), ...(espia ? { espia } : {}) }))
 
 describe('la pantalla de puertas', () => {
   it('ofrece las cinco puertas por su nombre', () => {
@@ -187,41 +204,94 @@ describe('la pantalla de puertas — cobertura adicional', () => {
  * ---------------------------------------------------------------------
  */
 describe('agregar y borrar', () => {
+  /*
+   * [Ronda de arreglo final] Los tres primeros tests de este bloque usaban
+   * `onCambia: (d) => { docs = d }`: capturaban el documento nuevo y NUNCA
+   * lo devolvían como prop, así que la pantalla no se redibujaba jamás y
+   * lo único que quedaba probado era la función pura de abajo —que ya
+   * tiene sus propios tests en `panel-listas.test.ts`. Pasan a
+   * `PuertaControlada`, que es el camino que recorre `Sesion.tsx`, y
+   * afirman sobre lo que MUESTRA la pantalla.
+   */
   it('en cocoas hay botón de agregar, y agrega de verdad', () => {
-    let docs = contenidoPublicado()
-    render(createElement(Puerta, { documentos: docs, onCambia: (d: typeof docs) => { docs = d } }))
+    let ultimo: Documentos | null = null
+    pintarControlada((d) => {
+      ultimo = d
+    })
     fireEvent.click(screen.getByText(ETIQUETA_DE_PUERTA.productos))
     fireEvent.click(screen.getByText('Cocoa natural'))
+    // Antes de tocar nada, en el cajón hay dos cocoas y ninguna fila nueva.
+    expect(screen.queryByText('(sin nombre)')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /agregar/i }))
-    const lista = (docs.sitio as { cocoas: { lista: unknown[] } }).cocoas.lista
-    expect(lista).toHaveLength(3)
+    // La pantalla lo muestra: una fila más en el cajón...
+    expect(screen.getByText('(sin nombre)')).toBeTruthy()
+    // ...y el documento que salió hacia afuera tiene las tres.
+    expect((ultimo!.sitio as { cocoas: { lista: unknown[] } }).cocoas.lista).toHaveLength(3)
   })
 
   it('borrar pide escribir el nombre: con el nombre mal, no borra', () => {
-    let docs = contenidoPublicado()
-    render(createElement(Puerta, { documentos: docs, onCambia: (d: typeof docs) => { docs = d } }))
+    let salidas = 0
+    pintarControlada(() => {
+      salidas += 1
+    })
     fireEvent.click(screen.getByText(ETIQUETA_DE_PUERTA.productos))
     fireEvent.click(screen.getByText('Cocoa natural'))
     fireEvent.click(screen.getByRole('button', { name: /borrar/i }))
     fireEvent.change(screen.getByLabelText(/escribe el nombre/i), { target: { value: 'cualquier cosa' } })
     fireEvent.click(screen.getByRole('button', { name: /confirmar/i }))
-    expect((docs.sitio as { cocoas: { lista: unknown[] } }).cocoas.lista).toHaveLength(2)
+    // Lo que se ve: el aviso de que no coincide, la fila intacta en el
+    // cajón y el formulario todavía parado en «Cocoa natural».
+    expect(screen.getByText(/no coincide con el nombre/i)).toBeTruthy()
+    expect(screen.getByText('Cocoa natural')).toBeTruthy()
+    expect((screen.getByLabelText(/nombre de la cocoa/i) as HTMLInputElement).value).toBe('Cocoa natural')
+    // Y no salió ni un cambio hacia afuera: no se borró nada.
+    expect(salidas).toBe(0)
   })
 
-  it('borrar con el nombre correcto sí borra, y no publica solo', () => {
-    let docs = contenidoPublicado()
-    render(createElement(Puerta, { documentos: docs, onCambia: (d: typeof docs) => { docs = d } }))
+  /*
+   * El caso que esta ronda vino a destapar: se borra el ítem que NO es el
+   * último (índice 0 de 2), así que la clave del sobreviviente —que lleva
+   * el índice— no desaparece, el efecto de reselección no se dispara y
+   * React recicla los cinco `Campo` ya montados. Si esos componentes no
+   * resincronizan su valor con la prop, el documento queda bien y la
+   * pantalla sigue mostrando los datos de la cocoa BORRADA: tocar una
+   * letra del nombre arma un ítem Frankenstein (el nombre de una, el
+   * perfil y los precios de la otra) sin que nada lo avise.
+   *
+   * Por eso se afirma sobre las CINCO cajas de la pantalla, no sobre el
+   * documento: el documento ya estaba bien antes del arreglo.
+   */
+  it('borrar un ítem que no es el último deja en pantalla los datos del que quedó', () => {
+    let ultimo: Documentos | null = null
+    pintarControlada((d) => {
+      ultimo = d
+    })
     fireEvent.click(screen.getByText(ETIQUETA_DE_PUERTA.productos))
     fireEvent.click(screen.getByText('Cocoa natural'))
     fireEvent.click(screen.getByRole('button', { name: /borrar/i }))
     fireEvent.change(screen.getByLabelText(/escribe el nombre/i), { target: { value: 'Cocoa natural' } })
     fireEvent.click(screen.getByRole('button', { name: /confirmar/i }))
-    // Se borró de verdad — nada de "publica solo": `onCambia` es el mismo
-    // camino que cualquier otro cambio de campo, así que queda en el
-    // borrador con el deshacer de media hora intacto (eso lo prueba
+
+    // El cajón ya no la tiene, y marca la que quedó.
+    expect(screen.queryByText('Cocoa natural')).toBeNull()
+    expect(screen.getByText('Cocoa alcalina').closest('button')?.getAttribute('aria-current')).toBe('true')
+
+    // Las cinco cajas, una por una: son las de «Cocoa alcalina».
+    expect((screen.getByLabelText(/nombre de la cocoa/i) as HTMLInputElement).value).toBe('Cocoa alcalina')
+    expect((screen.getByLabelText(/perfil de la cocoa/i) as HTMLTextAreaElement).value).toContain('alcalinizados')
+    expect((screen.getByLabelText(/usos de la cocoa/i) as HTMLInputElement).value).toBe(
+      'Repostería, chocolatería, confitería y bebidas',
+    )
+    expect((screen.getByLabelText(/precio de la bolsa chica/i) as HTMLInputElement).value).toBe('102')
+    expect((screen.getByLabelText(/precio de la bolsa grande/i) as HTMLInputElement).value).toBe('399')
+
+    // Y recién ahora, el documento — nada de "publica solo": `onCambia` es
+    // el mismo camino que cualquier otro cambio de campo, así que queda en
+    // el borrador con el deshacer de media hora intacto (eso lo prueba
     // `borrador.test.ts`; acá solo importa que ESTE cambio pase por ahí).
-    expect((docs.sitio as { cocoas: { lista: Array<{ nombre: string }> } }).cocoas.lista).toHaveLength(1)
-    expect((docs.sitio as { cocoas: { lista: Array<{ nombre: string }> } }).cocoas.lista[0].nombre).toBe('Cocoa alcalina')
+    const lista = (ultimo!.sitio as { cocoas: { lista: Array<{ nombre: string }> } }).cocoas.lista
+    expect(lista).toHaveLength(1)
+    expect(lista[0].nombre).toBe('Cocoa alcalina')
   })
 
   it('cuando la lista está en su mínimo, el botón de borrar se deshabilita y dice por qué', () => {
