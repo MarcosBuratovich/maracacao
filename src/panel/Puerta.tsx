@@ -328,6 +328,14 @@ function buscarListaAbierta(
 // escrito con letra se lee más natural que un dígito solo en una frase
 // («necesita al menos tres», no «necesita al menos 3»). Más allá de diez
 // cae al dígito: ninguna de las cinco listas llega ni cerca.
+//
+// `1: 'uno'` es la forma CANÓNICA del número, correcta sola o delante de
+// un sustantivo femenino («una») — no la forma que corresponde delante de
+// un sustantivo MASCULINO («un elemento», nunca «uno elemento»: apócope,
+// igual que «un año», no «uno año»). `enPalabras()` no sabe qué palabra
+// viene después, así que ese apócope no es trabajo suyo: se resuelve en
+// el punto donde se arma la frase — ver `textoMinimoElementos()`, la
+// única llamada de hoy, y la única con un sustantivo masculino pegado.
 const NUMEROS_EN_PALABRAS: Readonly<Record<number, string>> = {
   1: 'uno', 2: 'dos', 3: 'tres', 4: 'cuatro', 5: 'cinco',
   6: 'seis', 7: 'siete', 8: 'ocho', 9: 'nueve', 10: 'diez',
@@ -336,19 +344,47 @@ function enPalabras(n: number): string {
   return NUMEROS_EN_PALABRAS[n] ?? String(n)
 }
 
-/** El botón que agrega un elemento más al final de una lista abierta. */
+/**
+ * «Esta lista necesita al menos un elemento»/«...tres elementos»: el
+ * apócope de «uno» → «un» pasa ACÁ, no en `enPalabras()` — hallazgo del
+ * revisor, ronda de arreglo: las cuatro listas de mínimo 1 (cocoas,
+ * negocios.fichas, negocios.condiciones, fichas[].meta[]) leían «necesita
+ * al menos UNO elemento», con la forma canónica en vez de la apocopada.
+ * Verificado que `enPalabras()` no se usa en ningún otro lugar del
+ * repo antes de tocar esto — si mañana gana un segundo llamador sin un
+ * sustantivo masculino atrás, ese llamador sigue recibiendo «uno» sin
+ * cambios, porque el apócope vive acá y no en la raíz.
+ */
+function textoMinimoElementos(minItems: number): string {
+  const numero = minItems === 1 ? 'un' : enPalabras(minItems)
+  const sustantivo = minItems === 1 ? 'elemento' : 'elementos'
+  return `Esta lista necesita al menos ${numero} ${sustantivo}: no se puede borrar más.`
+}
+
+/**
+ * El botón que agrega un elemento más al final de una lista abierta.
+ *
+ * `onAgregado` (no `onCambia` a secas, como tenía antes de la ronda de
+ * arreglo) le entrega al que llama, además del documento nuevo, el ÍNDICE
+ * donde quedó el elemento agregado — el largo ACTUAL de la lista, ya que
+ * `agregarItem()` siempre agrega al final —, para que quien tenga el
+ * estado de selección (`AltaBajaDeItem()`, más abajo) pueda pararse en él.
+ * Sin esto, agregar no cambiaba nada en pantalla: el ítem nuevo entraba
+ * calladito al fondo del cajón, sin resaltar y sin seleccionarse —
+ * hallazgo del revisor, ronda de arreglo sobre la Tarea 7.
+ */
 function BotonAgregarLista({
   documentos,
   documento,
   rutaLista,
   info,
-  onCambia,
+  onAgregado,
 }: {
   documentos: Documentos
   documento: IdDocumento
   rutaLista: string
   info: ListaAbierta
-  onCambia: (documentos: Documentos) => void
+  onAgregado: (documentos: Documentos, indiceNuevo: number) => void
 }) {
   const habilitado = puedeAgregar(documentos, documento, rutaLista)
   return (
@@ -357,7 +393,10 @@ function BotonAgregarLista({
         type="button"
         className="panel-boton panel-boton-agregar"
         disabled={!habilitado}
-        onClick={() => onCambia(agregarItem(documentos, documento, rutaLista))}
+        onClick={() => {
+          const indiceNuevo = (leer(documentos[documento], rutaLista) as unknown[]).length
+          onAgregado(agregarItem(documentos, documento, rutaLista), indiceNuevo)
+        }}
       >
         {`Agregar a «${info.etiqueta}»`}
       </button>
@@ -465,7 +504,7 @@ function BotonBorrarItem({
       )}
       {!habilitado && (
         <p className="panel-aviso">
-          {`Esta lista necesita al menos ${enPalabras(info.minItems)} elemento${info.minItems === 1 ? '' : 's'}: no se puede borrar más.`}
+          {textoMinimoElementos(info.minItems)}
         </p>
       )}
     </div>
@@ -479,17 +518,24 @@ function BotonBorrarItem({
  * repetible, así que "agregar/quitar" no tiene sentido acá), el aviso fijo
  * (el ítem SÍ es de una lista repetible, pero cerrada: nueve de las
  * catorce), o los botones reales (una de las cinco abiertas).
+ *
+ * `onElegir` es el mismo `elegirNivel1()` que ya usa `ListaDeItems`: acá
+ * se reutiliza para pararla en el ítem RECIÉN agregado, en vez de dejarla
+ * mirando el que ya tenía elegido mientras el nuevo entra calladito al
+ * fondo del cajón.
  */
 function AltaBajaDeItem({
   documentos,
   itemElegido,
   abiertas,
   onCambia,
+  onElegir,
 }: {
   documentos: Documentos
   itemElegido: ItemNavegable
   abiertas: readonly ListaAbierta[]
   onCambia: (documentos: Documentos) => void
+  onElegir: (clave: string) => void
 }) {
   if (esSuelto(itemElegido.clave)) return null
   const documento = itemElegido.campos[0]?.documento
@@ -503,7 +549,16 @@ function AltaBajaDeItem({
   if (!info) return <p className="panel-aviso">{AVISO_ALTA_BAJA}</p>
   return (
     <div className="panel-lista-alta-baja">
-      <BotonAgregarLista documentos={documentos} documento={documento} rutaLista={rutaLista} info={info} onCambia={onCambia} />
+      <BotonAgregarLista
+        documentos={documentos}
+        documento={documento}
+        rutaLista={rutaLista}
+        info={info}
+        onAgregado={(documentosNuevos, indiceNuevo) => {
+          onCambia(documentosNuevos)
+          onElegir(`${documento} ${rutaLista}.${indiceNuevo}`)
+        }}
+      />
       <BotonBorrarItem
         key={rutaItem}
         documentos={documentos}
@@ -550,7 +605,19 @@ function AltaBajaDeMeta({
   const pares = (leer(documentos.fichas, rutaLista) as unknown[][] | undefined) ?? []
   return (
     <div className="panel-lista-alta-baja">
-      <BotonAgregarLista documentos={documentos} documento="fichas" rutaLista={rutaLista} info={info} onCambia={onCambia} />
+      {/*
+        Acá no hace falta "pararse en el nuevo": los pares de "Datos de
+        cabecera" no son ítems navegables (Tarea 7, ver el docstring de
+        arriba) — el par nuevo aparece de una en esta misma vista, sin
+        necesitar que se mueva ninguna selección.
+      */}
+      <BotonAgregarLista
+        documentos={documentos}
+        documento="fichas"
+        rutaLista={rutaLista}
+        info={info}
+        onAgregado={onCambia}
+      />
       {pares.map((par, indice) => {
         const rutaItem = `${rutaLista}.${indice}`
         const crudo = typeof par?.[0] === 'string' ? par[0].trim() : ''
@@ -836,7 +903,13 @@ export default function Puerta({
                 rutaContexto={itemElegido.campos[0]?.grupo?.ruta}
                 onCambio={alCambiarValor}
               />
-              <AltaBajaDeItem documentos={documentos} itemElegido={itemElegido} abiertas={abiertas} onCambia={onCambia} />
+              <AltaBajaDeItem
+                documentos={documentos}
+                itemElegido={itemElegido}
+                abiertas={abiertas}
+                onCambia={onCambia}
+                onElegir={elegirNivel1}
+              />
             </>
           )}
         </div>

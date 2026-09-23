@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach } from 'vitest'
-import { createElement } from 'react'
+import { createElement, useState } from 'react'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import { contenidoPublicado, leer, type Documentos } from '@/panel/campos'
 import { ETIQUETA_DE_PUERTA, AVISO_DE_PUERTA } from '@/panel/puertas'
@@ -20,6 +20,24 @@ afterEach(cleanup)
  */
 const pintar = (onCambia: (documentos: Documentos) => void = () => {}) =>
   render(createElement(Puerta, { documentos: contenidoPublicado(), onCambia }))
+
+/*
+ * Un componente CONTROLADO de verdad, con `useState` propio y `onCambia`
+ * actualizándolo — el mismo camino que va a recorrer `Sesion.tsx` en la
+ * Tarea 8, y el que un test con `cleanup()` + `render()` de nuevo + un
+ * `onCambia` que solo reasigna una variable de afuera NUNCA ejercita: ese
+ * patrón arma su propio mundo, donde la pantalla se vuelve a montar desde
+ * cero con el documento que YA trae el cambio, en vez de dejar que
+ * `Puerta` reaccione sola a un `documentos` que cambia debajo suyo. Ronda
+ * de arreglo del revisor sobre la Tarea 7: así fue como el bug real
+ * ("agregar no mueve la selección") se le escapó a mi primer test, que sí
+ * pasaba porque nunca recorría el camino real.
+ */
+function PuertaControlada({ inicial }: { inicial: Documentos }) {
+  const [documentos, setDocumentos] = useState(inicial)
+  return createElement(Puerta, { documentos, onCambia: setDocumentos })
+}
+const pintarControlada = () => render(createElement(PuertaControlada, { inicial: contenidoPublicado() }))
 
 describe('la pantalla de puertas', () => {
   it('ofrece las cinco puertas por su nombre', () => {
@@ -221,6 +239,23 @@ describe('agregar y borrar', () => {
     expect(screen.getByText(/necesita al menos tres/i)).toBeTruthy()
   })
 
+  /*
+   * Ronda de arreglo del revisor: «necesita al menos UNO elemento» está
+   * mal —corresponde el apócope «un», delante de un sustantivo masculino
+   * («un elemento», nunca «uno elemento», igual que «un año»)—. Afecta a
+   * las cuatro listas de mínimo 1 (todas menos preguntas, que tiene
+   * mínimo 3 y ya está cubierta arriba); cocoas alcanza para probarlo.
+   */
+  it('en el mínimo de una lista de mínimo uno, dice "un elemento", con apócope', () => {
+    let docs = contenidoPublicado()
+    docs = quitarItem(docs, 'sitio', 'cocoas.lista.0')
+    render(createElement(Puerta, { documentos: docs, onCambia: () => {} }))
+    fireEvent.click(screen.getByText(ETIQUETA_DE_PUERTA.productos))
+    fireEvent.click(screen.getByText('Cocoa alcalina'))
+    expect(screen.getByText(/necesita al menos un elemento/i)).toBeTruthy()
+    expect(screen.queryByText(/uno elemento/i)).toBeNull()
+  })
+
   it('en un sabor del anaquel no hay botón de agregar ni de borrar', () => {
     pintar()
     fireEvent.click(screen.getByText(ETIQUETA_DE_PUERTA.productos))
@@ -229,22 +264,58 @@ describe('agregar y borrar', () => {
     expect(screen.queryByRole('button', { name: /borrar/i })).toBeNull()
   })
 
-  it('un ítem recién agregado avisa cuántos datos le faltan para poder publicarse', () => {
-    let docs = contenidoPublicado()
-    render(createElement(Puerta, { documentos: docs, onCambia: (d: typeof docs) => { docs = d } }))
+  /*
+   * Ronda de arreglo del revisor: agregar dejaba la pantalla parada en el
+   * ítem VIEJO — el nuevo entraba calladito al fondo del cajón, sin
+   * resaltar y sin seleccionarse. Mi primer test de esta tarea no lo
+   * agarró porque usaba `cleanup()` + `render()` de nuevo + navegación a
+   * mano hasta "(sin nombre)": un mundo donde la función YA andaba, no el
+   * mundo real, donde `Puerta` reacciona sola al `documentos` que le
+   * llega. Este test usa `pintarControlada()` — sin `cleanup()`, sin
+   * segundo `render()`, sin click extra para "encontrar" el ítem nuevo —
+   * y por eso prueba algo.
+   */
+  it('después de agregar, la pantalla queda parada en el ítem nuevo', () => {
+    pintarControlada()
     fireEvent.click(screen.getByText(ETIQUETA_DE_PUERTA.productos))
     fireEvent.click(screen.getByText('Cocoa natural'))
     fireEvent.click(screen.getByRole('button', { name: /agregar/i }))
-    cleanup()
-    // Se vuelve a pintar con el documento YA actualizado (la cocoa nueva
-    // adentro) y se navega directo a ella — nombre vacío, así que
-    // `itemsDe()` la etiqueta "(sin nombre)" (Tarea 5).
-    render(createElement(Puerta, { documentos: docs, onCambia: () => {} }))
-    fireEvent.click(screen.getByText(ETIQUETA_DE_PUERTA.productos))
-    fireEvent.click(screen.getByText('(sin nombre)'))
-    // Sin tocar NINGÚN campo: el resumen ya está a la vista. Los cinco
-    // campos de una cocoa arrancan vacíos (Tarea 3), así que faltan los 5.
+    // Sin ningún click de más: la fila "(sin nombre)" ya está marcada
+    // como la elegida en el cajón...
+    const filaNueva = screen.getByText('(sin nombre)').closest('button')
+    expect(filaNueva?.getAttribute('aria-current')).toBe('true')
+    // ...la fila de "Cocoa natural" sigue en el cajón (no se borró nada),
+    // pero YA NO es la elegida...
+    const filaVieja = screen.getByText('Cocoa natural').closest('button')
+    expect(filaVieja?.getAttribute('aria-current')).toBeNull()
+    // ...y el formulario que se ve es el de la cocoa NUEVA (vacía), no el
+    // de "Cocoa natural": solo se dibuja UN ítem a la vez, y el campo
+    // "Nombre de la cocoa" en pantalla está vacío.
+    const nombre = screen.getByLabelText(/nombre de la cocoa/i) as HTMLInputElement
+    expect(nombre.value).toBe('')
+    // Y el resumen de faltantes (Tarea 7) ya está a la vista, sin tocar
+    // ningún campo: los cinco de una cocoa arrancan vacíos.
     expect(screen.getByText(/Faltan 5 datos para poder publicar/)).toBeTruthy()
+  })
+
+  /*
+   * El revisor pidió que este caso también quedara cubierto con el mismo
+   * andamio, aunque ya lo había verificado a mano: borrar el ÚLTIMO ítem
+   * de una lista deja `elegido1` apuntando a una clave que ya no existe, y
+   * el `useEffect` de reselección (`Puerta.tsx`) tiene que sacarla de ahí.
+   */
+  it('después de borrar el último ítem de la lista, la pantalla no se queda en blanco', () => {
+    pintarControlada()
+    fireEvent.click(screen.getByText(ETIQUETA_DE_PUERTA.productos))
+    fireEvent.click(screen.getByText('Cocoa alcalina'))
+    fireEvent.click(screen.getByRole('button', { name: /borrar/i }))
+    fireEvent.change(screen.getByLabelText(/escribe el nombre/i), { target: { value: 'Cocoa alcalina' } })
+    fireEvent.click(screen.getByRole('button', { name: /confirmar/i }))
+    // Sin "Cocoa alcalina" (ya borrada), lo único que puede quedar
+    // elegido es "Cocoa natural" — y el formulario lo confirma.
+    expect(screen.queryByText('Cocoa alcalina')).toBeNull()
+    const nombre = screen.getByLabelText(/nombre de la cocoa/i) as HTMLInputElement
+    expect(nombre.value).toBe('Cocoa natural')
   })
 
   it('los textos nuevos de agregar/borrar no traen jerga técnica', () => {
