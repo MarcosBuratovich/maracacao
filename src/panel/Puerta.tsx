@@ -42,10 +42,10 @@
  * ahora el alta y la baja las hace Marcos, para que la ausencia del botón
  * se lea como una decisión y no como un error del panel.
  */
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
-  campos, escribirValor,
-  type CampoEditable, type Documentos,
+  campos, escribirValor, leer,
+  type CampoEditable, type Documentos, type IdDocumento,
 } from './campos'
 import {
   camposDePuerta, PUERTAS, ETIQUETA_DE_PUERTA, AVISO_DE_PUERTA,
@@ -53,6 +53,10 @@ import {
 } from './puertas'
 import ListaDeItems, { itemsDe, type ItemNavegable } from './ListaDeItems'
 import Campo from './Campo'
+import {
+  agregarItem, quitarItem, puedeAgregar, puedeBorrar, listasAbiertas,
+  type ListaAbierta,
+} from './listas'
 
 /*
  * ---------------------------------------------------------------------
@@ -63,13 +67,17 @@ import Campo from './Campo'
 const TITULO_PUERTAS = '¿Qué quieres editar?'
 
 /**
- * Por ahora, ni un solo botón de agregar/quitar vive en esta pantalla —
- * llega recién en la Tarea 7. Sin este aviso, un cajón sin botón de alta se
- * lee como un error del panel; con él, se lee como lo que es: todavía no
- * se puede desde acá, y hay a quién escribirle. El mismo texto sirve para
- * cualquier puerta a propósito: hoy es cierto en las cinco por igual,
- * cocoas incluidas (Tarea 3 la dejó lista para dar de alta sola, pero esta
- * pantalla no le puso botón todavía).
+ * Tarea 7: ahora SÍ hay botón de agregar/quitar, pero solo en las cinco
+ * listas que `listasAbiertas()` (Tarea 3) marca como enteras de ella. Este
+ * aviso ya NO es un texto de puerta —sería falso en cocoas, preguntas,
+ * condiciones de mayoreo, el semáforo y los datos de cabecera de una
+ * ficha, que SÍ tienen botón— así que se dibuja por ÍTEM elegido, no por
+ * puerta: solo cuando el ítem que ella está mirando pertenece a una de las
+ * OTRAS nueve listas repetibles (sabores, gotas, polvo, recetas, los pasos
+ * de «Cómo catar», los enlaces del menú, los productos del pie, las
+ * fichas mismas y sus secciones). Ver `AltaBajaDeItem()`/`AltaBajaDeMeta()`
+ * más abajo, que deciden esto llamando a `puedeAgregar()`/`puedeBorrar()`
+ * en vez de a una lista fija escrita a mano.
  */
 const AVISO_ALTA_BAJA =
   'Agregar o quitar un elemento de esta lista todavía no se puede desde el panel: esos los da de alta Marcos. Escríbele si necesitas uno nuevo.'
@@ -208,6 +216,16 @@ function primeroReal(items: readonly ItemNavegable[]): ItemNavegable | undefined
  */
 
 /**
+ * «Falta 1 dato»/«Faltan 3 datos», nunca «Faltan 1 datos»: la única
+ * diferencia entre singular y plural de esta frase.
+ */
+function textoResumenDeFaltantes(faltan: number, etiqueta: string): string {
+  return faltan === 1
+    ? `Falta 1 dato para poder publicar «${etiqueta}».`
+    : `Faltan ${faltan} datos para poder publicar «${etiqueta}».`
+}
+
+/**
  * Dibuja los campos de un ítem ya elegido, con un encabezado chico cada vez
  * que aparece un grupo más adentro del que ella ya eligió — el caso real es
  * un bloque (párrafo/lista/tabla) DENTRO de una sección de ficha, para que
@@ -215,19 +233,36 @@ function primeroReal(items: readonly ItemNavegable[]): ItemNavegable | undefined
  * cualquier ítem de las otras cuatro puertas esto nunca dibuja un
  * encabezado: `itemsDe()` ya agrupó esos campos por su único grupo, así que
  * `campo.grupo.ruta` nunca cambia dentro de un mismo ítem.
+ *
+ * Arriba de todo, un resumen a nivel de ÍTEM cuando algo de acá adentro
+ * todavía no puede publicarse (`gravedad: 'impide'`) — hallazgo de la
+ * ronda de arreglo de la Tarea 6: `agregarItem()` (Tarea 3) crea un ítem
+ * con `''`/`null` en todos sus campos A PROPÓSITO, y `Campo` (ronda de
+ * arreglo de la Tarea 4) se calla hasta que ella sale de CADA campo por
+ * primera vez. Sin este resumen, ella agrega una cocoa, ve casillas
+ * vacías sin ningún aviso, y se entera recién al publicar. Cuenta CAMPOS,
+ * no problemas —un campo puede traer más de uno, pero «faltan 3 datos»
+ * tiene que decir cuántos CAMPOS bloquean, no cuántos problemas hay— y
+ * usa el mismo `campo.validar()` que ya usa `Campo`, nunca una lista
+ * propia de qué falta: si el esquema cambia qué es obligatorio, este
+ * resumen lo sigue solo.
  */
 function FormularioDeCampos({
   campos: lista,
+  etiqueta,
   rutaContexto,
   onCambio,
 }: {
   campos: readonly CampoEditable[]
+  etiqueta: string
   rutaContexto: string | undefined
   onCambio: (campo: CampoEditable, valor: unknown) => void
 }) {
   let grupoAbierto: string | undefined
+  const faltan = lista.filter((c) => c.validar(c.valor).some((p) => p.gravedad === 'impide')).length
   return (
     <div className="panel-puerta-campos">
+      {faltan > 0 && <p className="panel-aviso">{textoResumenDeFaltantes(faltan, etiqueta)}</p>}
       {lista.map((campo) => {
         const clave = `${campo.documento} ${campo.ruta}`
         const esSubgrupo = campo.grupo !== undefined && campo.grupo.ruta !== rutaContexto
@@ -238,6 +273,292 @@ function FormularioDeCampos({
             {abreGrupo && <h3 className="panel-grupo-titulo">{campo.grupo!.etiqueta}</h3>}
             <Campo campo={campo} onCambio={(valor) => onCambio(campo, valor)} />
           </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/*
+ * ---------------------------------------------------------------------
+ * Alta y baja de ítems (Tarea 7): solo en las cinco listas de `listas.ts`
+ * ---------------------------------------------------------------------
+ *
+ * `listasAbiertas()` (Tarea 3) da, por lista abierta, su ruta de ESQUEMA
+ * ('cocoas.lista[]', 'fichas[].meta[]'): con corchetes en vez de índices.
+ * Lo que tiene esta pantalla es la ruta CONCRETA del ítem que ella está
+ * mirando ('cocoas.lista.0', 'fichas.0.meta.2'): con índices en vez de
+ * corchetes. `buscarListaAbierta()` los empareja DESPOJANDO ambas formas a
+ * una tercera, neutral, en vez de reconstruir la conversión índice→corchete
+ * de `listas.ts` (esa lógica es privada de ese módulo a propósito, y
+ * repetirla acá es un lugar más donde podría desalinearse si cambia).
+ */
+
+/** 'cocoas.lista[]' → 'cocoas.lista'; 'fichas[].meta[]' → 'fichas.meta'. */
+function sinCorchetes(rutaEsquema: string): string {
+  return rutaEsquema.replace(/\[\]/g, '')
+}
+
+/** 'cocoas.lista.0' → 'cocoas.lista'; 'fichas.0.meta' → 'fichas.meta'. */
+function sinIndices(rutaConcreta: string): string {
+  return rutaConcreta
+    .split('.')
+    .filter((parte) => !/^\d+$/.test(parte))
+    .join('.')
+}
+
+/** La lista abierta que le corresponde a esta ruta concreta, si hay una. */
+function buscarListaAbierta(
+  abiertas: readonly ListaAbierta[],
+  documento: IdDocumento,
+  rutaListaConcreta: string,
+): ListaAbierta | undefined {
+  const objetivo = sinIndices(rutaListaConcreta)
+  return abiertas.find((l) => l.documento === documento && sinCorchetes(l.rutaEsquema) === objetivo)
+}
+
+// Los cinco `minItems`/maxItems de hoy son chicos (1 o 3) — un número
+// escrito con letra se lee más natural que un dígito solo en una frase
+// («necesita al menos tres», no «necesita al menos 3»). Más allá de diez
+// cae al dígito: ninguna de las cinco listas llega ni cerca.
+const NUMEROS_EN_PALABRAS: Readonly<Record<number, string>> = {
+  1: 'uno', 2: 'dos', 3: 'tres', 4: 'cuatro', 5: 'cinco',
+  6: 'seis', 7: 'siete', 8: 'ocho', 9: 'nueve', 10: 'diez',
+}
+function enPalabras(n: number): string {
+  return NUMEROS_EN_PALABRAS[n] ?? String(n)
+}
+
+/** El botón que agrega un elemento más al final de una lista abierta. */
+function BotonAgregarLista({
+  documentos,
+  documento,
+  rutaLista,
+  info,
+  onCambia,
+}: {
+  documentos: Documentos
+  documento: IdDocumento
+  rutaLista: string
+  info: ListaAbierta
+  onCambia: (documentos: Documentos) => void
+}) {
+  const habilitado = puedeAgregar(documentos, documento, rutaLista)
+  return (
+    <div className="panel-lista-agregar">
+      <button
+        type="button"
+        className="panel-boton panel-boton-agregar"
+        disabled={!habilitado}
+        onClick={() => onCambia(agregarItem(documentos, documento, rutaLista))}
+      >
+        {`Agregar a «${info.etiqueta}»`}
+      </button>
+      {!habilitado && (
+        <p className="panel-aviso">
+          {`Esta lista ya llegó a su máximo de ${info.maxItems} elementos: no se puede agregar otro.`}
+        </p>
+      )}
+    </div>
+  )
+}
+
+/**
+ * El botón que borra UN elemento de una lista abierta — nunca con un
+ * «¿estás seguro?» que se contesta sin leer: pide escribir el nombre del
+ * elemento tal como se ve en pantalla. Borrar nunca toca `publicacion.ts`
+ * ni `borrador.ts`: solo llama a `onCambia()`, igual que cualquier otro
+ * cambio de un campo — queda en el borrador hasta que ella toque
+ * «Publicar», con el deshacer de media hora de la Tarea 1 (fase 7) intacto.
+ *
+ * Cuando la lista está en su mínimo, el botón se DESHABILITA — no
+ * desaparece — y dice por qué: que desaparezca deja a alguien buscando un
+ * botón que existía hace un minuto.
+ */
+function BotonBorrarItem({
+  documentos,
+  documento,
+  rutaLista,
+  rutaItem,
+  nombreItem,
+  info,
+  onCambia,
+}: {
+  documentos: Documentos
+  documento: IdDocumento
+  rutaLista: string
+  rutaItem: string
+  nombreItem: string
+  info: ListaAbierta
+  onCambia: (documentos: Documentos) => void
+}) {
+  const [confirmando, setConfirmando] = useState(false)
+  const [nombreEscrito, setNombreEscrito] = useState('')
+  const [noCoincide, setNoCoincide] = useState(false)
+  const habilitado = puedeBorrar(documentos, documento, rutaLista)
+  const idNombre = `panel-borrar-nombre-${documento}-${rutaItem}`
+
+  function cancelar() {
+    setConfirmando(false)
+    setNombreEscrito('')
+    setNoCoincide(false)
+  }
+
+  function confirmar() {
+    if (nombreEscrito.trim() !== nombreItem.trim()) {
+      setNoCoincide(true)
+      return
+    }
+    onCambia(quitarItem(documentos, documento, rutaItem))
+    cancelar()
+  }
+
+  return (
+    <div className="panel-lista-borrar">
+      {!confirmando ? (
+        // El texto NO lleva el nombre del ítem (a diferencia del párrafo de
+        // confirmación, de acá abajo): el nombre real vive TAMBIÉN en el
+        // cajón de la izquierda («Cocoa natural», etc.), y repetirlo acá le
+        // da a `getByText()` dos lugares donde matchear el mismo texto —lo
+        // encontré corriendo el test 1 del despacho, que elige el ítem por
+        // su nombre y por eso necesita que ese nombre sea único en pantalla.
+        <button
+          type="button"
+          className="panel-boton panel-boton-borrar"
+          disabled={!habilitado}
+          onClick={() => setConfirmando(true)}
+        >
+          Borrar este elemento
+        </button>
+      ) : (
+        <div className="panel-confirmar-borrado">
+          <p>{`Para borrar «${nombreItem}», escribe su nombre exactamente como aparece.`}</p>
+          <label htmlFor={idNombre}>Escribe el nombre para confirmar</label>
+          <input
+            id={idNombre}
+            type="text"
+            value={nombreEscrito}
+            onChange={(e) => {
+              setNombreEscrito(e.target.value)
+              setNoCoincide(false)
+            }}
+          />
+          <button type="button" className="panel-boton" onClick={confirmar}>
+            Confirmar
+          </button>
+          <button type="button" className="panel-enlace-discreto" onClick={cancelar}>
+            Cancelar
+          </button>
+          {noCoincide && (
+            <p className="panel-campo-error" role="alert">
+              Lo que escribiste no coincide con el nombre: no se borró nada.
+            </p>
+          )}
+        </div>
+      )}
+      {!habilitado && (
+        <p className="panel-aviso">
+          {`Esta lista necesita al menos ${enPalabras(info.minItems)} elemento${info.minItems === 1 ? '' : 's'}: no se puede borrar más.`}
+        </p>
+      )}
+    </div>
+  )
+}
+
+/**
+ * El bloque de alta/baja para el ítem que ella está mirando en una de las
+ * cuatro puertas «de dos niveles» (todo menos fichas). Tres resultados:
+ * nada (está en el balde de "sueltos": no es un ítem de una lista
+ * repetible, así que "agregar/quitar" no tiene sentido acá), el aviso fijo
+ * (el ítem SÍ es de una lista repetible, pero cerrada: nueve de las
+ * catorce), o los botones reales (una de las cinco abiertas).
+ */
+function AltaBajaDeItem({
+  documentos,
+  itemElegido,
+  abiertas,
+  onCambia,
+}: {
+  documentos: Documentos
+  itemElegido: ItemNavegable
+  abiertas: readonly ListaAbierta[]
+  onCambia: (documentos: Documentos) => void
+}) {
+  if (itemElegido.clave === 'sueltos') return null
+  const documento = itemElegido.campos[0]?.documento
+  if (!documento) return null
+  // `itemElegido.clave` es '<documento> <rutaConcreta>' (ver `itemsDe()`
+  // en `ListaDeItems.tsx`): sacar el prefijo del documento y el espacio
+  // que lo separa da la ruta concreta del ítem.
+  const rutaItem = itemElegido.clave.slice(documento.length + 1)
+  const rutaLista = rutaItem.split('.').slice(0, -1).join('.')
+  const info = buscarListaAbierta(abiertas, documento, rutaLista)
+  if (!info) return <p className="panel-aviso">{AVISO_ALTA_BAJA}</p>
+  return (
+    <div className="panel-lista-alta-baja">
+      <BotonAgregarLista documentos={documentos} documento={documento} rutaLista={rutaLista} info={info} onCambia={onCambia} />
+      <BotonBorrarItem
+        key={rutaItem}
+        documentos={documentos}
+        documento={documento}
+        rutaLista={rutaLista}
+        rutaItem={rutaItem}
+        nombreItem={itemElegido.etiqueta}
+        info={info}
+        onCambia={onCambia}
+      />
+    </div>
+  )
+}
+
+/**
+ * El bloque de alta/baja para «Datos generales de la ficha»: la QUINTA
+ * lista abierta, `fichas[].meta[]` — los pares «Nombre del dato / Valor
+ * del dato» del encabezado. A diferencia de las otras cuatro, el elemento
+ * de esta lista es una TUPLA sin `nombra()` (ver `fichas.ts`), así que
+ * `campo.grupo` nunca se completa para sus campos y no aparecen como
+ * ítems navegables propios — viven adentro del balde "Datos generales",
+ * mezclados con el nombre del producto y la denominación legal. Por eso
+ * este bloque no reutiliza `AltaBajaDeItem()`: agrega UN botón para toda
+ * la lista y un botón de borrar POR PAR, leyendo los pares directo del
+ * documento con `leer()`.
+ */
+function AltaBajaDeMeta({
+  documentos,
+  rutaFicha,
+  abiertas,
+  onCambia,
+}: {
+  documentos: Documentos
+  rutaFicha: string
+  abiertas: readonly ListaAbierta[]
+  onCambia: (documentos: Documentos) => void
+}) {
+  const rutaLista = `${rutaFicha}.meta`
+  const info = buscarListaAbierta(abiertas, 'fichas', rutaLista)
+  // No debería pasar — 'fichas[].meta[]' es una de las cinco abiertas por
+  // diseño — pero si el día de mañana deja de estarlo, mejor no mostrar
+  // nada que mostrar un botón que tira al tocarlo.
+  if (!info) return null
+  const pares = (leer(documentos.fichas, rutaLista) as unknown[][] | undefined) ?? []
+  return (
+    <div className="panel-lista-alta-baja">
+      <BotonAgregarLista documentos={documentos} documento="fichas" rutaLista={rutaLista} info={info} onCambia={onCambia} />
+      {pares.map((par, indice) => {
+        const rutaItem = `${rutaLista}.${indice}`
+        const crudo = typeof par?.[0] === 'string' ? par[0].trim() : ''
+        const nombre = crudo.length > 0 ? crudo : SIN_NOMBRE
+        return (
+          <BotonBorrarItem
+            key={rutaItem}
+            documentos={documentos}
+            documento="fichas"
+            rutaLista={rutaLista}
+            rutaItem={rutaItem}
+            nombreItem={nombre}
+            info={info}
+            onCambia={onCambia}
+          />
         )
       })}
     </div>
@@ -298,6 +619,25 @@ export default function Puerta({
     [puerta, camposPuerta],
   )
   const itemElegido = puerta && puerta !== 'fichas' ? (items.find((i) => i.clave === elegido1) ?? null) : null
+
+  // Solo depende del ESQUEMA (Tarea 3), no de `documentos`: se calcula una
+  // sola vez, no en cada tecla.
+  const abiertas = useMemo(() => listasAbiertas(), [])
+
+  /**
+   * Borrar el ÚLTIMO ítem de una lista dentro de las cuatro puertas "de dos
+   * niveles" deja `elegido1` apuntando a una clave que ya no existe —
+   * borrar cualquier otro ítem no tiene este problema: como la clave lleva
+   * el ÍNDICE, lo que estaba un lugar más atrás ocupa la misma clave y
+   * sigue eligiéndose solo. Sin este efecto, la pantalla se queda en
+   * blanco después de borrar el último elemento de una lista.
+   */
+  useEffect(() => {
+    if (!puerta || puerta === 'fichas') return
+    if (items.length === 0) return
+    if (items.some((i) => i.clave === elegido1)) return
+    setElegido1(primeroReal(items)?.clave ?? null)
+  }, [puerta, items, elegido1])
 
   function alCambiarValor(campo: CampoEditable, valor: unknown) {
     onCambia(escribirValor(documentos, campo, valor))
@@ -393,7 +733,6 @@ export default function Puerta({
       <div className="panel-puerta">
         <CabeceraDePuerta titulo={ETIQUETA_DE_PUERTA.fichas} onVolver={volverAPuertas} />
         {avisoDePuerta && <AvisoDePuerta texto={avisoDePuerta} />}
-        {nivel1Fichas.length > 1 && <p className="panel-aviso">{AVISO_ALTA_BAJA}</p>}
 
         <div className="panel-puerta-cuerpo">
           <ListaDeItems
@@ -405,7 +744,12 @@ export default function Puerta({
           />
           <div className="panel-puerta-contenido">
             {fichaElegida !== null && !esFichaReal && (
-              <FormularioDeCampos campos={fichaElegida.campos} rutaContexto={undefined} onCambio={alCambiarValor} />
+              <FormularioDeCampos
+                campos={fichaElegida.campos}
+                etiqueta={fichaElegida.etiqueta}
+                rutaContexto={undefined}
+                onCambio={alCambiarValor}
+              />
             )}
 
             {fichaElegida !== null && esFichaReal && (
@@ -423,11 +767,31 @@ export default function Puerta({
                     {seccionElegida === null ? (
                       <p className="panel-aviso">{AVISO_SIN_SECCION}</p>
                     ) : (
-                      <FormularioDeCampos
-                        campos={seccionElegida.campos}
-                        rutaContexto={seccionElegida.clave}
-                        onCambio={alCambiarValor}
-                      />
+                      <>
+                        <FormularioDeCampos
+                          campos={seccionElegida.campos}
+                          etiqueta={seccionElegida.etiqueta}
+                          rutaContexto={seccionElegida.clave}
+                          onCambio={alCambiarValor}
+                        />
+                        {/*
+                          "Datos generales de la ficha" (Tarea 6) es el
+                          ÚNICO ítem de nivel 2 cuya clave es la ruta de la
+                          FICHA misma (ver `seccionesDe()`, más arriba): ahí
+                          adentro viven los pares de "Datos de cabecera"
+                          (`fichas[].meta[]`), la quinta lista abierta.
+                          Ninguna sección real (`fichas.<i>.secciones.<j>`)
+                          entra acá.
+                        */}
+                        {seccionElegida.clave === fichaElegida.clave && (
+                          <AltaBajaDeMeta
+                            documentos={documentos}
+                            rutaFicha={fichaElegida.clave}
+                            abiertas={abiertas}
+                            onCambia={onCambia}
+                          />
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -448,7 +812,6 @@ export default function Puerta({
     <div className="panel-puerta">
       <CabeceraDePuerta titulo={ETIQUETA_DE_PUERTA[puerta]} onVolver={volverAPuertas} />
       {avisoDePuerta && <AvisoDePuerta texto={avisoDePuerta} />}
-      {items.length > 1 && <p className="panel-aviso">{AVISO_ALTA_BAJA}</p>}
       <div className="panel-puerta-cuerpo">
         <ListaDeItems
           items={items}
@@ -459,11 +822,15 @@ export default function Puerta({
         />
         <div className="panel-puerta-contenido">
           {itemElegido !== null && (
-            <FormularioDeCampos
-              campos={itemElegido.campos}
-              rutaContexto={itemElegido.campos[0]?.grupo?.ruta}
-              onCambio={alCambiarValor}
-            />
+            <>
+              <FormularioDeCampos
+                campos={itemElegido.campos}
+                etiqueta={itemElegido.etiqueta}
+                rutaContexto={itemElegido.campos[0]?.grupo?.ruta}
+                onCambio={alCambiarValor}
+              />
+              <AltaBajaDeItem documentos={documentos} itemElegido={itemElegido} abiertas={abiertas} onCambia={onCambia} />
+            </>
           )}
         </div>
       </div>
