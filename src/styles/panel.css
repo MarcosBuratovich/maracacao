@@ -216,6 +216,36 @@
   border-left: 3px solid var(--mrc-marca-bandaCalida);
 }
 
+/* [Ronda de arreglo final] Los pares de «Datos de cabecera» de una ficha
+   (`DatosGeneralesDeFicha`, en `Puerta.tsx`). El marcado ya los entrega
+   emparejados y con su rótulo; este recuadro es lo que hace que se LEAN
+   como un par en el celular, donde las dos cajas quedan una arriba de la
+   otra y, sin un borde que las junte, la de abajo se confunde con el
+   nombre del par siguiente. Mismo borde y mismo radio que usa una fila del
+   cajón (`.panel-lista-fila`): vocabulario visual ya existente, no uno
+   nuevo. */
+.panel-datos-cabecera {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.panel-dato-par {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 0.9rem;
+  border: 2px solid var(--mrc-marca-bandaCalida);
+  border-radius: 10px;
+}
+
+.panel-dato-par-titulo {
+  margin: 0;
+  font-family: var(--mrc-font-titular);
+  font-weight: 700;
+  font-size: 1rem;
+}
+
 .panel-campo-editable {
   display: flex;
   flex-direction: column;
@@ -446,4 +476,273 @@
   margin: 0.2rem 0 0;
   font-size: 0.85rem;
   color: var(--mrc-marca-textoSuave);
+}
+
+/* Las cinco puertas y lo que hay adentro (Tarea 6, fase 7): el ensamblado
+   que reparte los 692 campos. Mobile-first, como el resto del archivo —
+   acá es donde entra la ÚNICA media query de esta hoja: la lista de ítems
+   de `ListaDeItems.tsx` (Tarea 5) llegó sin estilos a propósito («el CSS
+   responsive todavía no existe», dice su propio comentario) porque el
+   plan de la fase nunca se lo asignó a nadie. Sin esto el cajón EXISTE en
+   el marcado pero no se COMPORTA como cajón: Marcos lo eligió mirando tres
+   maquetas, contra la alternativa de empujar a otra pantalla, así que la
+   diferencia entre "está en el DOM" y "se abre encima del formulario y se
+   cierra sola al elegir" es la decisión entera. */
+
+.panel-puertas {
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  align-items: stretch;
+  text-align: left;
+}
+
+.panel-puertas-lista {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.panel-puerta-boton {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 60px;
+  padding: 0.9rem 1.1rem;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  font-family: var(--mrc-font-titular);
+  color: var(--mrc-marca-tinta);
+  background: var(--mrc-marca-blanco);
+  border: 2px solid var(--mrc-marca-bandaCalida);
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.panel-puerta-boton:active {
+  background: var(--mrc-marca-bandaCalida);
+}
+
+.panel-puerta-boton:focus-visible {
+  outline: 3px solid var(--mrc-marca-rojo);
+  outline-offset: 2px;
+}
+
+.panel-puerta {
+  width: min(720px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  align-items: stretch;
+  text-align: left;
+}
+
+.panel-puerta-cabecera {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: flex-start;
+}
+
+.panel-puerta-subtitulo {
+  font-family: var(--mrc-font-titular);
+  font-weight: 700;
+  font-size: 1.2rem;
+  margin: 0;
+}
+
+/* La advertencia de una puerta (fichas, hoy) tiene que notarse MÁS que un
+   `.panel-aviso` cualquiera: entrar ahí no puede sentirse igual que
+   corregir una errata de la portada. Mismo acento amarillo que ya usa
+   `.panel-avisos` para "revisar antes de publicar" — no uno nuevo. */
+.panel-puerta-advertencia {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  font-weight: 600;
+  color: var(--mrc-marca-tinta);
+  background: var(--mrc-marca-blanco);
+  border: 2px solid var(--mrc-marca-amarillo);
+  border-radius: 10px;
+}
+
+.panel-puerta-cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.panel-puerta-contenido {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.panel-puerta-campos {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+/* `ListaDeItems.tsx` (Tarea 5): la lista al costado en pantalla ancha, el
+   cajón en el celular. `position: relative` ancla el cajón abierto (más
+   abajo) a la caja del BOTÓN, no a `.panel-puerta-cuerpo` entero: el cajón
+   se dibuja con `top: 100%` —arranca justo debajo del botón— y no con
+   `inset: 0` —que lo haría del mismo tamaño que el botón y lo taparía a
+   ÉL también, dejándola sin forma de volver a cerrarlo—. */
+.panel-lista {
+  position: relative;
+  width: 100%;
+}
+
+.panel-lista-boton-cajon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 52px;
+  padding: 0.75rem 1.1rem;
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: var(--mrc-font-titular);
+  color: var(--mrc-marca-tinta);
+  background: var(--mrc-marca-bandaClara);
+  border: 2px solid var(--mrc-marca-textoSuave);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.panel-lista-boton-cajon:focus-visible {
+  outline: 3px solid var(--mrc-marca-rojo);
+  outline-offset: 2px;
+}
+
+/* Cerrada por default en celular. `display: none` la saca del flujo Y del
+   árbol de accesibilidad: con el cajón cerrado, sus filas no las alcanza
+   ni el teclado ni un lector de pantalla — el único camino hacia adentro
+   es el botón de arriba, que para eso lleva `aria-expanded`.
+
+   [Ronda de arreglo final] Acá decía que «el teclado siempre la puede
+   alcanzar», y era falso justamente por este `display: none`. Peor: al
+   elegir una fila, el cajón se cierra y ese mismo `display: none` se come
+   el botón que ella tenía enfocado, así que el foco caía a `<body>` y
+   quien navega con teclado volvía a empezar desde arriba de la página.
+   `ListaDeItems.tsx` ahora devuelve el foco al botón que abre y cierra el
+   cajón, que es el control del que salió y el único que queda en
+   pantalla. */
+.panel-lista-items {
+  display: none;
+}
+
+/* El cajón, abierto: entra POR ENCIMA del formulario —no lo empuja hacia
+   abajo— y se cierra sola en cuanto ella elige un ítem (`ListaDeItems.tsx`
+   ya llama a `onAbrir(false)` en su `elegir()`; acá solo hace falta que
+   "cerrada" vuelva a significar `display: none`). `top: 100%` en vez de
+   `inset: 0`: arranca justo debajo del botón que lo abre y lo cierra —ese
+   botón queda AFUERA de esta caja, en flujo normal, así que sigue visible
+   y tocable con el cajón abierto— y crece hacia abajo, tapando el
+   formulario que sigue después en el marcado. Sin `bottom` fijo, así que
+   `max-height` + `overflow-y` son los que deciden dónde para: una lista de
+   29 ítems (Productos) scrollea adentro del cajón en vez de estirarlo
+   hasta salirse de la pantalla. */
+.panel-lista-items-abierta {
+  display: block;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  margin-top: 0.5rem;
+  max-height: min(70vh, 420px);
+  padding: 0.75rem;
+  overflow-y: auto;
+  background: var(--mrc-marca-crema);
+  border: 2px solid var(--mrc-marca-textoSuave);
+  border-radius: 10px;
+  box-shadow: 0 16px 32px -16px color-mix(in srgb, var(--mrc-marca-oscuro) 65%, transparent);
+}
+
+.panel-lista-ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.panel-lista-fila {
+  display: block;
+  width: 100%;
+  min-height: 52px;
+  padding: 0.7rem 0.9rem;
+  font-size: 1rem;
+  font-family: var(--mrc-font-texto);
+  color: var(--mrc-marca-tinta);
+  text-align: left;
+  background: var(--mrc-marca-blanco);
+  border: 2px solid var(--mrc-marca-bandaCalida);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.panel-lista-fila-activa {
+  font-weight: 700;
+  border-color: var(--mrc-marca-rojo);
+  background: var(--mrc-marca-bandaCalida);
+}
+
+.panel-lista-fila:focus-visible {
+  outline: 3px solid var(--mrc-marca-rojo);
+  outline-offset: 2px;
+}
+
+/* Pantalla ancha: la lista queda fija al costado —Marcos la eligió mirando
+   tres maquetas, contra la alternativa de empujar a otra pantalla— y el
+   botón del cajón, que ahí no hace ninguna falta, desaparece. El punto de
+   corte es el mismo que ya usa `sitio.css` para "celular contra el resto"
+   (767px), no un número nuevo inventado para esta pantalla. */
+@media (min-width: 768px) {
+  .panel-puerta-cuerpo {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .panel-lista {
+    width: 260px;
+    flex: none;
+    position: sticky;
+    top: 0.5rem;
+  }
+
+  .panel-lista-boton-cajon {
+    display: none;
+  }
+
+  /* En escritorio la lista está SIEMPRE a la vista, sin importar
+     `abierta`: las dos clases quedan iguales y dejan de superponerse. */
+  .panel-lista-items,
+  .panel-lista-items-abierta {
+    display: block;
+    position: static;
+    inset: auto;
+    z-index: auto;
+    margin-top: 0;
+    padding: 0;
+    overflow-y: visible;
+    background: none;
+    border: none;
+    box-shadow: none;
+  }
+
+  .panel-puerta-contenido {
+    flex: 1;
+    min-width: 0;
+  }
 }

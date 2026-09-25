@@ -8,10 +8,10 @@
  * `test/panel-borrador.test.ts`/`test/panel-publicacion.test.ts`): se
  * prueba DIRECTO, con un reloj fijo, sin montar nada. Los componentes se
  * prueban con `renderToStaticMarkup` —sin jsdom, mismo criterio que
- * `test/panel-app.test.ts`/`test/panel-editor.test.ts` (léelos): este
- * proyecto no tiene DOM en el harness de test— así que lo que se verifica
- * ahí es comportamiento real (lo que el HTML resultante contiene o no
- * contiene), nunca el texto del archivo fuente.
+ * `test/panel-app.test.ts` (léelo): este proyecto no tiene DOM en el
+ * harness de test para estos casos —así que lo que se verifica ahí es
+ * comportamiento real (lo que el HTML resultante contiene o no contiene),
+ * nunca el texto del archivo fuente.
  */
 import { describe, it, expect } from 'vitest'
 import { createElement } from 'react'
