@@ -101,6 +101,10 @@
   text-decoration: none;
   text-align: center;
   width: 100%;
+  /* [2026-09-28] Tope propio desde que `.panel-sesion` sigue el ancho del
+     navegador: sin esto, «Publicar» pasaba a medir 1400px. No afecta al
+     formulario de entrada, que vive en una caja de 360. */
+  max-width: 26rem;
 }
 
 .panel-boton:active {
@@ -346,8 +350,16 @@
    visual — nada nuevo, los mismos `.panel-boton`/`.panel-aviso`/`.panel-error`
    de arriba, más un puñado de contenedores para agruparlos. */
 
+/* [2026-09-28] Este es el ancho que MANDA: `Puerta` se dibuja adentro de
+   acá (`Sesion.tsx:382`), así que mientras esto midiera 560 daba igual lo
+   que dijera `.panel-puerta` — el ancestro lo recortaba. Ahora sigue el
+   ancho del navegador y solo topa en monitores grandes, donde un renglón
+   de punta a punta deja de leerse.
+   Lo que NO puede estirarse hasta el tope va acotado abajo, uno por uno:
+   un botón de 1400px o un párrafo de 1400px no son más cómodos, son peores. */
 .panel-sesion {
-  width: min(560px, 100%);
+  width: 100%;
+  max-width: 1400px;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
@@ -355,7 +367,12 @@
   text-align: left;
 }
 
+/* Los bloques del flujo de publicar son PÁRRAFOS y listas cortas: estirarlos
+   hasta los 1400 del contenedor los vuelve renglones de punta a punta, que se
+   leen peor. 46rem es la medida a la que un texto sigue siendo cómodo. El
+   editor, en cambio, sí quiere todo el ancho: ahí hay cajas, no prosa. */
 .panel-conflicto {
+  max-width: 46rem;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -367,6 +384,7 @@
 
 .panel-revision,
 .panel-resultado {
+  max-width: 46rem;
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -403,6 +421,7 @@
 }
 
 .panel-boton-deshacer {
+  max-width: 26rem;
   min-height: 52px;
   font-size: 1.0625rem;
   font-weight: 700;
@@ -427,8 +446,12 @@
    estado que probar— con el mismo ancho y alineación a la izquierda que
    `.panel-editor`/`.panel-sesion`. */
 
+/* Mismo ancho que `.panel-sesion`: los dos son bloques hermanos de la misma
+   pantalla (`PantallaEditando`, en `App.tsx`) y con anchos distintos la
+   página queda con dos bordes izquierdos. */
 .panel-historial {
-  width: min(560px, 100%);
+  width: 100%;
+  max-width: 1400px;
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
@@ -541,14 +564,13 @@
   outline-offset: 2px;
 }
 
-/* [2026-09-28] Era `min(720px, 100%)`, y con eso la pantalla se sentía
-   apretada por aritmética, no por gusto: de esos 720 la lista al costado se
-   lleva 260 más 1rem de separación, así que al formulario le quedaban 444 —
-   y en fichas, que tiene DOS listas anidadas (ficha y sección), 168. Más
-   angosto que un celular, mientras 680px de pantalla quedaban vacíos a los
-   costados. Con 1180 el formulario pasa a 904, y el de fichas a 628. */
+/* [2026-09-28] Sin ancho propio a propósito: ocupa el de `.panel-sesion`,
+   que es quien lo contiene y quien pone el tope. Tener DOS topes fue el
+   error de la primera pasada — se subió éste a 1180 mientras el de arriba
+   seguía en 560, así que no cambió nada y encima el formulario, que no
+   entraba al lado de la lista, se fue abajo de una lista de 35 ítems. */
 .panel-puerta {
-  width: min(1180px, 100%);
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
