@@ -249,13 +249,13 @@
 .panel-campo-editable {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.5rem;
   padding-block: 0.25rem;
 }
 
 .panel-campo-etiqueta {
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 1.0625rem;
 }
 
 .panel-campo-sufijo {
@@ -265,15 +265,15 @@
 
 .panel-campo-ayuda {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   color: var(--mrc-marca-textoSuave);
 }
 
 .panel-campo-input,
 .panel-campo-textarea {
-  font-size: 1.0625rem;
-  min-height: 52px;
-  padding: 0.75rem 0.9rem;
+  font-size: 1.125rem;
+  min-height: 56px;
+  padding: 0.85rem 1rem;
   border: 2px solid var(--mrc-marca-textoSuave);
   border-radius: 10px;
   background: var(--mrc-marca-blanco);
@@ -282,7 +282,15 @@
   width: 100%;
 }
 
+/* [2026-09-28] El `<textarea>` no lleva `rows` en el marcado, así que sin
+   esto heredaba el `min-height: 56px` de arriba y quedaba del alto de un
+   campo de UNA línea: los párrafos largos —la descripción de un producto,
+   el perfil de una cocoa, el cuerpo de una sección de ficha— se editaban
+   por una ranura de un renglón. 8rem son unos cinco renglones, y `resize`
+   sigue dejándola estirarlo si necesita más. */
 .panel-campo-textarea {
+  min-height: 8rem;
+  line-height: 1.5;
   resize: vertical;
 }
 
@@ -533,8 +541,14 @@
   outline-offset: 2px;
 }
 
+/* [2026-09-28] Era `min(720px, 100%)`, y con eso la pantalla se sentía
+   apretada por aritmética, no por gusto: de esos 720 la lista al costado se
+   lleva 260 más 1rem de separación, así que al formulario le quedaban 444 —
+   y en fichas, que tiene DOS listas anidadas (ficha y sección), 168. Más
+   angosto que un celular, mientras 680px de pantalla quedaban vacíos a los
+   costados. Con 1180 el formulario pasa a 904, y el de fichas a 628. */
 .panel-puerta {
-  width: min(720px, 100%);
+  width: min(1180px, 100%);
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
@@ -712,6 +726,11 @@
   .panel-puerta-cuerpo {
     flex-direction: row;
     align-items: flex-start;
+    /* [2026-09-28] Junto con el piso de `.panel-puerta-contenido`: si las
+       listas y el formulario no entran a lo ancho, el formulario BAJA en vez
+       de exprimirse. El caso real es fichas, que tiene dos listas anidadas
+       de 260 y, sin esto, dejaba el formulario en 168px. */
+    flex-wrap: wrap;
   }
 
   .panel-lista {
@@ -741,8 +760,11 @@
     box-shadow: none;
   }
 
+  /* `min-width: 0` era lo que PERMITÍA que se aplastara: un hijo flex sin
+     piso cede todo el ancho que haga falta. 420px es el piso por debajo del
+     cual un campo con su etiqueta, su ayuda y su contador deja de leerse. */
   .panel-puerta-contenido {
     flex: 1;
-    min-width: 0;
+    min-width: 420px;
   }
 }
